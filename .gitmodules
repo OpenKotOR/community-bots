@@ -1,0 +1,6 @@
+[submodule "vendor/ai-researchwizard"]
+	path = vendor/ai-researchwizard
+	url = https://github.com/bolabaden/ai-researchwizard.git
+[submodule "vendor/llm_fallbacks"]
+	path = vendor/llm_fallbacks
+	url = https://github.com/bolabaden/llm_fallbacks.git
