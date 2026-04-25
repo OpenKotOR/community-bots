@@ -24,3 +24,4 @@ scripts/run_ghidra_apply_all.ps1
 scripts/run_ghidra_apply_one_audited.ps1
 scripts/summarize_k1_metadata_report.ps1
 scripts/metadata-audit/K1_k1_win_amazongames_swkotor.exe_audit.json
+scripts/summarize_one_audit.ps1
