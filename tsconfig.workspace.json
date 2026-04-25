@@ -20,13 +20,16 @@
       "path": "packages/retrieval"
     },
     {
+      "path": "packages/pazaak-engine"
+    },
+    {
       "path": "apps/trask-bot"
     },
     {
       "path": "apps/hk-bot"
     },
     {
-      "path": "apps/deadeye-duncan-bot"
+      "path": "apps/pazaak-bot"
     },
     {
       "path": "apps/ingest-worker"

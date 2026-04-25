@@ -14,20 +14,22 @@
 
 ### Trask (`apps/trask-bot`)
 
-Purpose: guild-first troubleshooting and source lookup.
+Purpose: guild-first KOTOR q&a and troubleshooting.
 
 Commands: `/ask`, `/sources`, `/queue-reindex`.
 
-Current implementation: slash commands backed by a `ChunkSearchProvider` that merges
-on-disk text chunks (from the ingest worker) with a static keyword-scored source catalog.
-`/ask` generates a citation-aware answer via OpenAI chat when `OPENAI_API_KEY` is set;
-falls back to keyword catalog summary when no key is configured.
+Current implementation: `/ask` forwards the user query to an `ai-researchwizard`
+sidecar via HTTP, pins the request to this repo's hardcoded approved source list, and
+renders the returned report into a Discord-native briefing with inline numeric citations
+plus a compact `Sources` block. `/sources` remains as an admin-facing policy inspection
+command. `/queue-reindex` remains an operational ingest hook.
 
 Config prefix: `TRASK_*`. Reads `TRASK_ALLOWED_GUILD_IDS` and `TRASK_APPROVED_CHANNEL_IDS` for
-scope restrictions. Shares `INGEST_STATE_DIR` with the ingest worker for chunk storage.
+scope restrictions, plus `TRASK_RESEARCHWIZARD_BASE_URL`, `TRASK_RESEARCHWIZARD_API_KEY`,
+and `TRASK_RESEARCHWIZARD_TIMEOUT_MS` for the vendor-backed answer path.
 
-Next phase: approved Discord channel indexing, Firecrawl-backed web scrape, chunk embeddings via
-OpenAI, and pgvector semantic retrieval.
+Next phase: tighten the vendor adapter contract, normalize source metadata further, and decide
+whether ingest-worker remains a secondary indexing path or becomes maintainer-only infrastructure.
 
 ---
 
@@ -51,7 +53,7 @@ admin-only role catalog management commands.
 
 ---
 
-### Deadeye Duncan (`apps/deadeye-duncan-bot`)
+### Pazaak Bot (`apps/pazaak-bot`)
 
 Purpose: KOTOR-faithful pazaak with a fake-credit economy.
 
@@ -63,11 +65,11 @@ buttons, private ephemeral action panels with Draw/Stand/EndTurn/Play side card 
 
 Current implementation: `PazaakCoordinator` with file-backed match snapshots (`MatchStore`)
 plus disk-backed wallet repository (`JsonWalletRepository`). Match state survives process
-restarts. A 60-second interval auto-forfeits the active player when `DEADEYE_TURN_TIMEOUT_MS`
-(default 5 min) elapses without action. Wallet state (balance, wins, losses, streak,
-rivalries, last daily) is persisted to JSON in `DEADEYE_DATA_DIR`.
+restarts. A 60-second interval auto-forfeits the active player when `PAZAAK_TURN_TIMEOUT_MS`
+default 5 min) elapses without action. Wallet state (balance, wins, losses, streak,
+rivalries, last daily) is persisted to JSON in `PAZAAK_DATA_DIR`.
 
-Config prefix: `DEADEYE_*`. Configurable starting credits, daily bonus amount, daily cooldown,
+Config prefix: `PAZAAK_*`. Configurable starting credits, daily bonus amount, daily cooldown,
 and turn timeout.
 
 Next phase: streak bonuses on daily claim, admin credit adjustment command.
@@ -104,7 +106,7 @@ Discord channel backfill, OpenAI embeddings, and chunk storage in pgvector.
 | `@openkotor/persistence` | `JsonWalletRepository` with wallet, rivals, daily bonus, and balance adjustment |
 | `@openkotor/retrieval` | Source registry, `FileChunkStore` with source index manifests, `ChunkSearchProvider` |
 
-## Data Flow: Deadeye Duncan Match
+## Data Flow: Pazaak Bot Match
 
 ```
 /pazaak challenge  ->  PazaakCoordinator.createChallenge()

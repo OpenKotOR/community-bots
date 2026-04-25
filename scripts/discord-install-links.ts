@@ -41,8 +41,8 @@ const installs = [
     permissions: 268454912n,
   },
   {
-    name: "Deadeye Duncan",
-    appId: readRequiredEnv("DEADEYE_DISCORD_APP_ID"),
+    name: "Pazaak Bot",
+    appId: readRequiredEnv("PAZAAK_DISCORD_APP_ID"),
     permissions: 19456n,
   },
 ];

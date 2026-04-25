@@ -1,6 +1,6 @@
 # Pazaak — How to Play
 
-Deadeye Duncan runs the pazaak table on this server. Pazaak is a card game from Knights of the Old Republic. You play against other server members for fake credits — no real money involved.
+Pazaak Bot runs the pazaak table on this server. Pazaak is a card game from Knights of the Old Republic. You play against other server members for fake credits — no real money involved.
 
 ---
 
@@ -23,8 +23,35 @@ Start a game against another player.
 |---|---|
 | **opponent** | The person you want to play against (type `@` and pick them) |
 | **wager** | How many credits to bet (minimum 1, maximum 5,000) |
+| **deck** | Optional runtime TSL preset (`Very Easy` through `Very Hard`) for your own sideboard |
+| **use_custom** | Use your saved custom 10-card sideboard instead of a runtime preset |
+| **custom_name** | Optional saved custom sideboard name for this one challenge |
 
-After you run this command, a message appears in the channel with two buttons: **Accept** and **Decline**. Your opponent has 5 minutes to accept before the challenge expires. Both players need enough credits to cover the wager.
+After you run this command, a message appears in the channel with **Accept**, **Decline**, and **Open Activity Lobby**. Your opponent has 5 minutes to accept before the challenge expires. Both players need enough credits to cover the wager. If you leave `deck` empty, the bot falls back to your saved runtime preset when you have one; if you set `use_custom`, it uses your active saved custom sideboard instead; if you set `custom_name`, it uses that specific saved custom sideboard just for this challenge.
+
+### `/pazaak sideboard`
+
+Save or review custom 10-card sideboards. You can keep multiple named sideboards and switch which one is active. The active one is what `/pazaak challenge use_custom:true` and the private Accept picker will use. If you run the command without options, the bot shows a private management screen with a sideboard selector plus four main actions. If you save a lot of sideboards, the selector pages through them instead of cutting the list off:
+
+- **Card Editor** — A paged per-slot picker that lets you browse all available card types from dropdown menus, focus one visible slot at a time, move that slot left or right, and review a quick validation summary without remembering token syntax.
+- **Sideboard Workshop** — In the browser Activity lobby or from the live Activity board header, open the workshop to manage named boards with drag/drop slot reordering, per-slot token pickers, save-and-activate controls, explicit rename, duplication, and fast name filtering outside Discord's component limits. The Activity lobby and live match board now also expose a lighter quick-switch panel so you can swap the active saved board without opening the full workshop.
+- **PazaakWorld Advisor** — During a live match, both the private Discord controls and the Activity board now show a move recommendation based on the shared PazaakWorld-inspired advisor logic. It can suggest when to draw, stand, end the turn, or commit a specific side card, and you can switch between Easy, Hard, and Professional advisor tiers.
+- The advisor now treats exact-hit finishes, recovery cards, standing-pressure lines, and slower setup plays as different categories, so its suggestions should feel less like a flat score threshold and more like actual match guidance.
+- The advisor now also shows a richer snapshot around that recommendation: confidence, the category behind the play, estimated bust risk on the next draw, and a few fallback alternatives when another line is still reasonable.
+- The latest advisor pass also treats special TSL cards more deliberately: D, VV, Tiebreaker, and the Flip 2&4 / Flip 3&6 cards now get their own tactical timing and rationale instead of being treated like ordinary point shifts.
+- The advisor also now recognizes nine-card auto-win pressure and basic match score pressure, so it becomes more willing to push when you are trailing the match and more willing to protect a lead when you are already ahead in sets.
+- **Find Board** — Opens a small search modal so you can filter large named-sideboard libraries by name.
+- **Build/Edit Sideboard** — Opens a modal with two text areas (slots 1-5 and 6-10) for quick bulk entry using tokens like `+1`, `-2`, `*3`, `$$`, `TT`, `F1`, `F2`, and `VV`.
+- **Clear Sideboard** — Removes your active sideboard, or a named sideboard if you target it from the slash command.
+
+The sideboard management screen and the challenged-player deck picker both now include an **Open Activity Lobby** link so you can jump directly into the browser-side quick switcher or full workshop while deciding which saved board should be active.
+
+You can also manage names directly from the slash command:
+
+- `/pazaak sideboard cards:...` saves over your current active sideboard.
+- `/pazaak sideboard name:aggressive cards:...` saves that named sideboard and makes it active.
+- `/pazaak sideboard name:aggressive` switches your active sideboard to `aggressive`.
+- `/pazaak sideboard name:aggressive clear:true` removes that named sideboard.
 
 ### `/pazaak wallet`
 
@@ -63,15 +90,15 @@ Shows your head-to-head record against every opponent you have played. Lists up 
 
 You type `/pazaak challenge`, pick an opponent and a wager. A public message appears:
 
-> **Deadeye Duncan** — Pazaak Challenge
+> **Pazaak Bot** — Pazaak Challenge
 > @You challenges @Opponent for 500 credits!
 > [ Accept ] [ Decline ]
 
-Your opponent clicks **Accept**. The game begins. A random coin flip decides who goes first.
+Your opponent clicks **Accept**. If they were not already seeded with a deck, they get a private picker first where they can leave the match on Auto, choose a runtime TSL preset, use their saved runtime preset, or choose from their saved custom sideboards. If they have a lot of saved custom sideboards, that custom-board list can be paged or searched by name so nothing gets cut off, and the picker also includes an **Open Activity Lobby** link so they can adjust their active saved board before they lock in the match. After that, the game begins and a random coin flip decides who goes first.
 
 ### Step 2 — Your Sideboard and Hand
 
-At the start of the match, each player receives a **10-card sideboard** drawn randomly from the full card pool (see Card Types below). At the start of each set, **4 cards** are drawn from your sideboard into your hand.
+At the start of the match, each player receives a **10-card sideboard**. In normal public play that sideboard is either one of the canonical runtime TSL decks (`Very Easy` through `Very Hard`), or the player's active saved custom sideboard if they explicitly chose it. At the start of each set, **4 cards** are drawn from your sideboard into your hand.
 
 Hands are **always refreshed** at the start of every set, including after ties.
 
@@ -88,6 +115,8 @@ A **public board** message appears in the channel. It shows:
 Two buttons are on the public board:
 - **Open Controls** — opens your private control panel
 - **Forfeit** — instantly lose the match (the other player gets the wager)
+
+Inside the browser Activity, players also get a **Sideboard Workshop** button in the live board header. That lets you jump into named-board management mid-match, then return to the same Activity session without backing out to Discord first. The Activity lobby is now linked directly from Discord challenge and sideboard-management surfaces too, so pre-match deck switching no longer depends on opening the workshop only after you are already inside the Activity.
 
 ### Step 4 — Your Private Controls
 
@@ -133,16 +162,16 @@ Flip cards show two buttons — one for plus, one for minus — so you choose at
 
 | Type | Label | What it does |
 |---|---|---|
-| **Tiebreaker** | `T+1` | Always adds +1 to your total. If the set ends in a tie, the player who played the Tiebreaker wins instead. |
-| **Double** | `x2` | Doubles the value of the last basic card on your board (targets the last main-deck draw, plus, minus, or flip card — skips tiebreaker and special cards). Does not add a new card. |
-| **Flip 2&4** | `Flip 2&4` | Flips the sign of every 2 and 4 on your board that came from the main deck or a plus/minus card. Flip and special cards are not affected. |
-| **Flip 3&6** | `Flip 3&6` | Same as above but targets every 3 and 6 on your board. |
+| **Copy** | `D` | Copies the resolved value of the previous board card. You cannot play it as your first board card. |
+| **Tiebreaker** | `±1T` | You choose `+1` or `-1`. If the set ends in a tie, the player who played the Tiebreaker wins instead. |
+| **Flip 2&4** | `Flip 2&4` | Occupies a board slot with value `0`, then flips the sign of every 2 and 4 on your board that came from the main deck or a plus/minus card. Flip and other special cards are not affected. |
+| **Flip 3&6** | `Flip 3&6` | Occupies a board slot with value `0`, then flips the sign of positive 3s and 6s on your board. |
 
 **When to use side cards:**
 - Your total is 18 and you have a `+2` → play it to hit exactly 20
 - Your total is 14 and you have a `±6` → play `+6` to hit 20
+- Your last board card is `-4` and you have `D` → play it to copy that `-4`
 - Your board has 10+4+8 = 22 and you play Flip 2&4 → the 4 becomes -4, total drops to 14
-- Your last draw was a 5 and you play x2 → the 5 becomes 10
 
 ### Step 7 — Winning a Set
 
@@ -153,6 +182,7 @@ A set ends when both players have stood or one player busts:
 - If both players stand, whoever is **closer to 20** wins the set.
 - If both players stand on the **same total**, the set is a **tie** — unless one player has played a **Tiebreaker** card, in which case that player wins.
 - On a true tie (no tiebreaker), a new set starts with **fresh side cards**.
+- If **5 sets tie in a row**, the match is force-resolved by current set record.
 
 ### Step 8 — Who Goes First Next
 
@@ -164,7 +194,7 @@ A set ends when both players have stood or one player busts:
 
 First player to win **3 sets** wins the match. The winner's credits go up by the wager amount. The loser's credits go down by the wager amount (but never below 0).
 
-After the match ends, a **Rematch** button appears. Either player can click it to start a new challenge at the same wager.
+After the match ends, a **Rematch** button appears. Either player can click it to start a new challenge at the same wager, and if the completed match used fixed sideboards those same sideboards carry forward into the rematch.
 
 ### Nine-Card Rule
 
@@ -195,9 +225,11 @@ Credits are fake. They are just for fun on this server. There is no way to conve
 - **Stand early if you are close to 20.** If your total is 17–20 and you have no good side cards, standing is safer than drawing. Drawing over 20 is an instant bust with no recovery.
 - **Play side cards to fine-tune your total before standing.** A `+2` when you are at 18 locks in a perfect 20.
 - **Minus and flip cards shine when you are close to 20 but not over.** Use them to drop your total after a strong draw — but remember, you cannot use them to recover if a draw puts you over 20.
-- **Tiebreaker cards are insurance.** If you play one early, ties become wins. The Tiebreaker always adds +1.
-- **Double (x2) is high risk, high reward.** If your last draw was a 10, doubling makes 20. If it was a 3, doubling only adds 3.
-- **Flip 2&4 / Flip 3&6 affect main-deck draws and plus/minus cards only.** They will not flip cards placed by other side cards.
+- **Tiebreaker cards are insurance.** They still win ties, but you can choose either `+1T` or `-1T` when you play them.
+- **D copies your last resolved board value.** If the previous card was negative or came from another side card, D copies that resolved number. You cannot open a board with D.
+- **Flip 2&4 affects main-deck draws and plus/minus cards only.** It will not flip cards placed by other side cards.
+- **Flip 2&4 and Flip 3&6 still consume a board slot.** Their own printed value is 0, but they count toward the 9-card auto-win.
+- **Flip 3&6 should be treated as a targeted board-flip card, not a generic sign toggle.**
 - **Claim your daily bonus every day.** Free credits add up, especially with a win streak multiplier.
 - **Watch your opponent's side card count.** If they have no side cards left, they cannot adjust their total after drawing.
 - **Do not wager more than you can afford to lose.** If your balance hits 0, you have to wait for daily bonuses to build it back up.

@@ -4,3 +4,6 @@
 [submodule "vendor/llm_fallbacks"]
 	path = vendor/llm_fallbacks
 	url = https://github.com/bolabaden/llm_fallbacks.git
+[submodule "vendor/PazaakWorld"]
+	path = vendor/PazaakWorld
+	url = C:/GitHub/PazaakWorld

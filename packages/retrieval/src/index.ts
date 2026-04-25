@@ -151,6 +151,14 @@ export const defaultSourceCatalog: readonly SourceDescriptor[] = [
   },
 ];
 
+export const traskApprovedResearchSources: readonly SourceDescriptor[] = defaultSourceCatalog.filter(
+  (source) => source.kind !== "discord",
+);
+
+export const traskApprovedResearchSourceUrls: readonly string[] = traskApprovedResearchSources.map(
+  (source) => source.homeUrl,
+);
+
 export class StaticCatalogSearchProvider implements SearchProvider {
   public constructor(private readonly sources: readonly SourceDescriptor[] = defaultSourceCatalog) {}
 

@@ -1,8 +1,8 @@
 # Trask Bot
 
-Trask Ulgo is the guild's troubleshooting and source-lookup bot. His personality is modelled on his
-in-game role as the plain-spoken Republic soldier who walks you through the Endar Spire in the first
-fifteen minutes of KOTOR: direct, urgency-aware, never condescending, and naturally instructional.
+Trask Ulgo is the guild's KOTOR q&a bot. His job is to answer questions clearly, stay useful for
+non-technical users, and support his claims with visible citations without dumping backend search
+mechanics into the conversation.
 
 ## Persona
 
@@ -21,7 +21,7 @@ Key voice notes:
 
 ### `/ask`
 
-Search the approved source registry for KOTOR-related content.
+Ask a KOTOR question and get a source-backed answer.
 
 **Options:**
 | Option | Required | Description |
@@ -29,24 +29,25 @@ Search the approved source registry for KOTOR-related content.
 | `query` | yes | Question or topic (max 200 characters) |
 
 **Behavior:**
-- Searches the local source catalog using keyword scoring against source names, descriptions, and
-  tags.
-- Returns up to five matching sources with description snippets and home URLs.
-- Current implementation is lexical/keyword only. Semantic search against indexed page chunks is
-  the next phase once the ingest pipeline is wired.
+- Sends the question to the configured `ai-researchwizard` backend.
+- Restricts research to Trask's approved source list.
+- Returns a short Discord-friendly answer with inline numeric citations and a compact `Sources`
+  bibliography section.
+- Does not explain retrieval internals unless the user explicitly asks.
 
 **Example:**
 ```
 /ask query:mdlops model formats
 ```
 
-Returns matching sources from the source catalog such as MDLOps, KOTOR Neocities, and PyKotor.
+Returns a direct answer supported by approved sources such as MDLOps, KOTOR Neocities, PyKotor,
+Deadly Stream, and related KOTOR references.
 
 ---
 
 ### `/sources`
 
-List the currently approved source catalog.
+Inspect the currently approved source policy. This is an admin-facing command.
 
 **Options:**
 | Option | Required | Description |
@@ -75,7 +76,7 @@ Queue a source refresh request. Requires **Manage Guild** permission.
 
 ## Approved Source Catalog
 
-Trask's search is scoped to these sources by default:
+Trask's answer generation is pinned to these approved sources by default:
 
 | ID | Name | Kind | Notes |
 |---|---|---|---|
@@ -98,23 +99,25 @@ The following environment variables control Trask's scope:
 | Variable | Purpose |
 |---|---|
 | `TRASK_ALLOWED_GUILD_IDS` | Comma-separated guild IDs where Trask is active |
-| `TRASK_APPROVED_CHANNEL_IDS` | Comma-separated channel IDs approved for Discord message indexing |
+| `TRASK_APPROVED_CHANNEL_IDS` | Comma-separated channel IDs where `/ask` is allowed |
 
-Channels are only indexed when explicitly listed in `TRASK_APPROVED_CHANNEL_IDS`. Trask never
-performs blanket server-history reads.
+When `TRASK_APPROVED_CHANNEL_IDS` is set, Trask only answers `/ask` in those channels. It does not
+perform blanket server-history reads.
 
 ## Current Limitations
 
-- Answers are source-catalog matches, not LLM-generated summaries. There is no RAG pipeline yet.
-- The ingest worker does not perform real web scraping yet. `/queue-reindex` records a stub
-  request.
-- Discord message indexing requires `MESSAGE_CONTENT` privileged intent enabled in the Developer
-  Portal and the channel ID whitelisted in `TRASK_APPROVED_CHANNEL_IDS`.
+- Trask depends on a reachable `ai-researchwizard` backend for `/ask`.
+- The vendored backend defaults to a report-oriented workflow, so prompt and formatting controls
+  still need refinement to keep replies concise under Discord limits.
+- The ingest worker remains separate from the new q&a path. `/queue-reindex` is operational rather
+  than part of the normal assistant experience.
+- `TRASK_APPROVED_CHANNEL_IDS` only restricts where `/ask` may be used. Trask's current runtime is
+  slash-command-only and does not require privileged message intents.
 
 ## Next Phase
 
-- Wire Firecrawl or a custom fetcher to scrape approved web sources on a schedule.
-- Chunk, embed, and store indexed content in Postgres via pgvector.
-- Replace the static catalog search with a vector-plus-lexical hybrid retrieval pass.
-- Add citation-aware summarization using the configured `OPENAI_CHAT_MODEL`.
-- Add a `/summarize` command for quick document summaries with source attribution.
+- Tighten the adapter contract with `ai-researchwizard` so Trask can parse structured citations
+  instead of formatting plain report text.
+- Add a direct-vendored fallback path for environments that do not want a separate sidecar process.
+- Decide whether Discord-channel indexing remains part of Trask's future evidence set or stays as
+  maintainer-only infrastructure.

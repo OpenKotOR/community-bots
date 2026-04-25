@@ -19,6 +19,7 @@
     "@openkotor/discord-ui": "workspace:*",
     "@openkotor/persistence": "workspace:*",
     "@openkotor/personas": "workspace:*",
-    "discord.js": "^14.26.2"
+    "discord.js": "^14.26.2",
+    "dotenv": "^16.4.7"
   }
 }

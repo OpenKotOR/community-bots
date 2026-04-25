@@ -1,12 +1,12 @@
-# Trask — KOTOR Source Lookup
+# Trask — KOTOR Q&A
 
-Trask is the server's Q&A bot for finding KOTOR-related resources. Ask it a question about modding, tools, troubleshooting, or any KOTOR topic, and it searches a curated list of trusted sources to find relevant results.
+Trask is the server's KOTOR help bot. Ask it about modding, tools, troubleshooting, or related projects and it will answer directly with citations instead of making you interpret raw search results.
 
 ---
 
 ## Quick Start
 
-Type **`/ask`** followed by your question. Trask searches the approved source list and returns up to 5 matching results with links.
+Type **`/ask`** followed by your question. Trask replies in a short Discord-friendly format and includes a compact bibliography.
 
 **Example:**
 ```
@@ -25,7 +25,7 @@ Search for KOTOR-related resources.
 |---|---|
 | **query** | Your question or topic (up to 200 characters) |
 
-Trask looks through the names, descriptions, and tags of all approved sources and returns the best matches. Each result shows the source name, a short description, and a link.
+Trask uses the server's approved KOTOR sources behind the scenes and answers the question directly. By default it does not explain the mechanics of how it gathered the answer. The reply includes inline citation markers and a short `Sources` list.
 
 The response is visible to everyone in the channel.
 
@@ -37,18 +37,7 @@ The response is visible to everyone in the channel.
 
 ### `/sources`
 
-List all approved sources that Trask can search.
-
-| What to fill in | What it means |
-|---|---|
-| **kind** (optional) | Filter by type: `website`, `github`, or `discord` |
-
-Shows up to 10 sources with their name, description, and type. Only you can see the response.
-
-**Examples:**
-- `/sources` — see everything
-- `/sources kind:github` — see only GitHub repositories
-- `/sources kind:website` — see only websites
+This is an admin-facing policy view rather than a normal user command. It exists so server staff can inspect the approved source list if needed.
 
 ---
 
@@ -89,8 +78,8 @@ Trask searches a curated list of trusted KOTOR community resources:
 **Trask gave me a "not available here" error. What happened?**
 Trask may be restricted to certain channels on this server. Try using the command in a different channel, or ask a server admin which channels Trask works in.
 
-**The results are not very detailed. Why?**
-Trask currently does keyword matching against the source catalog — it matches your words against source names, descriptions, and tags. It does not yet search the full text of those websites. A more detailed search system is being built.
+**Why does Trask answer directly instead of showing search results?**
+That is intentional. Trask is meant to behave like a helpful assistant, not a search console. It still shows citations so you can check the underlying sources.
 
 **Can I suggest a new source?**
 Yes — ask a server admin. Sources are added to the approved list by the people running the server.

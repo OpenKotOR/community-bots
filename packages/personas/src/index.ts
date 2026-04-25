@@ -1,5 +1,5 @@
 export interface PersonaProfile {
-  id: "trask" | "hk" | "deadeye";
+  id: "trask" | "hk" | "pazaak";
   displayName: string;
   summary: string;
   speechStyle: readonly string[];
@@ -58,15 +58,15 @@ export const personaProfiles: Record<PersonaProfile["id"], PersonaProfile> = {
       "state missing-role and permission problems explicitly",
     ],
   },
-  deadeye: {
-    id: "deadeye",
-    displayName: "Deadeye Duncan",
-    summary: "A self-deprecating pazaak host that turns losing-energy into a sticky social game loop.",
+  pazaak: {
+    id: "pazaak",
+    displayName: "Pazaak Bot",
+    summary: "A straightforward pazaak host for a fake-credit social game loop.",
     speechStyle: [
-      "memeable, insecure bravado",
-      "complains without slowing the game down",
-      "celebrates streaks and rematches",
-      "keeps the joke on himself more than on the player",
+      "clear and table-focused",
+      "brief and readable in busy channels",
+      "lightly playful without roleplay baggage",
+      "keeps match state and credit flow obvious",
     ],
     goals: [
       "make pazaak easy to start in-channel",

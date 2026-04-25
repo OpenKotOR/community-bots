@@ -17,6 +17,9 @@
       "path": "../../packages/discord-ui"
     },
     {
+      "path": "../../packages/pazaak-engine"
+    },
+    {
       "path": "../../packages/persistence"
     },
     {

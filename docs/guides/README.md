@@ -4,7 +4,7 @@ This server has three bots. Here is what each one does and where to learn more.
 
 ---
 
-## Deadeye Duncan — Pazaak
+## Pazaak Bot
 
 Play pazaak (the card game from KOTOR) against other server members for fake credits.
 

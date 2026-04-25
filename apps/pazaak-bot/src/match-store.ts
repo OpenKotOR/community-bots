@@ -8,45 +8,8 @@
 import { mkdir, readFile, writeFile, readdir, unlink } from "node:fs/promises";
 import path from "node:path";
 
-import type { MatchPersistence, MatchPlayerState, PazaakMatch } from "./pazaak.js";
-
-// ---------------------------------------------------------------------------
-// Serialization helpers — Set<string> ↔ string[]
-// ---------------------------------------------------------------------------
-
-interface SerializedPlayerState extends Omit<MatchPlayerState, "usedCardIds"> {
-  usedCardIds: string[];
-}
-
-type SerializedMatch = Omit<PazaakMatch, "players"> & {
-  players: [SerializedPlayerState, SerializedPlayerState];
-};
-
-const serializePlayer = (player: MatchPlayerState): SerializedPlayerState => ({
-  ...player,
-  usedCardIds: [...player.usedCardIds],
-});
-
-const deserializePlayer = (data: SerializedPlayerState): MatchPlayerState => ({
-  ...data,
-  usedCardIds: new Set(data.usedCardIds),
-  // Ensure defaults for fields added after initial schema.
-  sideDeck: data.sideDeck ?? [],
-  hasTiebreaker: data.hasTiebreaker ?? false,
-});
-
-const serializeMatch = (match: PazaakMatch): SerializedMatch => ({
-  ...match,
-  players: [serializePlayer(match.players[0]!), serializePlayer(match.players[1]!)],
-});
-
-const deserializeMatch = (data: SerializedMatch): PazaakMatch => ({
-  ...data,
-  players: [deserializePlayer(data.players[0]!), deserializePlayer(data.players[1]!)],
-  // Ensure defaults for fields added after initial schema.
-  initialStarterIndex: data.initialStarterIndex ?? 0,
-  lastSetWinnerIndex: data.lastSetWinnerIndex ?? null,
-});
+import type { MatchPersistence, MatchPlayerState, PazaakMatch, SerializedMatch } from "@openkotor/pazaak-engine";
+import { serializeMatch, deserializeMatch } from "@openkotor/pazaak-engine";
 
 // ---------------------------------------------------------------------------
 // MatchStore

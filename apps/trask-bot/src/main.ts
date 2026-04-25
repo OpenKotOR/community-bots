@@ -1,61 +1,23 @@
-import "dotenv/config";
-
 import {
   PermissionFlagsBits,
   SlashCommandBuilder,
   type ChatInputCommandInteraction,
+  type APIEmbedField,
   type RESTPostAPIApplicationCommandsJSONBody,
 } from "discord.js";
-import OpenAI from "openai";
 
 import { loadTraskBotConfig } from "@openkotor/config";
 import { createBotClient, createLogger, deployGuildCommands, toErrorMessage } from "@openkotor/core";
 import { buildErrorEmbed, buildInfoEmbed, buildSuccessEmbed } from "@openkotor/discord-ui";
 import { personaProfiles } from "@openkotor/personas";
-import { createChunkSearchProvider, defaultSourceCatalog, type SearchHit, type SourceKind } from "@openkotor/retrieval";
+import { createDefaultSearchProvider, defaultSourceCatalog, type SourceDescriptor, type SourceKind } from "@openkotor/retrieval";
+
+import { createResearchWizardClient } from "./research-wizard.js";
 
 const logger = createLogger("trask-bot");
 const config = loadTraskBotConfig();
-const searchProvider = createChunkSearchProvider(config.chunkDir);
-const openai = config.ai.openAiApiKey
-  ? new OpenAI({ apiKey: config.ai.openAiApiKey })
-  : null;
-
-// ---------------------------------------------------------------------------
-// LLM answer generation — used when an OpenAI key is configured
-// ---------------------------------------------------------------------------
-
-const SYSTEM_PROMPT = `\
-You are Trask Ulgo, a KOTOR community helper — direct, practical, no-nonsense.
-Answer questions about Star Wars: Knights of the Old Republic using only the
-provided source excerpts. Always cite the source name in your answer.
-If the excerpts do not contain enough information, say so plainly.
-Limit your answer to 300 words.
-`.trim();
-
-const generateLlmAnswer = async (query: string, hits: readonly SearchHit[]): Promise<string | null> => {
-  if (!openai || hits.length === 0) return null;
-
-  const context = hits
-    .slice(0, 5)
-    .map((hit, i) => `[${i + 1}] ${hit.sourceName}\n${hit.snippet}\nURL: ${hit.url}`)
-    .join("\n\n");
-
-  try {
-    const response = await openai.chat.completions.create({
-      model: config.ai.chatModel,
-      max_tokens: 500,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: `Question: ${query}\n\nSources:\n${context}` },
-      ],
-    });
-    return response.choices[0]?.message.content?.trim() ?? null;
-  } catch (err) {
-    logger.warn("OpenAI call failed, falling back to catalog summary.", err);
-    return null;
-  }
-};
+const searchProvider = createDefaultSearchProvider();
+const researchWizard = createResearchWizardClient(config.researchWizard);
 
 const sourceChoices = defaultSourceCatalog.map((source) => ({
   name: source.name,
@@ -75,7 +37,8 @@ const askCommand = new SlashCommandBuilder()
 
 const sourcesCommand = new SlashCommandBuilder()
   .setName("sources")
-  .setDescription("List the currently approved source catalog Trask can search.")
+  .setDescription("Inspect Trask's approved source policy.")
+  .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
   .addStringOption((option) => {
     return option
       .setName("kind")
@@ -102,14 +65,84 @@ const reindexCommand = new SlashCommandBuilder()
 
 const commands = [askCommand, sourcesCommand, reindexCommand] as const;
 
-const summarizeHits = (query: string, hits: readonly SearchHit[]): string => {
-  const intro = `I checked the approved source registry for \`${query}\`.`;
+const truncateForDiscord = (value: string, limit: number): string => {
+  if (value.length <= limit) return value;
+  return `${value.slice(0, Math.max(0, limit - 1)).trimEnd()}…`;
+};
 
-  if (hits.length === 0) {
-    return `${intro} I do not have a seeded match yet. Try a narrower tool, project, or troubleshooting phrase.`;
+const normalizeWhitespace = (value: string): string => value.replace(/\n{3,}/g, "\n\n").trim();
+
+const splitResearchAnswer = (value: string): { body: string; sourceLines: string[] } => {
+  const match = /\nSources\s*\n/i.exec(value);
+
+  if (!match) {
+    return {
+      body: normalizeWhitespace(value),
+      sourceLines: [],
+    };
   }
 
-  return `${intro} Start with the strongest matches below. This first pass searches the local source catalog; live scrape and semantic indexing come next.`;
+  const body = normalizeWhitespace(value.slice(0, match.index));
+  const sourceLines = value
+    .slice(match.index + match[0].length)
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  return { body, sourceLines };
+};
+
+const chunkSourceLines = (sourceLines: readonly string[]): APIEmbedField[] => {
+  if (sourceLines.length === 0) {
+    return [];
+  }
+
+  const fields: APIEmbedField[] = [];
+  let currentLines: string[] = [];
+
+  for (const line of sourceLines) {
+    const candidate = [...currentLines, line].join("\n");
+
+    if (candidate.length > 1024 && currentLines.length > 0) {
+      fields.push({
+        name: fields.length === 0 ? "Sources" : `Sources ${fields.length + 1}`,
+        value: currentLines.join("\n"),
+        inline: false,
+      });
+      currentLines = [line];
+      continue;
+    }
+
+    currentLines.push(line);
+  }
+
+  if (currentLines.length > 0) {
+    fields.push({
+      name: fields.length === 0 ? "Sources" : `Sources ${fields.length + 1}`,
+      value: currentLines.join("\n"),
+      inline: false,
+    });
+  }
+
+  return fields;
+};
+
+const buildFallbackSources = (sources: readonly SourceDescriptor[]): APIEmbedField[] => {
+  return chunkSourceLines(sources.map((source, index) => `${index + 1}. ${source.name} - ${source.homeUrl}`));
+};
+
+const buildResearchEmbed = (rawAnswer: string, approvedSources: readonly SourceDescriptor[]) => {
+  const { body, sourceLines } = splitResearchAnswer(rawAnswer);
+  const description = truncateForDiscord(body, 4000);
+  const sourceFields = sourceLines.length > 0
+    ? chunkSourceLines(sourceLines)
+    : buildFallbackSources(approvedSources);
+
+  return buildInfoEmbed({
+    title: `${personaProfiles.trask.displayName} Briefing`,
+    description,
+    fields: sourceFields.slice(0, 3),
+  });
 };
 
 const handleAskCommand = async (interaction: ChatInputCommandInteraction): Promise<void> => {
@@ -117,20 +150,8 @@ const handleAskCommand = async (interaction: ChatInputCommandInteraction): Promi
 
   await interaction.deferReply();
 
-  const hits = await searchProvider.search(query, 5);
-  const llmAnswer = await generateLlmAnswer(query, hits);
-
-  const description = llmAnswer ?? summarizeHits(query, hits);
-
-  const embed = buildInfoEmbed({
-    title: `${personaProfiles.trask.displayName} Briefing`,
-    description,
-    fields: hits.slice(0, 5).map((hit, index) => ({
-      name: `${index + 1}. ${hit.sourceName}`,
-      value: `${hit.snippet}\n${hit.url}`,
-      inline: false,
-    })),
-  });
+  const result = await researchWizard.answerQuestion(query);
+  const embed = buildResearchEmbed(result.answer, result.approvedSources);
 
   await interaction.editReply({
     embeds: [embed],
@@ -144,8 +165,8 @@ const handleSourcesCommand = async (interaction: ChatInputCommandInteraction): P
   const filtered = requestedKind ? sources.filter((source) => source.kind === requestedKind) : sources;
 
   const embed = buildInfoEmbed({
-    title: "Approved Source Registry",
-    description: `Trask currently knows about ${filtered.length} approved sources${requestedKind ? ` of type ${requestedKind}` : ""}.`,
+    title: "Approved Source Policy",
+    description: `Trask is pinned to ${filtered.length} approved sources${requestedKind ? ` of type ${requestedKind}` : ""}. This is an admin-facing policy view, not part of the normal user experience.`,
     fields: filtered.slice(0, 10).map((source) => ({
       name: source.name,
       value: `${source.description}\nPolicy: ${source.freshnessPolicy}`,
@@ -198,7 +219,7 @@ const dispatchChatCommand = async (interaction: ChatInputCommandInteraction): Pr
   }
 };
 
-const client = createBotClient({ guildMessages: true, messageContent: true });
+const client = createBotClient();
 
 client.once("ready", (readyClient) => {
   logger.info("Trask is online.", {
@@ -242,7 +263,7 @@ client.on("interactionCreate", async (interaction) => {
       embeds: [
         buildErrorEmbed({
           title: "Wrong Channel",
-          description: "Trask can only answer questions in approved channels. Check the channel list with `/sources`.",
+          description: "Trask can only answer questions in approved channels on this server.",
         }),
       ],
       ephemeral: true,

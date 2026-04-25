@@ -1,0 +1,108 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "probe-shell-health",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"echo ok"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "validate-nameplate-export",
+			"type": "shell",
+			"command": ".venv\\Scripts\\python.exe",
+			"args": [
+				"-B",
+				"scripts\\export_discord_server.py",
+				"--include-channel",
+				"796553430197469226",
+				"--max-messages-per-container",
+				"200",
+				"--output-dir",
+				"exports\\nameplate-validation",
+				"--no-resume",
+				"--json-summary",
+				"--color"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "validate-display-name-style-export",
+			"type": "shell",
+			"command": "cmd.exe",
+			"args": [
+				"/c",
+				"cd /d c:\\GitHub\\openkotor-discord-bots && .venv\\Scripts\\python.exe -B scripts\\export_discord_server.py --include-channel 1493555449981571242 --max-messages-per-container 200 --output-dir exports\\display-name-style-validation --no-resume --json-summary --color"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "inspect-export-disk-usage",
+			"type": "shell",
+			"command": "cmd.exe",
+			"args": [
+				"/c",
+				"cd /d c:\\GitHub\\openkotor-discord-bots && powershell -NoProfile -Command \"$drive=Get-PSDrive C; Write-Output ('FREE_BYTES=' + [int64]$drive.Free); Get-ChildItem exports -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -in @('nameplate-validation','reaction-emoji-validation','display-name-style-validation') } | Select-Object Name,@{Name='SizeBytes';Expression={(Get-ChildItem $_.FullName -Recurse -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum}} | Format-Table -HideTableHeaders | Out-String\""
+			],
+			"isBackground": false
+		},
+		{
+			"label": "inspect-export-disk-usage-pwsh",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"$drive = Get-PSDrive C; Write-Output ('FREE_BYTES=' + [int64]$drive.Free); Get-ChildItem 'c:\\GitHub\\openkotor-discord-bots\\exports' -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -in @('nameplate-validation','reaction-emoji-validation','display-name-style-validation') } | Select-Object Name,@{Name='SizeBytes';Expression={(Get-ChildItem $_.FullName -Recurse -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum}} | Format-Table -HideTableHeaders | Out-String"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "inspect-export-disk-usage-pwsh-simple",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"$drive = Get-PSDrive C; Write-Output (\"FREE_BYTES=$([int64]$drive.Free)\"); foreach ($name in @(\"nameplate-validation\",\"reaction-emoji-validation\",\"display-name-style-validation\")) { $path = Join-Path \"c:\\GitHub\\openkotor-discord-bots\\exports\" $name; if (Test-Path $path) { $size = (Get-ChildItem $path -Recurse -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum; Write-Output (\"$name|$size\") } }"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "cleanup-validation-exports",
+			"type": "shell",
+			"command": "cmd.exe",
+			"args": [
+				"/c",
+				"cd /d c:\\GitHub\\openkotor-discord-bots && if exist exports\\nameplate-validation rmdir /s /q exports\\nameplate-validation && if exist exports\\reaction-emoji-validation rmdir /s /q exports\\reaction-emoji-validation && if exist exports\\display-name-style-validation rmdir /s /q exports\\display-name-style-validation"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "validate-display-name-style-export-compact",
+			"type": "shell",
+			"command": "cmd.exe",
+			"args": [
+				"/c",
+				"cd /d c:\\GitHub\\openkotor-discord-bots && .venv\\Scripts\\python.exe -B scripts\\export_discord_server.py --include-channel 1493555449981571242 --max-messages-per-container 60 --output-dir exports\\display-name-style-validation --no-resume --json-summary --color"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "full-guild-export-with-resume",
+			"type": "shell",
+			"command": ".venv\\Scripts\\python.exe",
+			"args": [
+				"-B",
+				"scripts/export_discord_server.py",
+				"--json-summary",
+				"--color"
+			],
+			"isBackground": false
+		}
+	]
+}

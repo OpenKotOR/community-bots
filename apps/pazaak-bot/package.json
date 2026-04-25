@@ -1,5 +1,5 @@
 {
-  "name": "@openkotor/deadeye-duncan-bot",
+  "name": "@openkotor/pazaak-bot",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -17,8 +17,16 @@
     "@openkotor/config": "workspace:*",
     "@openkotor/core": "workspace:*",
     "@openkotor/discord-ui": "workspace:*",
+    "@openkotor/pazaak-engine": "workspace:*",
     "@openkotor/persistence": "workspace:*",
     "@openkotor/personas": "workspace:*",
-    "discord.js": "^14.26.2"
+    "discord.js": "^14.26.2",
+    "dotenv": "^17.4.2",
+    "express": "^5.1.0",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/ws": "^8.18.1"
   }
 }

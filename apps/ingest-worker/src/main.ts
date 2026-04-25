@@ -1,5 +1,3 @@
-import "dotenv/config";
-
 import { createHash } from "node:crypto";
 
 import FirecrawlApp from "@mendable/firecrawl-js";

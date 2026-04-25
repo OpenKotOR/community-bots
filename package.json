@@ -12,7 +12,8 @@
     "check": "tsc -b tsconfig.workspace.json --pretty false",
     "dev:trask": "pnpm --filter @openkotor/trask-bot dev",
     "dev:hk": "pnpm --filter @openkotor/hk-bot dev",
-    "dev:deadeye": "pnpm --filter @openkotor/deadeye-duncan-bot dev",
+    "dev:pazaak": "pnpm --filter @openkotor/pazaak-bot dev",
+    "dev:pazaak-activity": "pnpm --filter pazaak-activity dev",
     "dev:ingest": "pnpm --filter @openkotor/ingest-worker dev",
     "discord:install-links": "tsx scripts/discord-install-links.ts"
   },
