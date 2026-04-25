@@ -32,6 +32,25 @@ Create `.env` (copy `.env.example`) and fill in:
 VITE_DISCORD_CLIENT_ID=<your Discord application ID>
 ```
 
+## Account Sessions
+
+The Activity now uses a Pazaak app session token for API calls. In Discord Activity mode,
+`/api/auth/token` still exchanges the Discord OAuth2 code and returns the Discord access token
+needed by the Embedded App SDK, but it also creates/returns an `app_token` backed by the bot API's
+account repository. Existing Discord-linked wallets remain compatible because the bridge preserves
+the Discord user ID as the legacy game identity during migration.
+
+Standalone browser mode can use:
+
+- `POST /api/auth/register` with `username`, optional `displayName`/`email`, and `password`.
+- `POST /api/auth/login` with `identifier` and `password`.
+- `GET /api/auth/session` with `Authorization: Bearer <app_token>`.
+- `POST /api/auth/logout` with `Authorization: Bearer <app_token>`.
+
+The first implementation stores this bridge in `accounts.json` next to the existing Pazaak JSON
+repositories while the new Drizzle schema is introduced. The production target is PostgreSQL via the
+schema exports in `@openkotor/persistence`.
+
 ## Build
 
 ```bash

@@ -167,16 +167,30 @@ export interface PazaakLobbyPlayerRecord {
   isHost: boolean;
   isAi: boolean;
   aiDifficulty?: AdvisorDifficulty;
+  connectionStatus?: "connected" | "disconnected" | "ai_takeover";
   joinedAt: string;
+}
+
+export type PazaakTableVariant = "canonical" | "multi_seat";
+
+export interface PazaakTableSettings {
+  variant: PazaakTableVariant;
+  maxPlayers: number;
+  maxRounds: number;
+  turnTimerSeconds: number;
+  ranked: boolean;
+  allowAiFill: boolean;
 }
 
 export interface PazaakLobbyRecord {
   id: string;
+  lobbyCode: string;
   name: string;
   hostUserId: string;
   maxPlayers: number;
+  tableSettings: PazaakTableSettings;
   passwordHash: string | null;
-  status: "waiting" | "in_game" | "closed";
+  status: "waiting" | "matchmaking" | "in_game" | "closed";
   matchId: string | null;
   players: PazaakLobbyPlayerRecord[];
   createdAt: string;

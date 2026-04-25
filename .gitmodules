@@ -7,3 +7,7 @@
 [submodule "vendor/PazaakWorld"]
 	path = vendor/PazaakWorld
 	url = C:/GitHub/PazaakWorld
+[submodule "vendor/HoloPazaak"]
+	path = vendor/HoloPazaak
+	url = https://github.com/OpenKotOR/HoloPazaak
+	branch = master

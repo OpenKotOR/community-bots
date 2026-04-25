@@ -21,6 +21,7 @@ import { createBotClient, createLogger, deployGuildCommands, toErrorMessage } fr
 import { asBulletList, buildErrorEmbed, buildInfoEmbed, buildSuccessEmbed, buildWarningEmbed } from "@openkotor/discord-ui";
 import {
   DEFAULT_PAZAAK_SIDEBOARD_NAME,
+  JsonPazaakAccountRepository,
   JsonPazaakLobbyRepository,
   JsonPazaakMatchHistoryRepository,
   JsonPazaakMatchmakingQueueRepository,
@@ -66,6 +67,7 @@ import { createApiServer } from "./api-server.js";
 
 const logger = createLogger("pazaak-bot");
 const config = loadPazaakBotConfig();
+const accountRepository = new JsonPazaakAccountRepository(resolveDataFile(config.dataDir, "accounts.json"));
 const walletRepository = new JsonWalletRepository(resolveDataFile(config.dataDir, "wallets.json"), config.startingCredits);
 const sideboardRepository = new JsonPazaakSideboardRepository(resolveDataFile(config.dataDir, "custom-sideboards.json"));
 const matchmakingQueueRepository = new JsonPazaakMatchmakingQueueRepository(resolveDataFile(config.dataDir, "matchmaking-queue.json"));
@@ -3010,6 +3012,7 @@ const { listen: startApiServer } = createApiServer(coordinator, {
   discordClientSecret: config.discord.clientSecret,
   activityOrigin: config.activityUrl,
   publicWebOrigin: config.publicWebOrigin,
+  accountRepository,
   walletRepository,
   sideboardRepository,
   matchmakingQueueRepository,

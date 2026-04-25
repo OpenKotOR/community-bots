@@ -6,7 +6,19 @@ let discordSdk: DiscordSDK | null = null;
 export interface DiscordAuth {
   userId: string;
   username: string;
+  accountId?: string;
   accessToken: string;
+}
+
+interface DiscordTokenResponse {
+  access_token: string;
+  app_token?: string;
+  account?: {
+    accountId: string;
+    username: string;
+    displayName: string;
+    legacyGameUserId: string | null;
+  };
 }
 
 /** Returns true when the app is running inside a Discord Activity iframe. */
@@ -85,15 +97,16 @@ export async function initDiscordAuth(): Promise<DiscordAuth> {
     throw new Error(`Token exchange failed: ${err.error ?? tokenRes.statusText}`);
   }
 
-  const { access_token } = (await tokenRes.json()) as { access_token: string };
+  const tokenData = (await tokenRes.json()) as DiscordTokenResponse;
 
   // Step 3: Authenticate the SDK with the access token.
-  const auth = await sdk.commands.authenticate({ access_token });
+  const auth = await sdk.commands.authenticate({ access_token: tokenData.access_token });
 
   return {
-    userId: auth.user.id,
-    username: auth.user.username,
-    accessToken: access_token,
+    userId: tokenData.account?.legacyGameUserId ?? auth.user.id,
+    username: tokenData.account?.displayName ?? auth.user.username,
+    accountId: tokenData.account?.accountId,
+    accessToken: tokenData.app_token ?? tokenData.access_token,
   };
 }
 

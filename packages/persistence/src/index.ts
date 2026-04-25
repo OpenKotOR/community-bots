@@ -1,6 +1,15 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
 import path from "node:path";
+import { promisify } from "node:util";
+
+export * from "./pazaak-account-schema.js";
+export * from "./pazaak-platform-schema.js";
+
+const scrypt = promisify(scryptCallback);
+
+const PASSWORD_HASH_PREFIX = "scrypt-v1";
+const PASSWORD_KEY_LENGTH = 64;
 
 export interface RivalryRecord {
   opponentId: string;
@@ -91,6 +100,406 @@ const createWallet = (userId: string, displayName: string, startingBalance: numb
 export const resolveDataFile = (rootDir: string, fileName: string): string => {
   return path.resolve(rootDir, fileName);
 };
+
+export const hashPazaakPassword = async (password: string): Promise<string> => {
+  const salt = randomBytes(16).toString("base64url");
+  const derived = await scrypt(password, salt, PASSWORD_KEY_LENGTH) as Buffer;
+  return `${PASSWORD_HASH_PREFIX}:${salt}:${derived.toString("base64url")}`;
+};
+
+export const verifyPazaakPassword = async (password: string, storedHash: string): Promise<boolean> => {
+  const [version, salt, hash] = storedHash.split(":");
+
+  if (version !== PASSWORD_HASH_PREFIX || !salt || !hash) {
+    return false;
+  }
+
+  const expected = Buffer.from(hash, "base64url");
+  const actual = await scrypt(password, salt, expected.length) as Buffer;
+  return expected.length === actual.length && timingSafeEqual(expected, actual);
+};
+
+export type PazaakIdentityProvider = "discord";
+
+export type PazaakTableVariant = "canonical" | "multi_seat";
+
+export interface PazaakTableSettings {
+  variant: PazaakTableVariant;
+  maxPlayers: number;
+  maxRounds: number;
+  turnTimerSeconds: number;
+  ranked: boolean;
+  allowAiFill: boolean;
+}
+
+export interface PazaakAccountRecord {
+  accountId: string;
+  username: string;
+  displayName: string;
+  email: string | null;
+  legacyGameUserId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PazaakPasswordCredentialRecord {
+  accountId: string;
+  passwordHash: string;
+  updatedAt: string;
+}
+
+export interface PazaakLinkedIdentityRecord {
+  provider: PazaakIdentityProvider;
+  providerUserId: string;
+  accountId: string;
+  username: string;
+  displayName: string;
+  linkedAt: string;
+  updatedAt: string;
+}
+
+export interface PazaakAccountSessionRecord {
+  sessionId: string;
+  accountId: string;
+  tokenHash: string;
+  label: string | null;
+  createdAt: string;
+  lastUsedAt: string;
+  expiresAt: string;
+}
+
+export interface PazaakResolvedSessionRecord {
+  account: PazaakAccountRecord;
+  session: PazaakAccountSessionRecord;
+}
+
+interface PazaakAccountFileShape {
+  version: 1;
+  accounts: Record<string, PazaakAccountRecord>;
+  passwordCredentials: Record<string, PazaakPasswordCredentialRecord>;
+  linkedIdentities: Record<string, PazaakLinkedIdentityRecord>;
+  sessions: Record<string, PazaakAccountSessionRecord>;
+}
+
+const PAZAAK_SESSION_TOKEN_PREFIX = "paz_session_";
+
+const normalizeAccountLookup = (value: string): string => value.trim().toLowerCase();
+const linkedIdentityKey = (provider: PazaakIdentityProvider, providerUserId: string): string => `${provider}:${providerUserId}`;
+const hashAccountSessionToken = (token: string): string => createHash("sha256").update(token).digest("hex");
+const cloneAccount = (account: PazaakAccountRecord): PazaakAccountRecord => ({ ...account });
+const cloneLinkedIdentity = (identity: PazaakLinkedIdentityRecord): PazaakLinkedIdentityRecord => ({ ...identity });
+const cloneAccountSession = (session: PazaakAccountSessionRecord): PazaakAccountSessionRecord => ({ ...session });
+
+const createUniqueAccountUsername = (state: PazaakAccountFileShape, requestedUsername: string): string => {
+  const fallback = "pazaak-player";
+  const base = requestedUsername
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]+/gu, "-")
+    .replace(/^-+|-+$/gu, "")
+    .slice(0, 28) || fallback;
+  const usedNames = new Set(Object.values(state.accounts).map((account) => normalizeAccountLookup(account.username)));
+
+  if (!usedNames.has(normalizeAccountLookup(base))) {
+    return base;
+  }
+
+  for (let suffix = 2; suffix < 10_000; suffix += 1) {
+    const candidate = `${base.slice(0, 25)}-${suffix}`;
+    if (!usedNames.has(normalizeAccountLookup(candidate))) {
+      return candidate;
+    }
+  }
+
+  return `${fallback}-${randomUUID().slice(0, 8)}`;
+};
+
+export class JsonPazaakAccountRepository {
+  private state?: PazaakAccountFileShape;
+
+  public constructor(private readonly filePath: string) {}
+
+  public async createPasswordAccount(input: {
+    username: string;
+    displayName?: string | undefined;
+    email?: string | null | undefined;
+    passwordHash: string;
+  }): Promise<PazaakAccountRecord> {
+    const state = await this.ensureState();
+    const username = input.username.trim();
+    const email = input.email?.trim() ? normalizeAccountLookup(input.email) : null;
+
+    if (!username) {
+      throw new Error("Username is required.");
+    }
+
+    this.assertUsernameAvailable(state, username);
+    if (email) this.assertEmailAvailable(state, email);
+
+    const now = new Date().toISOString();
+    const account: PazaakAccountRecord = {
+      accountId: randomUUID(),
+      username,
+      displayName: input.displayName?.trim() || username,
+      email,
+      legacyGameUserId: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    state.accounts[account.accountId] = account;
+    state.passwordCredentials[account.accountId] = {
+      accountId: account.accountId,
+      passwordHash: input.passwordHash,
+      updatedAt: now,
+    };
+    await this.persist(state);
+
+    return cloneAccount(account);
+  }
+
+  public async ensureDiscordAccount(input: {
+    discordUserId: string;
+    username: string;
+    displayName: string;
+  }): Promise<{ account: PazaakAccountRecord; identity: PazaakLinkedIdentityRecord }> {
+    const state = await this.ensureState();
+    const key = linkedIdentityKey("discord", input.discordUserId);
+    const now = new Date().toISOString();
+    const existingIdentity = state.linkedIdentities[key];
+
+    if (existingIdentity) {
+      const account = state.accounts[existingIdentity.accountId];
+      if (!account) {
+        throw new Error("Linked Discord account points to a missing account.");
+      }
+
+      account.displayName = input.displayName;
+      account.updatedAt = now;
+      existingIdentity.username = input.username;
+      existingIdentity.displayName = input.displayName;
+      existingIdentity.updatedAt = now;
+      await this.persist(state);
+      return { account: cloneAccount(account), identity: cloneLinkedIdentity(existingIdentity) };
+    }
+
+    const username = createUniqueAccountUsername(state, input.username || input.displayName);
+    const account: PazaakAccountRecord = {
+      accountId: randomUUID(),
+      username,
+      displayName: input.displayName || username,
+      email: null,
+      legacyGameUserId: input.discordUserId,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const identity: PazaakLinkedIdentityRecord = {
+      provider: "discord",
+      providerUserId: input.discordUserId,
+      accountId: account.accountId,
+      username: input.username,
+      displayName: input.displayName,
+      linkedAt: now,
+      updatedAt: now,
+    };
+
+    state.accounts[account.accountId] = account;
+    state.linkedIdentities[key] = identity;
+    await this.persist(state);
+
+    return { account: cloneAccount(account), identity: cloneLinkedIdentity(identity) };
+  }
+
+  public async linkDiscordAccount(accountId: string, input: {
+    discordUserId: string;
+    username: string;
+    displayName: string;
+  }): Promise<PazaakLinkedIdentityRecord> {
+    const state = await this.ensureState();
+    const account = state.accounts[accountId];
+
+    if (!account) {
+      throw new Error("Account not found.");
+    }
+
+    const key = linkedIdentityKey("discord", input.discordUserId);
+    const existingIdentity = state.linkedIdentities[key];
+
+    if (existingIdentity && existingIdentity.accountId !== accountId) {
+      throw new Error("That Discord account is already linked to another account.");
+    }
+
+    const now = new Date().toISOString();
+    const identity: PazaakLinkedIdentityRecord = {
+      provider: "discord",
+      providerUserId: input.discordUserId,
+      accountId,
+      username: input.username,
+      displayName: input.displayName,
+      linkedAt: existingIdentity?.linkedAt ?? now,
+      updatedAt: now,
+    };
+
+    state.linkedIdentities[key] = identity;
+    account.updatedAt = now;
+    await this.persist(state);
+
+    return cloneLinkedIdentity(identity);
+  }
+
+  public async unlinkDiscordAccount(accountId: string, discordUserId: string): Promise<boolean> {
+    const state = await this.ensureState();
+    const key = linkedIdentityKey("discord", discordUserId);
+    const identity = state.linkedIdentities[key];
+
+    if (!identity || identity.accountId !== accountId) {
+      return false;
+    }
+
+    delete state.linkedIdentities[key];
+    const account = state.accounts[accountId];
+    if (account) account.updatedAt = new Date().toISOString();
+    await this.persist(state);
+    return true;
+  }
+
+  public async getAccount(accountId: string): Promise<PazaakAccountRecord | undefined> {
+    const state = await this.ensureState();
+    const account = state.accounts[accountId];
+    return account ? cloneAccount(account) : undefined;
+  }
+
+  public async findPasswordAccount(identifier: string): Promise<{ account: PazaakAccountRecord; credential: PazaakPasswordCredentialRecord } | undefined> {
+    const state = await this.ensureState();
+    const normalized = normalizeAccountLookup(identifier);
+    const account = Object.values(state.accounts).find((candidate) => (
+      normalizeAccountLookup(candidate.username) === normalized || candidate.email === normalized
+    ));
+
+    if (!account) {
+      return undefined;
+    }
+
+    const credential = state.passwordCredentials[account.accountId];
+    return credential ? { account: cloneAccount(account), credential: { ...credential } } : undefined;
+  }
+
+  public async listLinkedIdentities(accountId: string): Promise<readonly PazaakLinkedIdentityRecord[]> {
+    const state = await this.ensureState();
+    return Object.values(state.linkedIdentities)
+      .filter((identity) => identity.accountId === accountId)
+      .map(cloneLinkedIdentity)
+      .sort((left, right) => left.provider.localeCompare(right.provider));
+  }
+
+  public async createSession(accountId: string, input: { expiresAt: string; label?: string | null | undefined }): Promise<{ token: string; session: PazaakAccountSessionRecord }> {
+    const state = await this.ensureState();
+
+    if (!state.accounts[accountId]) {
+      throw new Error("Account not found.");
+    }
+
+    const sessionId = randomUUID();
+    const token = `${PAZAAK_SESSION_TOKEN_PREFIX}${sessionId}.${randomUUID().replace(/-/gu, "")}`;
+    const now = new Date().toISOString();
+    const session: PazaakAccountSessionRecord = {
+      sessionId,
+      accountId,
+      tokenHash: hashAccountSessionToken(token),
+      label: input.label ?? null,
+      createdAt: now,
+      lastUsedAt: now,
+      expiresAt: input.expiresAt,
+    };
+
+    state.sessions[sessionId] = session;
+    await this.persist(state);
+
+    return { token, session: cloneAccountSession(session) };
+  }
+
+  public async resolveSessionToken(token: string): Promise<PazaakResolvedSessionRecord | undefined> {
+    if (!token.startsWith(PAZAAK_SESSION_TOKEN_PREFIX)) {
+      return undefined;
+    }
+
+    const state = await this.ensureState();
+    const tokenHash = hashAccountSessionToken(token);
+    const session = Object.values(state.sessions).find((candidate) => candidate.tokenHash === tokenHash);
+
+    if (!session) {
+      return undefined;
+    }
+
+    if (new Date(session.expiresAt).getTime() <= Date.now()) {
+      delete state.sessions[session.sessionId];
+      await this.persist(state);
+      return undefined;
+    }
+
+    const account = state.accounts[session.accountId];
+    if (!account) {
+      delete state.sessions[session.sessionId];
+      await this.persist(state);
+      return undefined;
+    }
+
+    session.lastUsedAt = new Date().toISOString();
+    await this.persist(state);
+    return { account: cloneAccount(account), session: cloneAccountSession(session) };
+  }
+
+  public async deleteSession(sessionId: string): Promise<boolean> {
+    const state = await this.ensureState();
+
+    if (!state.sessions[sessionId]) {
+      return false;
+    }
+
+    delete state.sessions[sessionId];
+    await this.persist(state);
+    return true;
+  }
+
+  private async ensureState(): Promise<PazaakAccountFileShape> {
+    if (this.state) return this.state;
+    await mkdir(path.dirname(this.filePath), { recursive: true });
+
+    try {
+      const raw = await readFile(this.filePath, "utf8");
+      this.state = JSON.parse(raw) as PazaakAccountFileShape;
+    } catch {
+      this.state = {
+        version: 1,
+        accounts: {},
+        passwordCredentials: {},
+        linkedIdentities: {},
+        sessions: {},
+      };
+      await this.persist(this.state);
+    }
+
+    return this.state;
+  }
+
+  private assertUsernameAvailable(state: PazaakAccountFileShape, username: string): void {
+    const normalized = normalizeAccountLookup(username);
+    const existing = Object.values(state.accounts).find((account) => normalizeAccountLookup(account.username) === normalized);
+    if (existing) {
+      throw new Error("That username is already taken.");
+    }
+  }
+
+  private assertEmailAvailable(state: PazaakAccountFileShape, email: string): void {
+    const existing = Object.values(state.accounts).find((account) => account.email === email);
+    if (existing) {
+      throw new Error("That email is already in use.");
+    }
+  }
+
+  private async persist(state: PazaakAccountFileShape): Promise<void> {
+    await writeFile(this.filePath, JSON.stringify(state, null, 2), "utf8");
+  }
+}
 
 export class JsonWalletRepository {
   private state?: WalletFileShape;
@@ -718,7 +1127,8 @@ export class JsonPazaakMatchmakingQueueRepository {
   }
 }
 
-export type PazaakLobbyStatus = "waiting" | "in_game" | "closed";
+export type PazaakLobbyStatus = "waiting" | "matchmaking" | "in_game" | "closed";
+export type PazaakLobbyPlayerConnectionStatus = "connected" | "disconnected" | "ai_takeover";
 
 export interface PazaakLobbyPlayerRecord {
   userId: string;
@@ -727,14 +1137,17 @@ export interface PazaakLobbyPlayerRecord {
   isHost: boolean;
   isAi: boolean;
   aiDifficulty?: "easy" | "hard" | "professional" | undefined;
+  connectionStatus: PazaakLobbyPlayerConnectionStatus;
   joinedAt: string;
 }
 
 export interface PazaakLobbyRecord {
   id: string;
+  lobbyCode: string;
   name: string;
   hostUserId: string;
   maxPlayers: number;
+  tableSettings: PazaakTableSettings;
   passwordHash: string | null;
   status: PazaakLobbyStatus;
   matchId: string | null;
@@ -749,9 +1162,49 @@ interface PazaakLobbyFileShape {
 }
 
 const hashLobbyPassword = (password: string): string => createHash("sha256").update(password).digest("hex");
+const normalizeLobbyCode = (value: string): string => value.trim().toUpperCase();
+
+const createLobbyCode = (state: PazaakLobbyFileShape): string => {
+  const used = new Set(Object.values(state.lobbies).map((lobby) => normalizeLobbyCode(lobby.lobbyCode ?? "")));
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+  for (let attempt = 0; attempt < 20_000; attempt += 1) {
+    let code = "";
+    for (let index = 0; index < 6; index += 1) {
+      code += alphabet[Math.floor(Math.random() * alphabet.length)]!;
+    }
+
+    if (!used.has(code)) {
+      return code;
+    }
+  }
+
+  return randomUUID().slice(0, 6).toUpperCase();
+};
+
+const normalizeTableSettings = (settings?: Partial<PazaakTableSettings> | undefined): PazaakTableSettings => {
+  const variant = settings?.variant === "multi_seat" ? "multi_seat" : "canonical";
+  const maxPlayers = Math.max(2, Math.min(5, Math.trunc(settings?.maxPlayers ?? 2)));
+  const maxRounds = Math.max(1, Math.min(9, Math.trunc(settings?.maxRounds ?? 3)));
+  const turnTimerSeconds = Math.max(0, Math.min(300, Math.trunc(settings?.turnTimerSeconds ?? 120)));
+
+  return {
+    variant,
+    maxPlayers: variant === "canonical" ? 2 : maxPlayers,
+    maxRounds,
+    turnTimerSeconds,
+    ranked: settings?.ranked ?? variant === "canonical",
+    allowAiFill: settings?.allowAiFill ?? true,
+  };
+};
+
 const cloneLobby = (lobby: PazaakLobbyRecord): PazaakLobbyRecord => ({
   ...lobby,
-  players: lobby.players.map((player) => ({ ...player })),
+  tableSettings: normalizeTableSettings(lobby.tableSettings),
+  players: lobby.players.map((player) => ({
+    ...player,
+    connectionStatus: player.connectionStatus ?? (player.isAi ? "ai_takeover" : "connected"),
+  })),
 });
 
 export class JsonPazaakLobbyRepository {
@@ -762,7 +1215,7 @@ export class JsonPazaakLobbyRepository {
   public async listOpen(): Promise<readonly PazaakLobbyRecord[]> {
     const state = await this.ensureState();
     return Object.values(state.lobbies)
-      .filter((lobby) => lobby.status === "waiting")
+      .filter((lobby) => lobby.status === "waiting" || lobby.status === "matchmaking")
       .map(cloneLobby)
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
   }
@@ -773,20 +1226,37 @@ export class JsonPazaakLobbyRepository {
     return lobby ? cloneLobby(lobby) : undefined;
   }
 
+  public async getByCode(lobbyCode: string): Promise<PazaakLobbyRecord | undefined> {
+    const state = await this.ensureState();
+    const normalized = normalizeLobbyCode(lobbyCode);
+    const lobby = Object.values(state.lobbies).find((candidate) => (
+      (candidate.status === "waiting" || candidate.status === "matchmaking")
+      && normalizeLobbyCode(candidate.lobbyCode) === normalized
+    ));
+    return lobby ? cloneLobby(lobby) : undefined;
+  }
+
   public async create(input: {
     name: string;
     hostUserId: string;
     hostName: string;
     maxPlayers: number;
     password?: string | undefined;
+    tableSettings?: Partial<PazaakTableSettings> | undefined;
   }): Promise<PazaakLobbyRecord> {
     const state = await this.ensureState();
     const now = new Date().toISOString();
+    const tableSettings = normalizeTableSettings({
+      ...input.tableSettings,
+      maxPlayers: input.tableSettings?.maxPlayers ?? input.maxPlayers,
+    });
     const lobby: PazaakLobbyRecord = {
       id: randomUUID(),
+      lobbyCode: createLobbyCode(state),
       name: input.name.trim() || `${input.hostName}'s Table`,
       hostUserId: input.hostUserId,
-      maxPlayers: Math.max(2, Math.min(5, input.maxPlayers)),
+      maxPlayers: tableSettings.maxPlayers,
+      tableSettings,
       passwordHash: input.password ? hashLobbyPassword(input.password) : null,
       status: "waiting",
       matchId: null,
@@ -796,6 +1266,7 @@ export class JsonPazaakLobbyRepository {
         ready: true,
         isHost: true,
         isAi: false,
+        connectionStatus: "connected",
         joinedAt: now,
       }],
       createdAt: now,
@@ -825,6 +1296,7 @@ export class JsonPazaakLobbyRepository {
       ready: false,
       isHost: false,
       isAi: false,
+      connectionStatus: "connected",
       joinedAt: new Date().toISOString(),
     }];
     lobby.updatedAt = new Date().toISOString();
@@ -861,8 +1333,41 @@ export class JsonPazaakLobbyRepository {
       isHost: false,
       isAi: true,
       aiDifficulty: difficulty,
+      connectionStatus: "ai_takeover",
       joinedAt: new Date().toISOString(),
     }];
+    lobby.updatedAt = new Date().toISOString();
+    await this.persist(state);
+    return cloneLobby(lobby);
+  }
+
+  public async updateAiDifficulty(
+    lobbyId: string,
+    hostUserId: string,
+    aiUserId: string,
+    difficulty: "easy" | "hard" | "professional",
+  ): Promise<PazaakLobbyRecord> {
+    const state = await this.ensureState();
+    const lobby = this.getMutableLobby(state, lobbyId);
+
+    if (lobby.hostUserId !== hostUserId) {
+      throw new Error("Only the lobby host can update AI seat difficulty.");
+    }
+
+    const aiSeat = lobby.players.find((player) => player.userId === aiUserId);
+    if (!aiSeat || !aiSeat.isAi) {
+      throw new Error("AI seat not found.");
+    }
+
+    lobby.players = lobby.players.map((player) => {
+      if (player.userId !== aiUserId) return player;
+
+      return {
+        ...player,
+        aiDifficulty: difficulty,
+        displayName: `${difficulty[0]!.toUpperCase()}${difficulty.slice(1)} AI ${player.userId.split(":").pop() ?? ""}`.trim(),
+      };
+    });
     lobby.updatedAt = new Date().toISOString();
     await this.persist(state);
     return cloneLobby(lobby);
@@ -898,6 +1403,28 @@ export class JsonPazaakLobbyRepository {
     return cloneLobby(lobby);
   }
 
+  public async setStatus(
+    lobbyId: string,
+    hostUserId: string,
+    status: "waiting" | "matchmaking",
+  ): Promise<PazaakLobbyRecord> {
+    const state = await this.ensureState();
+    const lobby = state.lobbies[lobbyId];
+
+    if (!lobby || (lobby.status !== "waiting" && lobby.status !== "matchmaking")) {
+      throw new Error("That lobby is not available.");
+    }
+
+    if (lobby.hostUserId !== hostUserId) {
+      throw new Error("Only the lobby host can update lobby status.");
+    }
+
+    lobby.status = status;
+    lobby.updatedAt = new Date().toISOString();
+    await this.persist(state);
+    return cloneLobby(lobby);
+  }
+
   private async ensureState(): Promise<PazaakLobbyFileShape> {
     if (this.state) return this.state;
     await mkdir(path.dirname(this.filePath), { recursive: true });
@@ -905,6 +1432,15 @@ export class JsonPazaakLobbyRepository {
     try {
       const raw = await readFile(this.filePath, "utf8");
       this.state = JSON.parse(raw) as PazaakLobbyFileShape;
+      for (const lobby of Object.values(this.state.lobbies)) {
+        lobby.lobbyCode = lobby.lobbyCode ? normalizeLobbyCode(lobby.lobbyCode) : createLobbyCode(this.state);
+        lobby.tableSettings = normalizeTableSettings(lobby.tableSettings ?? { maxPlayers: lobby.maxPlayers });
+        lobby.maxPlayers = lobby.tableSettings.maxPlayers;
+        lobby.players = lobby.players.map((player) => ({
+          ...player,
+          connectionStatus: player.connectionStatus ?? (player.isAi ? "ai_takeover" : "connected"),
+        }));
+      }
     } catch {
       this.state = { version: 1, lobbies: {} };
       await this.persist(this.state);
@@ -916,7 +1452,7 @@ export class JsonPazaakLobbyRepository {
   private getMutableLobby(state: PazaakLobbyFileShape, lobbyId: string): PazaakLobbyRecord {
     const lobby = state.lobbies[lobbyId];
 
-    if (!lobby || lobby.status !== "waiting") {
+    if (!lobby || (lobby.status !== "waiting" && lobby.status !== "matchmaking")) {
       throw new Error("That lobby is not available.");
     }
 
