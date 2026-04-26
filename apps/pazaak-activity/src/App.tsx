@@ -1,34 +1,176 @@
-import { useState, useEffect, useCallback } from "react";
-import type { AdvisorDifficulty, LeaderboardEntry, MatchmakingQueueRecord, PazaakLobbyRecord, PazaakMatchHistoryRecord, PazaakTableVariant, SerializedMatch, WalletRecord } from "./types.ts";
+import { useState, useEffect, useCallback, useMemo, useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { MAIN_MENU_PRESET, type MainMenuIconKey } from "@openkotor/pazaak-engine/menu-preset";
+import type { AdvisorDifficulty, LeaderboardEntry, MatchmakingQueueRecord, PazaakLobbyRecord, PazaakMatchHistoryRecord, PazaakTableVariant, PazaakUserSettings, SerializedMatch, WalletRecord } from "./types.ts";
 import { initDiscordAuth, closeActivity, isDiscordActivity } from "./discord.ts";
+import { getDefaultLocalOpponentForDifficulty, localOpponents, type LocalOpponentProfile } from "./localOpponents.ts";
 import {
   addLobbyAi,
   createLobby,
   enqueueMatchmaking,
+  fetchSocialAuthProviders,
   fetchMatchmakingStats,
   fetchMatchmakingStatus,
   fetchHistory,
   fetchLeaderboard,
   fetchLobbies,
+  fetchAuthSession,
   fetchMe,
   fetchMyMatch,
   joinLobby,
   joinLobbyByCode,
   leaveLobby,
   leaveMatchmaking,
+  logoutAccount,
   loginAccount,
   registerAccount,
+  startSocialAuth,
+  type SocialAuthProvider,
+  type SocialAuthProviderConfig,
   updateLobbyAiDifficulty,
+  updateSettings,
   type MatchSocketConnectionState,
   setLobbyReady,
   setLobbyStatus,
   startLobby,
+  subscribeToLobbies,
   subscribeToMatch,
+  sendChatMessage,
+  type ChatMessage,
 } from "./api.ts";
 import { GameBoard } from "./components/GameBoard.tsx";
 import { LocalPracticeGame } from "./components/LocalPracticeGame.tsx";
 import { QuickSideboardSwitcher } from "./components/QuickSideboardSwitcher.tsx";
 import { SideboardWorkshop } from "./components/SideboardWorkshop.tsx";
+import { GlobalAccountCorner } from "./components/GlobalAccountCorner.tsx";
+import { soundManager } from "./utils/soundManager.ts";
+import { ConnectionStatus } from "./components/ConnectionStatus.tsx";
+
+const STANDALONE_AUTH_TOKEN_KEY = "pazaak-activity-standalone-auth-token-v1";
+const USER_SETTINGS_STORAGE_KEY = "pazaak-user-settings-v1";
+
+const loadUserSettings = (): PazaakUserSettings => {
+  try {
+    const stored = window.localStorage.getItem(USER_SETTINGS_STORAGE_KEY);
+    if (stored) {
+      return { ...DEFAULT_USER_SETTINGS, ...JSON.parse(stored) };
+    }
+  } catch {
+    // Use defaults
+  }
+  return DEFAULT_USER_SETTINGS;
+};
+
+const saveUserSettings = (settings: PazaakUserSettings): void => {
+  try {
+    window.localStorage.setItem(USER_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+  } catch {
+    // Ignore storage failures
+  }
+};
+
+const getStoredStandaloneAuthToken = (): string => {
+  try {
+    return window.localStorage.getItem(STANDALONE_AUTH_TOKEN_KEY)?.trim() || "";
+  } catch {
+    return "";
+  }
+};
+
+const setStoredStandaloneAuthToken = (token: string): void => {
+  try {
+    window.localStorage.setItem(STANDALONE_AUTH_TOKEN_KEY, token);
+  } catch {
+    // Ignore storage failures (private mode/storage disabled).
+  }
+};
+
+const clearStoredStandaloneAuthToken = (): void => {
+  try {
+    window.localStorage.removeItem(STANDALONE_AUTH_TOKEN_KEY);
+  } catch {
+    // Ignore storage failures (private mode/storage disabled).
+  }
+};
+
+const MENU_ICON_MAP: Record<MainMenuIconKey, string> = {
+  rocket: "◆",
+  robot: "◈",
+  seedling: "◇",
+  brain: "◉",
+  crown: "★",
+  bolt: "⚡",
+  search: "⌕",
+  users: "◎",
+  plus: "+",
+  signin: "↦",
+  scroll: "▤",
+  target: "◎",
+  layers: "▦",
+  star: "✶",
+  settings: "⚙",
+  user: "◌",
+};
+
+const menuIcon = (icon: MainMenuIconKey): string => MENU_ICON_MAP[icon] ?? "•";
+
+const formatDifficultyLabel = (difficulty: AdvisorDifficulty): string => {
+  if (difficulty === "easy") {
+    return "Easy";
+  }
+
+  if (difficulty === "hard") {
+    return "Hard";
+  }
+
+  return "Professional";
+};
+
+const formatVendorDifficultyLabel = (difficulty: LocalOpponentProfile["vendorDifficulty"]): string => {
+  return difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+};
+
+const DEFAULT_USER_SETTINGS: PazaakUserSettings = {
+  theme: "kotor",
+  soundEnabled: false,
+  reducedMotionEnabled: false,
+  turnTimerSeconds: 45,
+  preferredAiDifficulty: "professional",
+};
+
+const areUserSettingsEqual = (left: PazaakUserSettings, right: PazaakUserSettings): boolean => {
+  return left.theme === right.theme
+    && left.soundEnabled === right.soundEnabled
+    && left.reducedMotionEnabled === right.reducedMotionEnabled
+    && left.turnTimerSeconds === right.turnTimerSeconds
+    && left.preferredAiDifficulty === right.preferredAiDifficulty;
+};
+
+function ProviderMark({ provider }: { provider: SocialAuthProvider }) {
+  if (provider === "google") {
+    return (
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.7 1.1 7.8 3l5.7-5.7C34.1 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z" />
+        <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 18.9 12 24 12c3 0 5.7 1.1 7.8 3l5.7-5.7C34.1 6.1 29.3 4 24 4c-7.7 0-14.3 4.3-17.7 10.7z" />
+        <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.3-5.3l-6.5-5.5C29 34.6 26.6 36 24 36c-5.2 0-9.6-3.5-11.2-8.2l-6.6 5.1C9.5 39.5 16.2 44 24 44z" />
+        <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-1.1 3-3 5.5-5.5 7.2l.1-.1 6.5 5.5C36 41 44 35 44 24c0-1.3-.1-2.3-.4-3.5z" />
+      </svg>
+    );
+  }
+
+  if (provider === "discord") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+        <path d="M20.317 4.369A19.791 19.791 0 0 0 15.885 3c-.191.328-.403.769-.553 1.117a18.27 18.27 0 0 0-5.364 0A11.427 11.427 0 0 0 9.415 3a19.736 19.736 0 0 0-4.433 1.369C2.177 8.523 1.41 12.57 1.793 16.562a19.9 19.9 0 0 0 5.293 2.677 13.06 13.06 0 0 0 1.134-1.842 12.955 12.955 0 0 1-1.789-.861c.15-.109.296-.222.438-.338 3.45 1.623 7.196 1.623 10.605 0 .143.116.289.229.439.338-.571.333-1.172.62-1.793.862.32.658.699 1.272 1.133 1.84a19.863 19.863 0 0 0 5.295-2.676c.468-4.627-.798-8.637-3.24-12.193ZM9.954 14.144c-1.03 0-1.874-.947-1.874-2.11 0-1.164.826-2.111 1.874-2.111 1.057 0 1.892.956 1.874 2.11 0 1.164-.826 2.11-1.874 2.11Zm4.092 0c-1.03 0-1.874-.947-1.874-2.11 0-1.164.826-2.111 1.874-2.111 1.057 0 1.892.956 1.874 2.11 0 1.164-.817 2.11-1.874 2.11Z" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+      <path d="M12 .5C5.649.5.5 5.649.5 12A11.5 11.5 0 0 0 8.36 22.06c.575.106.785-.25.785-.556 0-.274-.01-1-.016-1.962-3.184.692-3.855-1.534-3.855-1.534-.52-1.322-1.27-1.674-1.27-1.674-1.037-.709.08-.695.08-.695 1.147.08 1.75 1.178 1.75 1.178 1.02 1.748 2.675 1.243 3.326.95.104-.739.4-1.244.727-1.53-2.542-.289-5.215-1.271-5.215-5.657 0-1.249.446-2.27 1.176-3.07-.118-.289-.51-1.452.111-3.027 0 0 .96-.307 3.145 1.173a10.93 10.93 0 0 1 5.728 0c2.184-1.48 3.143-1.173 3.143-1.173.623 1.575.231 2.738.113 3.027.732.8 1.174 1.821 1.174 3.07 0 4.397-2.677 5.365-5.227 5.648.412.355.779 1.058.779 2.133 0 1.54-.014 2.782-.014 3.16 0 .309.207.668.79.554A11.502 11.502 0 0 0 23.5 12C23.5 5.649 18.351.5 12 .5Z" />
+    </svg>
+  );
+}
 
 type ActivitySession = {
   userId: string;
@@ -47,18 +189,244 @@ type AppState =
   | { stage: "mode_selection"; auth: ActivitySession }
   | { stage: "matchmaking"; auth: ActivitySession; preferredMaxPlayers: number }
   | { stage: "lobby"; auth: ActivitySession }
-  | { stage: "local_game"; auth: ActivitySession; difficulty: AdvisorDifficulty }
+  | { stage: "local_game"; auth: ActivitySession; difficulty: AdvisorDifficulty; opponentId?: string }
   | { stage: "workshop"; auth: ActivitySession; returnTo: "lobby" | "game"; match?: SerializedMatch }
   | { stage: "game"; auth: ActivitySession; match: SerializedMatch };
+
+function getSessionFromAppState(state: AppState): ActivitySession | null {
+  switch (state.stage) {
+    case "loading":
+    case "auth_error":
+    case "standalone_auth":
+      return null;
+    case "mode_selection":
+    case "matchmaking":
+    case "lobby":
+    case "local_game":
+    case "workshop":
+    case "game":
+      return state.auth;
+  }
+}
 
 export default function App() {
   const [state, setState] = useState<AppState>({ stage: "loading" });
   const [matchSocketState, setMatchSocketState] = useState<MatchSocketConnectionState>("connecting");
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
+  const [cornerWallet, setCornerWallet] = useState<WalletRecord | null>(null);
+  const [cornerBusy, setCornerBusy] = useState(false);
+  const activeSession = getSessionFromAppState(state);
+  const [userSettings, setUserSettings] = useState<PazaakUserSettings>(loadUserSettings);
+
+  const handleSettingsSave = useCallback(async (settings: PazaakUserSettings) => {
+    setUserSettings(settings);
+    saveUserSettings(settings);
+    soundManager.setEnabled(settings.soundEnabled);
+
+    if (activeSession?.accessToken) {
+      try {
+        await updateSettings(activeSession.accessToken, settings);
+      } catch (error) {
+        console.error("Failed to save settings to server:", error);
+      }
+    }
+  }, [activeSession?.accessToken]);
+
+  useEffect(() => {
+    if (!activeSession?.accessToken) {
+      setCornerWallet(null);
+      return;
+    }
+
+    let cancelled = false;
+    fetchMe(activeSession.accessToken)
+      .then((data) => {
+        if (!cancelled) {
+          setCornerWallet(data.wallet);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCornerWallet(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSession?.accessToken]);
+
+  const handleCornerRefresh = useCallback(async () => {
+    if (!activeSession?.accessToken) {
+      return;
+    }
+
+    setCornerBusy(true);
+    try {
+      const data = await fetchMe(activeSession.accessToken);
+      setCornerWallet(data.wallet);
+    } finally {
+      setCornerBusy(false);
+    }
+  }, [activeSession?.accessToken]);
+
+  const handleCornerLogout = useCallback(async () => {
+    if (!activeSession?.accessToken) {
+      if (!isDiscordActivity()) {
+        setState({ stage: "standalone_auth" });
+      }
+      return;
+    }
+
+    setCornerBusy(true);
+    try {
+      await logoutAccount(activeSession.accessToken);
+    } catch {
+      // Continue local cleanup even if remote logout fails.
+    } finally {
+      clearStoredStandaloneAuthToken();
+      setCornerWallet(null);
+      setCornerBusy(false);
+    }
+
+    if (isDiscordActivity()) {
+      try {
+        const auth = await initDiscordAuth();
+        const match = await fetchMyMatch(auth.accessToken);
+        const session: ActivitySession = {
+          userId: auth.userId,
+          username: auth.username,
+          accessToken: auth.accessToken,
+        };
+        setState(match
+          ? { stage: "game", auth: session, match }
+          : { stage: "mode_selection", auth: session });
+        return;
+      } catch {
+        setState({ stage: "auth_error", message: "Signed out. Reconnect to continue." });
+        return;
+      }
+    }
+
+    setState({ stage: "standalone_auth", message: "Signed out." });
+  }, [activeSession?.accessToken]);
+
+  const withGlobalAccountCorner = useCallback((content: React.ReactNode) => (
+    <>
+      {content}
+      <GlobalAccountCorner
+        username={activeSession?.username ?? "Guest Pilot"}
+        mmr={cornerWallet?.mmr ?? (activeSession ? 1000 : null)}
+        isOnline={isOnline}
+        canLogout={Boolean(activeSession?.accessToken)}
+        canJumpToLobby={Boolean(activeSession?.accessToken) && state.stage !== "lobby"}
+        busy={cornerBusy}
+        currentSettings={userSettings}
+        socketState={matchSocketState}
+        onRefresh={handleCornerRefresh}
+        onJumpToLobby={() => {
+          if (!activeSession) return;
+          setState({ stage: "lobby", auth: activeSession });
+        }}
+        onLogout={handleCornerLogout}
+        onSettingsSave={handleSettingsSave}
+        onSignIn={() => {
+          if (state.stage === "standalone_auth") {
+            soundManager.playErrorSound();
+            window.dispatchEvent(new CustomEvent("pazaak-open-auth-dialog"));
+            return;
+          }
+          if (isDiscordActivity()) {
+            window.location.reload();
+            return;
+          }
+          setState({ stage: "standalone_auth" });
+        }}
+      />
+    </>
+  ), [activeSession, cornerBusy, cornerWallet?.mmr, handleCornerLogout, handleCornerRefresh, isOnline, state.stage, userSettings, matchSocketState, handleSettingsSave]);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  // Update browser tab title based on current stage.
+  useEffect(() => {
+    const stageTitles: Partial<Record<AppState["stage"], string>> = {
+      loading: "PazaakWorld — Loading",
+      standalone_auth: "PazaakWorld — Sign In",
+      auth_error: "PazaakWorld — Error",
+      mode_selection: "PazaakWorld — Choose Mode",
+      matchmaking: "PazaakWorld — Finding Match…",
+      lobby: "PazaakWorld — Lobby",
+      local_game: "PazaakWorld — Practice",
+      workshop: "PazaakWorld — Sideboard Workshop",
+      game: "PazaakWorld — Match",
+    };
+    document.title = stageTitles[state.stage] ?? "PazaakWorld";
+  }, [state.stage]);
 
   // On mount: run Discord SDK auth, then poll for an active match.
   useEffect(() => {
     (async () => {
       try {
+        if (!isDiscordActivity()) {
+          const params = new URLSearchParams(window.location.search);
+          const oauthToken = params.get("oauth_app_token")?.trim() || "";
+          const oauthError = params.get("oauth_error")?.trim() || "";
+          const clearOauthQuery = () => {
+            params.delete("oauth_app_token");
+            params.delete("oauth_user_id");
+            params.delete("oauth_username");
+            params.delete("oauth_provider");
+            params.delete("oauth_error");
+            params.delete("oauth_error_description");
+            window.history.replaceState({}, "", `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`);
+          };
+
+          if (oauthError) {
+            setState({ stage: "standalone_auth", message: decodeURIComponent(oauthError) });
+            clearOauthQuery();
+            return;
+          }
+
+          const accessToken = oauthToken || getStoredStandaloneAuthToken();
+          if (accessToken) {
+            try {
+              const sessionInfo = await fetchAuthSession(accessToken);
+              const username = sessionInfo.account.displayName;
+              const userId = sessionInfo.account.legacyGameUserId ?? sessionInfo.account.accountId;
+              const authSession: ActivitySession = {
+                userId,
+                username,
+                accessToken,
+              };
+
+              setStoredStandaloneAuthToken(accessToken);
+              const match = await fetchMyMatch(accessToken);
+              setState(match
+                ? { stage: "game", auth: authSession, match }
+                : { stage: "mode_selection", auth: authSession });
+              clearOauthQuery();
+              return;
+            } catch {
+              clearStoredStandaloneAuthToken();
+              clearOauthQuery();
+            }
+          }
+
+          setState({ stage: "standalone_auth" });
+          return;
+        }
+
         const auth = await initDiscordAuth();
         const match = await fetchMyMatch(auth.accessToken);
 
@@ -98,9 +466,11 @@ export default function App() {
 
   useEffect(() => {
     if (state.stage !== "game") return;
+    setChatMessages([]);
     const unsubscribe = subscribeToMatch(state.match.id, handleMatchUpdate, {
       reconnect: true,
       onConnectionChange: setMatchSocketState,
+      onChatMessage: (msg) => setChatMessages((prev) => [...prev, msg].slice(-100)),
     });
     return unsubscribe;
     // Re-subscribe only when the match ID changes.
@@ -125,18 +495,20 @@ export default function App() {
   }, []);
 
   if (state.stage === "loading") {
-    return <LoadingScreen />;
+    return withGlobalAccountCorner(<LoadingScreen />);
   }
 
   if (state.stage === "auth_error") {
-    return <ErrorScreen message={state.message} />;
+    return withGlobalAccountCorner(<ErrorScreen message={state.message} />);
   }
 
   if (state.stage === "standalone_auth") {
-    return (
+    return withGlobalAccountCorner(
       <StandaloneAuthScreen
         message={state.message}
+        isOnline={isOnline}
         onAuthenticated={async (session) => {
+          setStoredStandaloneAuthToken(session.accessToken);
           const match = await fetchMyMatch(session.accessToken);
           if (match) {
             setState({ stage: "game", auth: session, match });
@@ -144,15 +516,16 @@ export default function App() {
           }
           setState({ stage: "mode_selection", auth: session });
         }}
-        onStartGuestLocal={(difficulty) => {
+        onStartGuestLocal={(difficulty, opponentId, guestName) => {
           setState({
             stage: "local_game",
             auth: {
               userId: "guest-local",
-              username: "Guest Pilot",
+              username: guestName?.trim() || "Guest Pilot",
               accessToken: "",
             },
             difficulty,
+            ...(opponentId ? { opponentId } : {}),
           });
         }}
       />
@@ -160,18 +533,25 @@ export default function App() {
   }
 
   if (state.stage === "mode_selection") {
-    return (
+    return withGlobalAccountCorner(
       <ModeSelectionScreen
         username={state.auth.username}
+        mmr={cornerWallet?.mmr ?? 1000}
         onOpenLobbies={() => setState({ stage: "lobby", auth: state.auth })}
         onQuickMatch={(preferredMaxPlayers) => setState({ stage: "matchmaking", auth: state.auth, preferredMaxPlayers })}
-        onStartLocalGame={(difficulty) => setState({ stage: "local_game", auth: state.auth, difficulty })}
+        onStartLocalGame={(difficulty, opponentId) => setState({
+          stage: "local_game",
+          auth: state.auth,
+          difficulty,
+          ...(opponentId ? { opponentId } : {}),
+        })}
+        isOnline={isOnline}
       />
     );
   }
 
   if (state.stage === "matchmaking") {
-    return (
+    return withGlobalAccountCorner(
       <MatchmakingScreen
         accessToken={state.auth.accessToken}
         preferredMaxPlayers={state.preferredMaxPlayers}
@@ -182,23 +562,29 @@ export default function App() {
   }
 
   if (state.stage === "lobby") {
-    return (
+    return withGlobalAccountCorner(
       <LobbyScreen
         accessToken={state.auth.accessToken}
         userId={state.auth.userId}
         username={state.auth.username}
         onOpenWorkshop={() => setState({ stage: "workshop", auth: state.auth, returnTo: "lobby" })}
         onEnterMatch={(match) => setState({ stage: "game", auth: state.auth, match })}
-        onStartLocalGame={(difficulty) => setState({ stage: "local_game", auth: state.auth, difficulty })}
+        onStartLocalGame={(difficulty, opponentId) => setState({
+          stage: "local_game",
+          auth: state.auth,
+          difficulty,
+          ...(opponentId ? { opponentId } : {}),
+        })}
       />
     );
   }
 
   if (state.stage === "local_game") {
-    return (
+    return withGlobalAccountCorner(
       <LocalPracticeGame
         username={state.auth.username}
         difficulty={state.difficulty}
+        opponentId={state.opponentId}
         onExit={() => {
           if (state.auth.accessToken) {
             setState({ stage: "mode_selection", auth: state.auth });
@@ -212,7 +598,7 @@ export default function App() {
   }
 
   if (state.stage === "workshop") {
-    return (
+    return withGlobalAccountCorner(
       <SideboardWorkshop
         accessToken={state.auth.accessToken}
         username={state.auth.username}
@@ -222,12 +608,14 @@ export default function App() {
   }
 
   // stage === "game"
-  return (
+  return withGlobalAccountCorner(
     <GameBoard
       match={state.match}
       userId={state.auth.userId}
       accessToken={state.auth.accessToken}
       socketState={matchSocketState}
+      chatMessages={chatMessages}
+      onSendChat={(text) => { void sendChatMessage(state.match.id, state.auth.accessToken, text); }}
       onMatchUpdate={(match) => setState({ stage: "game", auth: state.auth, match })}
       onOpenWorkshop={() => setState({ stage: "workshop", auth: state.auth, returnTo: "game", match: state.match })}
       onReturnToLobby={() => setState({ stage: "lobby", auth: state.auth })}
@@ -238,73 +626,305 @@ export default function App() {
 
 function ModeSelectionScreen({
   username,
+  mmr,
   onOpenLobbies,
   onQuickMatch,
   onStartLocalGame,
+  isOnline = true,
 }: {
   username: string;
+  mmr?: number | null;
   onOpenLobbies: () => void;
   onQuickMatch: (preferredMaxPlayers: number) => void;
-  onStartLocalGame: (difficulty: AdvisorDifficulty) => void;
+  onStartLocalGame: (difficulty: AdvisorDifficulty, opponentId?: string) => void;
+  isOnline?: boolean;
 }) {
-  const [preferredQuickMatchPlayers, setPreferredQuickMatchPlayers] = useState(2);
+  const [localDifficulty, setLocalDifficulty] = useState<AdvisorDifficulty>(() => {
+    try {
+      const stored = window.localStorage.getItem("pazaak-activity-local-difficulty-v1");
+      if (stored === "easy" || stored === "hard" || stored === "professional") {
+        return stored;
+      }
+    } catch {
+      // Ignore storage read failures.
+    }
+    return "professional";
+  });
+  const [localOpponentId, setLocalOpponentId] = useState<string>(() => {
+    try {
+      const stored = window.localStorage.getItem("pazaak-activity-local-opponent-id-v1");
+      if (stored && localOpponents.some((opponent) => opponent.id === stored)) {
+        return stored;
+      }
+    } catch {
+      // Ignore storage read failures.
+    }
+    return getDefaultLocalOpponentForDifficulty("professional").id;
+  });
+
+  const availableOpponents = localOpponents;
+  // Read per-opponent local practice stats from localStorage (written by LocalPracticeGame).
+  const localPracticeStats = useMemo<Record<string, { played: number; won: number; lost: number }>>(() => {
+    try {
+      const raw = window.localStorage.getItem("pazaak-activity-local-practice-stats-v1");
+      if (!raw) return {};
+      const parsed = JSON.parse(raw) as { byOpponent?: Record<string, { played: number; won: number; lost: number }> };
+      return parsed?.byOpponent ?? {};
+    } catch { return {}; }
+  }, []);
+
+  const opponentsByVendorDifficulty = useMemo(() => {
+    const tiers: LocalOpponentProfile["vendorDifficulty"][] = ["novice", "easy", "normal", "hard", "expert", "master"];
+    return tiers
+      .map((tier) => ({ tier, opponents: availableOpponents.filter((opponent) => opponent.vendorDifficulty === tier) }))
+      .filter((entry) => entry.opponents.length > 0);
+  }, [availableOpponents]);
+
+  const selectedOpponent = availableOpponents.find((opponent) => opponent.id === localOpponentId)
+    ?? getDefaultLocalOpponentForDifficulty(localDifficulty);
+  const selectedLocalOpponentId = selectedOpponent?.id ?? getDefaultLocalOpponentForDifficulty(localDifficulty).id;
+  const handleLocalDifficultyChange = (difficulty: AdvisorDifficulty) => {
+    setLocalDifficulty(difficulty);
+    setLocalOpponentId(getDefaultLocalOpponentForDifficulty(difficulty).id);
+  };
+  const handleLocalOpponentChange = (opponentId: string) => {
+    const opponent = localOpponents.find((entry) => entry.id === opponentId);
+    setLocalOpponentId(opponentId);
+    if (opponent) {
+      setLocalDifficulty(opponent.difficulty);
+    }
+  };
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("pazaak-activity-local-difficulty-v1", localDifficulty);
+    } catch {
+      // Ignore storage write failures.
+    }
+  }, [localDifficulty]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("pazaak-activity-local-opponent-id-v1", selectedLocalOpponentId);
+    } catch {
+      // Ignore storage write failures.
+    }
+  }, [selectedLocalOpponentId]);
+
+  const statusLabel = isOnline ? "Connected to Galaxy Server" : "Disconnected from Galaxy Server";
+  const aiCard = MAIN_MENU_PRESET.modeCards.find((card) => card.key === "ai");
+  const quickMatchCard = MAIN_MENU_PRESET.modeCards.find((card) => card.key === "quick_match");
+  const lobbyCard = MAIN_MENU_PRESET.modeCards.find((card) => card.key === "private_lobby");
 
   return (
-    <div className="screen screen--lobby">
-      <div className="mode-selection-shell">
-        <section className="mode-selection-hero">
-          <p className="lobby-kicker">Multi-Pazaak</p>
-          <h1>Choose Your Mode</h1>
-          <p>Welcome {username}. Play online, host private tables, or practice offline against AI.</p>
+    <div className="pazaak-world-page">
+      <nav className="pazaak-world-nav">
+        <div className="pazaak-world-brand">
+          <span aria-hidden="true">{menuIcon("rocket")}</span>
+          {MAIN_MENU_PRESET.brandTitle}
+        </div>
+        <div className="pazaak-world-nav__right">
+          <div className="pazaak-world-status" data-online={isOnline ? "true" : "false"}>
+            <span className="pazaak-world-status__dot" aria-hidden="true" />
+            {statusLabel}
+          </div>
+          <div className="pazaak-world-user-pill" aria-label="Current pilot">
+            <span className="pazaak-world-user-icon" aria-hidden="true">{menuIcon("user")}</span>
+            <span>
+              <strong>{username}</strong>
+              <small>{mmr !== null && mmr !== undefined ? `MMR: ${mmr}` : "Guest"}</small>
+            </span>
+          </div>
+        </div>
+      </nav>
+
+      <main className="pazaak-world-main">
+        <section className="pazaak-world-hero">
+          <h1><span aria-hidden="true">{menuIcon("rocket")}</span>{MAIN_MENU_PRESET.heroTitle}</h1>
+          <p>{MAIN_MENU_PRESET.heroSubtitle}</p>
+          <p>{MAIN_MENU_PRESET.heroTagline}</p>
         </section>
 
-        <section className="mode-selection-grid">
-          <article className="mode-card">
-            <h2>Quick Match</h2>
-            <p>Join matchmaking and automatically find the next open opponent table.</p>
-            <div className="mode-card__controls">
-              <select value={String(preferredQuickMatchPlayers)} onChange={(event) => setPreferredQuickMatchPlayers(Number(event.target.value) || 2)} aria-label="Quick match max players">
-                {[2, 3, 4, 5].map((value) => <option key={value} value={value}>Up to {value} players</option>)}
-              </select>
-              <button className="btn btn--primary" onClick={() => onQuickMatch(preferredQuickMatchPlayers)}>Find Match</button>
-            </div>
-          </article>
+        <section className="pazaak-world-mode-grid">
+          {aiCard ? (
+            <article className="pazaak-world-card pazaak-world-card--ai">
+              <h2><span aria-hidden="true">{menuIcon(aiCard.icon)}</span>{aiCard.title}</h2>
+              <p>{aiCard.description}</p>
+              <div className="pazaak-world-card__actions">
+                {(aiCard.aiOptions ?? []).map((option) => (
+                  <button
+                    key={option.difficulty}
+                    className={`pazaak-world-button pazaak-world-button--${option.tone}`}
+                    onClick={() => onStartLocalGame(option.difficulty, getDefaultLocalOpponentForDifficulty(option.difficulty).id)}
+                  >
+                    <span aria-hidden="true">{menuIcon(option.icon)}</span>
+                    {option.label}
+                    <span>{option.tierLabel}</span>
+                  </button>
+                ))}
+                <div className="pazaak-world-selectors">
+                  <select value={localDifficulty} onChange={(event) => handleLocalDifficultyChange(event.target.value as AdvisorDifficulty)} aria-label="Local AI difficulty">
+                    <option value="easy">Easy</option>
+                    <option value="hard">Hard</option>
+                    <option value="professional">Professional</option>
+                  </select>
+                  <select value={selectedLocalOpponentId} onChange={(event) => handleLocalOpponentChange(event.target.value)} aria-label="Local AI opponent">
+                    {opponentsByVendorDifficulty.map((group) => (
+                      <optgroup key={group.tier} label={formatVendorDifficultyLabel(group.tier)}>
+                        {group.opponents.map((opponent) => (
+                          <option key={opponent.id} value={opponent.id}>{`${opponent.name} · ${formatDifficultyLabel(opponent.difficulty)}`}</option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                  {selectedOpponent ? <small>{selectedOpponent.description}</small> : null}
+                  <button className="pazaak-world-button pazaak-world-button--outline" onClick={() => onStartLocalGame(localDifficulty, selectedLocalOpponentId)}>
+                    <span aria-hidden="true">{menuIcon("target")}</span>
+                    Challenge Selected
+                  </button>
+                </div>
+              </div>
+            </article>
+          ) : null}
 
-          <article className="mode-card">
-            <h2>Private Lobby</h2>
-            <p>Create or join custom tables with table variants, timer controls, and optional AI seats.</p>
-            <div className="mode-card__controls">
-              <button className="btn btn--secondary" onClick={onOpenLobbies}>Open Lobby Browser</button>
-            </div>
-          </article>
+          {quickMatchCard ? (
+            <article className={`pazaak-world-card pazaak-world-card--online ${isOnline ? "" : "pazaak-world-card--disabled"}`}>
+              <h2>
+                <span aria-hidden="true">{menuIcon(quickMatchCard.icon)}</span>
+                {quickMatchCard.title}
+                {!isOnline ? <small>Offline</small> : null}
+              </h2>
+              <p>{quickMatchCard.description}</p>
+              <div className="pazaak-world-card__actions">
+                <button className="pazaak-world-button pazaak-world-button--galaxy" onClick={() => onQuickMatch(2)} disabled={!isOnline}>
+                  <span aria-hidden="true">{menuIcon(quickMatchCard.primaryAction?.icon ?? "search")}</span>
+                  {quickMatchCard.primaryAction?.label ?? "Find Match"}
+                </button>
+                {!isOnline ? <p className="pazaak-world-card__notice">{quickMatchCard.offlineNotice}</p> : null}
+              </div>
+            </article>
+          ) : null}
 
-          <article className="mode-card">
-            <h2>Local Practice</h2>
-            <p>Play instantly offline against an AI opponent with no network dependency.</p>
-            <div className="mode-card__controls mode-card__controls--stack">
-              <button className="btn btn--secondary" onClick={() => onStartLocalGame("easy")}>Start Easy AI</button>
-              <button className="btn btn--secondary" onClick={() => onStartLocalGame("hard")}>Start Hard AI</button>
-              <button className="btn btn--secondary" onClick={() => onStartLocalGame("professional")}>Start Professional AI</button>
-            </div>
-          </article>
+          {lobbyCard ? (
+            <article className={`pazaak-world-card pazaak-world-card--lobby ${isOnline ? "" : "pazaak-world-card--disabled"}`}>
+              <h2>
+                <span aria-hidden="true">{menuIcon(lobbyCard.icon)}</span>
+                {lobbyCard.title}
+                {!isOnline ? <small>Offline</small> : null}
+              </h2>
+              <p>{lobbyCard.description}</p>
+              <div className="pazaak-world-card__actions">
+                <button className="pazaak-world-button pazaak-world-button--hyperspace" onClick={onOpenLobbies} disabled={!isOnline}>
+                  <span aria-hidden="true">{menuIcon(lobbyCard.primaryAction?.icon ?? "plus")}</span>
+                  {lobbyCard.primaryAction?.label ?? "Create Lobby"}
+                </button>
+                <button className="pazaak-world-button pazaak-world-button--outline" onClick={onOpenLobbies} disabled={!isOnline}>
+                  <span aria-hidden="true">{menuIcon(lobbyCard.secondaryAction?.icon ?? "signin")}</span>
+                  {lobbyCard.secondaryAction?.label ?? "Join Lobby"}
+                </button>
+                {!isOnline ? <p className="pazaak-world-card__notice">{lobbyCard.offlineNotice}</p> : null}
+              </div>
+            </article>
+          ) : null}
         </section>
-        <section className="mode-selection-rules">
-          <h3>How to Play Pazaak</h3>
-          <div className="mode-selection-rules__columns">
+
+        <section className="pazaak-world-opponents" aria-labelledby="pazaak-opponent-catalogue-title">
+          <div className="pazaak-world-opponents__header">
             <div>
-              <h4>Goal</h4>
-              <p>Score as close to 20 as possible without going over. First player to win 3 sets wins the match.</p>
+              <h2 id="pazaak-opponent-catalogue-title"><span aria-hidden="true">{menuIcon("user")}</span>Opponent Catalogue</h2>
+              <p>{availableOpponents.length} merged profiles from HoloPazaak, PazaakWorld, and Activity practice.</p>
             </div>
-            <div>
-              <h4>Each Turn</h4>
-              <p>Draw a card from the main deck (1–10), then optionally play a card from your side deck. Stand to lock in your score or keep drawing.</p>
+            <button className="pazaak-world-button pazaak-world-button--galaxy" onClick={() => onStartLocalGame(selectedOpponent.difficulty, selectedOpponent.id)}>
+              <span aria-hidden="true">{menuIcon("target")}</span>
+              Challenge {selectedOpponent.name}
+            </button>
+          </div>
+
+          <div className="pazaak-world-opponents__layout">
+            <div className="pazaak-world-opponent-list" aria-label="Opponent roster">
+              {opponentsByVendorDifficulty.map((group) => (
+                <section className="pazaak-world-opponent-tier" key={group.tier} aria-label={`${formatVendorDifficultyLabel(group.tier)} opponents`}>
+                  <h3>{formatVendorDifficultyLabel(group.tier)}</h3>
+                  <div className="pazaak-world-opponent-tier__grid">
+                    {group.opponents.map((opponent) => (
+                      <button
+                        key={opponent.id}
+                        className={`pazaak-world-opponent-chip ${opponent.id === selectedOpponent.id ? "pazaak-world-opponent-chip--active" : ""}`}
+                        onClick={() => handleLocalOpponentChange(opponent.id)}
+                        aria-pressed={opponent.id === selectedOpponent.id}
+                      >
+                        <span>{opponent.name}</span>
+                        <small>{opponent.archetype}</small>
+                        {(() => {
+                          const rec = localPracticeStats[opponent.id];
+                          return rec && rec.played > 0
+                            ? <small className="pazaak-world-opponent-chip__record">{rec.won}W-{rec.lost}L</small>
+                            : null;
+                        })()}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ))}
             </div>
-            <div>
-              <h4>Special Cards</h4>
-              <p><strong>+/-</strong> cards can be used as positive or negative. <strong>Flip</strong> cards invert matching board values. <strong>±1T</strong> adds 1 and lets you win tied sets.</p>
-            </div>
+
+            <article className="pazaak-world-opponent-profile">
+              <div className="pazaak-world-opponent-profile__title">
+                <div>
+                  <p>{formatVendorDifficultyLabel(selectedOpponent.vendorDifficulty)} · {formatDifficultyLabel(selectedOpponent.difficulty)}</p>
+                  <h3>{selectedOpponent.name}</h3>
+                </div>
+                <strong>{selectedOpponent.skillLevel}</strong>
+              </div>
+              <p>{selectedOpponent.description}</p>
+              <div className="pazaak-world-opponent-profile__facts">
+                <span>{selectedOpponent.species}</span>
+                <span>{selectedOpponent.origin}</span>
+                <span>{selectedOpponent.archetype}</span>
+                <span>Stand {selectedOpponent.standAt}</span>
+                <span>Tie {selectedOpponent.tieChance}%</span>
+              </div>
+              <div className="pazaak-world-opponent-profile__deck" aria-label="Opponent side deck">
+                {selectedOpponent.sideDeckTokens.map((token, index) => <span key={`${selectedOpponent.id}-${token}-${index}`}>{token}</span>)}
+              </div>
+              <div className="pazaak-world-opponent-profile__quote">
+                <span aria-hidden="true">{menuIcon("scroll")}</span>
+                <p>{selectedOpponent.phrases.chosen[0] ?? selectedOpponent.description}</p>
+              </div>
+              <div className="pazaak-world-opponent-profile__sources">
+                {selectedOpponent.sources.map((source) => <span key={source}>{source}</span>)}
+                {(() => {
+                  const rec = localPracticeStats[selectedOpponent.id];
+                  if (!rec || rec.played === 0) return null;
+                  const pct = Math.round((rec.won / rec.played) * 100);
+                  return (
+                    <div className="pazaak-world-opponent-profile__record">
+                      <span>Your record vs {selectedOpponent.name}</span>
+                      <strong>{rec.won}W – {rec.lost}L ({pct}% win rate)</strong>
+                    </div>
+                  );
+                })()}
+              </div>
+            </article>
           </div>
         </section>
+
+        <section className="pazaak-world-rules">
+          <h2><span aria-hidden="true">{menuIcon("scroll")}</span>{MAIN_MENU_PRESET.rulesTitle}</h2>
+          <div className="pazaak-world-rules__grid">
+            {MAIN_MENU_PRESET.rules.map((rule) => (
+              <article key={rule.title}>
+                <div className={`pazaak-world-rule-icon pazaak-world-rule-icon--${rule.accent}`} aria-hidden="true">{menuIcon(rule.icon)}</div>
+                <h3>{rule.title}</h3>
+                <p>{rule.body}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      </main>
+
+      <div className="pazaak-world-floating-status">
+        <ConnectionStatus isOnline={isOnline} />
       </div>
     </div>
   );
@@ -418,8 +1038,22 @@ function MatchmakingScreen({
         <p>{queueLabel}</p>
         <p>Queue updated {stats.queueUpdatedAt === new Date(0).toISOString() ? "just now" : new Date(stats.queueUpdatedAt).toLocaleTimeString()}</p>
         {error ? <div className="lobby-alert lobby-alert--error">{error}</div> : null}
-        <div className="matchmaking-card__meter">
-          <div className="matchmaking-card__meter-fill" />
+        <div className="matchmaking-card__stages">
+          <div className="matchmaking-card__stage matchmaking-card__stage--done">
+            <span className="matchmaking-card__stage-name">Scanning hyperspace routes</span>
+            <span className="matchmaking-card__stage-status">Complete ✓</span>
+            <div className="matchmaking-card__stage-bar"><div className="matchmaking-card__stage-fill" style={{ width: "100%" }} /></div>
+          </div>
+          <div className="matchmaking-card__stage matchmaking-card__stage--active">
+            <span className="matchmaking-card__stage-name">Matching skill levels</span>
+            <span className="matchmaking-card__stage-status">In Progress…</span>
+            <div className="matchmaking-card__stage-bar"><div className="matchmaking-card__stage-fill matchmaking-card__stage-fill--pulse" /></div>
+          </div>
+          <div className="matchmaking-card__stage matchmaking-card__stage--pending">
+            <span className="matchmaking-card__stage-name">Establishing connection</span>
+            <span className="matchmaking-card__stage-status">Pending</span>
+            <div className="matchmaking-card__stage-bar"><div className="matchmaking-card__stage-fill" style={{ width: "0%" }} /></div>
+          </div>
         </div>
         <div className="matchmaking-card__stats">
           <div><span>Players in queue</span><strong>{stats.playersInQueue}</strong></div>
@@ -472,12 +1106,14 @@ function ErrorScreen({ message }: { message: string }) {
 
 function StandaloneAuthScreen({
   message,
+  isOnline = true,
   onAuthenticated,
   onStartGuestLocal,
 }: {
   message?: string;
+  isOnline?: boolean;
   onAuthenticated: (session: ActivitySession) => Promise<void>;
-  onStartGuestLocal: (difficulty: AdvisorDifficulty) => void;
+  onStartGuestLocal: (difficulty: AdvisorDifficulty, opponentId?: string, guestName?: string) => void;
 }) {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [identifier, setIdentifier] = useState("");
@@ -485,8 +1121,225 @@ function StandaloneAuthScreen({
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(message ?? null);
+  const [showAuth, setShowAuth] = useState(false);
+  const [providers, setProviders] = useState<SocialAuthProviderConfig[]>([]);
+  const [providersLoading, setProvidersLoading] = useState(false);
+  const authDialogRef = useRef<HTMLDivElement | null>(null);
+  const loginTabRef = useRef<HTMLButtonElement | null>(null);
+  const registerTabRef = useRef<HTMLButtonElement | null>(null);
+  const [guestProfile] = useState(() => {
+    const fallback = {
+      id: `guest_${Date.now()}`,
+      username: `Guest_${Math.random().toString(36).slice(2, 6)}`,
+      mmr: 1000,
+    };
+
+    try {
+      const raw = window.localStorage.getItem("pazaak_guest_profile");
+      if (!raw) return fallback;
+      const parsed = JSON.parse(raw) as { id?: string; username?: string; mmr?: number };
+      return {
+        id: parsed.id || fallback.id,
+        username: parsed.username || fallback.username,
+        mmr: typeof parsed.mmr === "number" ? parsed.mmr : 1000,
+      };
+    } catch {
+      return fallback;
+    }
+  });
+
+  useEffect(() => {
+    window.localStorage.setItem("pazaak_guest_profile", JSON.stringify(guestProfile));
+  }, [guestProfile]);
+
+  useEffect(() => {
+    const handleOpenAuth = () => {
+      openAuth("login");
+    };
+
+    window.addEventListener("pazaak-open-auth-dialog", handleOpenAuth as EventListener);
+    return () => {
+      window.removeEventListener("pazaak-open-auth-dialog", handleOpenAuth as EventListener);
+    };
+  }, []);
+
+  const openAuth = (nextMode: "login" | "register" = mode) => {
+    setMode(nextMode);
+    setError(message ?? null);
+    setPassword("");
+    setShowPassword(false);
+    setShowAuth(true);
+  };
+
+  const closeAuth = () => {
+    if (busy) return;
+    setShowAuth(false);
+    setPassword("");
+    setShowPassword(false);
+    setError(null);
+  };
+
+  useEffect(() => {
+    if (!showAuth) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeAuth();
+        return;
+      }
+
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const dialog = authDialogRef.current;
+      if (!dialog) {
+        return;
+      }
+
+      const focusable = dialog.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+
+      if (event.shiftKey) {
+        if (active === first || !active || !dialog.contains(active)) {
+          event.preventDefault();
+          last.focus();
+        }
+        return;
+      }
+
+      if (active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    const dialog = authDialogRef.current;
+    const firstFocusable = dialog?.querySelector<HTMLElement>(
+      'input:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    );
+    firstFocusable?.focus();
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [showAuth, busy]);
+
+  useEffect(() => {
+    if (!showAuth) {
+      return;
+    }
+
+    const { overflow } = document.body.style;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = overflow;
+    };
+  }, [showAuth]);
+
+  useEffect(() => {
+    if (!showAuth) {
+      return;
+    }
+    setShowPassword(false);
+  }, [mode, showAuth]);
+
+  const startGuestPractice = (difficulty: AdvisorDifficulty) => {
+    onStartGuestLocal(difficulty, getDefaultLocalOpponentForDifficulty(difficulty).id, guestProfile.username);
+  };
+
+  useEffect(() => {
+    if (!showAuth) {
+      return;
+    }
+
+    let active = true;
+    setProvidersLoading(true);
+    const load = async () => {
+      try {
+        const result = await fetchSocialAuthProviders();
+        if (!active) return;
+        setProviders(result.providers);
+      } catch {
+        if (!active) return;
+        setProviders([
+          { provider: "google", enabled: false },
+          { provider: "discord", enabled: false },
+          { provider: "github", enabled: false },
+        ]);
+      } finally {
+        if (!active) return;
+        setProvidersLoading(false);
+      }
+    };
+
+    void load();
+    return () => {
+      active = false;
+    };
+  }, [showAuth]);
+
+  const providerEnabled = (provider: SocialAuthProvider): boolean => {
+    const config = providers.find((entry) => entry.provider === provider);
+    return config?.enabled ?? false;
+  };
+
+  const signInWithProvider = async (provider: SocialAuthProvider) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await startSocialAuth(provider);
+      window.location.assign(result.redirectUrl);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const providerButtonMeta: Array<{
+    provider: SocialAuthProvider;
+    buttonClass: string;
+    label: string;
+  }> = [
+      {
+        provider: "google",
+        buttonClass: "pazaak-world-social-btn--google",
+        label: "Sign in with Google",
+      },
+      {
+        provider: "discord",
+        buttonClass: "pazaak-world-social-btn--discord",
+        label: "Sign in with Discord",
+      },
+      {
+        provider: "github",
+        buttonClass: "pazaak-world-social-btn--github",
+        label: "Sign in with GitHub",
+      },
+    ];
+  const credentialsTabPanelId = "pazaak-auth-credentials-panel";
+  const loginTabId = "pazaak-auth-tab-login";
+  const registerTabId = "pazaak-auth-tab-register";
 
   const submit = async () => {
     setBusy(true);
@@ -514,77 +1367,231 @@ function StandaloneAuthScreen({
     }
   };
 
+  const handleAuthBackdropMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (event.currentTarget !== event.target) {
+      return;
+    }
+    closeAuth();
+  };
+
+  const moveAuthMode = (nextMode: "login" | "register") => {
+    setMode(nextMode);
+    requestAnimationFrame(() => {
+      if (nextMode === "login") {
+        loginTabRef.current?.focus();
+        return;
+      }
+      registerTabRef.current?.focus();
+    });
+  };
+
+  const handleAuthModeTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (busy) {
+      return;
+    }
+
+    if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      event.preventDefault();
+      moveAuthMode("login");
+      return;
+    }
+
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      event.preventDefault();
+      moveAuthMode("register");
+      return;
+    }
+
+    if (event.key === "Home") {
+      event.preventDefault();
+      moveAuthMode("login");
+      return;
+    }
+
+    if (event.key === "End") {
+      event.preventDefault();
+      moveAuthMode("register");
+    }
+  };
+
   return (
-    <div className="screen screen--error">
-      <div className="error-card">
-        <div className="error-icon" aria-hidden="true">♠</div>
-        <h2 className="error-title">Pazaak Account</h2>
-        <p className="error-message">Sign in with an app account to play outside Discord Activity mode.</p>
-        <div className="auth-switch">
-          <button className={`btn btn--sm ${mode === "login" ? "btn--primary" : "btn--ghost"}`} onClick={() => setMode("login")} disabled={busy}>Sign In</button>
-          <button className={`btn btn--sm ${mode === "register" ? "btn--primary" : "btn--ghost"}`} onClick={() => setMode("register")} disabled={busy}>Create Account</button>
+    <div className="pazaak-world-page">
+      <nav className="pazaak-world-nav" aria-hidden={showAuth}>
+        <div className="pazaak-world-brand">
+          <span aria-hidden="true">{menuIcon("rocket")}</span>
+          {MAIN_MENU_PRESET.brandTitle}
         </div>
-        <div className="auth-form">
-          {mode === "login" ? (
-            <>
-              <input
-                value={identifier}
-                onChange={(event) => setIdentifier(event.target.value)}
-                placeholder="Username or Email"
-                aria-label="Username or email"
-                disabled={busy}
-              />
-              <input
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                type="password"
-                placeholder="Password"
-                aria-label="Password"
-                disabled={busy}
-              />
-            </>
-          ) : (
-            <>
-              <input
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-                placeholder="Username"
-                aria-label="Username"
-                disabled={busy}
-              />
-              <input
-                value={displayName}
-                onChange={(event) => setDisplayName(event.target.value)}
-                placeholder="Display Name (optional)"
-                aria-label="Display name"
-                disabled={busy}
-              />
-              <input
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="Email (optional)"
-                aria-label="Email"
-                disabled={busy}
-              />
-              <input
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                type="password"
-                placeholder="Password (10+ chars)"
-                aria-label="Password"
-                disabled={busy}
-              />
-            </>
-          )}
+        <div className="pazaak-world-nav__right">
+          <div className="pazaak-world-status" data-online="false">
+            <span className="pazaak-world-status__dot" aria-hidden="true" />
+            Disconnected from Galaxy Server
+          </div>
         </div>
-        {error ? <p className="error-message">{error}</p> : null}
-        <button className="btn btn--primary" onClick={submit} disabled={busy}>
-          {busy ? "Working..." : mode === "login" ? "Sign In" : "Create Account"}
-        </button>
-        <button className="btn btn--secondary" onClick={() => onStartGuestLocal("professional")} disabled={busy}>
-          Play Local Practice As Guest
-        </button>
+      </nav>
+
+      <main className="pazaak-world-main" aria-hidden={showAuth}>
+        <section className="pazaak-world-hero">
+          <h1><span aria-hidden="true">{menuIcon("rocket")}</span>{MAIN_MENU_PRESET.heroTitle}</h1>
+          <p>{MAIN_MENU_PRESET.heroSubtitle}</p>
+          <p>{MAIN_MENU_PRESET.heroTagline}</p>
+        </section>
+
+        <section className="pazaak-world-mode-grid">
+          <article className="pazaak-world-card pazaak-world-card--ai">
+            <h2><span aria-hidden="true">{menuIcon("robot")}</span>AI Opponents</h2>
+            <p>Practice against AI opponents with different skill levels</p>
+            <div className="pazaak-world-card__actions">
+              <button className="pazaak-world-button pazaak-world-button--easy" onClick={() => startGuestPractice("easy")}><span aria-hidden="true">{menuIcon("seedling")}</span>Easy AI <span>Beginner</span></button>
+              <button className="pazaak-world-button pazaak-world-button--hard" onClick={() => startGuestPractice("hard")}><span aria-hidden="true">{menuIcon("brain")}</span>Hard AI <span>Advanced</span></button>
+              <button className="pazaak-world-button pazaak-world-button--professional" onClick={() => startGuestPractice("professional")}><span aria-hidden="true">{menuIcon("crown")}</span>Professional AI <span>Expert</span></button>
+            </div>
+          </article>
+
+          <article className="pazaak-world-card pazaak-world-card--online pazaak-world-card--disabled">
+            <h2><span aria-hidden="true">{menuIcon("bolt")}</span>Quick Match <small>Locked</small></h2>
+            <p>Find random opponents based on your skill level</p>
+            <div className="pazaak-world-card__actions">
+              <p className="pazaak-world-card__notice">Sign in from the account corner in the top-right to unlock online play.</p>
+            </div>
+          </article>
+
+          <article className="pazaak-world-card pazaak-world-card--lobby pazaak-world-card--disabled">
+            <h2><span aria-hidden="true">{menuIcon("users")}</span>Private Lobby <small>Locked</small></h2>
+            <p>Create or join private games with friends</p>
+            <div className="pazaak-world-card__actions">
+              <p className="pazaak-world-card__notice">Use the top-right account corner to sign in once, then jump straight in.</p>
+            </div>
+          </article>
+        </section>
+
+        <section className="pazaak-world-rules">
+          <h2><span aria-hidden="true">{menuIcon("scroll")}</span>{MAIN_MENU_PRESET.rulesTitle}</h2>
+          <div className="pazaak-world-rules__grid">
+            {MAIN_MENU_PRESET.rules.map((rule) => (
+              <article key={rule.title}>
+                <div className={`pazaak-world-rule-icon pazaak-world-rule-icon--${rule.accent}`} aria-hidden="true">{menuIcon(rule.icon)}</div>
+                <h3>{rule.title}</h3>
+                <p>{rule.body}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      </main>
+
+      <div className="pazaak-world-floating-status" aria-hidden={showAuth ? "true" : "false"}>
+        <ConnectionStatus isOnline={isOnline} />
       </div>
+
+      {showAuth ? (
+        <div className="pazaak-world-auth-backdrop" onMouseDown={handleAuthBackdropMouseDown}>
+          <div ref={authDialogRef} className="pazaak-world-auth-card" role="dialog" aria-modal="true" aria-labelledby="pazaak-auth-title" aria-describedby="pazaak-auth-subtitle" tabIndex={-1}>
+            <div className="pazaak-world-auth-card__header">
+              <div>
+                <p>Account</p>
+                <h2 id="pazaak-auth-title">Sign in to PazaakWorld</h2>
+                <p id="pazaak-auth-subtitle" className="pazaak-world-auth-subtitle">Choose a provider, or sign in with your PazaakWorld account.</p>
+              </div>
+              <button className="pazaak-world-icon-btn pazaak-world-auth-card__close" onClick={closeAuth} disabled={busy} aria-label="Close account dialog">×</button>
+            </div>
+
+            <div className="pazaak-world-social-grid" aria-busy={providersLoading}>
+              {providerButtonMeta.map((providerMeta) => {
+                const enabled = providerEnabled(providerMeta.provider);
+                return (
+                  <button
+                    key={providerMeta.provider}
+                    className={`pazaak-world-social-btn ${providerMeta.buttonClass}`}
+                    onClick={() => signInWithProvider(providerMeta.provider)}
+                    disabled={busy || providersLoading || !enabled}
+                    aria-label={providerMeta.label}
+                  >
+                    <span className="pazaak-world-social-btn__icon" aria-hidden="true"><ProviderMark provider={providerMeta.provider} /></span>
+                    <span className="pazaak-world-social-btn__content">
+                      <span className="pazaak-world-social-btn__row">
+                        <span className="pazaak-world-social-btn__label">{providerMeta.label}</span>
+                        {!providersLoading && !enabled ? <span className="pazaak-world-social-btn__pill">Unavailable</span> : null}
+                      </span>
+                      <span className="pazaak-world-social-btn__status">
+                        {providersLoading ? "Checking availability..." : enabled ? "Secure OAuth redirect" : "Not enabled in this environment"}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            {providersLoading ? (
+              <p className="sr-only" role="status" aria-live="polite">Checking provider availability.</p>
+            ) : null}
+
+            <div className="pazaak-world-auth-divider" role="separator" aria-label="Or continue with credentials">
+              <span>Or use your email</span>
+            </div>
+
+            <div className="auth-credential-panel">
+              <div className="auth-switch" role="tablist" aria-label="Choose account action" aria-orientation="horizontal">
+                <button ref={loginTabRef} type="button" id={loginTabId} role="tab" tabIndex={mode === "login" ? 0 : -1} aria-selected={mode === "login"} aria-controls={credentialsTabPanelId} className={`btn btn--sm auth-switch__btn ${mode === "login" ? "btn--primary auth-switch__btn--active" : "btn--ghost"}`} onClick={() => setMode("login")} onKeyDown={handleAuthModeTabKeyDown} disabled={busy}>Sign In</button>
+                <button ref={registerTabRef} type="button" id={registerTabId} role="tab" tabIndex={mode === "register" ? 0 : -1} aria-selected={mode === "register"} aria-controls={credentialsTabPanelId} className={`btn btn--sm auth-switch__btn ${mode === "register" ? "btn--primary auth-switch__btn--active" : "btn--ghost"}`} onClick={() => setMode("register")} onKeyDown={handleAuthModeTabKeyDown} disabled={busy}>Create Account</button>
+              </div>
+              <form id={credentialsTabPanelId} role="tabpanel" aria-labelledby={mode === "login" ? loginTabId : registerTabId} className="auth-form auth-form--modal" aria-describedby="pazaak-auth-footnote" onSubmit={(event) => {
+                event.preventDefault();
+                void submit();
+              }}>
+                <div className="auth-form__section-title">{mode === "login" ? "Use your PazaakWorld account" : "Create your PazaakWorld account"}</div>
+                {mode === "login" ? (
+                  <>
+                    <label className="auth-field">
+                      <span className="auth-field__label">Username or email</span>
+                      <input value={identifier} onChange={(event) => setIdentifier(event.target.value)} placeholder="Enter your username or email" aria-label="Username or email" autoComplete="username" autoFocus={showAuth} required disabled={busy} />
+                    </label>
+                    <label className="auth-field">
+                      <span className="auth-field__label">Password</span>
+                      <span className="auth-input-wrap">
+                        <input value={password} onChange={(event) => setPassword(event.target.value)} type={showPassword ? "text" : "password"} placeholder="Enter your password" aria-label="Password" autoComplete="current-password" required disabled={busy} />
+                        <button type="button" className="auth-input-wrap__toggle" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} disabled={busy}>
+                          {showPassword ? "Hide" : "Show"}
+                        </button>
+                      </span>
+                    </label>
+                  </>
+                ) : (
+                  <>
+                    <label className="auth-field">
+                      <span className="auth-field__label">Username</span>
+                      <input value={username} onChange={(event) => setUsername(event.target.value)} placeholder="Choose a username" aria-label="Username" autoComplete="username" autoFocus={showAuth} required disabled={busy} />
+                    </label>
+                    <label className="auth-field">
+                      <span className="auth-field__label">Display name</span>
+                      <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Optional display name" aria-label="Display name" autoComplete="nickname" disabled={busy} />
+                    </label>
+                    <label className="auth-field">
+                      <span className="auth-field__label">Email</span>
+                      <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Optional email address" aria-label="Email" autoComplete="email" type="email" disabled={busy} />
+                    </label>
+                    <label className="auth-field">
+                      <span className="auth-field__label">Password</span>
+                      <span className="auth-input-wrap">
+                        <input value={password} onChange={(event) => setPassword(event.target.value)} type={showPassword ? "text" : "password"} placeholder="Create a password (10+ chars)" aria-label="Password" autoComplete="new-password" required minLength={10} disabled={busy} />
+                        <button type="button" className="auth-input-wrap__toggle" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} disabled={busy}>
+                          {showPassword ? "Hide" : "Show"}
+                        </button>
+                      </span>
+                    </label>
+                  </>
+                )}
+                <div className="pazaak-world-auth-footnote" id="pazaak-auth-footnote">
+                  {providersLoading
+                    ? "Checking provider configuration for this environment..."
+                    : "Social sign-in appears here when provider credentials are configured for this environment."}
+                </div>
+                {error ? <p className="error-message" role="alert" aria-live="assertive">{error}</p> : null}
+                <button type="submit" className="btn btn--primary auth-form__submit" disabled={busy}>
+                  {busy ? "Working..." : mode === "login" ? "Sign In" : "Create Account"}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -605,7 +1612,7 @@ function LobbyScreen({
   userId: string;
   username: string;
   onEnterMatch: (match: SerializedMatch) => void;
-  onStartLocalGame: (difficulty: AdvisorDifficulty) => void;
+  onStartLocalGame: (difficulty: AdvisorDifficulty, opponentId?: string) => void;
   onOpenWorkshop: () => void;
 }) {
   const [wallet, setWallet] = useState<WalletRecord | null>(null);
@@ -623,9 +1630,14 @@ function LobbyScreen({
   const [newLobbyAllowAiFill, setNewLobbyAllowAiFill] = useState(true);
   const [preferredQueuePlayers, setPreferredQueuePlayers] = useState(2);
   const [localAiDifficulty, setLocalAiDifficulty] = useState<AdvisorDifficulty>("professional");
+  const [localOpponentId, setLocalOpponentId] = useState<string>(() => getDefaultLocalOpponentForDifficulty("professional").id);
   const [joinLobbyCodeValue, setJoinLobbyCodeValue] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [joinPasswordLobbyId, setJoinPasswordLobbyId] = useState<string | null>(null);
+  const [joinPasswordValue, setJoinPasswordValue] = useState("");
+  const [settingsDraft, setSettingsDraft] = useState<PazaakUserSettings>(DEFAULT_USER_SETTINGS);
+  const hydratedSettingsRef = useRef(false);
 
   const refreshLobby = useCallback(async () => {
     const [me, openLobbies, leaderboard, recentHistory] = await Promise.all([
@@ -650,6 +1662,28 @@ function LobbyScreen({
   useEffect(() => {
     refreshLobby().catch((err) => setError(err instanceof Error ? err.message : String(err)));
   }, [refreshLobby]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToLobbies(() => {
+      void refreshLobby().catch((err) => setError(err instanceof Error ? err.message : String(err)));
+    }, { reconnect: true });
+
+    return unsubscribe;
+  }, [refreshLobby]);
+
+  useEffect(() => {
+    if (!wallet) {
+      return;
+    }
+
+    setSettingsDraft(wallet.userSettings);
+
+    if (!hydratedSettingsRef.current) {
+      setNewLobbyTurnTimer(wallet.userSettings.turnTimerSeconds);
+      setLocalAiDifficulty(wallet.userSettings.preferredAiDifficulty);
+      hydratedSettingsRef.current = true;
+    }
+  }, [wallet]);
 
   const runLobbyAction = async (label: string, action: () => Promise<void>) => {
     setBusy(label);
@@ -693,16 +1727,47 @@ function LobbyScreen({
   });
 
   const handleStartSolo = () => runLobbyAction("solo", async () => {
-    const lobby = await createLobby(accessToken, { name: `${username} vs AI`, maxPlayers: 2 });
-    await addLobbyAi(accessToken, lobby.id, wallet?.userSettings.preferredAiDifficulty ?? "professional");
+    const lobby = await createLobby(accessToken, {
+      name: `${username} vs AI`,
+      maxPlayers: 2,
+      variant: "canonical",
+      turnTimerSeconds: settingsDraft.turnTimerSeconds,
+      tableSettings: {
+        variant: "canonical",
+        maxPlayers: 2,
+        maxRounds: 3,
+        turnTimerSeconds: settingsDraft.turnTimerSeconds,
+        ranked: true,
+        allowAiFill: true,
+      },
+    });
+    await addLobbyAi(accessToken, lobby.id, settingsDraft.preferredAiDifficulty);
     const started = await startLobby(accessToken, lobby.id);
     onEnterMatch(started.match);
   });
 
   const ownLobby = lobbies.find((lobby) => lobby.players.some((player) => player.userId === userId));
   const canUseLobbyControls = busy === null;
+  const availableLocalOpponents = localOpponents;
+  const selectedLocalOpponent = availableLocalOpponents.find((opponent) => opponent.id === localOpponentId)
+    ?? getDefaultLocalOpponentForDifficulty(localAiDifficulty);
+
+  useEffect(() => {
+    if (!availableLocalOpponents.some((opponent) => opponent.id === localOpponentId)) {
+      setLocalOpponentId(getDefaultLocalOpponentForDifficulty(localAiDifficulty).id);
+    }
+  }, [availableLocalOpponents, localAiDifficulty, localOpponentId]);
+
+  const handleLocalOpponentChange = (opponentId: string) => {
+    const opponent = localOpponents.find((entry) => entry.id === opponentId);
+    setLocalOpponentId(opponentId);
+    if (opponent) {
+      setLocalAiDifficulty(opponent.difficulty);
+    }
+  };
 
   const formatDate = (value: string | null) => value ? new Date(value).toLocaleDateString() : "Never";
+  const settingsDirty = wallet ? !areUserSettingsEqual(settingsDraft, wallet.userSettings) : false;
 
   return (
     <div className="screen screen--lobby">
@@ -719,6 +1784,83 @@ function LobbyScreen({
             <div><span>Best</span><strong>{wallet?.bestStreak ?? 0}</strong></div>
             <div><span>Last Match</span><strong>{formatDate(wallet?.lastMatchAt ?? null)}</strong></div>
           </div>
+          <div className="lobby-settings-card">
+            <div className="lobby-settings-card__header">
+              <div>
+                <p className="lobby-kicker">Preferences</p>
+                <h2>Match QoL</h2>
+              </div>
+              {settingsDirty ? <span className="lobby-settings-card__status">Unsaved</span> : <span className="lobby-settings-card__status lobby-settings-card__status--saved">Saved</span>}
+            </div>
+            <div className="lobby-settings-grid">
+              <label>
+                <span>Turn timer default</span>
+                <select
+                  value={String(settingsDraft.turnTimerSeconds)}
+                  onChange={(event) => {
+                    const turnTimerSeconds = Number(event.target.value) || 45;
+                    setSettingsDraft((previous) => ({ ...previous, turnTimerSeconds }));
+                    setNewLobbyTurnTimer(turnTimerSeconds);
+                  }}
+                  disabled={!canUseLobbyControls}
+                >
+                  {[0, 30, 45, 60, 90, 120, 180].map((value) => <option key={value} value={value}>{value === 0 ? "No timer" : `${value}s`}</option>)}
+                </select>
+              </label>
+              <label>
+                <span>Preferred AI difficulty</span>
+                <select
+                  value={settingsDraft.preferredAiDifficulty}
+                  onChange={(event) => {
+                    const preferredAiDifficulty = event.target.value as AdvisorDifficulty;
+                    setSettingsDraft((previous) => ({ ...previous, preferredAiDifficulty }));
+                    setLocalAiDifficulty(preferredAiDifficulty);
+                  }}
+                  disabled={!canUseLobbyControls}
+                >
+                  <option value="easy">Easy</option>
+                  <option value="hard">Hard</option>
+                  <option value="professional">Professional</option>
+                </select>
+              </label>
+              <label className="lobby-settings-toggle">
+                <input
+                  type="checkbox"
+                  checked={settingsDraft.soundEnabled}
+                  onChange={(event) => setSettingsDraft((previous) => ({ ...previous, soundEnabled: event.target.checked }))}
+                  disabled={!canUseLobbyControls}
+                />
+                <span>Enable turn beeps in live matches</span>
+              </label>
+              <label className="lobby-settings-toggle">
+                <input
+                  type="checkbox"
+                  checked={settingsDraft.reducedMotionEnabled}
+                  onChange={(event) => setSettingsDraft((previous) => ({ ...previous, reducedMotionEnabled: event.target.checked }))}
+                  disabled={!canUseLobbyControls}
+                />
+                <span>Reduce motion effects</span>
+              </label>
+            </div>
+            <div className="lobby-settings-actions">
+              <button
+                className="btn btn--secondary btn--sm"
+                onClick={() => setSettingsDraft(wallet?.userSettings ?? DEFAULT_USER_SETTINGS)}
+                disabled={!wallet || !settingsDirty || !canUseLobbyControls}
+              >
+                Reset
+              </button>
+              <button
+                className="btn btn--primary btn--sm"
+                onClick={() => runLobbyAction("save-settings", async () => {
+                  await updateSettings(accessToken, settingsDraft);
+                })}
+                disabled={!wallet || !settingsDirty || !canUseLobbyControls}
+              >
+                Save Preferences
+              </button>
+            </div>
+          </div>
           <div className="lobby-actions">
             <button className="btn btn--primary" onClick={handleStartSolo} disabled={!canUseLobbyControls}>
               Start AI Table
@@ -729,10 +1871,16 @@ function LobbyScreen({
                 <option value="hard">Local AI Hard</option>
                 <option value="professional">Local AI Professional</option>
               </select>
-              <button className="btn btn--secondary" onClick={() => onStartLocalGame(localAiDifficulty)}>
+              <select value={localOpponentId} onChange={(event) => handleLocalOpponentChange(event.target.value)} aria-label="Local opponent">
+                {availableLocalOpponents.map((opponent) => (
+                  <option key={opponent.id} value={opponent.id}>{`${opponent.name} · ${formatDifficultyLabel(opponent.difficulty)}`}</option>
+                ))}
+              </select>
+              <button className="btn btn--secondary" onClick={() => onStartLocalGame(localAiDifficulty, localOpponentId)}>
                 Start Local Practice
               </button>
             </div>
+            {selectedLocalOpponent ? <p className="mode-card__hint">{selectedLocalOpponent.description}</p> : null}
             {queue ? (
               <button className="btn btn--secondary" onClick={() => runLobbyAction("leave-queue", async () => { await leaveMatchmaking(accessToken); })} disabled={!canUseLobbyControls}>
                 Leave Queue
@@ -817,7 +1965,7 @@ function LobbyScreen({
                 onChange={(event) => setNewLobbyTurnTimer(Number(event.target.value) || 120)}
                 aria-label="Turn timer"
               >
-                {[0, 30, 60, 90, 120, 180].map((value) => <option key={value} value={value}>{value === 0 ? "No timer" : `${value}s`}</option>)}
+                {[0, 30, 45, 60, 90, 120, 180].map((value) => <option key={value} value={value}>{value === 0 ? "No timer" : `${value}s`}</option>)}
               </select>
               <label className="lobby-toggle">
                 <input type="checkbox" checked={newLobbyRanked} onChange={(event) => setNewLobbyRanked(event.target.checked)} disabled={newLobbyVariant === "canonical"} />
@@ -872,7 +2020,7 @@ function LobbyScreen({
               const readyCount = lobby.players.filter((player) => player.ready).length;
               const seatSlots = Array.from({ length: lobby.maxPlayers }, (_, index) => lobby.players[index] ?? null);
               const canStart = isHost
-                && readyCount === 2
+                && readyCount >= 2
                 && (lobby.tableSettings.variant === "multi_seat" || lobby.players.length === 2);
               const canAddAi = isHost && lobby.tableSettings.allowAiFill && lobby.players.length < lobby.maxPlayers;
 
@@ -884,9 +2032,6 @@ function LobbyScreen({
                     <span>Status {lobby.status === "matchmaking" ? "Matchmaking" : lobby.status === "in_game" ? "In Game" : lobby.status === "closed" ? "Closed" : "Waiting"}</span>
                     <span>{lobby.players.length}/{lobby.maxPlayers} seats</span>
                     <span>
-                      {lobby.tableSettings.variant === "multi_seat" ? "Multi-seat" : "Canonical"}
-                      {" · "}{lobby.tableSettings.maxRounds} rounds
-                      {" · "}{lobby.tableSettings.turnTimerSeconds === 0 ? "No timer" : `${lobby.tableSettings.turnTimerSeconds}s turn timer`}
                       {" · "}{lobby.tableSettings.ranked ? "Ranked" : "Casual"}
                       {" · "}{lobby.tableSettings.allowAiFill ? "AI fill on" : "AI fill off"}
                     </span>
@@ -895,7 +2040,7 @@ function LobbyScreen({
                         if (!seat) {
                           return (
                             <div className="lobby-seat lobby-seat--empty" key={`${lobby.id}-seat-${index}`}>
-                              <span>Seat {index + 1}</span>
+                              <span><span className="seat-icon" aria-hidden="true">○</span> Seat {index + 1}</span>
                               <strong>Open</strong>
                             </div>
                           );
@@ -910,7 +2055,12 @@ function LobbyScreen({
 
                         return (
                           <div className="lobby-seat" key={`${lobby.id}-${seat.userId}`}>
-                            <span>Seat {index + 1}</span>
+                            <span>
+                              <span className="seat-icon" aria-hidden="true">
+                                {seat.userId === lobby.hostUserId ? "👑" : seat.isAi ? "🤖" : "👤"}
+                              </span>
+                              {" "}Seat {index + 1}
+                            </span>
                             <strong>{seat.displayName}</strong>
                             <small>
                               {seat.ready ? "Ready" : "Waiting"}
@@ -956,15 +2106,53 @@ function LobbyScreen({
                             {lobby.status === "matchmaking" ? "Set Waiting" : "Set Matchmaking"}
                           </button>
                         ) : null}
-                        {isHost ? <button className="btn btn--card" onClick={() => runLobbyAction(`ai-${lobby.id}`, async () => { await addLobbyAi(accessToken, lobby.id, wallet?.userSettings.preferredAiDifficulty ?? "professional"); })} disabled={!canUseLobbyControls || !canAddAi}>Add AI</button> : null}
+                        {isHost ? <button className="btn btn--card" onClick={() => runLobbyAction(`ai-${lobby.id}`, async () => { await addLobbyAi(accessToken, lobby.id, settingsDraft.preferredAiDifficulty); })} disabled={!canUseLobbyControls || !canAddAi}>Add AI</button> : null}
                         {isHost ? <button className="btn btn--primary btn--sm" onClick={() => runLobbyAction(`start-${lobby.id}`, async () => { const result = await startLobby(accessToken, lobby.id); onEnterMatch(result.match); })} disabled={!canUseLobbyControls || !canStart}>Start</button> : null}
                         <button className="btn btn--ghost btn--sm" onClick={() => runLobbyAction(`leave-${lobby.id}`, async () => { await leaveLobby(accessToken, lobby.id); })} disabled={!canUseLobbyControls}>Leave</button>
                       </>
                     ) : (
-                      <button className="btn btn--card" onClick={() => runLobbyAction(`join-${lobby.id}`, async () => {
-                        const password = lobby.passwordHash ? (window.prompt("This table requires a password.") ?? "") : undefined;
-                        await joinLobby(accessToken, lobby.id, password || undefined);
-                      })} disabled={!canUseLobbyControls || ownLobby !== undefined || lobby.players.length >= lobby.maxPlayers}>Join</button>
+                      joinPasswordLobbyId === lobby.id ? (
+                        <span className="lobby-join-pw-form">
+                          <input
+                            type="password"
+                            className="lobby-join-pw-input"
+                            placeholder="Enter password…"
+                            value={joinPasswordValue}
+                            onChange={(e) => setJoinPasswordValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                void runLobbyAction(`join-${lobby.id}`, async () => {
+                                  await joinLobby(accessToken, lobby.id, joinPasswordValue || undefined);
+                                  setJoinPasswordLobbyId(null);
+                                  setJoinPasswordValue("");
+                                });
+                              }
+                            }}
+                            autoFocus
+                          />
+                          <button className="btn btn--primary btn--sm" onClick={() => runLobbyAction(`join-${lobby.id}`, async () => {
+                            await joinLobby(accessToken, lobby.id, joinPasswordValue || undefined);
+                            setJoinPasswordLobbyId(null);
+                            setJoinPasswordValue("");
+                          })} disabled={!canUseLobbyControls}>Join</button>
+                          <button className="btn btn--ghost btn--sm" onClick={() => { setJoinPasswordLobbyId(null); setJoinPasswordValue(""); }}>Cancel</button>
+                        </span>
+                      ) : (
+                        <button
+                          className="btn btn--card"
+                          disabled={!canUseLobbyControls || ownLobby !== undefined || lobby.players.length >= lobby.maxPlayers}
+                          onClick={() => {
+                            if (lobby.passwordHash) {
+                              setJoinPasswordLobbyId(lobby.id);
+                              setJoinPasswordValue("");
+                            } else {
+                              void runLobbyAction(`join-${lobby.id}`, async () => {
+                                await joinLobby(accessToken, lobby.id, undefined);
+                              });
+                            }
+                          }}
+                        >Join</button>
+                      )
                     )}
                   </div>
                 </article>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { fetchSideboards, setActiveSideboard } from "../api.ts";
 import type { SavedSideboardCollectionRecord, SavedSideboardRecord } from "../types.ts";
 
@@ -16,9 +16,23 @@ export function QuickSideboardSwitcher({ accessToken, variant, onOpenWorkshop }:
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  const loadSideboards = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const nextCollection = await fetchSideboards(accessToken);
+      setCollection(nextCollection);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  }, [accessToken]);
+
   useEffect(() => {
     void loadSideboards();
-  }, []);
+  }, [loadSideboards]);
 
   useEffect(() => {
     const fallbackName = collection?.activeName ?? collection?.sideboards[0]?.name ?? "";
@@ -36,20 +50,6 @@ export function QuickSideboardSwitcher({ accessToken, variant, onOpenWorkshop }:
       return fallbackName;
     });
   }, [collection]);
-
-  const loadSideboards = async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const nextCollection = await fetchSideboards(accessToken);
-      setCollection(nextCollection);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const sortedSideboards = [...(collection?.sideboards ?? [])].sort(compareSideboards);
   const activeSideboard = sortedSideboards.find((sideboard) => sideboard.isActive) ?? null;

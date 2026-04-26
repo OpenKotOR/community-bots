@@ -23,6 +23,7 @@ export type PazaakThemePreference = "kotor" | "modern" | "adaptive";
 export interface PazaakUserSettings {
   theme: PazaakThemePreference;
   soundEnabled: boolean;
+  reducedMotionEnabled: boolean;
   turnTimerSeconds: number;
   preferredAiDifficulty: "easy" | "hard" | "professional";
 }
@@ -54,6 +55,7 @@ interface WalletFileShape {
 const defaultPazaakUserSettings = (): PazaakUserSettings => ({
   theme: "kotor",
   soundEnabled: false,
+  reducedMotionEnabled: false,
   turnTimerSeconds: 45,
   preferredAiDifficulty: "professional",
 });
@@ -119,7 +121,7 @@ export const verifyPazaakPassword = async (password: string, storedHash: string)
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 };
 
-export type PazaakIdentityProvider = "discord";
+export type PazaakIdentityProvider = "discord" | "google" | "github";
 
 export type PazaakTableVariant = "canonical" | "multi_seat";
 
@@ -262,18 +264,39 @@ export class JsonPazaakAccountRepository {
     username: string;
     displayName: string;
   }): Promise<{ account: PazaakAccountRecord; identity: PazaakLinkedIdentityRecord }> {
+    return this.ensureExternalAccount({
+      provider: "discord",
+      providerUserId: input.discordUserId,
+      username: input.username,
+      displayName: input.displayName,
+      legacyGameUserId: input.discordUserId,
+    });
+  }
+
+  public async ensureExternalAccount(input: {
+    provider: PazaakIdentityProvider;
+    providerUserId: string;
+    username: string;
+    displayName: string;
+    email?: string | null | undefined;
+    legacyGameUserId?: string | null | undefined;
+  }): Promise<{ account: PazaakAccountRecord; identity: PazaakLinkedIdentityRecord }> {
     const state = await this.ensureState();
-    const key = linkedIdentityKey("discord", input.discordUserId);
+    const key = linkedIdentityKey(input.provider, input.providerUserId);
     const now = new Date().toISOString();
     const existingIdentity = state.linkedIdentities[key];
 
     if (existingIdentity) {
       const account = state.accounts[existingIdentity.accountId];
       if (!account) {
-        throw new Error("Linked Discord account points to a missing account.");
+        throw new Error("Linked account points to a missing account.");
       }
 
+      const normalizedEmail = input.email?.trim() ? normalizeAccountLookup(input.email) : null;
       account.displayName = input.displayName;
+      if (normalizedEmail && !account.email) {
+        account.email = normalizedEmail;
+      }
       account.updatedAt = now;
       existingIdentity.username = input.username;
       existingIdentity.displayName = input.displayName;
@@ -287,14 +310,14 @@ export class JsonPazaakAccountRepository {
       accountId: randomUUID(),
       username,
       displayName: input.displayName || username,
-      email: null,
-      legacyGameUserId: input.discordUserId,
+      email: input.email?.trim() ? normalizeAccountLookup(input.email) : null,
+      legacyGameUserId: input.legacyGameUserId ?? null,
       createdAt: now,
       updatedAt: now,
     };
     const identity: PazaakLinkedIdentityRecord = {
-      provider: "discord",
-      providerUserId: input.discordUserId,
+      provider: input.provider,
+      providerUserId: input.providerUserId,
       accountId: account.accountId,
       username: input.username,
       displayName: input.displayName,
@@ -314,6 +337,20 @@ export class JsonPazaakAccountRepository {
     username: string;
     displayName: string;
   }): Promise<PazaakLinkedIdentityRecord> {
+    return this.linkExternalIdentity(accountId, {
+      provider: "discord",
+      providerUserId: input.discordUserId,
+      username: input.username,
+      displayName: input.displayName,
+    });
+  }
+
+  public async linkExternalIdentity(accountId: string, input: {
+    provider: PazaakIdentityProvider;
+    providerUserId: string;
+    username: string;
+    displayName: string;
+  }): Promise<PazaakLinkedIdentityRecord> {
     const state = await this.ensureState();
     const account = state.accounts[accountId];
 
@@ -321,17 +358,17 @@ export class JsonPazaakAccountRepository {
       throw new Error("Account not found.");
     }
 
-    const key = linkedIdentityKey("discord", input.discordUserId);
+    const key = linkedIdentityKey(input.provider, input.providerUserId);
     const existingIdentity = state.linkedIdentities[key];
 
     if (existingIdentity && existingIdentity.accountId !== accountId) {
-      throw new Error("That Discord account is already linked to another account.");
+      throw new Error("That account is already linked to another profile.");
     }
 
     const now = new Date().toISOString();
     const identity: PazaakLinkedIdentityRecord = {
-      provider: "discord",
-      providerUserId: input.discordUserId,
+      provider: input.provider,
+      providerUserId: input.providerUserId,
       accountId,
       username: input.username,
       displayName: input.displayName,
@@ -347,8 +384,12 @@ export class JsonPazaakAccountRepository {
   }
 
   public async unlinkDiscordAccount(accountId: string, discordUserId: string): Promise<boolean> {
+    return this.unlinkExternalIdentity(accountId, "discord", discordUserId);
+  }
+
+  public async unlinkExternalIdentity(accountId: string, provider: PazaakIdentityProvider, providerUserId: string): Promise<boolean> {
     const state = await this.ensureState();
-    const key = linkedIdentityKey("discord", discordUserId);
+    const key = linkedIdentityKey(provider, providerUserId);
     const identity = state.linkedIdentities[key];
 
     if (!identity || identity.accountId !== accountId) {

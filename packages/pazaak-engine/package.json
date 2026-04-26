@@ -7,6 +7,14 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./menu-preset": {
+      "import": "./dist/menu-preset.js",
+      "types": "./dist/menu-preset.d.ts"
+    },
+    "./opponents": {
+      "import": "./dist/opponents.js",
+      "types": "./dist/opponents.d.ts"
     }
   },
   "main": "dist/index.js",

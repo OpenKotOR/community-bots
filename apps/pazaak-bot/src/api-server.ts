@@ -15,11 +15,13 @@
  */
 
 import http from "node:http";
+import { randomUUID } from "node:crypto";
 import type { AiDifficulty, PazaakCoordinator, PazaakMatch } from "@openkotor/pazaak-engine";
-import { SIDE_DECK_SIZE, normalizeSideDeckToken, serializeMatch } from "@openkotor/pazaak-engine";
+import { MAIN_MENU_PRESET, SIDE_DECK_SIZE, normalizeSideDeckToken, pazaakOpponents, serializeMatch } from "@openkotor/pazaak-engine";
 import { hashPazaakPassword, verifyPazaakPassword } from "@openkotor/persistence";
 import type {
   JsonPazaakAccountRepository,
+  PazaakLobbyRecord,
   JsonPazaakLobbyRepository,
   JsonPazaakMatchHistoryRepository,
   JsonPazaakMatchmakingQueueRepository,
@@ -45,6 +47,21 @@ interface DiscordUser {
   discriminator: string;
 }
 
+interface GoogleUser {
+  sub: string;
+  email?: string;
+  name?: string;
+  given_name?: string;
+  picture?: string;
+}
+
+interface GithubUser {
+  id: number;
+  login: string;
+  name: string | null;
+  email: string | null;
+}
+
 interface AuthenticatedPazaakUser {
   /** The identity currently used by game/wallet records during migration. */
   id: string;
@@ -68,6 +85,50 @@ interface SerializedAccountSession {
 
 const DISCORD_API = "https://discord.com/api/v10";
 const APP_SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
+const OAUTH_PROVIDER_ENV = {
+  google: {
+    clientId: "PAZAAK_OAUTH_GOOGLE_CLIENT_ID",
+    clientSecret: "PAZAAK_OAUTH_GOOGLE_CLIENT_SECRET",
+    callbackUrl: "PAZAAK_OAUTH_GOOGLE_CALLBACK_URL",
+    startUrl: "PAZAAK_OAUTH_GOOGLE_URL",
+  },
+  discord: {
+    clientId: "PAZAAK_OAUTH_DISCORD_CLIENT_ID",
+    clientSecret: "PAZAAK_OAUTH_DISCORD_CLIENT_SECRET",
+    callbackUrl: "PAZAAK_OAUTH_DISCORD_CALLBACK_URL",
+    startUrl: "PAZAAK_OAUTH_DISCORD_URL",
+  },
+  github: {
+    clientId: "PAZAAK_OAUTH_GITHUB_CLIENT_ID",
+    clientSecret: "PAZAAK_OAUTH_GITHUB_CLIENT_SECRET",
+    callbackUrl: "PAZAAK_OAUTH_GITHUB_CALLBACK_URL",
+    startUrl: "PAZAAK_OAUTH_GITHUB_URL",
+  },
+} as const;
+
+type SocialAuthProvider = keyof typeof OAUTH_PROVIDER_ENV;
+
+const SOCIAL_PROVIDERS = Object.keys(OAUTH_PROVIDER_ENV) as SocialAuthProvider[];
+
+const resolveOauthConfig = (provider: SocialAuthProvider) => {
+  const env = OAUTH_PROVIDER_ENV[provider];
+  const clientId = (process.env[env.clientId]?.trim()
+    || (provider === "discord" ? process.env.PAZAAK_DISCORD_APP_ID?.trim() : "")
+    || "");
+  const clientSecret = (process.env[env.clientSecret]?.trim()
+    || (provider === "discord" ? process.env.PAZAAK_DISCORD_CLIENT_SECRET?.trim() : "")
+    || "");
+  const callbackUrl = process.env[env.callbackUrl]?.trim() ?? "";
+  const startUrl = process.env[env.startUrl]?.trim() ?? "";
+
+  return {
+    clientId,
+    clientSecret,
+    callbackUrl,
+    startUrl,
+    enabled: Boolean(clientId && clientSecret),
+  };
+};
 
 const getSessionExpiresAt = (): string => new Date(Date.now() + APP_SESSION_TTL_MS).toISOString();
 const resolveGameUserId = (account: PazaakAccountRecord): string => account.legacyGameUserId ?? account.accountId;
@@ -111,22 +172,41 @@ async function resolveDiscordUser(authHeader: string | undefined): Promise<Disco
 const safeSerialize = (match: PazaakMatch) => serializeMatch(match);
 
 // ---------------------------------------------------------------------------
+// Chat message type
+// ---------------------------------------------------------------------------
+
+export interface ChatMessage {
+  id: string;
+  matchId: string;
+  userId: string;
+  displayName: string;
+  text: string;
+  at: number;
+}
+
+// ---------------------------------------------------------------------------
 // WebSocket hub — broadcast match updates to all subscribed clients
 // ---------------------------------------------------------------------------
 
-type WsClient = { ws: WebSocket; matchId: string };
+type WsClient = {
+  ws: WebSocket;
+  stream: "match" | "lobbies";
+  matchId: string;
+};
 
 class WsHub {
   private readonly clients = new Set<WsClient>();
   private readonly wss: WebSocketServer;
+  private readonly chatHistory = new Map<string, ChatMessage[]>();
 
   public constructor(server: http.Server) {
     this.wss = new WebSocketServer({ server, path: "/ws" });
 
     this.wss.on("connection", (ws, req) => {
       const url = new URL(req.url ?? "/", "http://localhost");
+      const stream = url.searchParams.get("stream") === "lobbies" ? "lobbies" : "match";
       const matchId = url.searchParams.get("matchId") ?? "";
-      const entry: WsClient = { ws, matchId };
+      const entry: WsClient = { ws, stream, matchId };
       this.clients.add(entry);
 
       ws.on("close", () => {
@@ -144,7 +224,57 @@ class WsHub {
     const payload = JSON.stringify({ type: "match_update", data: safeSerialize(match) });
 
     for (const client of this.clients) {
-      if (client.matchId === match.id && client.ws.readyState === 1 /* OPEN */) {
+      if (client.stream === "match" && client.matchId === match.id && client.ws.readyState === 1 /* OPEN */) {
+        try {
+          client.ws.send(payload);
+        } catch {
+          // Ignore send errors; client will be cleaned up on close.
+        }
+      }
+    }
+  }
+
+  /** Push a single lobby snapshot to all lobby stream subscribers. */
+  public broadcastLobby(lobby: PazaakLobbyRecord): void {
+    const payload = JSON.stringify({ type: "lobby_update", data: lobby });
+
+    for (const client of this.clients) {
+      if (client.stream === "lobbies" && client.ws.readyState === 1 /* OPEN */) {
+        try {
+          client.ws.send(payload);
+        } catch {
+          // Ignore send errors; client will be cleaned up on close.
+        }
+      }
+    }
+  }
+
+  /** Persist a chat message and push it to all match subscribers. */
+  public broadcastChatMessage(matchId: string, msg: ChatMessage): void {
+    const history = this.chatHistory.get(matchId) ?? [];
+    history.push(msg);
+    if (history.length > 100) history.splice(0, history.length - 100);
+    this.chatHistory.set(matchId, history);
+
+    const payload = JSON.stringify({ type: "chat_message", data: msg });
+    for (const client of this.clients) {
+      if (client.stream === "match" && client.matchId === matchId && client.ws.readyState === 1) {
+        try { client.ws.send(payload); } catch { /* ignore */ }
+      }
+    }
+  }
+
+  /** Return stored chat history for a match. */
+  public getChatHistory(matchId: string): ChatMessage[] {
+    return this.chatHistory.get(matchId) ?? [];
+  }
+
+  /** Push the current open lobby list to all lobby stream subscribers. */
+  public broadcastLobbyList(lobbies: readonly PazaakLobbyRecord[]): void {
+    const payload = JSON.stringify({ type: "lobby_list_update", data: lobbies });
+
+    for (const client of this.clients) {
+      if (client.stream === "lobbies" && client.ws.readyState === 1 /* OPEN */) {
         try {
           client.ws.send(payload);
         } catch {
@@ -340,6 +470,206 @@ export function createApiServer(
     throw Object.assign(new Error("Theme must be kotor, modern, or adaptive."), { status: 422 });
   };
 
+  type PendingOauthState = {
+    provider: SocialAuthProvider;
+    expiresAt: number;
+    accountId?: string;
+  };
+
+  const oauthStateStore = new Map<string, PendingOauthState>();
+  const OAUTH_STATE_TTL_MS = 1000 * 60 * 10;
+  const oauthLandingBase = opts.publicWebOrigin?.trim() || "http://localhost:5173";
+
+  const cleanupOauthState = (): void => {
+    const now = Date.now();
+    for (const [key, entry] of oauthStateStore.entries()) {
+      if (entry.expiresAt <= now) {
+        oauthStateStore.delete(key);
+      }
+    }
+  };
+
+  const createOauthState = (provider: SocialAuthProvider, accountId?: string): string => {
+    cleanupOauthState();
+    const state = randomUUID().replace(/-/g, "");
+    oauthStateStore.set(state, {
+      provider,
+      expiresAt: Date.now() + OAUTH_STATE_TTL_MS,
+      ...(accountId ? { accountId } : {}),
+    });
+    return state;
+  };
+
+  const consumeOauthState = (state: string, provider: SocialAuthProvider): PendingOauthState => {
+    cleanupOauthState();
+    const entry = oauthStateStore.get(state);
+    oauthStateStore.delete(state);
+
+    if (!entry || entry.expiresAt <= Date.now() || entry.provider !== provider) {
+      throw Object.assign(new Error("OAuth state is invalid or expired."), { status: 401 });
+    }
+
+    return entry;
+  };
+
+  const resolveCallbackUrl = (provider: SocialAuthProvider, configured: string): string => {
+    if (configured) {
+      return configured;
+    }
+    return `${oauthLandingBase.replace(/\/$/u, "")}/api/auth/oauth/${provider}/callback`;
+  };
+
+  const fetchGoogleProfile = async (code: string): Promise<{ providerUserId: string; username: string; displayName: string; email: string | null }> => {
+    const config = resolveOauthConfig("google");
+    const callbackUrl = resolveCallbackUrl("google", config.callbackUrl);
+    const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        code,
+        client_id: config.clientId,
+        client_secret: config.clientSecret,
+        redirect_uri: callbackUrl,
+        grant_type: "authorization_code",
+      }),
+    });
+
+    if (!tokenRes.ok) {
+      const message = await tokenRes.text();
+      throw Object.assign(new Error(`Google token exchange failed: ${message}`), { status: 401 });
+    }
+
+    const tokenBody = await tokenRes.json() as { access_token?: string };
+    const accessToken = tokenBody.access_token;
+    if (!accessToken) {
+      throw Object.assign(new Error("Google token response did not include an access token."), { status: 401 });
+    }
+
+    const profileRes = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!profileRes.ok) {
+      const message = await profileRes.text();
+      throw Object.assign(new Error(`Google profile fetch failed: ${message}`), { status: 401 });
+    }
+
+    const profile = await profileRes.json() as GoogleUser;
+    return {
+      providerUserId: profile.sub,
+      username: profile.email?.split("@")[0] || profile.name || "google-user",
+      displayName: profile.name || profile.given_name || profile.email || "Google User",
+      email: profile.email?.trim() || null,
+    };
+  };
+
+  const fetchDiscordProfile = async (code: string): Promise<{ providerUserId: string; username: string; displayName: string; email: string | null }> => {
+    const config = resolveOauthConfig("discord");
+    const callbackUrl = resolveCallbackUrl("discord", config.callbackUrl);
+    const tokenRes = await fetch(`${DISCORD_API}/oauth2/token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        code,
+        client_id: config.clientId,
+        client_secret: config.clientSecret,
+        redirect_uri: callbackUrl,
+        grant_type: "authorization_code",
+      }),
+    });
+
+    if (!tokenRes.ok) {
+      const message = await tokenRes.text();
+      throw Object.assign(new Error(`Discord token exchange failed: ${message}`), { status: 401 });
+    }
+
+    const tokenBody = await tokenRes.json() as { access_token?: string };
+    const accessToken = tokenBody.access_token;
+    if (!accessToken) {
+      throw Object.assign(new Error("Discord token response did not include an access token."), { status: 401 });
+    }
+
+    const profileRes = await fetch(`${DISCORD_API}/users/@me`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!profileRes.ok) {
+      const message = await profileRes.text();
+      throw Object.assign(new Error(`Discord profile fetch failed: ${message}`), { status: 401 });
+    }
+
+    const profile = await profileRes.json() as DiscordUser & { email?: string | null };
+    return {
+      providerUserId: profile.id,
+      username: profile.username,
+      displayName: resolveDiscordDisplayName(profile),
+      email: profile.email?.trim() || null,
+    };
+  };
+
+  const fetchGithubProfile = async (code: string): Promise<{ providerUserId: string; username: string; displayName: string; email: string | null }> => {
+    const config = resolveOauthConfig("github");
+    const callbackUrl = resolveCallbackUrl("github", config.callbackUrl);
+    const tokenRes = await fetch("https://github.com/login/oauth/access_token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Accept: "application/json",
+      },
+      body: new URLSearchParams({
+        code,
+        client_id: config.clientId,
+        client_secret: config.clientSecret,
+        redirect_uri: callbackUrl,
+      }),
+    });
+
+    if (!tokenRes.ok) {
+      const message = await tokenRes.text();
+      throw Object.assign(new Error(`GitHub token exchange failed: ${message}`), { status: 401 });
+    }
+
+    const tokenBody = await tokenRes.json() as { access_token?: string };
+    const accessToken = tokenBody.access_token;
+    if (!accessToken) {
+      throw Object.assign(new Error("GitHub token response did not include an access token."), { status: 401 });
+    }
+
+    const profileRes = await fetch("https://api.github.com/user", {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/vnd.github+json",
+      },
+    });
+    if (!profileRes.ok) {
+      const message = await profileRes.text();
+      throw Object.assign(new Error(`GitHub profile fetch failed: ${message}`), { status: 401 });
+    }
+
+    const profile = await profileRes.json() as GithubUser;
+    let email = profile.email?.trim() || null;
+    if (!email) {
+      const emailsRes = await fetch("https://api.github.com/user/emails", {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          Accept: "application/vnd.github+json",
+        },
+      });
+      if (emailsRes.ok) {
+        const emails = await emailsRes.json() as Array<{ email: string; primary?: boolean; verified?: boolean }>;
+        email = emails.find((entry) => entry.primary && entry.verified)?.email
+          ?? emails.find((entry) => entry.verified)?.email
+          ?? emails[0]?.email
+          ?? null;
+      }
+    }
+
+    return {
+      providerUserId: String(profile.id),
+      username: profile.login,
+      displayName: profile.name || profile.login,
+      email,
+    };
+  };
+
   const settleCompletedMatch = async (match: PazaakMatch): Promise<void> => {
     if (match.phase !== "completed" || match.settled || !match.winnerId || !match.winnerName || !match.loserId || !match.loserName) {
       return;
@@ -364,6 +694,14 @@ export function createApiServer(
       summary: match.statusLine,
     });
     coordinator.markSettled(match.id);
+  };
+
+  const broadcastLobbyState = async (lobby?: PazaakLobbyRecord | null): Promise<void> => {
+    if (lobby) {
+      hub.broadcastLobby(lobby);
+    }
+    const openLobbies = await opts.lobbyRepository.listOpen();
+    hub.broadcastLobbyList(openLobbies);
   };
 
   let backgroundTickRunning = false;
@@ -393,12 +731,25 @@ export function createApiServer(
       const queue = await opts.matchmakingQueueRepository.list();
       const available = [...queue].sort((left, right) => left.enqueuedAt.localeCompare(right.enqueuedAt));
 
+      const mmrTolerance = (mmr: number): number => {
+        if (mmr < 1000) return 200;
+        if (mmr < 1500) return 150;
+        return 300;
+      };
+
       for (let index = 0; index + 1 < available.length; index += 2) {
         const first = available[index]!;
         const second = available[index + 1]!;
 
         if (first.userId === second.userId) {
           await opts.matchmakingQueueRepository.remove(second.userId);
+          continue;
+        }
+
+        const mmrDiff = Math.abs(first.mmr - second.mmr);
+        const tolerance = Math.max(mmrTolerance(first.mmr), mmrTolerance(second.mmr));
+        if (mmrDiff > tolerance) {
+          // Players are too far apart in skill — skip this pair.
           continue;
         }
 
@@ -601,6 +952,194 @@ export function createApiServer(
     res.json({ ok: true });
   });
 
+  /** HEAD/GET /api/ping  —  lightweight latency probe for Activity connection status. */
+  app.head("/api/ping", (_req, res) => {
+    res.status(204).end();
+  });
+
+  app.get("/api/ping", (_req, res) => {
+    res.status(204).end();
+  });
+
+  app.get("/api/ui/main-menu", (_req, res) => {
+    res.json({
+      preset: MAIN_MENU_PRESET,
+      serverTime: new Date().toISOString(),
+    });
+  });
+
+  app.get("/api/pazaak/opponents", (_req, res) => {
+    res.json({
+      opponents: pazaakOpponents,
+      serverTime: new Date().toISOString(),
+    });
+  });
+
+  app.get("/api/auth/oauth/providers", (_req, res) => {
+    res.json({
+      providers: SOCIAL_PROVIDERS.map((provider) => ({
+        provider,
+        enabled: resolveOauthConfig(provider).enabled,
+      })),
+    });
+  });
+
+  const buildProviderAuthorizeUrl = (provider: SocialAuthProvider, state: string): string => {
+    const config = resolveOauthConfig(provider);
+    const callbackUrl = resolveCallbackUrl(provider, config.callbackUrl);
+
+    if (config.startUrl) {
+      return config.startUrl
+        .replaceAll("{state}", encodeURIComponent(state))
+        .replaceAll("{callback}", encodeURIComponent(callbackUrl))
+        .replaceAll("{clientId}", encodeURIComponent(config.clientId));
+    }
+
+    if (provider === "google") {
+      const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+      url.searchParams.set("client_id", config.clientId);
+      url.searchParams.set("redirect_uri", callbackUrl);
+      url.searchParams.set("response_type", "code");
+      url.searchParams.set("scope", "openid profile email");
+      url.searchParams.set("access_type", "online");
+      url.searchParams.set("prompt", "select_account");
+      url.searchParams.set("state", state);
+      return url.toString();
+    }
+
+    if (provider === "discord") {
+      const url = new URL(`${DISCORD_API}/oauth2/authorize`);
+      url.searchParams.set("client_id", config.clientId);
+      url.searchParams.set("redirect_uri", callbackUrl);
+      url.searchParams.set("response_type", "code");
+      url.searchParams.set("scope", "identify email");
+      url.searchParams.set("prompt", "consent");
+      url.searchParams.set("state", state);
+      return url.toString();
+    }
+
+    const url = new URL("https://github.com/login/oauth/authorize");
+    url.searchParams.set("client_id", config.clientId);
+    url.searchParams.set("redirect_uri", callbackUrl);
+    url.searchParams.set("scope", "read:user user:email");
+    url.searchParams.set("state", state);
+    return url.toString();
+  };
+
+  app.post("/api/auth/oauth/:provider/start", async (req, res) => {
+    const providerParam = (req.params.provider ?? "").toLowerCase();
+    if (!SOCIAL_PROVIDERS.includes(providerParam as SocialAuthProvider)) {
+      res.status(404).json({ error: "Unsupported OAuth provider." });
+      return;
+    }
+
+    const provider = providerParam as SocialAuthProvider;
+    const config = resolveOauthConfig(provider);
+    if (!config.enabled) {
+      res.status(501).json({
+        error: `OAuth provider ${provider} is not configured on this server.`,
+      });
+      return;
+    }
+
+    let accountId: string | undefined;
+    try {
+      const user = await resolveAuthenticatedUser(req.headers.authorization);
+      accountId = user.accountId;
+    } catch {
+      // Continue as login flow for anonymous users.
+    }
+
+    const state = createOauthState(provider, accountId);
+    const redirectUrl = buildProviderAuthorizeUrl(provider, state);
+
+    res.json({ provider, redirectUrl });
+  });
+
+  app.get("/api/auth/oauth/:provider/callback", async (req, res) => {
+    const providerParam = (req.params.provider ?? "").toLowerCase();
+    if (!SOCIAL_PROVIDERS.includes(providerParam as SocialAuthProvider)) {
+      res.status(404).send("Unsupported OAuth provider.");
+      return;
+    }
+
+    const provider = providerParam as SocialAuthProvider;
+    const code = typeof req.query.code === "string" ? req.query.code : "";
+    const state = typeof req.query.state === "string" ? req.query.state : "";
+    const error = typeof req.query.error === "string" ? req.query.error : "";
+
+    const redirect = new URL("/", oauthLandingBase);
+
+    if (error) {
+      redirect.searchParams.set("oauth_error", error);
+      if (typeof req.query.error_description === "string") {
+        redirect.searchParams.set("oauth_error_description", req.query.error_description);
+      }
+      res.redirect(302, redirect.toString());
+      return;
+    }
+
+    if (!code || !state) {
+      redirect.searchParams.set("oauth_error", "missing_code_or_state");
+      res.redirect(302, redirect.toString());
+      return;
+    }
+
+    try {
+      const pending = consumeOauthState(state, provider);
+      const profile = provider === "google"
+        ? await fetchGoogleProfile(code)
+        : provider === "discord"
+          ? await fetchDiscordProfile(code)
+          : await fetchGithubProfile(code);
+
+      if (pending.accountId) {
+        await opts.accountRepository.linkExternalIdentity(pending.accountId, {
+          provider,
+          providerUserId: profile.providerUserId,
+          username: profile.username,
+          displayName: profile.displayName,
+        });
+        const account = await opts.accountRepository.getAccount(pending.accountId);
+        if (!account) {
+          throw Object.assign(new Error("Account not found after linking OAuth identity."), { status: 404 });
+        }
+        const { token: appToken } = await opts.accountRepository.createSession(account.accountId, {
+          expiresAt: getSessionExpiresAt(),
+          label: `${provider} OAuth`,
+        });
+        redirect.searchParams.set("oauth_provider", provider);
+        redirect.searchParams.set("oauth_app_token", appToken);
+        redirect.searchParams.set("oauth_username", account.displayName);
+        redirect.searchParams.set("oauth_user_id", resolveGameUserId(account));
+        res.redirect(302, redirect.toString());
+        return;
+      }
+
+      const ensured = await opts.accountRepository.ensureExternalAccount({
+        provider,
+        providerUserId: profile.providerUserId,
+        username: profile.username,
+        displayName: profile.displayName,
+        email: profile.email,
+        legacyGameUserId: provider === "discord" ? profile.providerUserId : null,
+      });
+      const { token: appToken } = await opts.accountRepository.createSession(ensured.account.accountId, {
+        expiresAt: getSessionExpiresAt(),
+        label: `${provider} OAuth`,
+      });
+
+      redirect.searchParams.set("oauth_provider", provider);
+      redirect.searchParams.set("oauth_app_token", appToken);
+      redirect.searchParams.set("oauth_username", ensured.account.displayName);
+      redirect.searchParams.set("oauth_user_id", resolveGameUserId(ensured.account));
+      res.redirect(302, redirect.toString());
+    } catch (err) {
+      redirect.searchParams.set("oauth_error", err instanceof Error ? err.message : String(err));
+      res.redirect(302, redirect.toString());
+    }
+  });
+
   app.get("/api/me", withAuth(async (_req, res, user) => {
     const wallet = await opts.walletRepository.getWallet(user.id, resolveDisplayName(user));
     const queue = await opts.matchmakingQueueRepository.get(user.id);
@@ -618,6 +1157,7 @@ export function createApiServer(
       const body = req.body as {
         theme?: unknown;
         soundEnabled?: unknown;
+        reducedMotionEnabled?: unknown;
         turnTimerSeconds?: unknown;
         preferredAiDifficulty?: unknown;
       };
@@ -626,6 +1166,7 @@ export function createApiServer(
 
       if (theme !== undefined) settings.theme = theme;
       if (typeof body.soundEnabled === "boolean") settings.soundEnabled = body.soundEnabled;
+      if (typeof body.reducedMotionEnabled === "boolean") settings.reducedMotionEnabled = body.reducedMotionEnabled;
       if (typeof body.turnTimerSeconds === "number") settings.turnTimerSeconds = Math.max(10, Math.min(300, Math.trunc(body.turnTimerSeconds)));
       if (body.preferredAiDifficulty !== undefined) settings.preferredAiDifficulty = parseAiDifficulty(body.preferredAiDifficulty);
 
@@ -671,11 +1212,13 @@ export function createApiServer(
       mmr: wallet.mmr,
       preferredMaxPlayers: Number.isFinite(preferredMaxPlayers) ? preferredMaxPlayers : 2,
     });
+    await broadcastLobbyState();
     res.json({ queue });
   }));
 
   app.post("/api/matchmaking/leave", withAuth(async (_req, res, user) => {
     const removed = await opts.matchmakingQueueRepository.remove(user.id);
+    await broadcastLobbyState();
     res.json({ removed });
   }));
 
@@ -751,6 +1294,7 @@ export function createApiServer(
       password: typeof body.password === "string" ? body.password : undefined,
       tableSettings,
     });
+    await broadcastLobbyState(lobby);
     res.json({ lobby });
   }));
 
@@ -770,6 +1314,7 @@ export function createApiServer(
       }
 
       const joinedLobby = await opts.lobbyRepository.join(lobby.id, { userId: user.id, displayName: resolveDisplayName(user), password });
+      await broadcastLobbyState(joinedLobby);
       res.json({ lobby: joinedLobby });
     } catch (err) {
       res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
@@ -780,6 +1325,7 @@ export function createApiServer(
     try {
       const { password } = req.body as { password?: string };
       const lobby = await opts.lobbyRepository.join(param(req, "lobbyId"), { userId: user.id, displayName: resolveDisplayName(user), password });
+      await broadcastLobbyState(lobby);
       res.json({ lobby });
     } catch (err) {
       res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
@@ -789,6 +1335,7 @@ export function createApiServer(
   app.post("/api/lobbies/:lobbyId/ready", withAuth(async (req, res, user) => {
     const ready = (req.body as { ready?: unknown }).ready !== false;
     const lobby = await opts.lobbyRepository.setReady(param(req, "lobbyId"), user.id, ready);
+    await broadcastLobbyState(lobby);
     res.json({ lobby });
   }));
 
@@ -797,6 +1344,7 @@ export function createApiServer(
       const statusRaw = (req.body as { status?: unknown }).status;
       const status = statusRaw === "matchmaking" ? "matchmaking" : "waiting";
       const lobby = await opts.lobbyRepository.setStatus(param(req, "lobbyId"), user.id, status);
+      await broadcastLobbyState(lobby);
       res.json({ lobby });
     } catch (err) {
       const status = (err as { status?: number }).status ?? 400;
@@ -808,6 +1356,7 @@ export function createApiServer(
     try {
       const difficulty = parseAiDifficulty((req.body as { difficulty?: unknown }).difficulty ?? "professional");
       const lobby = await opts.lobbyRepository.addAi(param(req, "lobbyId"), user.id, difficulty);
+      await broadcastLobbyState(lobby);
       res.json({ lobby });
     } catch (err) {
       const status = (err as { status?: number }).status ?? 400;
@@ -824,6 +1373,7 @@ export function createApiServer(
         decodeURIComponent(param(req, "aiUserId")),
         difficulty,
       );
+      await broadcastLobbyState(lobby);
       res.json({ lobby });
     } catch (err) {
       const status = (err as { status?: number }).status ?? 400;
@@ -833,6 +1383,7 @@ export function createApiServer(
 
   app.post("/api/lobbies/:lobbyId/leave", withAuth(async (req, res, user) => {
     const lobby = await opts.lobbyRepository.leave(param(req, "lobbyId"), user.id);
+    await broadcastLobbyState(lobby);
     res.json({ lobby: lobby ?? null });
   }));
 
@@ -873,6 +1424,7 @@ export function createApiServer(
       });
       const updatedLobby = await opts.lobbyRepository.markInGame(lobby.id, match.id);
       hub.broadcast(match);
+      await broadcastLobbyState(updatedLobby);
       res.json({ lobby: updatedLobby, match: safeSerialize(match) });
     } catch (err) {
       res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
@@ -1079,6 +1631,38 @@ export function createApiServer(
 
   app.post("/api/match/:matchId/forfeit", forfeitHandler);
   app.post("/api/match/:matchId/concede", forfeitHandler);
+
+  /**
+   * GET /api/match/:matchId/chat
+   * Fetch chat message history for a match.
+   */
+  app.get("/api/match/:matchId/chat", withAuth((req, res) => {
+    const matchId = param(req, "matchId");
+    res.json({ messages: hub.getChatHistory(matchId) });
+  }));
+
+  /**
+   * POST /api/match/:matchId/chat
+   * Send a chat message to all match participants.
+   */
+  app.post("/api/match/:matchId/chat", withAuth((req, res, user) => {
+    const matchId = param(req, "matchId");
+    const text = typeof req.body?.text === "string" ? req.body.text.trim().slice(0, 300) : "";
+    if (!text) {
+      res.status(422).json({ error: "Message text is required." });
+      return;
+    }
+    const msg: ChatMessage = {
+      id: randomUUID(),
+      matchId,
+      userId: user.id,
+      displayName: resolveDisplayName(user),
+      text,
+      at: Date.now(),
+    };
+    hub.broadcastChatMessage(matchId, msg);
+    res.status(201).json({ message: msg });
+  }));
 
   // Catch-all 404.
   app.use((_req, res) => {

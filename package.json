@@ -10,6 +10,7 @@
   "scripts": {
     "build": "tsc -b tsconfig.workspace.json",
     "check": "tsc -b tsconfig.workspace.json --pretty false",
+    "check:pazaak-oauth": "node scripts/check_pazaak_oauth_readiness.mjs",
     "dev:trask": "pnpm --filter @openkotor/trask-bot dev",
     "dev:hk": "pnpm --filter @openkotor/hk-bot dev",
     "dev:pazaak": "pnpm --filter @openkotor/pazaak-bot dev",

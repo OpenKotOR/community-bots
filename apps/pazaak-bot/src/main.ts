@@ -128,6 +128,25 @@ const sideboardTokenDescriptions: Readonly<Record<string, string>> = {
 
 const formatSideboardTokens = (tokens: readonly string[]): string => tokens.join(" ");
 
+const resolveGameUserId = (legacyGameUserId: string | null, accountId: string): string => legacyGameUserId ?? accountId;
+
+const resolveCommandActor = async (interaction: ChatInputCommandInteraction): Promise<{ userId: string; displayName: string }> => {
+  const { account } = await accountRepository.ensureDiscordAccount({
+    discordUserId: interaction.user.id,
+    username: interaction.user.username,
+    displayName: interaction.user.displayName ?? interaction.user.username,
+  });
+
+  return {
+    userId: resolveGameUserId(account.legacyGameUserId, account.accountId),
+    displayName: account.displayName,
+  };
+};
+
+const buildActivityLobbyComponents = (label = "Open Activity Lobby") => [
+  new ActionRowBuilder<ButtonBuilder>().addComponents(buildActivityLobbyButton(label)),
+];
+
 const normalizeRequestedSideboardName = (name?: string): string | undefined => {
   if (!name) {
     return undefined;
@@ -1972,57 +1991,73 @@ const handleSlashCommand = async (interaction: ChatInputCommandInteraction): Pro
     }
 
     case "queue": {
+      const actor = await resolveCommandActor(interaction);
       const action = interaction.options.getString("action", true);
 
       if (action === "join") {
-        const wallet = await walletRepository.getWallet(interaction.user.id, interaction.user.displayName);
+        const wallet = await walletRepository.getWallet(actor.userId, actor.displayName);
         await matchmakingQueueRepository.enqueue({
-          userId: interaction.user.id,
-          displayName: interaction.user.displayName,
+          userId: actor.userId,
+          displayName: actor.displayName,
           mmr: wallet.mmr,
           preferredMaxPlayers: 2,
         });
-        await interaction.reply({ embeds: [await buildQueueEmbed(interaction.user.id)], ephemeral: true });
-        return;
-      }
-
-      if (action === "leave") {
-        const removed = await matchmakingQueueRepository.remove(interaction.user.id);
         await interaction.reply({
-          embeds: [removed
-            ? buildSuccessEmbed({ title: "Queue Left", description: "You left the cross-platform Pazaak queue." })
-            : buildInfoEmbed({ title: "Queue Status", description: "You were not in the queue." })],
+          embeds: [await buildQueueEmbed(actor.userId)],
+          components: buildActivityLobbyComponents("Open Queue in Activity"),
           ephemeral: true,
         });
         return;
       }
 
-      await interaction.reply({ embeds: [await buildQueueEmbed(interaction.user.id)], ephemeral: true });
+      if (action === "leave") {
+        const removed = await matchmakingQueueRepository.remove(actor.userId);
+        await interaction.reply({
+          embeds: [removed
+            ? buildSuccessEmbed({ title: "Queue Left", description: "You left the cross-platform Pazaak queue." })
+            : buildInfoEmbed({ title: "Queue Status", description: "You were not in the queue." })],
+          components: buildActivityLobbyComponents(),
+          ephemeral: true,
+        });
+        return;
+      }
+
+      await interaction.reply({
+        embeds: [await buildQueueEmbed(actor.userId)],
+        components: buildActivityLobbyComponents(),
+        ephemeral: true,
+      });
       return;
     }
 
     case "lobby": {
+      const actor = await resolveCommandActor(interaction);
       const action = interaction.options.getString("action", true);
       const requestedLobbyId = interaction.options.getString("lobby_id") ?? undefined;
       const openLobbies = await lobbyRepository.listOpen();
-      const ownLobby = openLobbies.find((lobby) => lobby.players.some((player) => player.userId === interaction.user.id));
+      const ownLobby = openLobbies.find((lobby) => lobby.players.some((player) => player.userId === actor.userId));
       const lobbyId = requestedLobbyId ?? ownLobby?.id;
 
       if (action === "list") {
-        await interaction.reply({ embeds: [await buildLobbyListEmbed()], ephemeral: true });
+        await interaction.reply({
+          embeds: [await buildLobbyListEmbed()],
+          components: buildActivityLobbyComponents(),
+          ephemeral: true,
+        });
         return;
       }
 
       if (action === "create") {
-        const name = interaction.options.getString("name") ?? `${interaction.user.displayName}'s Table`;
+        const name = interaction.options.getString("name") ?? `${actor.displayName}'s Table`;
         const lobby = await lobbyRepository.create({
           name,
-          hostUserId: interaction.user.id,
-          hostName: interaction.user.displayName,
+          hostUserId: actor.userId,
+          hostName: actor.displayName,
           maxPlayers: 2,
         });
         await interaction.reply({
           embeds: [buildSuccessEmbed({ title: "Lobby Created", description: `Created **${lobby.name}**. Lobby ID: ${lobby.id}` })],
+          components: buildActivityLobbyComponents(),
           ephemeral: true,
         });
         return;
@@ -2037,21 +2072,30 @@ const handleSlashCommand = async (interaction: ChatInputCommandInteraction): Pro
       }
 
       if (action === "join") {
-        const lobby = await lobbyRepository.join(lobbyId, { userId: interaction.user.id, displayName: interaction.user.displayName });
-        await interaction.reply({ embeds: [buildSuccessEmbed({ title: "Lobby Joined", description: `Joined **${lobby.name}**.` })], ephemeral: true });
+        const lobby = await lobbyRepository.join(lobbyId, { userId: actor.userId, displayName: actor.displayName });
+        await interaction.reply({
+          embeds: [buildSuccessEmbed({ title: "Lobby Joined", description: `Joined **${lobby.name}**.` })],
+          components: buildActivityLobbyComponents(),
+          ephemeral: true,
+        });
         return;
       }
 
       if (action === "ready") {
-        const lobby = await lobbyRepository.setReady(lobbyId, interaction.user.id, true);
-        await interaction.reply({ embeds: [buildSuccessEmbed({ title: "Ready", description: `Marked ready in **${lobby.name}**.` })], ephemeral: true });
+        const lobby = await lobbyRepository.setReady(lobbyId, actor.userId, true);
+        await interaction.reply({
+          embeds: [buildSuccessEmbed({ title: "Ready", description: `Marked ready in **${lobby.name}**.` })],
+          components: buildActivityLobbyComponents(),
+          ephemeral: true,
+        });
         return;
       }
 
       if (action === "leave") {
-        const lobby = await lobbyRepository.leave(lobbyId, interaction.user.id);
+        const lobby = await lobbyRepository.leave(lobbyId, actor.userId);
         await interaction.reply({
           embeds: [buildSuccessEmbed({ title: "Lobby Left", description: lobby ? `Left **${lobby.name}**.` : "That lobby is already closed." })],
+          components: buildActivityLobbyComponents(),
           ephemeral: true,
         });
         return;
@@ -2059,8 +2103,12 @@ const handleSlashCommand = async (interaction: ChatInputCommandInteraction): Pro
 
       if (action === "add_ai") {
         const difficulty = normalizeAiDifficulty(interaction.options.getString("difficulty"));
-        const lobby = await lobbyRepository.addAi(lobbyId, interaction.user.id, difficulty);
-        await interaction.reply({ embeds: [buildSuccessEmbed({ title: "AI Seat Added", description: `Added ${difficulty} AI to **${lobby.name}**.` })], ephemeral: true });
+        const lobby = await lobbyRepository.addAi(lobbyId, actor.userId, difficulty);
+        await interaction.reply({
+          embeds: [buildSuccessEmbed({ title: "AI Seat Added", description: `Added ${difficulty} AI to **${lobby.name}**.` })],
+          components: buildActivityLobbyComponents(),
+          ephemeral: true,
+        });
         return;
       }
 
@@ -2072,7 +2120,7 @@ const handleSlashCommand = async (interaction: ChatInputCommandInteraction): Pro
           return;
         }
 
-        if (lobby.hostUserId !== interaction.user.id || lobby.players.length !== 2 || !lobby.players.every((player) => player.ready)) {
+        if (lobby.hostUserId !== actor.userId || lobby.players.length !== 2 || !lobby.players.every((player) => player.ready)) {
           await interaction.reply({
             embeds: [buildWarningEmbed({ title: "Lobby Not Ready", description: "Only the host can start a two-seat lobby once both seats are ready." })],
             ephemeral: true,

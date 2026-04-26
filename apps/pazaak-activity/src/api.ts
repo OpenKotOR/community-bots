@@ -2,6 +2,7 @@ import type {
   AdvisorDifficulty,
   LeaderboardEntry,
   MatchmakingQueueRecord,
+  PazaakOpponentProfileRecord,
   PazaakLobbyRecord,
   PazaakMatchHistoryRecord,
   PazaakTableSettings,
@@ -47,6 +48,22 @@ export interface AuthSessionResponse {
   account: PazaakAccountRecord;
   session: PazaakAccountSessionRecord;
   linkedIdentities: PazaakLinkedIdentityRecord[];
+}
+
+export type SocialAuthProvider = "google" | "discord" | "github";
+
+export interface SocialAuthProviderConfig {
+  provider: SocialAuthProvider;
+  enabled: boolean;
+}
+
+export interface SocialAuthProviderListResponse {
+  providers: SocialAuthProviderConfig[];
+}
+
+export interface SocialAuthStartResponse {
+  provider: SocialAuthProvider;
+  redirectUrl: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -108,6 +125,11 @@ export interface HistoryResponse {
   history: PazaakMatchHistoryRecord[];
 }
 
+export interface OpponentsResponse {
+  opponents: PazaakOpponentProfileRecord[];
+  serverTime: string;
+}
+
 export interface QueueResponse {
   queue: MatchmakingQueueRecord | null;
 }
@@ -161,6 +183,23 @@ export async function loginAccount(identifier: string, password: string): Promis
   return body as AuthSessionResponse;
 }
 
+export async function fetchSocialAuthProviders(): Promise<SocialAuthProviderListResponse> {
+  const res = await fetch("/api/auth/oauth/providers");
+  const body = await res.json() as SocialAuthProviderListResponse | { error?: string };
+  if (!res.ok) throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
+  return body as SocialAuthProviderListResponse;
+}
+
+export async function startSocialAuth(provider: SocialAuthProvider): Promise<SocialAuthStartResponse> {
+  const res = await fetch(`/api/auth/oauth/${encodeURIComponent(provider)}/start`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+  const body = await res.json() as SocialAuthStartResponse | { error?: string };
+  if (!res.ok) throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
+  return body as SocialAuthStartResponse;
+}
+
 export async function fetchAuthSession(accessToken: string): Promise<{
   account: PazaakAccountRecord;
   linkedIdentities: PazaakLinkedIdentityRecord[];
@@ -196,6 +235,13 @@ export async function fetchLeaderboard(accessToken: string): Promise<Leaderboard
 export async function fetchHistory(accessToken: string, limit = 25): Promise<PazaakMatchHistoryRecord[]> {
   const data = await apiFetch<HistoryResponse>(`/api/me/history?limit=${encodeURIComponent(String(limit))}`, accessToken);
   return data.history;
+}
+
+export async function fetchPazaakOpponents(): Promise<PazaakOpponentProfileRecord[]> {
+  const res = await fetch("/api/pazaak/opponents");
+  const body = await res.json() as OpponentsResponse | { error?: string };
+  if (!res.ok) throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
+  return (body as OpponentsResponse).opponents;
 }
 
 export async function enqueueMatchmaking(accessToken: string, preferredMaxPlayers = 2): Promise<MatchmakingQueueRecord | null> {
@@ -403,6 +449,15 @@ export async function forfeit(matchId: string, accessToken: string): Promise<Ser
 // WebSocket subscription
 // ---------------------------------------------------------------------------
 
+export interface ChatMessage {
+  id: string;
+  matchId: string;
+  userId: string;
+  displayName: string;
+  text: string;
+  at: number;
+}
+
 export type MatchUpdateHandler = (match: SerializedMatch) => void;
 
 export type MatchSocketConnectionState = "connecting" | "connected" | "reconnecting" | "disconnected";
@@ -411,11 +466,24 @@ export interface MatchSubscriptionOptions {
   reconnect?: boolean;
   maxDelayMs?: number;
   onConnectionChange?: (state: MatchSocketConnectionState) => void;
+  onChatMessage?: (msg: ChatMessage) => void;
 }
 
-interface WsMessage {
+interface MatchUpdateWsMessage {
   type: "match_update";
   data: SerializedMatch;
+}
+
+interface ChatWsMessage {
+  type: "chat_message";
+  data: ChatMessage;
+}
+
+type WsMessage = MatchUpdateWsMessage | ChatWsMessage;
+
+interface LobbyWsMessage {
+  type: "lobby_update" | "lobby_list_update";
+  data: PazaakLobbyRecord | PazaakLobbyRecord[];
 }
 
 /**
@@ -459,6 +527,8 @@ export function subscribeToMatch(matchId: string, onUpdate: MatchUpdateHandler, 
         const msg = JSON.parse(event.data as string) as WsMessage;
         if (msg.type === "match_update") {
           onUpdate(msg.data);
+        } else if (msg.type === "chat_message") {
+          options.onChatMessage?.(msg.data);
         }
       } catch {
         // Ignore malformed messages.
@@ -496,4 +566,103 @@ export function subscribeToMatch(matchId: string, onUpdate: MatchUpdateHandler, 
     setConnectionState("disconnected");
     socket?.close();
   };
+}
+
+export type LobbyUpdateHandler = () => void;
+
+/**
+ * Opens a WebSocket connection for lobby updates.
+ * Emits callback whenever lobby state changes server-side.
+ */
+export function subscribeToLobbies(onUpdate: LobbyUpdateHandler, options: MatchSubscriptionOptions = {}): () => void {
+  const wsBase = window.location.origin.replace(/^http/, "ws");
+  const reconnect = options.reconnect !== false;
+  const maxDelayMs = options.maxDelayMs ?? 8000;
+
+  let socket: WebSocket | null = null;
+  let retryCount = 0;
+  let active = true;
+  let reconnectTimer: number | undefined;
+
+  const setConnectionState = (state: MatchSocketConnectionState) => {
+    options.onConnectionChange?.(state);
+  };
+
+  const clearReconnectTimer = () => {
+    if (reconnectTimer !== undefined) {
+      window.clearTimeout(reconnectTimer);
+      reconnectTimer = undefined;
+    }
+  };
+
+  const connect = () => {
+    if (!active) return;
+
+    setConnectionState(retryCount === 0 ? "connecting" : "reconnecting");
+    socket = new WebSocket(`${wsBase}/ws?stream=lobbies`);
+
+    socket.addEventListener("open", () => {
+      retryCount = 0;
+      setConnectionState("connected");
+    });
+
+    socket.addEventListener("message", (event) => {
+      try {
+        const msg = JSON.parse(event.data as string) as LobbyWsMessage;
+        if (msg.type === "lobby_update" || msg.type === "lobby_list_update") {
+          onUpdate();
+        }
+      } catch {
+        // Ignore malformed messages.
+      }
+    });
+
+    socket.addEventListener("close", () => {
+      if (!active) {
+        setConnectionState("disconnected");
+        return;
+      }
+
+      if (!reconnect) {
+        setConnectionState("disconnected");
+        return;
+      }
+
+      retryCount += 1;
+      const delay = Math.min(maxDelayMs, 400 * (2 ** Math.min(retryCount, 5)));
+      setConnectionState("reconnecting");
+      clearReconnectTimer();
+      reconnectTimer = window.setTimeout(connect, delay);
+    });
+
+    socket.addEventListener("error", () => {
+      // Let close handle reconnect behavior.
+    });
+  };
+
+  connect();
+
+  return () => {
+    active = false;
+    clearReconnectTimer();
+    setConnectionState("disconnected");
+    socket?.close();
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Chat
+// ---------------------------------------------------------------------------
+
+export async function sendChatMessage(matchId: string, accessToken: string, text: string): Promise<ChatMessage> {
+  const data = await apiFetch<{ message: ChatMessage }>(`/api/match/${encodeURIComponent(matchId)}/chat`, accessToken, {
+    method: "POST",
+    body: JSON.stringify({ text }),
+  });
+  return data.message;
+}
+
+export async function fetchChatHistory(matchId: string, accessToken: string): Promise<ChatMessage[]> {
+  const data = await apiFetch<{ messages: ChatMessage[] }>(`/api/match/${encodeURIComponent(matchId)}/chat`, accessToken);
+  return data.messages;
 }

@@ -3,6 +3,8 @@
 // but is safe to import in the browser (no node:crypto dependency).
 // ---------------------------------------------------------------------------
 
+import type { PazaakOpponentDifficulty, PazaakOpponentPhraseKey } from "@openkotor/pazaak-engine/opponents";
+
 export type SideCardType =
   | "plus"
   | "minus"
@@ -84,6 +86,30 @@ export interface SideCardOption {
 
 export type AdvisorDifficulty = "easy" | "hard" | "professional";
 
+export interface PazaakOpponentPrizeTable {
+  credits: number;
+  cards: readonly string[];
+}
+
+export interface PazaakOpponentProfileRecord {
+  id: string;
+  aliases?: readonly string[];
+  name: string;
+  description: string;
+  difficulty: PazaakOpponentDifficulty;
+  advisorDifficulty: AdvisorDifficulty;
+  standAt: number;
+  tieChance: number;
+  species: string;
+  origin: string;
+  archetype: string;
+  skillLevel: number;
+  prizes: PazaakOpponentPrizeTable;
+  sideDeckTokens: readonly string[];
+  phrases: Readonly<Record<PazaakOpponentPhraseKey, readonly string[]>>;
+  sources: readonly ("HoloPazaak" | "PazaakWorld" | "pazaak-activity")[];
+}
+
 export type AdvisorCategory = "exact" | "recovery" | "pressure" | "setup" | "neutral";
 
 export type AdvisorConfidence = "low" | "medium" | "high";
@@ -130,6 +156,7 @@ export type PazaakThemePreference = "kotor" | "modern" | "adaptive";
 export interface PazaakUserSettings {
   theme: PazaakThemePreference;
   soundEnabled: boolean;
+  reducedMotionEnabled: boolean;
   turnTimerSeconds: number;
   preferredAiDifficulty: AdvisorDifficulty;
 }

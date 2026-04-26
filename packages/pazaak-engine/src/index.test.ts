@@ -2,12 +2,18 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  MAIN_MENU_PRESET,
   MAX_BOARD_SIZE,
   type MatchPlayerState,
   type PazaakMatch,
   PazaakCoordinator,
   type SideCard,
+  createCustomSideDeck,
+  getDefaultPazaakOpponentForAdvisorDifficulty,
   getAdvisorSnapshotForPlayer,
+  getPazaakOpponentById,
+  pazaakOpponents,
+  pickPazaakOpponentPhrase,
 } from "./index.js";
 
 const createCard = (overrides: Partial<SideCard> = {}): SideCard => ({
@@ -242,6 +248,72 @@ test("advisor does not recommend D when it only copies a neutral zero", () => {
   assert.equal(snapshot.recommendation.action, "end_turn");
   assert.equal(snapshot.alternatives[0]?.displayLabel, "Play D (= 0)");
   assert.match(snapshot.alternatives[0]?.rationale ?? "", /neutral 0/i);
+});
+
+test("main menu preset keeps canonical PazaakWorld card and rule structure", () => {
+  assert.equal(MAIN_MENU_PRESET.heroTitle, "PAZAAK");
+  assert.equal(MAIN_MENU_PRESET.modeCards.length, 3);
+  assert.equal(MAIN_MENU_PRESET.rules.length, 3);
+
+  const aiCard = MAIN_MENU_PRESET.modeCards.find((card) => card.key === "ai");
+  assert.ok(aiCard);
+  assert.equal(aiCard.aiOptions?.length, 3);
+  assert.deepEqual(
+    aiCard.aiOptions?.map((option) => option.difficulty),
+    ["easy", "hard", "professional"],
+  );
+
+  const quickMatch = MAIN_MENU_PRESET.modeCards.find((card) => card.key === "quick_match");
+  assert.ok(quickMatch?.requiresAuth);
+  assert.equal(quickMatch?.primaryAction?.label, "Find Match");
+});
+
+test("opponent catalogue includes HoloPazaak roster and Activity profiles", () => {
+  const ids = new Set(pazaakOpponents.map((opponent) => opponent.id));
+  for (const id of [
+    "jarjar",
+    "c3po",
+    "butters",
+    "porkins",
+    "hk47",
+    "hal9000",
+    "republic_soldier",
+    "ig88",
+    "trump",
+    "yoda",
+    "theemperor",
+    "revan",
+    "atton",
+    "t1000",
+    "drchannard",
+    "blaine",
+    "nu",
+  ]) {
+    assert.ok(ids.has(id), `Expected ${id} in merged opponent catalogue`);
+  }
+
+  assert.equal(getPazaakOpponentById("hal")?.id, "hal9000");
+  assert.equal(getDefaultPazaakOpponentForAdvisorDifficulty("easy").id, "jarjar");
+  assert.equal(getDefaultPazaakOpponentForAdvisorDifficulty("hard").id, "porkins");
+  assert.equal(getDefaultPazaakOpponentForAdvisorDifficulty("professional").id, "revan");
+});
+
+test("opponent sideboards build through canonical custom sideboard normalization", () => {
+  for (const opponent of pazaakOpponents) {
+    assert.equal(opponent.sideDeckTokens.length, 10, `${opponent.id} should define 10 sideboard tokens`);
+    const result = createCustomSideDeck({ label: opponent.name, tokens: opponent.sideDeckTokens });
+    assert.equal(result.sideDeck.length, 10, `${opponent.id} should build as a custom sideboard`);
+  }
+});
+
+test("opponent phrase picker avoids immediate repeats when alternatives exist", () => {
+  const opponent = getPazaakOpponentById("revan");
+  assert.ok(opponent);
+
+  const previous = opponent.phrases.chosen[0];
+  const next = pickPazaakOpponentPhrase(opponent, "chosen", previous, "...", () => 0);
+
+  assert.notEqual(next, previous);
 });
 
 test("advisor snapshot keeps the recommended line at the top of alternatives with metadata", () => {

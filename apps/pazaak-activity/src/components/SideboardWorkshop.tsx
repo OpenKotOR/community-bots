@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useState } from "react";
 import type { SavedSideboardCollectionRecord } from "../types.ts";
 import { deleteSideboard, fetchSideboards, saveSideboard, setActiveSideboard } from "../api.ts";
 
@@ -67,29 +67,27 @@ export function SideboardWorkshop({ accessToken, username, onBack }: SideboardWo
     ? normalizedDraftName.length > 0 || tokenDirty
     : tokenDirty;
   const renameDirty = selectedSideboard !== null && normalizedDraftName.length > 0 && normalizedDraftName !== selectedSideboard.name;
+  const hasUnsavedChanges = contentDirty || renameDirty;
   const selectedBoardVisible = selectedSideboard !== null
     ? filteredSideboards.some((sideboard) => sideboard.name === selectedSideboard.name)
     : false;
 
-  useEffect(() => {
-    void loadSideboards();
-  }, []);
+  const syncDraft = useCallback((nextCollection: SavedSideboardCollectionRecord, nextSelectedName: string | null) => {
+    setSelectedName(nextSelectedName);
 
-  useEffect(() => {
-    if (!collection) {
+    const selected = nextCollection.sideboards.find((sideboard) => sideboard.name === nextSelectedName) ?? null;
+
+    if (selected) {
+      setDraftName(selected.name);
+      setDraftTokens([...selected.tokens]);
       return;
     }
 
-    const fallback = collection.sideboards.find((sideboard) => sideboard.isActive)?.name
-      ?? collection.sideboards[0]?.name
-      ?? null;
+    setDraftName("");
+    setDraftTokens([...DEFAULT_TOKENS]);
+  }, []);
 
-    if (!selectedName || !collection.sideboards.some((sideboard) => sideboard.name === selectedName)) {
-      syncDraft(collection, fallback);
-    }
-  }, [collection, selectedName]);
-
-  const loadSideboards = async () => {
+  const loadSideboards = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -105,22 +103,25 @@ export function SideboardWorkshop({ accessToken, username, onBack }: SideboardWo
     } finally {
       setLoading(false);
     }
-  };
+  }, [accessToken, syncDraft]);
 
-  const syncDraft = (nextCollection: SavedSideboardCollectionRecord, nextSelectedName: string | null) => {
-    setSelectedName(nextSelectedName);
+  useEffect(() => {
+    void loadSideboards();
+  }, [loadSideboards]);
 
-    const selected = nextCollection.sideboards.find((sideboard) => sideboard.name === nextSelectedName) ?? null;
-
-    if (selected) {
-      setDraftName(selected.name);
-      setDraftTokens([...selected.tokens]);
+  useEffect(() => {
+    if (!collection) {
       return;
     }
 
-    setDraftName("");
-    setDraftTokens([...DEFAULT_TOKENS]);
-  };
+    const fallback = collection.sideboards.find((sideboard) => sideboard.isActive)?.name
+      ?? collection.sideboards[0]?.name
+      ?? null;
+
+    if (!selectedName || !collection.sideboards.some((sideboard) => sideboard.name === selectedName)) {
+      syncDraft(collection, fallback);
+    }
+  }, [collection, selectedName, syncDraft]);
 
   const updateDraftToken = (index: number, token: string) => {
     setDraftTokens((prev) => prev.map((entry, entryIndex) => entryIndex === index ? token : entry));
@@ -292,6 +293,64 @@ export function SideboardWorkshop({ accessToken, username, onBack }: SideboardWo
     setDraggingIndex(null);
   };
 
+  const moveToken = (fromIndex: number, direction: -1 | 1) => {
+    const toIndex = fromIndex + direction;
+    if (toIndex < 0 || toIndex >= draftTokens.length) {
+      return;
+    }
+
+    setDraftTokens((prev) => {
+      const next = [...prev];
+      [next[fromIndex], next[toIndex]] = [next[toIndex]!, next[fromIndex]!];
+      return next;
+    });
+  };
+
+  const handleBack = () => {
+    if (hasUnsavedChanges && !confirm("Discard unsaved sideboard changes and go back?")) {
+      return;
+    }
+
+    onBack();
+  };
+
+  useEffect(() => {
+    if (!notice) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => setNotice(null), 4000);
+    return () => window.clearTimeout(timeoutId);
+  }, [notice]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasUnsavedChanges) {
+        return;
+      }
+
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  useEffect(() => {
+    const handleKey = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        if (!saving && contentDirty) {
+          void handleSave(false);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [contentDirty, saving]);
+
   const validation = buildValidationSummary(draftTokens);
 
   return (
@@ -303,11 +362,11 @@ export function SideboardWorkshop({ accessToken, username, onBack }: SideboardWo
             <h1 className="workshop-title">Sideboard Workshop</h1>
             <p className="workshop-sub">{username}, shape your saved 10-card boards here and keep Discord for match flow.</p>
           </div>
-          <button className="btn btn--ghost" onClick={onBack}>Back</button>
+          <button className="btn btn--ghost" onClick={handleBack}>Back</button>
         </header>
 
-        {error && <div className="workshop-alert workshop-alert--error">{error}</div>}
-        {notice && <div className="workshop-alert workshop-alert--success">{notice}</div>}
+        {error && <div className="workshop-alert workshop-alert--error" role="alert">{error}</div>}
+        {notice && <div className="workshop-alert workshop-alert--success" role="status" aria-live="polite">{notice}</div>}
 
         {loading ? (
           <div className="workshop-loading">Loading sideboards…</div>
@@ -326,6 +385,12 @@ export function SideboardWorkshop({ accessToken, username, onBack }: SideboardWo
                       className="workshop-input"
                       value={searchQuery}
                       onChange={(event) => setSearchQuery(event.target.value.slice(0, 32))}
+                      onKeyDown={(event) => {
+                        if (event.key === "Escape" && searchQuery.length > 0) {
+                          event.preventDefault();
+                          setSearchQuery("");
+                        }
+                      }}
                       placeholder="ranked, doubles, anti-burst..."
                     />
                     <button
@@ -419,6 +484,26 @@ export function SideboardWorkshop({ accessToken, username, onBack }: SideboardWo
                     <div className="workshop-slot__meta">
                       <span className="workshop-slot__label">Slot {index + 1}</span>
                       <span className="workshop-slot__token">{token}</span>
+                    </div>
+                    <div className="workshop-slot__reorder" role="group" aria-label={`Reorder slot ${index + 1}`}>
+                      <button
+                        className="btn btn--ghost btn--sm"
+                        type="button"
+                        onClick={() => moveToken(index, -1)}
+                        disabled={index === 0}
+                        aria-label={`Move slot ${index + 1} up`}
+                      >
+                        Move Up
+                      </button>
+                      <button
+                        className="btn btn--ghost btn--sm"
+                        type="button"
+                        onClick={() => moveToken(index, 1)}
+                        disabled={index === draftTokens.length - 1}
+                        aria-label={`Move slot ${index + 1} down`}
+                      >
+                        Move Down
+                      </button>
                     </div>
                     <label className="workshop-field">
                       <span>Card</span>
