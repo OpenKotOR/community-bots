@@ -1,4 +1,4 @@
-# pazaak-activity
+# pazaak-world
 
 Discord Embedded App Activity for the Pazaak Bot. Runs inside a Discord Activity iframe using the
 [@discord/embedded-app-sdk](https://github.com/discord/embedded-app-sdk), and talks to the
@@ -14,7 +14,7 @@ embedded HTTP/WebSocket server that runs inside the `pazaak-bot` process.
 
 ```bash
 # From repo root — starts the Vite dev server on http://localhost:5173
-pnpm dev:pazaak-activity
+pnpm dev:pazaak-world
 ```
 
 The dev server proxies `/api` and `/ws` to `http://localhost:4001`, which is the embedded API
@@ -54,7 +54,7 @@ schema exports in `@openkotor/persistence`.
 ## Build
 
 ```bash
-pnpm --filter pazaak-activity build
+pnpm --filter pazaak-world build
 ```
 
 Deploy `dist/` to any static host. In production the Activity URL must be registered in the

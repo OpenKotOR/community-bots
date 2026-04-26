@@ -137,11 +137,11 @@ corepack pnpm discord:install-links
 - `/pazaak daily` → awards the daily bonus on first claim.
 - `/pazaak challenge opponent:@someone wager:100` → issues a challenge embed with Accept/Decline.
 - After a game starts, the **"🎮 Play in Browser"** button opens the Discord Activity if the
-  Activity URL is configured (see [Pazaak Activity](#pazaak-activity-optional)).
+  Activity URL is configured (see [Pazaak World](#pazaak-world-optional)).
 
-## Pazaak Activity (Optional)
+## Pazaak World (Optional)
 
-The Pazaak Bot ships with an optional Discord Embedded App Activity (`apps/pazaak-activity`). When
+The Pazaak Bot ships with an optional Discord Embedded App Activity (`apps/pazaak-world`). When
 enabled, players can play Pazaak directly inside a Discord Activity iframe instead of only through
 text commands. Games are cross-interface: you can start a match with `/pazaak challenge` and
 continue in the Activity, or vice versa.
@@ -152,7 +152,7 @@ continue in the Activity, or vice versa.
    select the **Pazaak Bot** application.
 2. Navigate to **Activities** in the left sidebar.
 3. Under **URL Mappings**, add a mapping: set **Prefix** to `/` and **Target** to the public URL
-   of your deployed `pazaak-activity` frontend (e.g. `https://pazaak.example.com`). During local
+   of your deployed `pazaak-world` frontend (e.g. `https://pazaak.example.com`). During local
    development, Discord's tunnel or a service like [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/) can proxy `localhost:5173`.
 4. Under **OAuth2 → General**, copy the **Client Secret** — you need it for the token exchange.
 
@@ -166,7 +166,7 @@ PAZAAK_API_PORT=4001              # port the embedded HTTP/WS server listens on 
 PAZAAK_ACTIVITY_URL=https://pazaak.example.com   # your deployed Activity URL
 ```
 
-The Activity frontend also needs `.env` in `apps/pazaak-activity/`:
+The Activity frontend also needs `.env` in `apps/pazaak-world/`:
 
 ```env
 VITE_DISCORD_CLIENT_ID=<same as PAZAAK_DISCORD_APP_ID>
@@ -314,7 +314,7 @@ duplicate, reorder, and delete saved named custom boards before or during a matc
 corepack pnpm dev:pazaak
 
 # Terminal 2 — Activity frontend hot-reload dev server on http://localhost:5173
-corepack pnpm dev:pazaak-activity
+corepack pnpm dev:pazaak-world
 ```
 
 The Vite dev server proxies `/api` and `/ws` to `localhost:4001` automatically.
@@ -322,10 +322,10 @@ The Vite dev server proxies `/api` and `/ws` to `localhost:4001` automatically.
 ### 4. Build the Activity for Production
 
 ```bash
-corepack pnpm --filter pazaak-activity build
+corepack pnpm --filter pazaak-world build
 ```
 
-Deploy the `apps/pazaak-activity/dist/` directory to any static host, then update
+Deploy the `apps/pazaak-world/dist/` directory to any static host, then update
 `PAZAAK_ACTIVITY_URL` to the public URL and re-register it in the Developer Portal URL Mappings.
 
 ## 7. Data Directories

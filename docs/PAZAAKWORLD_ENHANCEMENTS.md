@@ -1,6 +1,6 @@
 # PazaakWorld Enhancement Implementation Guide
 
-This document outlines all the major improvements made to the Pazaak activity UI and provides guidance for integrating vendor opponent data and AI strategies.
+This document outlines all the major improvements made to the Pazaak World UI and provides guidance for integrating vendor opponent data and AI strategies.
 
 ## ✅ Completed Enhancements
 
@@ -62,7 +62,7 @@ This document outlines all the major improvements made to the Pazaak activity UI
 ### 6. **GitHub Pages Deployment**
 - **.github/workflows/deploy-pazaakworld.yml**: GitHub Actions workflow
   - Triggered on push to main or manual dispatch
-  - Builds pazaak-activity with Vite
+  - Builds pazaak-world with Vite
   - Deploys to `th3w1zard1.github.io/pazaakworld`
   - Proper base path handling (`/pazaakworld/`)
   - Uses Node.js 20 + pnpm
@@ -244,7 +244,7 @@ The GitHub Actions workflow is ready:
 ## 📝 Code Organization
 
 ```
-apps/pazaak-activity/
+apps/pazaak-world/
   src/
     components/
       AnimatedBackground.tsx        ✅

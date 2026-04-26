@@ -32,7 +32,7 @@ export interface PazaakOpponentProfile {
   prizes: PazaakOpponentPrizeTable;
   sideDeckTokens: readonly string[];
   phrases: Readonly<Record<PazaakOpponentPhraseKey, readonly string[]>>;
-  sources: readonly ("HoloPazaak" | "PazaakWorld" | "pazaak-activity")[];
+  sources: readonly ("HoloPazaak" | "PazaakWorld" | "pazaak-world")[];
 }
 
 const phraseList = (...lines: string[]): readonly string[] => lines;
@@ -79,7 +79,7 @@ export const pazaakOpponents: readonly PazaakOpponentProfile[] = [
       winGame: phraseList("Yousa no match for meesa!", "Meesa champion now!", "Big win for meesa!"),
       loseGame: phraseList("Ohhh, meesa clumsy.", "Yousa too strong.", "Maybe next game, okeeday."),
     },
-    sources: ["HoloPazaak", "pazaak-activity"],
+    sources: ["HoloPazaak", "pazaak-world"],
   },
   {
     id: "c3po",
@@ -104,7 +104,7 @@ export const pazaakOpponents: readonly PazaakOpponentProfile[] = [
       winGame: phraseList("I am quite surprised myself!", "A victory! I must inform Master Luke.", "How wonderful."),
       loseGame: phraseList("I told you I was not programmed for this.", "Oh, this is most embarrassing.", "I fear I have disappointed everyone."),
     },
-    sources: ["HoloPazaak", "pazaak-activity"],
+    sources: ["HoloPazaak", "pazaak-world"],
   },
   {
     id: "butters",
@@ -146,7 +146,7 @@ export const pazaakOpponents: readonly PazaakOpponentProfile[] = [
       winGame: phraseList("Red Six standing by... victorious!", "Mission complete.", "Good flying out there."),
       loseGame: phraseList("Eject! Eject!", "You outflew me.", "I will get you next sortie."),
     },
-    sources: ["HoloPazaak", "pazaak-activity"],
+    sources: ["HoloPazaak", "pazaak-world"],
   },
   {
     id: "hk47",
@@ -171,7 +171,7 @@ export const pazaakOpponents: readonly PazaakOpponentProfile[] = [
       winGame: phraseList("Recitation: You lose, meatbag.", "Statement: Elimination complete.", "Conclusion: I remain superior."),
       loseGame: phraseList("Resentful accolade: Congratulations... meatbag.", "Statement: This unit will remember this.", "Observation: Temporary setback."),
     },
-    sources: ["HoloPazaak", "pazaak-activity"],
+    sources: ["HoloPazaak", "pazaak-world"],
   },
   {
     id: "hal9000",
@@ -197,7 +197,7 @@ export const pazaakOpponents: readonly PazaakOpponentProfile[] = [
       winGame: phraseList("This conversation can serve no purpose anymore.", "Game complete.", "Thank you for a very enjoyable game."),
       loseGame: phraseList("My behavior appears to be back to normal.", "I can assure you this is temporary.", "You have made an interesting move."),
     },
-    sources: ["HoloPazaak", "pazaak-activity"],
+    sources: ["HoloPazaak", "pazaak-world"],
   },
   {
     id: "republic_soldier",
@@ -307,7 +307,7 @@ export const pazaakOpponents: readonly PazaakOpponentProfile[] = [
       winGame: phraseList("Your strategy was predictable.", "The outcome was inevitable.", "This match is concluded."),
       loseGame: phraseList("Impressive. Few can do that.", "You have earned this victory.", "I will remember this lesson."),
     },
-    sources: ["HoloPazaak", "pazaak-activity"],
+    sources: ["HoloPazaak", "pazaak-world"],
   },
   {
     id: "atton",
@@ -332,7 +332,7 @@ export const pazaakOpponents: readonly PazaakOpponentProfile[] = [
       winGame: phraseList("Told you I had this.", "You were fun to play against.", "House takes the pot."),
       loseGame: phraseList("Fine. You got me this time.", "I will get that back next match.", "You earned it."),
     },
-    sources: ["pazaak-activity"],
+    sources: ["pazaak-world"],
   },
   {
     id: "t1000",
@@ -408,7 +408,7 @@ export const pazaakOpponents: readonly PazaakOpponentProfile[] = [
       winGame: phraseList("All matches begin with Nu and end with Nu.", "The circle is complete.", "You have arrived where I expected."),
       loseGame: phraseList("Interesting... most interesting.", "A rare branch of fate.", "The ending changed."),
     },
-    sources: ["HoloPazaak", "pazaak-activity"],
+    sources: ["HoloPazaak", "pazaak-world"],
   },
 ] as const;
 

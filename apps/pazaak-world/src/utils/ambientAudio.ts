@@ -12,7 +12,7 @@
 
 type StopFn = () => void;
 
-const MUSIC_STORAGE_KEY = "pazaak-activity-music-enabled-v1";
+const MUSIC_STORAGE_KEY = "pazaak-world-music-enabled-v1";
 
 export function getStoredMusicEnabled(): boolean {
   try {

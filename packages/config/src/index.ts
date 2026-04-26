@@ -110,7 +110,7 @@ export interface PazaakBotConfig {
   turnTimeoutMs: number;
   /** Port for the embedded HTTP/WS API used by Activities and the browser UI. */
   apiPort: number;
-  /** Public URL where the pazaak-activity frontend is hosted (for the "Launch Activity" button link). */
+  /** Public URL where the pazaak-world frontend is hosted (for the "Launch Activity" button link). */
   activityUrl: string;
   /** Public standalone website origin for CORS and OAuth redirect flows. */
   publicWebOrigin: string | undefined;

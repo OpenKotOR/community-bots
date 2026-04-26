@@ -358,7 +358,7 @@ export function SideboardWorkshop({ accessToken, username, onBack }: SideboardWo
       <div className="workshop-shell">
         <header className="workshop-header">
           <div>
-            <p className="workshop-kicker">Pazaak Activity</p>
+            <p className="workshop-kicker">Pazaak World</p>
             <h1 className="workshop-title">Sideboard Workshop</h1>
             <p className="workshop-sub">{username}, shape your saved 10-card boards here and keep Discord for match flow.</p>
           </div>

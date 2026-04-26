@@ -10,23 +10,31 @@ interface ConnectionStatusProps {
  */
 export function ConnectionStatus({ isOnline, socketState = "connecting" }: ConnectionStatusProps) {
   const [ping, setPing] = useState<number | null>(null);
-  const [lastUpdate, setLastUpdate] = useState(Date.now());
+  const [hadRecentFailure, setHadRecentFailure] = useState(false);
 
   useEffect(() => {
     if (!isOnline) {
       setPing(null);
+      setHadRecentFailure(false);
       return;
     }
 
     let cancelled = false;
-    let pongTimer: number;
+    let pongTimer = 0;
 
     const measurePing = async () => {
+      if (document.visibilityState === "hidden") {
+        if (!cancelled) {
+          pongTimer = window.setTimeout(measurePing, 5000);
+        }
+        return;
+      }
+
       const startTime = performance.now();
 
       try {
-        const response = await fetch("/api/ping", {
-          method: "HEAD",
+        const response = await fetch(`/api/ping?ts=${Date.now()}`, {
+          method: "GET",
           cache: "no-store",
         });
 
@@ -34,17 +42,21 @@ export function ConnectionStatus({ isOnline, socketState = "connecting" }: Conne
           const endTime = performance.now();
           const latency = Math.round(endTime - startTime);
           setPing(latency);
-          setLastUpdate(Date.now());
+          setHadRecentFailure(false);
+        } else if (!cancelled) {
+          setPing(null);
+          setHadRecentFailure(true);
         }
       } catch {
         // Network error, ping remains unknown
         if (!cancelled) {
           setPing(null);
+          setHadRecentFailure(true);
         }
       }
 
       if (!cancelled) {
-        pongTimer = window.setTimeout(measurePing, 3000); // Measure every 3 seconds
+        pongTimer = window.setTimeout(measurePing, hadRecentFailure ? 5000 : 3000);
       }
     };
 
@@ -54,20 +66,19 @@ export function ConnectionStatus({ isOnline, socketState = "connecting" }: Conne
       cancelled = true;
       clearTimeout(pongTimer);
     };
-  }, [isOnline]);
+  }, [hadRecentFailure, isOnline]);
 
   // Determine status color and icon
   let statusColor = "var(--text-dim)";
   let statusLabel = "Unknown";
 
+  const canShowLatency = ping !== null && isOnline;
+
   if (!isOnline) {
     statusColor = "var(--danger)";
     statusLabel = "Offline";
-  } else if (socketState === "connected" || socketState === "reconnecting") {
-    if (ping === null) {
-      statusColor = "var(--warn)";
-      statusLabel = "Connected";
-    } else if (ping < 100) {
+  } else if (canShowLatency) {
+    if (ping < 100) {
       statusColor = "var(--success)";
       statusLabel = `${ping}ms`;
     } else if (ping < 300) {
@@ -80,9 +91,15 @@ export function ConnectionStatus({ isOnline, socketState = "connecting" }: Conne
   } else if (socketState === "connecting") {
     statusColor = "var(--warn)";
     statusLabel = "Connecting...";
+  } else if (socketState === "reconnecting") {
+    statusColor = "var(--warn)";
+    statusLabel = "Reconnecting...";
+  } else if (socketState === "connected") {
+    statusColor = "var(--success)";
+    statusLabel = "Connected";
   } else {
-    statusColor = "var(--danger)";
-    statusLabel = "Disconnected";
+    statusColor = "var(--warn)";
+    statusLabel = "Online";
   }
 
   return (
@@ -105,7 +122,7 @@ export function ConnectionStatus({ isOnline, socketState = "connecting" }: Conne
           borderRadius: "50%",
           backgroundColor: statusColor,
           animation:
-            socketState === "connecting"
+            (socketState === "connecting" || socketState === "reconnecting") && ping === null
               ? "pulse 1s infinite"
               : "none",
         }}

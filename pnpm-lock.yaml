@@ -60,7 +60,7 @@ importers:
         specifier: ^16.4.7
         version: 16.6.1
 
-  apps/pazaak-activity:
+  apps/pazaak-world:
     dependencies:
       '@discord/embedded-app-sdk':
         specifier: ^2.4.1

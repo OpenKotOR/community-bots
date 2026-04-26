@@ -7,6 +7,8 @@ import { AnimatedBackground } from './components/AnimatedBackground.tsx'
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AnimatedBackground />
-    <App />
+    <div className="app-shell">
+      <App />
+    </div>
   </StrictMode>,
 )

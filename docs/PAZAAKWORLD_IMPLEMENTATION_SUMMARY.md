@@ -66,7 +66,7 @@ You asked for immersive, animated gameplay with sound, visuals, and better separ
 
 ## 📁 Files Created/Modified
 
-### **New Components** (in `apps/pazaak-activity/src/components/`)
+### **New Components** (in `apps/pazaak-world/src/components/`)
 1. ✅ **AnimatedBackground.tsx** - Starfield animation
 2. ✅ **AnimatedText.tsx** - Jailbars/glitch/scan effects
 3. ✅ **SettingsModal.tsx** - Game settings interface
@@ -74,7 +74,7 @@ You asked for immersive, animated gameplay with sound, visuals, and better separ
 5. ✅ **ConnectionStatus.tsx** - Real-time ping display
 6. ✅ **PazaakAsset.tsx** - Game asset renderer with AI image support
 
-### **New Utilities** (in `apps/pazaak-activity/src/utils/`)
+### **New Utilities** (in `apps/pazaak-world/src/utils/`)
 1. ✅ **soundManager.ts** - Web Audio API wrapper + game sounds
 
 ### **Updated Files**
@@ -162,7 +162,7 @@ git push origin main
 
 # GitHub Actions will:
 # 1. Install dependencies
-# 2. Build pazaak-activity with Vite
+# 2. Build pazaak-world with Vite
 # 3. Deploy to gh-pages branch
 # 4. Available at: https://th3w1zard1.github.io/pazaakworld
 
@@ -250,10 +250,10 @@ git push origin main
 corepack pnpm dev:pazaak
 
 # Build
-corepack pnpm --filter pazaak-activity build
+corepack pnpm --filter pazaak-world build
 
 # Test specific task
-corepack pnpm --filter pazaak-activity check:pazaak-oauth
+corepack pnpm --filter pazaak-world check:pazaak-oauth
 ```
 
 **Documentation Files**:

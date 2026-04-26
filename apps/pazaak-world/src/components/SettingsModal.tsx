@@ -2,6 +2,22 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { soundManager } from "../utils/soundManager.ts";
 import type { PazaakUserSettings } from "../types.ts";
 
+const DEFAULT_MODAL_SETTINGS: PazaakUserSettings = {
+  theme: "kotor",
+  soundEnabled: false,
+  reducedMotionEnabled: false,
+  turnTimerSeconds: 45,
+  preferredAiDifficulty: "professional",
+};
+
+const areSettingsEqual = (left: PazaakUserSettings, right: PazaakUserSettings): boolean => {
+  return left.theme === right.theme
+    && left.soundEnabled === right.soundEnabled
+    && left.reducedMotionEnabled === right.reducedMotionEnabled
+    && left.turnTimerSeconds === right.turnTimerSeconds
+    && left.preferredAiDifficulty === right.preferredAiDifficulty;
+};
+
 interface SettingsModalProps {
   isOpen: boolean;
   currentSettings: PazaakUserSettings;
@@ -12,11 +28,24 @@ interface SettingsModalProps {
 export function SettingsModal({ isOpen, currentSettings, onClose, onSave }: SettingsModalProps) {
   const [settings, setSettings] = useState<PazaakUserSettings>(currentSettings);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const modalRef = useRef<HTMLDivElement | null>(null);
+  const hasChanges = !areSettingsEqual(settings, currentSettings);
+
+  const requestClose = useCallback(() => {
+    if (!isSaving) {
+      onClose();
+    }
+  }, [isSaving, onClose]);
 
   useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
     setSettings(currentSettings);
-  }, [currentSettings]);
+    setSaveError(null);
+  }, [currentSettings, isOpen]);
 
   // Escape to close + focus trap
   useEffect(() => {
@@ -25,7 +54,17 @@ export function SettingsModal({ isOpen, currentSettings, onClose, onSave }: Sett
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        if (!isSaving) {
+          requestClose();
+        }
+        return;
+      }
+
+      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+        if (!isSaving && hasChanges) {
+          event.preventDefault();
+          void handleSave();
+        }
         return;
       }
 
@@ -61,7 +100,7 @@ export function SettingsModal({ isOpen, currentSettings, onClose, onSave }: Sett
     window.addEventListener("keydown", handleKeyDown);
 
     // Auto-focus first focusable element when modal opens
-    requestAnimationFrame(() => {
+    const rafId = requestAnimationFrame(() => {
       const modal = modalRef.current;
       if (!modal) return;
       const first = modal.querySelector<HTMLElement>(
@@ -70,8 +109,11 @@ export function SettingsModal({ isOpen, currentSettings, onClose, onSave }: Sett
       first?.focus();
     });
 
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.cancelAnimationFrame(rafId);
+    };
+  }, [hasChanges, isOpen, isSaving, requestClose]);
 
   // Lock body scroll while open
   useEffect(() => {
@@ -82,37 +124,50 @@ export function SettingsModal({ isOpen, currentSettings, onClose, onSave }: Sett
   }, [isOpen]);
 
   const handleSave = useCallback(async () => {
+    if (!hasChanges) {
+      return;
+    }
+
     setIsSaving(true);
+    setSaveError(null);
     try {
       await onSave(settings);
       soundManager.beep("success", 150);
-      onClose();
+      requestClose();
     } catch (error) {
       soundManager.playErrorSound();
       console.error("Failed to save settings:", error);
+      setSaveError("Could not save settings. Please try again.");
     } finally {
       setIsSaving(false);
     }
-  }, [settings, onSave, onClose]);
+  }, [hasChanges, onSave, requestClose, settings]);
+
+  const handleResetDefaults = () => {
+    setSettings(DEFAULT_MODAL_SETTINGS);
+    setSaveError(null);
+  };
 
   if (!isOpen) return null;
 
   return (
-    <div className="settings-modal-overlay" onClick={onClose} role="presentation">
+    <div className="settings-modal-overlay" onClick={requestClose} role="presentation">
       <div
         ref={modalRef}
         className="settings-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="settings-modal-title"
+        aria-busy={isSaving}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="settings-modal-header">
           <h2 id="settings-modal-title">Settings</h2>
           <button
             className="settings-modal-close"
-            onClick={onClose}
+            onClick={requestClose}
             aria-label="Close settings"
+            disabled={isSaving}
           >
             ✕
           </button>
@@ -193,15 +248,28 @@ export function SettingsModal({ isOpen, currentSettings, onClose, onSave }: Sett
           {/* Info Section */}
           <div className="settings-info">
             <h3>About</h3>
-            <p>Pazaak Activity v0.1</p>
+            <p>Pazaak World v0.1</p>
             <p>The legendary card game from Knights of the Old Republic</p>
           </div>
         </div>
 
+        {saveError ? (
+          <p className="settings-modal-error" role="status" aria-live="polite">{saveError}</p>
+        ) : null}
+
+        <p className="settings-modal-hint" aria-live="off">Tip: press Ctrl+Enter to save quickly.</p>
+
         <div className="settings-modal-footer">
           <button
+            className="settings-modal-reset"
+            onClick={handleResetDefaults}
+            disabled={isSaving || areSettingsEqual(settings, DEFAULT_MODAL_SETTINGS)}
+          >
+            Reset Defaults
+          </button>
+          <button
             className="settings-modal-cancel"
-            onClick={onClose}
+            onClick={requestClose}
             disabled={isSaving}
           >
             Cancel
@@ -209,7 +277,7 @@ export function SettingsModal({ isOpen, currentSettings, onClose, onSave }: Sett
           <button
             className="settings-modal-save"
             onClick={handleSave}
-            disabled={isSaving}
+            disabled={isSaving || !hasChanges}
           >
             {isSaving ? "Saving..." : "Save Settings"}
           </button>

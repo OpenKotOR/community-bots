@@ -5,7 +5,7 @@ import { draw, stand, endTurn, playSideCard, forfeit, fetchMe } from "../api.ts"
 import { getAdvisorSnapshot, getSideCardOptions, WIN_SCORE, SETS_TO_WIN } from "../game-utils.ts";
 import { QuickSideboardSwitcher } from "./QuickSideboardSwitcher.tsx";
 
-const CHAT_OPEN_STORAGE_KEY = "pazaak-activity-chat-open-v1";
+const CHAT_OPEN_STORAGE_KEY = "pazaak-world-chat-open-v1";
 
 interface GameBoardProps {
   match: SerializedMatch;

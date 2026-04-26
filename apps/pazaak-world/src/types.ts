@@ -107,7 +107,7 @@ export interface PazaakOpponentProfileRecord {
   prizes: PazaakOpponentPrizeTable;
   sideDeckTokens: readonly string[];
   phrases: Readonly<Record<PazaakOpponentPhraseKey, readonly string[]>>;
-  sources: readonly ("HoloPazaak" | "PazaakWorld" | "pazaak-activity")[];
+  sources: readonly ("HoloPazaak" | "PazaakWorld" | "pazaak-world")[];
 }
 
 export type AdvisorCategory = "exact" | "recovery" | "pressure" | "setup" | "neutral";

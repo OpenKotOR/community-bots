@@ -45,8 +45,49 @@ import { GlobalAccountCorner } from "./components/GlobalAccountCorner.tsx";
 import { soundManager } from "./utils/soundManager.ts";
 import { ConnectionStatus } from "./components/ConnectionStatus.tsx";
 
-const STANDALONE_AUTH_TOKEN_KEY = "pazaak-activity-standalone-auth-token-v1";
+const STANDALONE_AUTH_TOKEN_KEY = "pazaak-world-standalone-auth-token-v1";
 const USER_SETTINGS_STORAGE_KEY = "pazaak-user-settings-v1";
+const AUTH_MODE_STORAGE_KEY = "pazaak-world-auth-mode-v1";
+const ONBOARDING_STORAGE_KEY = "pazaak-world-onboarding-v1";
+
+type OnboardingBoardStyle = "classic" | "wood" | "ocean" | "rose";
+
+interface OnboardingState {
+  completed: boolean;
+  boardStyle: OnboardingBoardStyle;
+  notificationChoice: "pending" | "allow" | "skip";
+  completedAt?: string;
+}
+
+const DEFAULT_ONBOARDING_STATE: OnboardingState = {
+  completed: false,
+  boardStyle: "classic",
+  notificationChoice: "pending",
+};
+
+const loadOnboardingState = (): OnboardingState => {
+  try {
+    const raw = window.localStorage.getItem(ONBOARDING_STORAGE_KEY);
+    if (!raw) {
+      return DEFAULT_ONBOARDING_STATE;
+    }
+    const parsed = JSON.parse(raw) as Partial<OnboardingState>;
+    return {
+      ...DEFAULT_ONBOARDING_STATE,
+      ...parsed,
+    };
+  } catch {
+    return DEFAULT_ONBOARDING_STATE;
+  }
+};
+
+const saveOnboardingState = (state: OnboardingState): void => {
+  try {
+    window.localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Ignore storage write failures.
+  }
+};
 
 const loadUserSettings = (): PazaakUserSettings => {
   try {
@@ -186,6 +227,7 @@ type AppState =
   | { stage: "loading" }
   | { stage: "standalone_auth"; message?: string }
   | { stage: "auth_error"; message: string }
+  | { stage: "onboarding"; auth: ActivitySession }
   | { stage: "mode_selection"; auth: ActivitySession }
   | { stage: "matchmaking"; auth: ActivitySession; preferredMaxPlayers: number }
   | { stage: "lobby"; auth: ActivitySession }
@@ -199,6 +241,7 @@ function getSessionFromAppState(state: AppState): ActivitySession | null {
     case "auth_error":
     case "standalone_auth":
       return null;
+    case "onboarding":
     case "mode_selection":
     case "matchmaking":
     case "lobby":
@@ -211,13 +254,32 @@ function getSessionFromAppState(state: AppState): ActivitySession | null {
 
 export default function App() {
   const [state, setState] = useState<AppState>({ stage: "loading" });
-  const [matchSocketState, setMatchSocketState] = useState<MatchSocketConnectionState>("connecting");
+  const [matchSocketState, setMatchSocketState] = useState<MatchSocketConnectionState>("disconnected");
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
   const [cornerWallet, setCornerWallet] = useState<WalletRecord | null>(null);
   const [cornerBusy, setCornerBusy] = useState(false);
   const activeSession = getSessionFromAppState(state);
   const [userSettings, setUserSettings] = useState<PazaakUserSettings>(loadUserSettings);
+  const [onboardingState, setOnboardingState] = useState<OnboardingState>(loadOnboardingState);
+
+  const shouldRequireOnboarding = useCallback(() => {
+    return !isDiscordActivity() && !onboardingState.completed;
+  }, [onboardingState.completed]);
+
+  const routePostAuth = useCallback((session: ActivitySession, match: SerializedMatch | null) => {
+    if (match) {
+      setState({ stage: "game", auth: session, match });
+      return;
+    }
+
+    if (shouldRequireOnboarding()) {
+      setState({ stage: "onboarding", auth: session });
+      return;
+    }
+
+    setState({ stage: "mode_selection", auth: session });
+  }, [shouldRequireOnboarding]);
 
   const handleSettingsSave = useCallback(async (settings: PazaakUserSettings) => {
     setUserSettings(settings);
@@ -236,6 +298,7 @@ export default function App() {
   useEffect(() => {
     if (!activeSession?.accessToken) {
       setCornerWallet(null);
+      setMatchSocketState("disconnected");
       return;
     }
 
@@ -299,9 +362,7 @@ export default function App() {
           username: auth.username,
           accessToken: auth.accessToken,
         };
-        setState(match
-          ? { stage: "game", auth: session, match }
-          : { stage: "mode_selection", auth: session });
+        routePostAuth(session, match);
         return;
       } catch {
         setState({ stage: "auth_error", message: "Signed out. Reconnect to continue." });
@@ -310,7 +371,7 @@ export default function App() {
     }
 
     setState({ stage: "standalone_auth", message: "Signed out." });
-  }, [activeSession?.accessToken]);
+  }, [activeSession?.accessToken, routePostAuth]);
 
   const withGlobalAccountCorner = useCallback((content: React.ReactNode) => (
     <>
@@ -364,6 +425,7 @@ export default function App() {
       loading: "PazaakWorld — Loading",
       standalone_auth: "PazaakWorld — Sign In",
       auth_error: "PazaakWorld — Error",
+      onboarding: "PazaakWorld - Onboarding",
       mode_selection: "PazaakWorld — Choose Mode",
       matchmaking: "PazaakWorld — Finding Match…",
       lobby: "PazaakWorld — Lobby",
@@ -412,9 +474,7 @@ export default function App() {
 
               setStoredStandaloneAuthToken(accessToken);
               const match = await fetchMyMatch(accessToken);
-              setState(match
-                ? { stage: "game", auth: authSession, match }
-                : { stage: "mode_selection", auth: authSession });
+              routePostAuth(authSession, match);
               clearOauthQuery();
               return;
             } catch {
@@ -439,7 +499,7 @@ export default function App() {
         if (match) {
           setState({ stage: "game", auth: session, match });
         } else {
-          setState({ stage: "mode_selection", auth: session });
+          routePostAuth(session, null);
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -454,7 +514,7 @@ export default function App() {
         });
       }
     })();
-  }, []);
+  }, [routePostAuth]);
 
   // Subscribe to live WS updates when in game.
   const handleMatchUpdate = useCallback((updated: SerializedMatch) => {
@@ -507,26 +567,24 @@ export default function App() {
       <StandaloneAuthScreen
         message={state.message}
         isOnline={isOnline}
+        socketState={matchSocketState}
         onAuthenticated={async (session) => {
           setStoredStandaloneAuthToken(session.accessToken);
           const match = await fetchMyMatch(session.accessToken);
-          if (match) {
-            setState({ stage: "game", auth: session, match });
-            return;
-          }
-          setState({ stage: "mode_selection", auth: session });
+          routePostAuth(session, match);
         }}
-        onStartGuestLocal={(difficulty, opponentId, guestName) => {
-          setState({
-            stage: "local_game",
-            auth: {
-              userId: "guest-local",
-              username: guestName?.trim() || "Guest Pilot",
-              accessToken: "",
-            },
-            difficulty,
-            ...(opponentId ? { opponentId } : {}),
-          });
+      />
+    );
+  }
+
+  if (state.stage === "onboarding") {
+    return withGlobalAccountCorner(
+      <OnboardingScreen
+        username={state.auth.username}
+        onComplete={(next) => {
+          setOnboardingState(next);
+          saveOnboardingState(next);
+          setState({ stage: "mode_selection", auth: state.auth });
         }}
       />
     );
@@ -537,6 +595,7 @@ export default function App() {
       <ModeSelectionScreen
         username={state.auth.username}
         mmr={cornerWallet?.mmr ?? 1000}
+        socketState={matchSocketState}
         onOpenLobbies={() => setState({ stage: "lobby", auth: state.auth })}
         onQuickMatch={(preferredMaxPlayers) => setState({ stage: "matchmaking", auth: state.auth, preferredMaxPlayers })}
         onStartLocalGame={(difficulty, opponentId) => setState({
@@ -624,9 +683,134 @@ export default function App() {
   );
 }
 
+function OnboardingScreen({
+  username,
+  onComplete,
+}: {
+  username: string;
+  onComplete: (next: OnboardingState) => void;
+}) {
+  const [step, setStep] = useState(1);
+  const [boardStyle, setBoardStyle] = useState<OnboardingBoardStyle>("classic");
+  const [notificationChoice, setNotificationChoice] = useState<OnboardingState["notificationChoice"]>("pending");
+  const maxStep = 6;
+
+  const completeOnboarding = () => {
+    onComplete({
+      completed: true,
+      boardStyle,
+      notificationChoice,
+      completedAt: new Date().toISOString(),
+    });
+  };
+
+  const nextStep = () => {
+    if (step >= maxStep) {
+      completeOnboarding();
+      return;
+    }
+    setStep((current) => Math.min(maxStep, current + 1));
+  };
+
+  const requestNotifications = async () => {
+    if (!("Notification" in window)) {
+      setNotificationChoice("skip");
+      return;
+    }
+
+    try {
+      const permission = await Notification.requestPermission();
+      setNotificationChoice(permission === "granted" ? "allow" : "skip");
+    } catch {
+      setNotificationChoice("skip");
+    }
+  };
+
+  const canContinue = step !== 5 || notificationChoice !== "pending";
+
+  return (
+    <div className="pazaak-world-page">
+      <main className="pazaak-world-main pazaak-onboarding">
+        <section className="pazaak-onboarding__card">
+          <p className="pazaak-onboarding__step">Step {step} / {maxStep}</p>
+          {step === 1 ? (
+            <>
+              <h1>Welcome to PazaakWorld, {username}</h1>
+              <p>We will set up your match hub in under a minute.</p>
+            </>
+          ) : null}
+          {step === 2 ? (
+            <>
+              <h1>Choose your default focus</h1>
+              <p>All match types stay available; this just tunes your initial hub suggestions.</p>
+              <div className="pazaak-onboarding__chips">
+                <span>Online Ranked</span>
+                <span>Private Lobbies</span>
+                <span>AI Practice</span>
+              </div>
+            </>
+          ) : null}
+          {step === 3 ? (
+            <>
+              <h1>Match setup stays flexible</h1>
+              <p>Player count, queue target, and bot difficulty can all be changed directly from your matchmaking hub.</p>
+            </>
+          ) : null}
+          {step === 4 ? (
+            <>
+              <h1>Which board fits your style?</h1>
+              <div className="pazaak-onboarding__boards">
+                {([
+                  ["classic", "Classic"],
+                  ["wood", "Cantina Wood"],
+                  ["ocean", "Republic Blue"],
+                  ["rose", "Sith Rose"],
+                ] as const).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className={`pazaak-onboarding__board ${boardStyle === value ? "pazaak-onboarding__board--active" : ""}`}
+                    onClick={() => setBoardStyle(value)}
+                  >
+                    <span>{label}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : null}
+          {step === 5 ? (
+            <>
+              <h1>Get notified when it is your move</h1>
+              <p>Optional: allow browser notifications for turns, invites, and direct messages.</p>
+              <div className="pazaak-onboarding__actions pazaak-onboarding__actions--stack">
+                <button className="btn btn--primary" type="button" onClick={() => { void requestNotifications(); }}>Allow notifications</button>
+                <button className="btn btn--ghost" type="button" onClick={() => setNotificationChoice("skip")}>No thanks</button>
+              </div>
+            </>
+          ) : null}
+          {step === 6 ? (
+            <>
+              <h1>You are ready</h1>
+              <p>Your hub is configured. Discord Activity users are not blocked by web notification setup.</p>
+            </>
+          ) : null}
+
+          <div className="pazaak-onboarding__footer">
+            <div className="pazaak-onboarding__progress" role="progressbar" aria-valuemin={1} aria-valuemax={maxStep} aria-valuenow={step}>
+              <span style={{ width: `${(step / maxStep) * 100}%` }} />
+            </div>
+            <button className="btn btn--primary" type="button" disabled={!canContinue} onClick={nextStep}>{step === maxStep ? "Enter Match Hub" : "Continue"}</button>
+          </div>
+        </section>
+      </main>
+    </div>
+  );
+}
+
 function ModeSelectionScreen({
   username,
   mmr,
+  socketState,
   onOpenLobbies,
   onQuickMatch,
   onStartLocalGame,
@@ -634,6 +818,7 @@ function ModeSelectionScreen({
 }: {
   username: string;
   mmr?: number | null;
+  socketState?: MatchSocketConnectionState;
   onOpenLobbies: () => void;
   onQuickMatch: (preferredMaxPlayers: number) => void;
   onStartLocalGame: (difficulty: AdvisorDifficulty, opponentId?: string) => void;
@@ -641,7 +826,7 @@ function ModeSelectionScreen({
 }) {
   const [localDifficulty, setLocalDifficulty] = useState<AdvisorDifficulty>(() => {
     try {
-      const stored = window.localStorage.getItem("pazaak-activity-local-difficulty-v1");
+      const stored = window.localStorage.getItem("pazaak-world-local-difficulty-v1");
       if (stored === "easy" || stored === "hard" || stored === "professional") {
         return stored;
       }
@@ -652,7 +837,7 @@ function ModeSelectionScreen({
   });
   const [localOpponentId, setLocalOpponentId] = useState<string>(() => {
     try {
-      const stored = window.localStorage.getItem("pazaak-activity-local-opponent-id-v1");
+      const stored = window.localStorage.getItem("pazaak-world-local-opponent-id-v1");
       if (stored && localOpponents.some((opponent) => opponent.id === stored)) {
         return stored;
       }
@@ -661,12 +846,14 @@ function ModeSelectionScreen({
     }
     return getDefaultLocalOpponentForDifficulty("professional").id;
   });
+  const [matchIntent, setMatchIntent] = useState<"quick_match" | "private_lobby" | "ai_practice">("quick_match");
+  const [quickQueuePlayers, setQuickQueuePlayers] = useState(2);
 
   const availableOpponents = localOpponents;
   // Read per-opponent local practice stats from localStorage (written by LocalPracticeGame).
   const localPracticeStats = useMemo<Record<string, { played: number; won: number; lost: number }>>(() => {
     try {
-      const raw = window.localStorage.getItem("pazaak-activity-local-practice-stats-v1");
+      const raw = window.localStorage.getItem("pazaak-world-local-practice-stats-v1");
       if (!raw) return {};
       const parsed = JSON.parse(raw) as { byOpponent?: Record<string, { played: number; won: number; lost: number }> };
       return parsed?.byOpponent ?? {};
@@ -697,7 +884,7 @@ function ModeSelectionScreen({
 
   useEffect(() => {
     try {
-      window.localStorage.setItem("pazaak-activity-local-difficulty-v1", localDifficulty);
+      window.localStorage.setItem("pazaak-world-local-difficulty-v1", localDifficulty);
     } catch {
       // Ignore storage write failures.
     }
@@ -705,7 +892,7 @@ function ModeSelectionScreen({
 
   useEffect(() => {
     try {
-      window.localStorage.setItem("pazaak-activity-local-opponent-id-v1", selectedLocalOpponentId);
+      window.localStorage.setItem("pazaak-world-local-opponent-id-v1", selectedLocalOpponentId);
     } catch {
       // Ignore storage write failures.
     }
@@ -715,6 +902,20 @@ function ModeSelectionScreen({
   const aiCard = MAIN_MENU_PRESET.modeCards.find((card) => card.key === "ai");
   const quickMatchCard = MAIN_MENU_PRESET.modeCards.find((card) => card.key === "quick_match");
   const lobbyCard = MAIN_MENU_PRESET.modeCards.find((card) => card.key === "private_lobby");
+
+  const launchConfiguredMatch = () => {
+    if (matchIntent === "quick_match") {
+      onQuickMatch(quickQueuePlayers);
+      return;
+    }
+
+    if (matchIntent === "private_lobby") {
+      onOpenLobbies();
+      return;
+    }
+
+    onStartLocalGame(localDifficulty, selectedLocalOpponentId);
+  };
 
   return (
     <div className="pazaak-world-page">
@@ -796,7 +997,7 @@ function ModeSelectionScreen({
               </h2>
               <p>{quickMatchCard.description}</p>
               <div className="pazaak-world-card__actions">
-                <button className="pazaak-world-button pazaak-world-button--galaxy" onClick={() => onQuickMatch(2)} disabled={!isOnline}>
+                <button className="pazaak-world-button pazaak-world-button--galaxy" onClick={() => onQuickMatch(quickQueuePlayers)} disabled={!isOnline}>
                   <span aria-hidden="true">{menuIcon(quickMatchCard.primaryAction?.icon ?? "search")}</span>
                   {quickMatchCard.primaryAction?.label ?? "Find Match"}
                 </button>
@@ -924,7 +1125,7 @@ function ModeSelectionScreen({
       </main>
 
       <div className="pazaak-world-floating-status">
-        <ConnectionStatus isOnline={isOnline} />
+        <ConnectionStatus isOnline={isOnline} socketState={socketState} />
       </div>
     </div>
   );
@@ -1107,15 +1308,25 @@ function ErrorScreen({ message }: { message: string }) {
 function StandaloneAuthScreen({
   message,
   isOnline = true,
+  socketState,
   onAuthenticated,
-  onStartGuestLocal,
 }: {
   message?: string;
   isOnline?: boolean;
+  socketState?: MatchSocketConnectionState;
   onAuthenticated: (session: ActivitySession) => Promise<void>;
-  onStartGuestLocal: (difficulty: AdvisorDifficulty, opponentId?: string, guestName?: string) => void;
 }) {
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const [mode, setMode] = useState<"login" | "register">(() => {
+    try {
+      const saved = window.localStorage.getItem(AUTH_MODE_STORAGE_KEY);
+      if (saved === "login" || saved === "register") {
+        return saved;
+      }
+    } catch {
+      // Ignore storage read failures.
+    }
+    return "login";
+  });
   const [identifier, setIdentifier] = useState("");
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -1130,30 +1341,14 @@ function StandaloneAuthScreen({
   const authDialogRef = useRef<HTMLDivElement | null>(null);
   const loginTabRef = useRef<HTMLButtonElement | null>(null);
   const registerTabRef = useRef<HTMLButtonElement | null>(null);
-  const [guestProfile] = useState(() => {
-    const fallback = {
-      id: `guest_${Date.now()}`,
-      username: `Guest_${Math.random().toString(36).slice(2, 6)}`,
-      mmr: 1000,
-    };
-
-    try {
-      const raw = window.localStorage.getItem("pazaak_guest_profile");
-      if (!raw) return fallback;
-      const parsed = JSON.parse(raw) as { id?: string; username?: string; mmr?: number };
-      return {
-        id: parsed.id || fallback.id,
-        username: parsed.username || fallback.username,
-        mmr: typeof parsed.mmr === "number" ? parsed.mmr : 1000,
-      };
-    } catch {
-      return fallback;
-    }
-  });
 
   useEffect(() => {
-    window.localStorage.setItem("pazaak_guest_profile", JSON.stringify(guestProfile));
-  }, [guestProfile]);
+    try {
+      window.localStorage.setItem(AUTH_MODE_STORAGE_KEY, mode);
+    } catch {
+      // Ignore storage write failures.
+    }
+  }, [mode]);
 
   useEffect(() => {
     const handleOpenAuth = () => {
@@ -1263,10 +1458,6 @@ function StandaloneAuthScreen({
     setShowPassword(false);
   }, [mode, showAuth]);
 
-  const startGuestPractice = (difficulty: AdvisorDifficulty) => {
-    onStartGuestLocal(difficulty, getDefaultLocalOpponentForDifficulty(difficulty).id, guestProfile.username);
-  };
-
   useEffect(() => {
     if (!showAuth) {
       return;
@@ -1340,8 +1531,18 @@ function StandaloneAuthScreen({
   const credentialsTabPanelId = "pazaak-auth-credentials-panel";
   const loginTabId = "pazaak-auth-tab-login";
   const registerTabId = "pazaak-auth-tab-register";
+  const canSubmit = mode === "login"
+    ? identifier.trim().length > 0 && password.length > 0
+    : username.trim().length >= 3 && password.length >= 10;
+  const validationHint = mode === "login"
+    ? "Enter your username/email and password to continue."
+    : "Username must be at least 3 characters and password at least 10 characters.";
 
   const submit = async () => {
+    if (!canSubmit) {
+      return;
+    }
+
     setBusy(true);
     setError(null);
 
@@ -1367,6 +1568,28 @@ function StandaloneAuthScreen({
     }
   };
 
+  useEffect(() => {
+    if (!showAuth) {
+      return;
+    }
+
+    const handleAuthSubmitShortcut = (event: KeyboardEvent) => {
+      if (busy || !canSubmit) {
+        return;
+      }
+
+      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+        event.preventDefault();
+        void submit();
+      }
+    };
+
+    window.addEventListener("keydown", handleAuthSubmitShortcut);
+    return () => {
+      window.removeEventListener("keydown", handleAuthSubmitShortcut);
+    };
+  }, [busy, canSubmit, showAuth]);
+
   const handleAuthBackdropMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
     if (event.currentTarget !== event.target) {
       return;
@@ -1376,6 +1599,7 @@ function StandaloneAuthScreen({
 
   const moveAuthMode = (nextMode: "login" | "register") => {
     setMode(nextMode);
+    setError(null);
     requestAnimationFrame(() => {
       if (nextMode === "login") {
         loginTabRef.current?.focus();
@@ -1384,6 +1608,8 @@ function StandaloneAuthScreen({
       registerTabRef.current?.focus();
     });
   };
+
+  const standaloneStatusLabel = isOnline ? "Connected to Galaxy Server" : "Disconnected from Galaxy Server";
 
   const handleAuthModeTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
     if (busy) {
@@ -1422,9 +1648,9 @@ function StandaloneAuthScreen({
           {MAIN_MENU_PRESET.brandTitle}
         </div>
         <div className="pazaak-world-nav__right">
-          <div className="pazaak-world-status" data-online="false">
+          <div className="pazaak-world-status" data-online={isOnline ? "true" : "false"}>
             <span className="pazaak-world-status__dot" aria-hidden="true" />
-            Disconnected from Galaxy Server
+            {standaloneStatusLabel}
           </div>
         </div>
       </nav>
@@ -1432,18 +1658,17 @@ function StandaloneAuthScreen({
       <main className="pazaak-world-main" aria-hidden={showAuth}>
         <section className="pazaak-world-hero">
           <h1><span aria-hidden="true">{menuIcon("rocket")}</span>{MAIN_MENU_PRESET.heroTitle}</h1>
-          <p>{MAIN_MENU_PRESET.heroSubtitle}</p>
-          <p>{MAIN_MENU_PRESET.heroTagline}</p>
+          <p>Sign in to unlock your match hub and configure how you want to play.</p>
+          <p>Account access is required before entering the main matchmaking area.</p>
+          <button className="pazaak-world-button pazaak-world-button--galaxy" onClick={() => openAuth("login")}>Sign In To Continue</button>
         </section>
 
         <section className="pazaak-world-mode-grid">
-          <article className="pazaak-world-card pazaak-world-card--ai">
-            <h2><span aria-hidden="true">{menuIcon("robot")}</span>AI Opponents</h2>
-            <p>Practice against AI opponents with different skill levels</p>
+          <article className="pazaak-world-card pazaak-world-card--ai pazaak-world-card--disabled">
+            <h2><span aria-hidden="true">{menuIcon("robot")}</span>AI Opponents <small>Account Required</small></h2>
+            <p>Practice against AI opponents with customizable setup once signed in.</p>
             <div className="pazaak-world-card__actions">
-              <button className="pazaak-world-button pazaak-world-button--easy" onClick={() => startGuestPractice("easy")}><span aria-hidden="true">{menuIcon("seedling")}</span>Easy AI <span>Beginner</span></button>
-              <button className="pazaak-world-button pazaak-world-button--hard" onClick={() => startGuestPractice("hard")}><span aria-hidden="true">{menuIcon("brain")}</span>Hard AI <span>Advanced</span></button>
-              <button className="pazaak-world-button pazaak-world-button--professional" onClick={() => startGuestPractice("professional")}><span aria-hidden="true">{menuIcon("crown")}</span>Professional AI <span>Expert</span></button>
+              <p className="pazaak-world-card__notice">Choose difficulty, opponent profile, and match setup from your hub after sign-in.</p>
             </div>
           </article>
 
@@ -1479,7 +1704,7 @@ function StandaloneAuthScreen({
       </main>
 
       <div className="pazaak-world-floating-status" aria-hidden={showAuth ? "true" : "false"}>
-        <ConnectionStatus isOnline={isOnline} />
+        <ConnectionStatus isOnline={isOnline} socketState={socketState} />
       </div>
 
       {showAuth ? (
@@ -1541,12 +1766,18 @@ function StandaloneAuthScreen({
                   <>
                     <label className="auth-field">
                       <span className="auth-field__label">Username or email</span>
-                      <input value={identifier} onChange={(event) => setIdentifier(event.target.value)} placeholder="Enter your username or email" aria-label="Username or email" autoComplete="username" autoFocus={showAuth} required disabled={busy} />
+                      <input value={identifier} onChange={(event) => {
+                        setIdentifier(event.target.value);
+                        if (error) setError(null);
+                      }} placeholder="Enter your username or email" aria-label="Username or email" autoComplete="username" autoFocus={showAuth} required disabled={busy} />
                     </label>
                     <label className="auth-field">
                       <span className="auth-field__label">Password</span>
                       <span className="auth-input-wrap">
-                        <input value={password} onChange={(event) => setPassword(event.target.value)} type={showPassword ? "text" : "password"} placeholder="Enter your password" aria-label="Password" autoComplete="current-password" required disabled={busy} />
+                        <input value={password} onChange={(event) => {
+                          setPassword(event.target.value);
+                          if (error) setError(null);
+                        }} type={showPassword ? "text" : "password"} placeholder="Enter your password" aria-label="Password" autoComplete="current-password" required disabled={busy} />
                         <button type="button" className="auth-input-wrap__toggle" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} disabled={busy}>
                           {showPassword ? "Hide" : "Show"}
                         </button>
@@ -1557,20 +1788,32 @@ function StandaloneAuthScreen({
                   <>
                     <label className="auth-field">
                       <span className="auth-field__label">Username</span>
-                      <input value={username} onChange={(event) => setUsername(event.target.value)} placeholder="Choose a username" aria-label="Username" autoComplete="username" autoFocus={showAuth} required disabled={busy} />
+                      <input value={username} onChange={(event) => {
+                        setUsername(event.target.value);
+                        if (error) setError(null);
+                      }} placeholder="Choose a username" aria-label="Username" autoComplete="username" autoFocus={showAuth} required disabled={busy} />
                     </label>
                     <label className="auth-field">
                       <span className="auth-field__label">Display name</span>
-                      <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Optional display name" aria-label="Display name" autoComplete="nickname" disabled={busy} />
+                      <input value={displayName} onChange={(event) => {
+                        setDisplayName(event.target.value);
+                        if (error) setError(null);
+                      }} placeholder="Optional display name" aria-label="Display name" autoComplete="nickname" disabled={busy} />
                     </label>
                     <label className="auth-field">
                       <span className="auth-field__label">Email</span>
-                      <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Optional email address" aria-label="Email" autoComplete="email" type="email" disabled={busy} />
+                      <input value={email} onChange={(event) => {
+                        setEmail(event.target.value);
+                        if (error) setError(null);
+                      }} placeholder="Optional email address" aria-label="Email" autoComplete="email" type="email" disabled={busy} />
                     </label>
                     <label className="auth-field">
                       <span className="auth-field__label">Password</span>
                       <span className="auth-input-wrap">
-                        <input value={password} onChange={(event) => setPassword(event.target.value)} type={showPassword ? "text" : "password"} placeholder="Create a password (10+ chars)" aria-label="Password" autoComplete="new-password" required minLength={10} disabled={busy} />
+                        <input value={password} onChange={(event) => {
+                          setPassword(event.target.value);
+                          if (error) setError(null);
+                        }} type={showPassword ? "text" : "password"} placeholder="Create a password (10+ chars)" aria-label="Password" autoComplete="new-password" required minLength={10} disabled={busy} />
                         <button type="button" className="auth-input-wrap__toggle" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} disabled={busy}>
                           {showPassword ? "Hide" : "Show"}
                         </button>
@@ -1583,8 +1826,9 @@ function StandaloneAuthScreen({
                     ? "Checking provider configuration for this environment..."
                     : "Social sign-in appears here when provider credentials are configured for this environment."}
                 </div>
+                {!canSubmit ? <p className="auth-validation-hint" role="status" aria-live="polite">{validationHint}</p> : null}
                 {error ? <p className="error-message" role="alert" aria-live="assertive">{error}</p> : null}
-                <button type="submit" className="btn btn--primary auth-form__submit" disabled={busy}>
+                <button type="submit" className="btn btn--primary auth-form__submit" disabled={busy || !canSubmit}>
                   {busy ? "Working..." : mode === "login" ? "Sign In" : "Create Account"}
                 </button>
               </form>

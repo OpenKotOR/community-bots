@@ -14,7 +14,7 @@
     "dev:trask": "pnpm --filter @openkotor/trask-bot dev",
     "dev:hk": "pnpm --filter @openkotor/hk-bot dev",
     "dev:pazaak": "pnpm --filter @openkotor/pazaak-bot dev",
-    "dev:pazaak-activity": "pnpm --filter pazaak-activity dev",
+    "dev:pazaak-world": "pnpm --filter pazaak-world dev",
     "dev:ingest": "pnpm --filter @openkotor/ingest-worker dev",
     "discord:install-links": "tsx scripts/discord-install-links.ts"
   },

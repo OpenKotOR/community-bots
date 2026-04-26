@@ -60,8 +60,8 @@ interface LocalPracticeStats {
 const TARGET_SCORE = 20;
 const MAX_BOARD = 9;
 const SETS_TO_WIN_LOCAL = 3;
-const LOCAL_STATS_KEY = "pazaak-activity-local-practice-stats-v1";
-const LOCAL_SOUND_KEY = "pazaak-activity-sound-enabled-v1";
+const LOCAL_STATS_KEY = "pazaak-world-local-practice-stats-v1";
+const LOCAL_SOUND_KEY = "pazaak-world-sound-enabled-v1";
 
 // ---------------------------------------------------------------------------
 // Audio helpers (Web Audio API, no external assets)

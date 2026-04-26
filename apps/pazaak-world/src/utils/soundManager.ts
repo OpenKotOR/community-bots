@@ -1,5 +1,5 @@
 /**
- * Simple sound manager for Pazaak activity
+ * Simple sound manager for Pazaak World
  */
 
 interface SoundConfig {

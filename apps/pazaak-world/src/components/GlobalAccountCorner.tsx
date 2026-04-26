@@ -60,12 +60,14 @@ export function GlobalAccountCorner({
 }: GlobalAccountCornerProps) {
   const [identityMenuOpen, setIdentityMenuOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<"idle" | "success" | "error">("idle");
   const rootRef = useRef<HTMLDivElement | null>(null);
   const identityMenuRef = useRef<HTMLDivElement | null>(null);
   const identityButtonRef = useRef<HTMLButtonElement | null>(null);
   const gearButtonRef = useRef<HTMLButtonElement | null>(null);
   const lastTriggerRef = useRef<HTMLButtonElement | null>(null);
   const wasOpenRef = useRef(false);
+  const copyStatusTimerRef = useRef<number | null>(null);
 
   const getMenuItems = () => {
     if (!identityMenuRef.current) {
@@ -76,6 +78,14 @@ export function GlobalAccountCorner({
 
   const closeIdentityMenu = useCallback(() => {
     setIdentityMenuOpen(false);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (copyStatusTimerRef.current !== null) {
+        window.clearTimeout(copyStatusTimerRef.current);
+      }
+    };
   }, []);
 
   const toggleIdentityMenu = () => {
@@ -168,17 +178,51 @@ export function GlobalAccountCorner({
     }
   };
 
-  const copyLabel = async (value: string) => {
+  const copyLabel = async (value: string): Promise<boolean> => {
+    const fallbackCopy = (text: string): boolean => {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "absolute";
+      textarea.style.left = "-9999px";
+      document.body.appendChild(textarea);
+      textarea.select();
+      let copied = false;
+      try {
+        copied = document.execCommand("copy");
+      } finally {
+        document.body.removeChild(textarea);
+      }
+      return copied;
+    };
+
     try {
       await navigator.clipboard.writeText(value);
       soundManager.beep("success", 100);
+      return true;
     } catch {
-      // Ignore clipboard failures in restricted contexts.
+      const copied = fallbackCopy(value);
+      if (copied) {
+        soundManager.beep("success", 100);
+      }
+      return copied;
     }
+  };
+
+  const showCopyStatus = (status: "success" | "error") => {
+    setCopyStatus(status);
+    if (copyStatusTimerRef.current !== null) {
+      window.clearTimeout(copyStatusTimerRef.current);
+    }
+    copyStatusTimerRef.current = window.setTimeout(() => {
+      setCopyStatus("idle");
+      copyStatusTimerRef.current = null;
+    }, 1800);
   };
 
   const handleGearClick = () => {
     soundManager.beep("warning", 150);
+    closeIdentityMenu();
     setSettingsModalOpen(true);
   };
 
@@ -235,14 +279,23 @@ export function GlobalAccountCorner({
           <button
             className="activity-global-corner__item"
             type="button"
-            onClick={() => {
-              void copyLabel(username);
-              closeIdentityMenu();
+            onClick={async () => {
+              const copied = await copyLabel(username);
+              showCopyStatus(copied ? "success" : "error");
             }}
             role="menuitem"
           >
             Copy username
           </button>
+          {copyStatus !== "idle" ? (
+            <p
+              className={`activity-global-corner__copy-feedback activity-global-corner__copy-feedback--${copyStatus}`}
+              role="status"
+              aria-live="polite"
+            >
+              {copyStatus === "success" ? "Username copied." : "Clipboard blocked in this browser."}
+            </p>
+          ) : null}
           {canJumpToLobby ? (
             <button
               className="activity-global-corner__item"
