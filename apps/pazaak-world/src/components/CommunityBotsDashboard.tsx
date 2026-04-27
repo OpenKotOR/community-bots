@@ -107,7 +107,6 @@ interface DashboardHttpResult {
 const DASHBOARD_PREFS_KEY = "openkotor-bots-dashboard-prefs-v1";
 const DASHBOARD_CHECKLIST_KEY = "openkotor-bots-dashboard-checklist-v1";
 const BOTS_PUBLIC_ROUTE = "/bots";
-const COMMUNITY_BOTS_ROUTE = "/community-bots";
 const PAZAAK_WORLD_PUBLIC_ROUTE = "/bots/pazaakworld";
 const PAZAAK_WORLD_PUBLIC_URL = "https://openkotor.github.io/bots/pazaakworld";
 
@@ -862,7 +861,6 @@ export function CommunityBotsDashboard() {
         </div>
         <nav className="bots-dashboard-nav" aria-label="Bot site routes">
           <a href={BOTS_PUBLIC_ROUTE}>Dashboard</a>
-          <a href={COMMUNITY_BOTS_ROUTE}>Community route</a>
           <a href={PAZAAK_WORLD_PUBLIC_ROUTE}>PazaakWorld</a>
           <a href="https://github.com/OpenKotOR/bots">GitHub</a>
         </nav>
@@ -897,7 +895,7 @@ export function CommunityBotsDashboard() {
           <article>
             <span>Frontend route</span>
             <strong>{window.location.pathname}</strong>
-            <small>/bots and /community-bots resolve here; /bots/pazaakworld opens the game.</small>
+            <small>The deployed console is under /bots; /bots/pazaakworld opens the game.</small>
           </article>
           <article>
             <span>Selected API</span>
