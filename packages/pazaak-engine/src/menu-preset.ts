@@ -66,7 +66,7 @@ export const MAIN_MENU_PRESET: MainMenuPreset = {
   brandTitle: "PazaakWorld",
   heroTitle: "PAZAAK",
   heroSubtitle: "The legendary card game from Knights of the Old Republic",
-  heroTagline: "First to win 3 rounds wins the game. Get as close to 20 as possible without going over.",
+  heroTagline: "First to win 3 sets wins the game. Recover over-20 draws before your turn ends.",
   rulesTitle: "How to Play Pazaak",
   modeCards: [
     {
@@ -138,19 +138,19 @@ export const MAIN_MENU_PRESET: MainMenuPreset = {
   rules: [
     {
       title: "Objective",
-      body: "Get as close to 20 as possible without going over. First to win 3 rounds wins the game.",
+      body: "Get as close to 20 as possible. You only bust if you are still over 20 when the turn resolves.",
       icon: "target",
       accent: "republic",
     },
     {
       title: "Cards",
-      body: "Main deck cards (1-10) are drawn automatically. Use side deck cards strategically to modify your score.",
+      body: "Main deck cards (1-10) are drawn first. Your four side cards are drawn once and last the whole match.",
       icon: "layers",
       accent: "hyperspace",
     },
     {
       title: "Strategy",
-      body: "Choose when to draw, play side cards, or stand. Special yellow cards have unique effects!",
+      body: "Save negative and gold cards for recovery, exact 20s, ninth-card wins, and tie-break pressure.",
       icon: "star",
       accent: "yellow",
     },

@@ -87,6 +87,7 @@ export function GameBoard({ match, userId, accessToken, socketState, chatMessage
   const advisor = advisorSnapshot?.recommendation ?? null;
   const disconnectedSince = match.disconnectedSince ?? {};
   const aiSeats = match.aiSeats ?? {};
+  const targetSetsToWin = match.setsToWin ?? SETS_TO_WIN;
 
   const isCompleted = match.phase === "completed";
   const accountDisplayName = myPlayer?.displayName ?? "Spectator";
@@ -520,7 +521,7 @@ export function GameBoard({ match, userId, accessToken, socketState, chatMessage
       </div>
 
       {roundSummary ? (
-        <div className="round-summary-modal" role="dialog" aria-modal="true" aria-label="Round summary" onKeyDown={handleRoundSummaryKeyDown}>
+        <div className="round-summary-modal" role="dialog" aria-modal="true" aria-label="Set summary" onKeyDown={handleRoundSummaryKeyDown}>
           <div className="round-summary-modal__card" role="document">
             <h3>{roundSummary.title}</h3>
             <p>{roundSummary.body}</p>
@@ -813,7 +814,7 @@ export function GameBoard({ match, userId, accessToken, socketState, chatMessage
 
       {/* Score legend */}
       <footer className="game-footer">
-        First to {SETS_TO_WIN} set wins · Target: {WIN_SCORE}
+        First to {targetSetsToWin} set wins · Target: {WIN_SCORE}
       </footer>
     </div>
   );

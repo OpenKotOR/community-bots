@@ -70,6 +70,19 @@ export interface SocialAuthStartResponse {
 // HTTP helpers
 // ---------------------------------------------------------------------------
 
+async function parseJsonBodySafe<T>(res: Response): Promise<T | null> {
+  const text = await res.text();
+  if (!text.trim()) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
+}
+
 async function apiFetch<T>(
   path: string,
   accessToken: string,
@@ -84,10 +97,17 @@ async function apiFetch<T>(
     },
   });
 
-  const body = await res.json() as Record<string, unknown>;
+  const body = await parseJsonBodySafe<Record<string, unknown>>(res);
 
   if (!res.ok) {
-    throw new Error((body["error"] as string | undefined) ?? `HTTP ${res.status}`);
+    const message = typeof body?.["error"] === "string" && body["error"].trim().length > 0
+      ? body["error"]
+      : `HTTP ${res.status}`;
+    throw new Error(message);
+  }
+
+  if (!body) {
+    throw new Error(`Empty response body from ${path}`);
   }
 
   return body as T;
@@ -167,8 +187,9 @@ export async function registerAccount(input: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
-  const body = await res.json() as AuthSessionResponse | { error?: string };
-  if (!res.ok) throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
+  const body = await parseJsonBodySafe<AuthSessionResponse | { error?: string }>(res);
+  if (!res.ok) throw new Error(body && typeof (body as { error?: string }).error === "string" ? (body as { error?: string }).error as string : `HTTP ${res.status}`);
+  if (!body) throw new Error("Empty register response from auth service");
   return body as AuthSessionResponse;
 }
 
@@ -178,15 +199,25 @@ export async function loginAccount(identifier: string, password: string): Promis
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ identifier, password }),
   });
-  const body = await res.json() as AuthSessionResponse | { error?: string };
-  if (!res.ok) throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
+  const body = await parseJsonBodySafe<AuthSessionResponse | { error?: string }>(res);
+  if (!res.ok) throw new Error(body && typeof (body as { error?: string }).error === "string" ? (body as { error?: string }).error as string : `HTTP ${res.status}`);
+  if (!body) throw new Error("Empty login response from auth service");
   return body as AuthSessionResponse;
 }
 
 export async function fetchSocialAuthProviders(): Promise<SocialAuthProviderListResponse> {
   const res = await fetch("/api/auth/oauth/providers");
-  const body = await res.json() as SocialAuthProviderListResponse | { error?: string };
-  if (!res.ok) throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
+  const body = await parseJsonBodySafe<SocialAuthProviderListResponse | { error?: string }>(res);
+  if (!res.ok) throw new Error(body && typeof (body as { error?: string }).error === "string" ? (body as { error?: string }).error as string : `HTTP ${res.status}`);
+  if (!body) {
+    return {
+      providers: [
+        { provider: "google", enabled: false },
+        { provider: "discord", enabled: false },
+        { provider: "github", enabled: false },
+      ],
+    };
+  }
   return body as SocialAuthProviderListResponse;
 }
 
@@ -195,8 +226,9 @@ export async function startSocialAuth(provider: SocialAuthProvider): Promise<Soc
     method: "POST",
     headers: { "Content-Type": "application/json" },
   });
-  const body = await res.json() as SocialAuthStartResponse | { error?: string };
-  if (!res.ok) throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
+  const body = await parseJsonBodySafe<SocialAuthStartResponse | { error?: string }>(res);
+  if (!res.ok) throw new Error(body && typeof (body as { error?: string }).error === "string" ? (body as { error?: string }).error as string : `HTTP ${res.status}`);
+  if (!body) throw new Error("Empty social auth response from auth service");
   return body as SocialAuthStartResponse;
 }
 
@@ -283,6 +315,7 @@ export async function createLobby(
     turnTimerSeconds?: number;
     ranked?: boolean;
     allowAiFill?: boolean;
+    sideboardMode?: "runtime_random" | "player_active_custom" | "host_mirror_custom";
   },
 ): Promise<PazaakLobbyRecord> {
   const data = await apiFetch<LobbyResponse>("/api/lobbies", accessToken, {

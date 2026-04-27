@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { createHash, randomBytes, randomUUID, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -125,6 +125,8 @@ export type PazaakIdentityProvider = "discord" | "google" | "github";
 
 export type PazaakTableVariant = "canonical" | "multi_seat";
 
+export type PazaakLobbySideboardMode = "runtime_random" | "player_active_custom" | "host_mirror_custom";
+
 export interface PazaakTableSettings {
   variant: PazaakTableVariant;
   maxPlayers: number;
@@ -132,6 +134,7 @@ export interface PazaakTableSettings {
   turnTimerSeconds: number;
   ranked: boolean;
   allowAiFill: boolean;
+  sideboardMode: PazaakLobbySideboardMode;
 }
 
 export interface PazaakAccountRecord {
@@ -505,10 +508,18 @@ export class JsonPazaakAccountRepository {
     if (this.state) return this.state;
     await mkdir(path.dirname(this.filePath), { recursive: true });
 
+    let raw: string;
     try {
-      const raw = await readFile(this.filePath, "utf8");
-      this.state = JSON.parse(raw) as PazaakAccountFileShape;
-    } catch {
+      raw = await readFile(this.filePath, "utf8");
+    } catch (error) {
+      const code = typeof error === "object" && error !== null && "code" in error
+        ? (error as { code?: string }).code
+        : undefined;
+
+      if (code !== "ENOENT") {
+        throw error;
+      }
+
       this.state = {
         version: 1,
         accounts: {},
@@ -517,7 +528,48 @@ export class JsonPazaakAccountRepository {
         sessions: {},
       };
       await this.persist(this.state);
+      return this.state;
     }
+
+    try {
+      const parsed = JSON.parse(raw) as Partial<PazaakAccountFileShape>;
+      if (
+        parsed.version === 1
+        && parsed.accounts
+        && typeof parsed.accounts === "object"
+        && parsed.passwordCredentials
+        && typeof parsed.passwordCredentials === "object"
+        && parsed.linkedIdentities
+        && typeof parsed.linkedIdentities === "object"
+        && parsed.sessions
+        && typeof parsed.sessions === "object"
+      ) {
+        this.state = {
+          version: 1,
+          accounts: parsed.accounts,
+          passwordCredentials: parsed.passwordCredentials,
+          linkedIdentities: parsed.linkedIdentities,
+          sessions: parsed.sessions,
+        };
+        return this.state;
+      }
+    } catch {
+      // Fall through to quarantine + reset for malformed persisted state.
+    }
+
+    const quarantinePath = `${this.filePath}.corrupt.${Date.now()}`;
+    await rename(this.filePath, quarantinePath).catch(() => {
+      // Ignore quarantine failures and continue with reset state.
+    });
+
+    this.state = {
+      version: 1,
+      accounts: {},
+      passwordCredentials: {},
+      linkedIdentities: {},
+      sessions: {},
+    };
+    await this.persist(this.state);
 
     return this.state;
   }
@@ -538,7 +590,10 @@ export class JsonPazaakAccountRepository {
   }
 
   private async persist(state: PazaakAccountFileShape): Promise<void> {
-    await writeFile(this.filePath, JSON.stringify(state, null, 2), "utf8");
+    await mkdir(path.dirname(this.filePath), { recursive: true });
+    const tempPath = `${this.filePath}.${process.pid}.${Date.now()}.tmp`;
+    await writeFile(tempPath, JSON.stringify(state, null, 2), "utf8");
+    await rename(tempPath, this.filePath);
   }
 }
 
@@ -695,17 +750,50 @@ export class JsonWalletRepository {
 
     await mkdir(path.dirname(this.filePath), { recursive: true });
 
+    let raw: string;
     try {
-      const raw = await readFile(this.filePath, "utf8");
-      this.state = JSON.parse(raw) as WalletFileShape;
-    } catch {
+      raw = await readFile(this.filePath, "utf8");
+    } catch (error) {
+      const code = typeof error === "object" && error !== null && "code" in error
+        ? (error as { code?: string }).code
+        : undefined;
+
+      if (code !== "ENOENT") {
+        throw error;
+      }
+
       this.state = {
         version: 1,
         wallets: {},
       };
 
       await this.persist(this.state);
+      return this.state;
     }
+
+    try {
+      const parsed = JSON.parse(raw) as Partial<WalletFileShape>;
+      if (parsed.version === 1 && parsed.wallets && typeof parsed.wallets === "object") {
+        this.state = {
+          version: 1,
+          wallets: parsed.wallets,
+        };
+        return this.state;
+      }
+    } catch {
+      // Fall through to quarantine + reset for malformed persisted state.
+    }
+
+    const quarantinePath = `${this.filePath}.corrupt.${Date.now()}`;
+    await rename(this.filePath, quarantinePath).catch(() => {
+      // Ignore quarantine failures and continue with reset state.
+    });
+
+    this.state = {
+      version: 1,
+      wallets: {},
+    };
+    await this.persist(this.state);
 
     return this.state;
   }
@@ -743,7 +831,10 @@ export class JsonWalletRepository {
   }
 
   private async persist(state: WalletFileShape): Promise<void> {
-    await writeFile(this.filePath, JSON.stringify(state, null, 2), "utf8");
+    await mkdir(path.dirname(this.filePath), { recursive: true });
+    const tempPath = `${this.filePath}.${process.pid}.${Date.now()}.tmp`;
+    await writeFile(tempPath, JSON.stringify(state, null, 2), "utf8");
+    await rename(tempPath, this.filePath);
   }
 }
 
@@ -987,17 +1078,52 @@ export class JsonPazaakSideboardRepository {
 
     await mkdir(path.dirname(this.filePath), { recursive: true });
 
+    let raw: string;
     try {
-      const raw = await readFile(this.filePath, "utf8");
-      const parsed = JSON.parse(raw) as SavedPazaakSideboardFileShape | LegacySavedPazaakSideboardFileShape;
-      this.state = parsed.version === 2 ? parsed as SavedPazaakSideboardFileShape : migrateLegacySideboards(parsed as LegacySavedPazaakSideboardFileShape);
-    } catch {
+      raw = await readFile(this.filePath, "utf8");
+    } catch (error) {
+      const code = typeof error === "object" && error !== null && "code" in error
+        ? (error as { code?: string }).code
+        : undefined;
+
+      if (code !== "ENOENT") {
+        throw error;
+      }
+
       this.state = {
         version: 2,
         sideboards: {},
       };
+      await this.persist(this.state);
+      return this.state;
     }
 
+    try {
+      const parsed = JSON.parse(raw) as SavedPazaakSideboardFileShape | LegacySavedPazaakSideboardFileShape;
+
+      if (parsed.version === 2 && parsed.sideboards && typeof parsed.sideboards === "object") {
+        this.state = parsed;
+        return this.state;
+      }
+
+      if (parsed.version === 1) {
+        this.state = migrateLegacySideboards(parsed as LegacySavedPazaakSideboardFileShape);
+        await this.persist(this.state);
+        return this.state;
+      }
+    } catch {
+      // Fall through to quarantine + reset for malformed persisted state.
+    }
+
+    const quarantinePath = `${this.filePath}.corrupt.${Date.now()}`;
+    await rename(this.filePath, quarantinePath).catch(() => {
+      // Ignore quarantine failures and continue with reset state.
+    });
+
+    this.state = {
+      version: 2,
+      sideboards: {},
+    };
     await this.persist(this.state);
 
     return this.state;
@@ -1021,7 +1147,10 @@ export class JsonPazaakSideboardRepository {
   }
 
   private async persist(state: SavedPazaakSideboardFileShape): Promise<void> {
-    await writeFile(this.filePath, JSON.stringify(state, null, 2), "utf8");
+    await mkdir(path.dirname(this.filePath), { recursive: true });
+    const tempPath = `${this.filePath}.${process.pid}.${Date.now()}.tmp`;
+    await writeFile(tempPath, JSON.stringify(state, null, 2), "utf8");
+    await rename(tempPath, this.filePath);
   }
 }
 
@@ -1071,19 +1200,52 @@ export class JsonDesignationPresetRepository {
 
     await mkdir(path.dirname(this.filePath), { recursive: true });
 
+    let raw: string;
     try {
-      const raw = await readFile(this.filePath, "utf8");
-      this.state = JSON.parse(raw) as DesignationPresetFileShape;
-    } catch {
+      raw = await readFile(this.filePath, "utf8");
+    } catch (error) {
+      const code = typeof error === "object" && error !== null && "code" in error
+        ? (error as { code?: string }).code
+        : undefined;
+
+      if (code !== "ENOENT") {
+        throw error;
+      }
+
       this.state = { version: 1, presets: {} };
       await this.persist(this.state);
+      return this.state;
     }
+
+    try {
+      const parsed = JSON.parse(raw) as Partial<DesignationPresetFileShape>;
+      if (parsed.version === 1 && parsed.presets && typeof parsed.presets === "object") {
+        this.state = {
+          version: 1,
+          presets: parsed.presets,
+        };
+        return this.state;
+      }
+    } catch {
+      // Fall through to quarantine + reset for malformed persisted state.
+    }
+
+    const quarantinePath = `${this.filePath}.corrupt.${Date.now()}`;
+    await rename(this.filePath, quarantinePath).catch(() => {
+      // Ignore quarantine failures and continue with reset state.
+    });
+
+    this.state = { version: 1, presets: {} };
+    await this.persist(this.state);
 
     return this.state;
   }
 
   private async persist(state: DesignationPresetFileShape): Promise<void> {
-    await writeFile(this.filePath, JSON.stringify(state, null, 2), "utf8");
+    await mkdir(path.dirname(this.filePath), { recursive: true });
+    const tempPath = `${this.filePath}.${process.pid}.${Date.now()}.tmp`;
+    await writeFile(tempPath, JSON.stringify(state, null, 2), "utf8");
+    await rename(tempPath, this.filePath);
   }
 }
 
@@ -1152,19 +1314,52 @@ export class JsonPazaakMatchmakingQueueRepository {
     if (this.state) return this.state;
     await mkdir(path.dirname(this.filePath), { recursive: true });
 
+    let raw: string;
     try {
-      const raw = await readFile(this.filePath, "utf8");
-      this.state = JSON.parse(raw) as MatchmakingQueueFileShape;
-    } catch {
+      raw = await readFile(this.filePath, "utf8");
+    } catch (error) {
+      const code = typeof error === "object" && error !== null && "code" in error
+        ? (error as { code?: string }).code
+        : undefined;
+
+      if (code !== "ENOENT") {
+        throw error;
+      }
+
       this.state = { version: 1, queue: {} };
       await this.persist(this.state);
+      return this.state;
     }
+
+    try {
+      const parsed = JSON.parse(raw) as Partial<MatchmakingQueueFileShape>;
+      if (parsed.version === 1 && parsed.queue && typeof parsed.queue === "object") {
+        this.state = {
+          version: 1,
+          queue: parsed.queue,
+        };
+        return this.state;
+      }
+    } catch {
+      // Fall through to quarantine + reset for malformed persisted state.
+    }
+
+    const quarantinePath = `${this.filePath}.corrupt.${Date.now()}`;
+    await rename(this.filePath, quarantinePath).catch(() => {
+      // Ignore quarantine failures and continue with reset state.
+    });
+
+    this.state = { version: 1, queue: {} };
+    await this.persist(this.state);
 
     return this.state;
   }
 
   private async persist(state: MatchmakingQueueFileShape): Promise<void> {
-    await writeFile(this.filePath, JSON.stringify(state, null, 2), "utf8");
+    await mkdir(path.dirname(this.filePath), { recursive: true });
+    const tempPath = `${this.filePath}.${process.pid}.${Date.now()}.tmp`;
+    await writeFile(tempPath, JSON.stringify(state, null, 2), "utf8");
+    await rename(tempPath, this.filePath);
   }
 }
 
@@ -1228,6 +1423,11 @@ const normalizeTableSettings = (settings?: Partial<PazaakTableSettings> | undefi
   const maxPlayers = Math.max(2, Math.min(5, Math.trunc(settings?.maxPlayers ?? 2)));
   const maxRounds = Math.max(1, Math.min(9, Math.trunc(settings?.maxRounds ?? 3)));
   const turnTimerSeconds = Math.max(0, Math.min(300, Math.trunc(settings?.turnTimerSeconds ?? 120)));
+  const sideboardMode = settings?.sideboardMode === "player_active_custom"
+    ? "player_active_custom"
+    : settings?.sideboardMode === "host_mirror_custom"
+      ? "host_mirror_custom"
+      : "runtime_random";
 
   return {
     variant,
@@ -1236,6 +1436,7 @@ const normalizeTableSettings = (settings?: Partial<PazaakTableSettings> | undefi
     turnTimerSeconds,
     ranked: settings?.ranked ?? variant === "canonical",
     allowAiFill: settings?.allowAiFill ?? true,
+    sideboardMode,
   };
 };
 
@@ -1470,9 +1671,50 @@ export class JsonPazaakLobbyRepository {
     if (this.state) return this.state;
     await mkdir(path.dirname(this.filePath), { recursive: true });
 
+    let raw: string;
     try {
-      const raw = await readFile(this.filePath, "utf8");
-      this.state = JSON.parse(raw) as PazaakLobbyFileShape;
+      raw = await readFile(this.filePath, "utf8");
+    } catch (error) {
+      const code = typeof error === "object" && error !== null && "code" in error
+        ? (error as { code?: string }).code
+        : undefined;
+
+      if (code !== "ENOENT") {
+        throw error;
+      }
+
+      this.state = { version: 1, lobbies: {} };
+      await this.persist(this.state);
+      return this.state;
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as Partial<PazaakLobbyFileShape>;
+      if (parsed.version === 1 && parsed.lobbies && typeof parsed.lobbies === "object") {
+        this.state = {
+          version: 1,
+          lobbies: parsed.lobbies,
+        };
+      } else {
+        const quarantinePath = `${this.filePath}.corrupt.${Date.now()}`;
+        await rename(this.filePath, quarantinePath).catch(() => {
+          // Ignore quarantine failures and continue with reset state.
+        });
+        this.state = { version: 1, lobbies: {} };
+        await this.persist(this.state);
+        return this.state;
+      }
+    } catch {
+      const quarantinePath = `${this.filePath}.corrupt.${Date.now()}`;
+      await rename(this.filePath, quarantinePath).catch(() => {
+        // Ignore quarantine failures and continue with reset state.
+      });
+      this.state = { version: 1, lobbies: {} };
+      await this.persist(this.state);
+      return this.state;
+    }
+
+    try {
       for (const lobby of Object.values(this.state.lobbies)) {
         lobby.lobbyCode = lobby.lobbyCode ? normalizeLobbyCode(lobby.lobbyCode) : createLobbyCode(this.state);
         lobby.tableSettings = normalizeTableSettings(lobby.tableSettings ?? { maxPlayers: lobby.maxPlayers });
@@ -1483,8 +1725,7 @@ export class JsonPazaakLobbyRepository {
         }));
       }
     } catch {
-      this.state = { version: 1, lobbies: {} };
-      await this.persist(this.state);
+      // Ignore legacy record normalization failures.
     }
 
     return this.state;
@@ -1507,7 +1748,10 @@ export class JsonPazaakLobbyRepository {
   }
 
   private async persist(state: PazaakLobbyFileShape): Promise<void> {
-    await writeFile(this.filePath, JSON.stringify(state, null, 2), "utf8");
+    await mkdir(path.dirname(this.filePath), { recursive: true });
+    const tempPath = `${this.filePath}.${process.pid}.${Date.now()}.tmp`;
+    await writeFile(tempPath, JSON.stringify(state, null, 2), "utf8");
+    await rename(tempPath, this.filePath);
   }
 }
 

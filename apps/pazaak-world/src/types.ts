@@ -58,6 +58,7 @@ export interface SerializedMatch {
   players: [SerializedPlayerState, SerializedPlayerState];
   activePlayerIndex: number;
   setNumber: number;
+  setsToWin?: number;
   mainDeck: number[];
   phase: "turn" | "after-draw" | "after-card" | "completed";
   pendingDraw: number | null;
@@ -200,6 +201,8 @@ export interface PazaakLobbyPlayerRecord {
 
 export type PazaakTableVariant = "canonical" | "multi_seat";
 
+export type PazaakLobbySideboardMode = "runtime_random" | "player_active_custom" | "host_mirror_custom";
+
 export interface PazaakTableSettings {
   variant: PazaakTableVariant;
   maxPlayers: number;
@@ -207,6 +210,7 @@ export interface PazaakTableSettings {
   turnTimerSeconds: number;
   ranked: boolean;
   allowAiFill: boolean;
+  sideboardMode: PazaakLobbySideboardMode;
 }
 
 export interface PazaakLobbyRecord {

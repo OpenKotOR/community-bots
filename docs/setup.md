@@ -123,7 +123,7 @@ corepack pnpm discord:install-links
 ### Trask
 - `/ask query:mdlops` → should return a list of matching sources from the catalog.
 - `/sources` → should list all approved source entries.
-- `/queue-reindex` → should confirm stub mode and queue count.
+- `/queue-reindex` → should confirm queued source refresh count.
 
 ### HK
 - `/designations list` → should display the curated role catalog by category.
@@ -336,7 +336,7 @@ local-only and not committed to the repository.
 
 ## 8. Running the Ingest Worker CLI
 
-The ingest worker is a standalone CLI stub, not a long-running service yet:
+The ingest worker is a standalone CLI that supports both queued and immediate indexing paths:
 
 ```bash
 # List all registered sources
@@ -344,6 +344,15 @@ node --import tsx/esm apps/ingest-worker/src/main.ts list-sources
 
 # Queue a refresh for one source
 node --import tsx/esm apps/ingest-worker/src/main.ts queue-reindex deadlystream
+
+# Process currently queued refresh jobs once
+node --import tsx/esm apps/ingest-worker/src/main.ts drain-queue
+
+# Run a continuous queue worker (polling every 15s by default)
+node --import tsx/esm apps/ingest-worker/src/main.ts run-queue-worker
+
+# Run an immediate refresh without queueing
+node --import tsx/esm apps/ingest-worker/src/main.ts reindex-now deadlystream
 
 # Show loaded config
 node --import tsx/esm apps/ingest-worker/src/main.ts show-config

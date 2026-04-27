@@ -52,6 +52,8 @@ import {
   normalizeSideDeckToken,
   WIN_SCORE,
   SIDE_DECK_SIZE,
+  assertCustomSideDeckTokenLimits,
+  getCustomSideDeckLimitErrors,
   type AdvisorAlternative,
   type AdvisorDifficulty,
   type AdvisorSnapshot,
@@ -119,11 +121,11 @@ const sideboardTokenDescriptions: Readonly<Record<string, string>> = {
   "*4": "Flip plus/minus 4",
   "*5": "Flip plus/minus 5",
   "*6": "Flip plus/minus 6",
-  "$$": "Copy previous",
-  TT: "Tiebreaker",
-  F1: "Flip 2&4",
-  F2: "Flip 3&6",
-  VV: "Value change",
+  "$$": "D: copy the previous resolved board card",
+  TT: "±1T: choose +1 or -1 and win exact ties this set",
+  F1: "2&4: flip all visible 2s and 4s",
+  F2: "3&6: flip all visible 3s and 6s",
+  VV: "1±2: choose +1, +2, -1, or -2",
 };
 
 const formatSideboardTokens = (tokens: readonly string[]): string => tokens.join(" ");
@@ -194,7 +196,7 @@ const parseCustomSideboardTokens = (input: string): string[] => {
     throw new Error(`Custom sideboards must contain exactly ${SIDE_DECK_SIZE} tokens.`);
   }
 
-  return rawTokens.map((token) => {
+  const tokens = rawTokens.map((token) => {
     const normalized = normalizeSideDeckToken(token);
 
     if (!normalized) {
@@ -203,6 +205,9 @@ const parseCustomSideboardTokens = (input: string): string[] => {
 
     return normalized;
   });
+
+  assertCustomSideDeckTokenLimits(tokens);
+  return tokens;
 };
 
 const buildDeckSelectionDescription = (
@@ -533,14 +538,15 @@ const pazaakAdminCommand = new SlashCommandBuilder()
 const buildRulesEmbed = () => {
   return buildInfoEmbed({
     title: `${personaProfiles.pazaak.displayName} Explains The Rules`,
-    description: "Look, these are the KOTOR-flavored house rules on this table. Try not to laugh if I lose again.",
+    description: "Look, these are the KOTOR-flavored table rules. Try not to laugh if I lose again.",
     fields: [
       {
         name: "Match Flow",
         value: asBulletList([
           `Each match is first to ${SETS_TO_WIN} sets.`,
-          `Each set aims to get closer to ${WIN_SCORE} without going over.`,
-          "A tie starts another set with fresh side cards — unless one player has a Tiebreaker card.",
+          `Each set aims to get closer to ${WIN_SCORE} without ending the turn over ${WIN_SCORE}.`,
+          "A tie starts another set unless one player has a Tiebreaker card.",
+          "Your four-card side hand lasts for the whole match. Spent side cards stay spent across later sets and ties.",
           "The loser of a set goes first in the next set. On a tie, the coin-flip opener resumes.",
         ]),
         inline: false,
@@ -550,8 +556,8 @@ const buildRulesEmbed = () => {
         value: asBulletList([
           "The main deck contains four copies of cards 1 through 10.",
           `Each player gets a ${SIDE_DECK_SIZE}-card canonical TSL sideboard at match start.`,
-          `${HAND_SIZE} side cards are drawn from the sideboard each set.`,
-          "Side cards include fixed (+/−), flip (±), the VV value-change card (±1/±2), the D copy card, sign-selectable Tiebreaker (±1T), and board-flip specials (Flip 2&4, Flip 3&6).",
+          `${HAND_SIZE} side cards are drawn from the sideboard once when the match begins.`,
+          "Side cards include fixed (+/−), flip (±), 1±2/VV, D/$$, ±1T/TT, 2&4/F1, and 3&6/F2.",
         ]),
         inline: false,
       },
@@ -559,8 +565,8 @@ const buildRulesEmbed = () => {
         name: "Turns",
         value: asBulletList([
           "On your turn, you must draw from the main deck first.",
-          `If the draw puts you over ${WIN_SCORE}, you bust and lose the set immediately.`,
-          "If you don't bust, you may play one side card, then stand or end the turn.",
+          `If the draw puts you over ${WIN_SCORE}, you may play one side card to recover before ending the turn.`,
+          "After the draw window, stand to hold your total or end the turn to pass priority.",
           `Filling all ${MAX_BOARD_SIZE} board slots without busting wins the set automatically.`,
         ]),
         inline: false,
@@ -585,7 +591,7 @@ const buildDeckCatalogEmbed = () => {
       },
       {
         name: "Token Legend",
-        value: "+/- = fixed value | * = flip sign | $$ = copy previous | TT = +/-1T | F1 = Flip 2&4 | F2 = Flip 3&6 | VV = +/-1 or +/-2",
+        value: "+/- = fixed value | * = flip sign | $$ or D = copy previous | TT = +/-1T | F1 = 2&4 | F2 = 3&6 | VV = 1±2",
         inline: false,
       },
     ],
@@ -950,7 +956,9 @@ const buildSideboardValidationSummary = (tokens: readonly string[]): string => {
   }, { fixed: 0, flip: 0, special: 0 });
 
   const uniqueCount = new Set(tokens).size;
-  return `All ${tokens.length} slots valid | Fixed: ${categoryCounts.fixed} | Flip: ${categoryCounts.flip} | Special: ${categoryCounts.special} | Unique tokens: ${uniqueCount}`;
+  const limitErrors = getCustomSideDeckLimitErrors(tokens);
+  const status = limitErrors.length > 0 ? `Needs edits: ${limitErrors.join(" ")}` : `All ${tokens.length} slots valid`;
+  return `${status} | Fixed: ${categoryCounts.fixed} | Flip: ${categoryCounts.flip} | Special: ${categoryCounts.special} | Unique tokens: ${uniqueCount}`;
 };
 
 const buildSideboardEditorEmbed = (tokens: readonly string[], page: number, sideboardName: string, selectedSlot?: number) => {
@@ -2267,7 +2275,7 @@ const handleSlashCommand = async (interaction: ChatInputCommandInteraction): Pro
         challengerId: interaction.user.id,
         challengerName: interaction.user.displayName,
         ...((useCustom || requestedCustomName !== undefined) && challengerSideboard
-          ? { challengerCustomDeck: { tokens: challengerSideboard.tokens, label: buildCustomSideboardLabel(challengerSideboard.name) } }
+          ? { challengerCustomDeck: { tokens: challengerSideboard.tokens, label: buildCustomSideboardLabel(challengerSideboard.name), enforceTokenLimits: true } }
           : {}),
         ...(!(useCustom || requestedCustomName !== undefined) && challengerDeckId !== undefined ? { challengerDeckId } : {}),
         challengedId: opponent.id,
@@ -2824,6 +2832,7 @@ const handleStringSelectInteraction = async (interaction: StringSelectMenuIntera
     const savedSideboard = await sideboardRepository.getSideboard(interaction.user.id);
     const tokens = getEffectiveSideboardTokens(savedSideboard?.tokens);
     tokens[slotIndex] = normalizedToken;
+    assertCustomSideDeckTokenLimits(tokens);
     const updatedSideboard = await sideboardRepository.saveSideboard(interaction.user.id, interaction.user.displayName, tokens);
 
     await interaction.update({
@@ -2874,7 +2883,7 @@ const handleStringSelectInteraction = async (interaction: StringSelectMenuIntera
   }
 
   const challengedDeckChoice: SideDeckChoice | undefined = customDeckMatch
-    ? { tokens: savedSideboard!.tokens, label: buildCustomSideboardLabel(savedSideboard!.name) }
+    ? { tokens: savedSideboard!.tokens, label: buildCustomSideboardLabel(savedSideboard!.name), enforceTokenLimits: true }
     : challengedDeckId;
 
   const match = await startAcceptedMatch(challenge, interaction.user.id, challengedDeckChoice);

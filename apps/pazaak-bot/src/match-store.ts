@@ -5,7 +5,7 @@
  * coordinator can call it without a circular import.
  */
 
-import { mkdir, readFile, writeFile, readdir, unlink } from "node:fs/promises";
+import { mkdir, readFile, writeFile, readdir, rename, unlink } from "node:fs/promises";
 import path from "node:path";
 
 import type { MatchPersistence, MatchPlayerState, PazaakMatch, SerializedMatch } from "@openkotor/pazaak-engine";
@@ -22,10 +22,21 @@ export class MatchStore implements MatchPersistence {
     return path.join(this.dataDir, "matches");
   }
 
+  private async saveAtomicJson(filePath: string, payload: unknown): Promise<void> {
+    const tempPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+    await writeFile(tempPath, JSON.stringify(payload, null, 2), "utf8");
+    await rename(tempPath, filePath);
+  }
+
+  private async quarantineCorruptFile(filePath: string): Promise<void> {
+    const corruptPath = `${filePath}.corrupt.${Date.now()}`;
+    await rename(filePath, corruptPath);
+  }
+
   public async save(match: PazaakMatch): Promise<void> {
     await mkdir(this.matchesDir(), { recursive: true });
     const filePath = path.join(this.matchesDir(), `${match.id}.json`);
-    await writeFile(filePath, JSON.stringify(serializeMatch(match), null, 2), "utf8");
+    await this.saveAtomicJson(filePath, serializeMatch(match));
   }
 
   public async loadActive(maxAgeMs: number): Promise<PazaakMatch[]> {
@@ -37,13 +48,20 @@ export class MatchStore implements MatchPersistence {
 
     try {
       files = await readdir(dir);
-    } catch {
-      return [];
+    } catch (error) {
+      const code = typeof error === "object" && error !== null && "code" in error
+        ? (error as { code?: string }).code
+        : undefined;
+      if (code === "ENOENT") {
+        return [];
+      }
+      throw error;
     }
 
     for (const file of files.filter((f) => f.endsWith(".json"))) {
+      const filePath = path.join(dir, file);
       try {
-        const raw = await readFile(path.join(dir, file), "utf8");
+        const raw = await readFile(filePath, "utf8");
         const data = JSON.parse(raw) as SerializedMatch;
 
         // Skip completed or expired matches (they shouldn't be resumed).
@@ -52,7 +70,10 @@ export class MatchStore implements MatchPersistence {
 
         results.push(deserializeMatch(data));
       } catch {
-        // Skip malformed or partially-written files.
+        // Quarantine malformed or partially-written files to avoid repeated parse failures.
+        await this.quarantineCorruptFile(filePath).catch(() => {
+          // Ignore quarantine failures; best effort only.
+        });
       }
     }
 
@@ -69,21 +90,30 @@ export class MatchStore implements MatchPersistence {
 
     try {
       files = await readdir(dir);
-    } catch {
-      return 0;
+    } catch (error) {
+      const code = typeof error === "object" && error !== null && "code" in error
+        ? (error as { code?: string }).code
+        : undefined;
+      if (code === "ENOENT") {
+        return 0;
+      }
+      throw error;
     }
 
     for (const file of files.filter((f) => f.endsWith(".json"))) {
+      const filePath = path.join(dir, file);
       try {
-        const raw = await readFile(path.join(dir, file), "utf8");
+        const raw = await readFile(filePath, "utf8");
         const data = JSON.parse(raw) as SerializedMatch;
 
         if (data.phase === "completed" || data.createdAt < cutoff) {
-          await unlink(path.join(dir, file));
+          await unlink(filePath);
           removed += 1;
         }
       } catch {
-        // Ignore
+        await this.quarantineCorruptFile(filePath).catch(() => {
+          // Ignore quarantine failures; best effort only.
+        });
       }
     }
 

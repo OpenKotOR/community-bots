@@ -69,8 +69,8 @@ Queue a source refresh request. Requires **Manage Guild** permission.
 | `source` | no | Source ID to refresh, or leave blank for all sources |
 
 **Behavior:**
-- Currently operates in stub mode — logs the request and records the queued source IDs.
-- In the next phase this will dispatch a real crawl/embed job to the ingest worker.
+- Writes source IDs into the ingest-worker file queue.
+- The ingest worker can then process queued jobs with `drain-queue` (single pass) or `run-queue-worker` (continuous polling).
 
 ---
 
@@ -109,8 +109,8 @@ perform blanket server-history reads.
 - Trask depends on a reachable `ai-researchwizard` backend for `/ask`.
 - The vendored backend defaults to a report-oriented workflow, so prompt and formatting controls
   still need refinement to keep replies concise under Discord limits.
-- The ingest worker remains separate from the new q&a path. `/queue-reindex` is operational rather
-  than part of the normal assistant experience.
+- Ingest queue processing is still a separate operator workflow. `/queue-reindex` enqueues work,
+  while indexing execution is managed by ingest-worker CLI commands.
 - `TRASK_APPROVED_CHANNEL_IDS` only restricts where `/ask` may be used. Trask's current runtime is
   slash-command-only and does not require privileged message intents.
 

@@ -80,18 +80,26 @@ Next phase: streak bonuses on daily claim, admin credit adjustment command.
 
 Purpose: shared indexing and source refresh orchestration.
 
-CLI commands: `list-sources`, `queue-reindex [sourceIds...]`, `show-indexed`, `show-config`.
+CLI commands: `list-sources`, `queue-reindex [sourceIds...]`, `reindex-now [sourceIds...]`,
+`drain-queue`, `run-queue-worker [pollMs]`, `show-indexed`, `show-config`.
 
-Current implementation: `queue-reindex` fetches each source's `homeUrl` via `node:fetch`,
-strips HTML, chunks text into ~500-word pieces, persists each chunk via `FileChunkStore`,
-and writes a `_index.json` manifest per source recording chunk count and fetch timestamp.
-`show-indexed` reads all manifests and prints a table of what has been indexed.
-A 1-second delay is applied between sources to avoid hammering external servers.
+Current implementation:
+- `queue-reindex` writes source IDs into a persisted queue file (`reindex-queue.json`) under
+	`INGEST_STATE_DIR`.
+- `drain-queue` runs one queue-processing pass: loads queued IDs, indexes known sources, and
+	re-queues failed source IDs for retry.
+- `run-queue-worker` executes the same drain logic continuously on a configurable poll interval.
+- `reindex-now` performs immediate indexing without queueing.
+- Source indexing fetches each source's `homeUrl` (Firecrawl markdown when configured,
+	raw HTTP + HTML strip fallback otherwise), chunks text into ~500-word pieces, persists each
+	chunk via `FileChunkStore`, and writes a `_index.json` manifest per source recording chunk
+	count and fetch timestamp.
+- A 1-second delay is applied between sources to avoid hammering external servers.
 
 Config: reads `INGEST_STATE_DIR` and shared AI config.
 
-Next phase: Firecrawl-backed scrape for JavaScript-rendered pages, GitHub README/wiki sync,
-Discord channel backfill, OpenAI embeddings, and chunk storage in pgvector.
+Next phase: deeper multi-page crawl policies (per-source depth/path controls), GitHub README/wiki
+sync, Discord channel backfill, OpenAI embeddings, and chunk storage in pgvector.
 
 ---
 

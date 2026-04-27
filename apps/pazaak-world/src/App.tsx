@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { MAIN_MENU_PRESET, type MainMenuIconKey } from "@openkotor/pazaak-engine/menu-preset";
-import type { AdvisorDifficulty, LeaderboardEntry, MatchmakingQueueRecord, PazaakLobbyRecord, PazaakMatchHistoryRecord, PazaakTableVariant, PazaakUserSettings, SerializedMatch, WalletRecord } from "./types.ts";
+import type { AdvisorDifficulty, LeaderboardEntry, MatchmakingQueueRecord, PazaakLobbyRecord, PazaakLobbySideboardMode, PazaakMatchHistoryRecord, PazaakTableVariant, PazaakUserSettings, SerializedMatch, WalletRecord } from "./types.ts";
 import { initDiscordAuth, closeActivity, isDiscordActivity } from "./discord.ts";
 import { getDefaultLocalOpponentForDifficulty, localOpponents, type LocalOpponentProfile } from "./localOpponents.ts";
 import {
@@ -49,6 +49,7 @@ const STANDALONE_AUTH_TOKEN_KEY = "pazaak-world-standalone-auth-token-v1";
 const USER_SETTINGS_STORAGE_KEY = "pazaak-user-settings-v1";
 const AUTH_MODE_STORAGE_KEY = "pazaak-world-auth-mode-v1";
 const ONBOARDING_STORAGE_KEY = "pazaak-world-onboarding-v1";
+const LOCAL_GUEST_ID_KEY = "pazaak-world-local-guest-id-v1";
 
 type OnboardingBoardStyle = "classic" | "wood" | "ocean" | "rose";
 
@@ -130,6 +131,21 @@ const clearStoredStandaloneAuthToken = (): void => {
     window.localStorage.removeItem(STANDALONE_AUTH_TOKEN_KEY);
   } catch {
     // Ignore storage failures (private mode/storage disabled).
+  }
+};
+
+const getOrCreateLocalGuestId = (): string => {
+  try {
+    const existing = window.localStorage.getItem(LOCAL_GUEST_ID_KEY)?.trim();
+    if (existing) {
+      return existing;
+    }
+
+    const created = `guest-${Math.random().toString(36).slice(2, 10)}`;
+    window.localStorage.setItem(LOCAL_GUEST_ID_KEY, created);
+    return created;
+  } catch {
+    return `guest-${Math.random().toString(36).slice(2, 10)}`;
   }
 };
 
@@ -217,6 +233,15 @@ type ActivitySession = {
   userId: string;
   username: string;
   accessToken: string;
+};
+
+const createLocalGuestSession = (): ActivitySession => {
+  const guestId = getOrCreateLocalGuestId();
+  return {
+    userId: guestId,
+    username: "Guest Pilot",
+    accessToken: `local-guest-token:${guestId}`,
+  };
 };
 
 // ---------------------------------------------------------------------------
@@ -568,9 +593,24 @@ export default function App() {
         message={state.message}
         isOnline={isOnline}
         socketState={matchSocketState}
+        onPlayOffline={() => {
+          const guest = createLocalGuestSession();
+          setStoredStandaloneAuthToken(guest.accessToken);
+          setState({
+            stage: "local_game",
+            auth: guest,
+            difficulty: "professional",
+            opponentId: getDefaultLocalOpponentForDifficulty("professional").id,
+          });
+        }}
         onAuthenticated={async (session) => {
           setStoredStandaloneAuthToken(session.accessToken);
-          const match = await fetchMyMatch(session.accessToken);
+          let match: SerializedMatch | null = null;
+          try {
+            match = await fetchMyMatch(session.accessToken);
+          } catch {
+            match = null;
+          }
           routePostAuth(session, match);
         }}
       />
@@ -1309,11 +1349,13 @@ function StandaloneAuthScreen({
   message,
   isOnline = true,
   socketState,
+  onPlayOffline,
   onAuthenticated,
 }: {
   message?: string;
   isOnline?: boolean;
   socketState?: MatchSocketConnectionState;
+  onPlayOffline: () => void;
   onAuthenticated: (session: ActivitySession) => Promise<void>;
 }) {
   const [mode, setMode] = useState<"login" | "register">(() => {
@@ -1561,6 +1603,32 @@ function StandaloneAuthScreen({
         username: auth.account.displayName,
         accessToken: auth.app_token,
       });
+      setShowAuth(false);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const continueAsGuest = async () => {
+    if (busy) {
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+
+    try {
+      const guestId = getOrCreateLocalGuestId();
+      await onAuthenticated({
+        userId: guestId,
+        username: "Guest Pilot",
+        accessToken: `local-guest-token:${guestId}`,
+      });
+      setShowAuth(false);
+      setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -1661,6 +1729,7 @@ function StandaloneAuthScreen({
           <p>Sign in to unlock your match hub and configure how you want to play.</p>
           <p>Account access is required before entering the main matchmaking area.</p>
           <button className="pazaak-world-button pazaak-world-button--galaxy" onClick={() => openAuth("login")}>Sign In To Continue</button>
+          <button className="pazaak-world-button pazaak-world-button--outline" onClick={onPlayOffline}>Play Offline Practice Now</button>
         </section>
 
         <section className="pazaak-world-mode-grid">
@@ -1831,6 +1900,9 @@ function StandaloneAuthScreen({
                 <button type="submit" className="btn btn--primary auth-form__submit" disabled={busy || !canSubmit}>
                   {busy ? "Working..." : mode === "login" ? "Sign In" : "Create Account"}
                 </button>
+                <button type="button" className="btn btn--ghost auth-form__submit" onClick={() => { void continueAsGuest(); }} disabled={busy}>
+                  Continue as Guest (Offline Practice)
+                </button>
               </form>
             </div>
           </div>
@@ -1872,6 +1944,7 @@ function LobbyScreen({
   const [newLobbyTurnTimer, setNewLobbyTurnTimer] = useState(120);
   const [newLobbyRanked, setNewLobbyRanked] = useState(true);
   const [newLobbyAllowAiFill, setNewLobbyAllowAiFill] = useState(true);
+  const [newLobbySideboardMode, setNewLobbySideboardMode] = useState<PazaakLobbySideboardMode>("runtime_random");
   const [preferredQueuePlayers, setPreferredQueuePlayers] = useState(2);
   const [localAiDifficulty, setLocalAiDifficulty] = useState<AdvisorDifficulty>("professional");
   const [localOpponentId, setLocalOpponentId] = useState<string>(() => getDefaultLocalOpponentForDifficulty("professional").id);
@@ -1959,6 +2032,7 @@ function LobbyScreen({
       turnTimerSeconds: newLobbyTurnTimer,
       ranked: newLobbyRanked,
       allowAiFill: newLobbyAllowAiFill,
+      sideboardMode: newLobbySideboardMode,
       tableSettings: {
         variant: newLobbyVariant,
         maxPlayers,
@@ -1966,6 +2040,7 @@ function LobbyScreen({
         turnTimerSeconds: newLobbyTurnTimer,
         ranked: newLobbyRanked,
         allowAiFill: newLobbyAllowAiFill,
+        sideboardMode: newLobbySideboardMode,
       },
     });
   });
@@ -1983,6 +2058,7 @@ function LobbyScreen({
         turnTimerSeconds: settingsDraft.turnTimerSeconds,
         ranked: true,
         allowAiFill: true,
+        sideboardMode: "runtime_random",
       },
     });
     await addLobbyAi(accessToken, lobby.id, settingsDraft.preferredAiDifficulty);
@@ -2200,9 +2276,9 @@ function LobbyScreen({
               <select
                 value={String(newLobbyMaxRounds)}
                 onChange={(event) => setNewLobbyMaxRounds(Number(event.target.value) || 3)}
-                aria-label="Max rounds"
+                aria-label="Sets to win"
               >
-                {[1, 3, 5, 7, 9].map((value) => <option key={value} value={value}>{value} rounds</option>)}
+                {[1, 3, 5, 7, 9].map((value) => <option key={value} value={value}>{value} sets to win</option>)}
               </select>
               <select
                 value={String(newLobbyTurnTimer)}
@@ -2219,6 +2295,22 @@ function LobbyScreen({
                 <input type="checkbox" checked={newLobbyAllowAiFill} onChange={(event) => setNewLobbyAllowAiFill(event.target.checked)} />
                 AI Fill
               </label>
+              <select
+                value={newLobbySideboardMode}
+                onChange={(event) => {
+                  const nextMode = event.target.value === "player_active_custom"
+                    ? "player_active_custom"
+                    : event.target.value === "host_mirror_custom"
+                      ? "host_mirror_custom"
+                      : "runtime_random";
+                  setNewLobbySideboardMode(nextMode);
+                }}
+                aria-label="Sideboard mode"
+              >
+                <option value="runtime_random">Sideboards: Runtime random</option>
+                <option value="player_active_custom">Sideboards: Each player active custom</option>
+                <option value="host_mirror_custom">Sideboards: Host mirrored custom</option>
+              </select>
               <button className="btn btn--primary btn--sm" onClick={handleCreateLobby} disabled={!canUseLobbyControls}>Create</button>
             </div>
           </div>
@@ -2278,6 +2370,11 @@ function LobbyScreen({
                     <span>
                       {" · "}{lobby.tableSettings.ranked ? "Ranked" : "Casual"}
                       {" · "}{lobby.tableSettings.allowAiFill ? "AI fill on" : "AI fill off"}
+                      {" · "}{lobby.tableSettings.sideboardMode === "player_active_custom"
+                        ? "Active custom sideboards"
+                        : lobby.tableSettings.sideboardMode === "host_mirror_custom"
+                          ? "Host mirrored custom"
+                          : "Runtime random sideboards"}
                     </span>
                     <div className="lobby-seat-grid">
                       {seatSlots.map((seat, index) => {

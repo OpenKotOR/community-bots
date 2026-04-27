@@ -56,6 +56,22 @@ const matchApprovedSource = (
   });
 };
 
+const sourceMentionedInReport = (report: string, source: SourceDescriptor): boolean => {
+  const normalizedReport = report.toLowerCase();
+  const normalizedSourceName = source.name.toLowerCase().trim();
+
+  if (normalizedSourceName.length >= 4 && normalizedReport.includes(normalizedSourceName)) {
+    return true;
+  }
+
+  try {
+    const hostname = new URL(source.homeUrl).hostname.replace(/^www\./, "").toLowerCase();
+    return hostname.length > 0 && normalizedReport.includes(hostname);
+  } catch {
+    return false;
+  }
+};
+
 const collectRelevantSources = (
   report: string,
   approvedSources: readonly SourceDescriptor[],
@@ -79,7 +95,13 @@ const collectRelevantSources = (
     }
   }
 
-  return matched.length > 0 ? matched : approvedSources;
+  for (const source of approvedSources) {
+    if (sourceMentionedInReport(report, source) && !matched.some((entry) => entry.id === source.id)) {
+      matched.push(source);
+    }
+  }
+
+  return matched;
 };
 
 const normalizeReport = (value: string): string => {

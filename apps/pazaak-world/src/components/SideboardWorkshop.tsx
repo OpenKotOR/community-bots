@@ -9,6 +9,9 @@ const SUPPORTED_TOKENS = [
   "*1", "*2", "*3", "*4", "*5", "*6",
   "$$", "TT", "F1", "F2", "VV",
 ];
+const SPECIAL_TOKENS = new Set(["$$", "TT", "F1", "F2", "VV"]);
+const STANDARD_TOKEN_LIMIT = 4;
+const SPECIAL_TOKEN_LIMIT = 1;
 const TOKEN_DESCRIPTIONS: Record<string, string> = {
   "+1": "Fixed plus 1",
   "+2": "Fixed plus 2",
@@ -28,11 +31,11 @@ const TOKEN_DESCRIPTIONS: Record<string, string> = {
   "*4": "Flip plus/minus 4",
   "*5": "Flip plus/minus 5",
   "*6": "Flip plus/minus 6",
-  "$$": "Copy previous",
-  "TT": "Tiebreaker",
-  "F1": "Flip 2 and 4",
-  "F2": "Flip 3 and 6",
-  "VV": "Value change",
+  "$$": "D: copy previous card",
+  "TT": "±1T: win exact ties",
+  "F1": "2&4: flip all 2s and 4s",
+  "F2": "3&6: flip all 3s and 6s",
+  "VV": "1±2: choose ±1 or ±2",
 };
 
 interface SideboardWorkshopProps {
@@ -71,6 +74,8 @@ export function SideboardWorkshop({ accessToken, username, onBack }: SideboardWo
   const selectedBoardVisible = selectedSideboard !== null
     ? filteredSideboards.some((sideboard) => sideboard.name === selectedSideboard.name)
     : false;
+  const validation = buildValidationSummary(draftTokens);
+  const hasValidationErrors = validation.errors.length > 0;
 
   const syncDraft = useCallback((nextCollection: SavedSideboardCollectionRecord, nextSelectedName: string | null) => {
     setSelectedName(nextSelectedName);
@@ -171,6 +176,11 @@ export function SideboardWorkshop({ accessToken, username, onBack }: SideboardWo
       return;
     }
 
+    if (hasValidationErrors) {
+      setError(validation.errors.join(" "));
+      return;
+    }
+
     await persistBoard(targetName, draftTokens, makeActive, null);
     setNotice(makeActive ? `Saved and activated ${targetName}.` : `Saved ${targetName}.`);
   };
@@ -192,6 +202,11 @@ export function SideboardWorkshop({ accessToken, username, onBack }: SideboardWo
 
     if (hasNameConflict(normalizedDraftName, selectedSideboard.name)) {
       setError(`A saved sideboard named ${normalizedDraftName} already exists.`);
+      return;
+    }
+
+    if (hasValidationErrors) {
+      setError(validation.errors.join(" "));
       return;
     }
 
@@ -341,7 +356,7 @@ export function SideboardWorkshop({ accessToken, username, onBack }: SideboardWo
     const handleKey = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
         event.preventDefault();
-        if (!saving && contentDirty) {
+        if (!saving && contentDirty && !hasValidationErrors) {
           void handleSave(false);
         }
       }
@@ -349,9 +364,7 @@ export function SideboardWorkshop({ accessToken, username, onBack }: SideboardWo
 
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [contentDirty, saving]);
-
-  const validation = buildValidationSummary(draftTokens);
+  }, [contentDirty, hasValidationErrors, saving]);
 
   return (
     <div className="screen screen--workshop">
@@ -449,10 +462,10 @@ export function SideboardWorkshop({ accessToken, username, onBack }: SideboardWo
                 </label>
 
                 <div className="workshop-actions">
-                  <button className="btn btn--secondary" onClick={() => void handleRename()} disabled={saving || !renameDirty}>Rename</button>
+                  <button className="btn btn--secondary" onClick={() => void handleRename()} disabled={saving || !renameDirty || hasValidationErrors}>Rename</button>
                   <button className="btn btn--secondary" onClick={() => void handleActivate()} disabled={saving || !selectedSideboard || selectedSideboard.isActive}>Set Active</button>
-                  <button className="btn btn--secondary" onClick={() => void handleSave(false)} disabled={saving || !contentDirty}>Save</button>
-                  <button className="btn btn--primary" onClick={() => void handleSave(true)} disabled={saving || !contentDirty}>Save and Activate</button>
+                  <button className="btn btn--secondary" onClick={() => void handleSave(false)} disabled={saving || !contentDirty || hasValidationErrors}>Save</button>
+                  <button className="btn btn--primary" onClick={() => void handleSave(true)} disabled={saving || !contentDirty || hasValidationErrors}>Save and Activate</button>
                   <button className="btn btn--danger" onClick={() => void handleDelete()} disabled={saving || !selectedSideboard}>Delete</button>
                 </div>
               </div>
@@ -461,6 +474,9 @@ export function SideboardWorkshop({ accessToken, username, onBack }: SideboardWo
                 <div>
                   <strong>Validation</strong>
                   <p>{validation.summary}</p>
+                  {validation.errors.length > 0 && (
+                    <p>{validation.errors.join(" ")}</p>
+                  )}
                 </div>
                 <div className="workshop-validation__chips">
                   <span>{validation.fixed} fixed</span>
@@ -536,7 +552,10 @@ function normalizeBoardName(name: string): string {
 }
 
 function buildValidationSummary(tokens: string[]) {
+  const tokenCounts = new Map<string, number>();
   const counts = tokens.reduce((state, token) => {
+    tokenCounts.set(token, (tokenCounts.get(token) ?? 0) + 1);
+
     if (/^[+-][1-6]$/u.test(token)) {
       state.fixed += 1;
     } else if (/^[*][1-6]$/u.test(token)) {
@@ -548,9 +567,20 @@ function buildValidationSummary(tokens: string[]) {
     return state;
   }, { fixed: 0, flip: 0, special: 0 });
 
+  const errors = [...tokenCounts.entries()]
+    .filter(([token, count]) => count > getTokenLimit(token))
+    .map(([token, count]) => `${token} appears ${count} times; use at most ${getTokenLimit(token)} in multiplayer custom boards.`);
+
   return {
     ...counts,
+    errors,
     unique: new Set(tokens).size,
-    summary: `All ${tokens.length} slots are valid for the bot's custom-sideboard rules.`,
+    summary: errors.length === 0
+      ? `All ${tokens.length} slots are valid: regular cards allow up to ${STANDARD_TOKEN_LIMIT} copies, gold specials allow ${SPECIAL_TOKEN_LIMIT}.`
+      : "This board needs balance edits before it can be saved.",
   };
+}
+
+function getTokenLimit(token: string): number {
+  return SPECIAL_TOKENS.has(token) ? SPECIAL_TOKEN_LIMIT : STANDARD_TOKEN_LIMIT;
 }

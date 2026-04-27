@@ -16,8 +16,8 @@
 
 import http from "node:http";
 import { randomUUID } from "node:crypto";
-import type { AiDifficulty, PazaakCoordinator, PazaakMatch } from "@openkotor/pazaak-engine";
-import { MAIN_MENU_PRESET, SIDE_DECK_SIZE, normalizeSideDeckToken, pazaakOpponents, serializeMatch } from "@openkotor/pazaak-engine";
+import type { AiDifficulty, PazaakCoordinator, PazaakMatch, SideDeckChoice } from "@openkotor/pazaak-engine";
+import { MAIN_MENU_PRESET, SIDE_DECK_SIZE, assertCustomSideDeckTokenLimits, normalizeSideDeckToken, pazaakOpponents, serializeMatch } from "@openkotor/pazaak-engine";
 import { hashPazaakPassword, verifyPazaakPassword } from "@openkotor/persistence";
 import type {
   JsonPazaakAccountRepository,
@@ -31,6 +31,7 @@ import type {
   PazaakAccountSessionRecord,
   PazaakLinkedIdentityRecord,
   PazaakTableSettings,
+  PazaakLobbySideboardMode,
   PazaakThemePreference,
 } from "@openkotor/persistence";
 import express, { type Request, type Response, type NextFunction } from "express";
@@ -441,7 +442,7 @@ export function createApiServer(
       throw Object.assign(new Error(`Body must include exactly ${SIDE_DECK_SIZE} sideboard tokens.`), { status: 422 });
     }
 
-    return value.map((token, index) => {
+    const tokens = value.map((token, index) => {
       if (typeof token !== "string") {
         throw Object.assign(new Error(`Token ${index + 1} must be a string.`), { status: 422 });
       }
@@ -454,6 +455,14 @@ export function createApiServer(
 
       return normalized;
     });
+
+    try {
+      assertCustomSideDeckTokenLimits(tokens);
+    } catch (err) {
+      throw Object.assign(err instanceof Error ? err : new Error(String(err)), { status: 422 });
+    }
+
+    return tokens;
   };
 
   const parseAiDifficulty = (value: unknown): AiDifficulty => {
@@ -462,6 +471,62 @@ export function createApiServer(
     }
 
     throw Object.assign(new Error("AI difficulty must be easy, hard, or professional."), { status: 422 });
+  };
+
+  const parseLobbySideboardMode = (value: unknown): PazaakLobbySideboardMode => {
+    if (value === "player_active_custom" || value === "host_mirror_custom") {
+      return value;
+    }
+    return "runtime_random";
+  };
+
+  const createSavedSideboardDeckChoice = (tokens: readonly string[], label: string): SideDeckChoice => ({
+    tokens: [...tokens],
+    label,
+    enforceTokenLimits: true,
+  });
+
+  const resolveLobbyDeckChoices = async (
+    lobby: PazaakLobbyRecord,
+    challenger: PazaakLobbyRecord["players"][number],
+    opponent: PazaakLobbyRecord["players"][number],
+  ): Promise<{ challengerDeck: SideDeckChoice | undefined; opponentDeck: SideDeckChoice | undefined }> => {
+    const mode = lobby.tableSettings.sideboardMode;
+
+    if (mode === "runtime_random") {
+      return { challengerDeck: undefined, opponentDeck: undefined };
+    }
+
+    if (mode === "host_mirror_custom") {
+      const hostSideboard = await opts.sideboardRepository.getSideboard(lobby.hostUserId);
+      if (!hostSideboard) {
+        throw Object.assign(new Error("Host must set an active custom sideboard before starting host-mirrored custom mode."), { status: 409 });
+      }
+
+      const label = `Host mirror: ${hostSideboard.name}`;
+      return {
+        challengerDeck: createSavedSideboardDeckChoice(hostSideboard.tokens, label),
+        opponentDeck: createSavedSideboardDeckChoice(hostSideboard.tokens, label),
+      };
+    }
+
+    const resolveSeatDeck = async (player: PazaakLobbyRecord["players"][number]): Promise<SideDeckChoice | undefined> => {
+      if (player.isAi) {
+        return undefined;
+      }
+
+      const sideboard = await opts.sideboardRepository.getSideboard(player.userId);
+      if (!sideboard) {
+        throw Object.assign(new Error(`${player.displayName} must set an active custom sideboard before starting this lobby mode.`), { status: 409 });
+      }
+
+      return createSavedSideboardDeckChoice(sideboard.tokens, `${player.displayName}: ${sideboard.name}`);
+    };
+
+    return {
+      challengerDeck: await resolveSeatDeck(challenger),
+      opponentDeck: await resolveSeatDeck(opponent),
+    };
   };
 
   const parseThemePreference = (value: unknown): PazaakThemePreference | undefined => {
@@ -1265,6 +1330,7 @@ export function createApiServer(
       turnTimerSeconds?: unknown;
       ranked?: unknown;
       allowAiFill?: unknown;
+      sideboardMode?: unknown;
     };
 
     const maxPlayers = Number(body.maxPlayers ?? 2);
@@ -1285,6 +1351,7 @@ export function createApiServer(
     if (typeof body.allowAiFill === "boolean") {
       tableSettings.allowAiFill = body.allowAiFill;
     }
+    tableSettings.sideboardMode = parseLobbySideboardMode(body.sideboardMode ?? body.tableSettings?.sideboardMode);
 
     const lobby = await opts.lobbyRepository.create({
       name: typeof body.name === "string" ? body.name : `${resolveDisplayName(user)}'s Table`,
@@ -1414,13 +1481,17 @@ export function createApiServer(
       }
 
       const [challenger, opponent] = readyPlayers;
+      const deckChoices = await resolveLobbyDeckChoices(lobby, challenger!, opponent!);
       const match = coordinator.createDirectMatch({
         channelId: `lobby:${lobby.id}`,
         challengerId: challenger!.userId,
         challengerName: challenger!.displayName,
+        challengerDeck: deckChoices.challengerDeck,
         opponentId: opponent!.userId,
         opponentName: opponent!.displayName,
+        opponentDeck: deckChoices.opponentDeck,
         opponentAiDifficulty: opponent!.aiDifficulty,
+        setsToWin: lobby.tableSettings.maxRounds,
       });
       const updatedLobby = await opts.lobbyRepository.markInGame(lobby.id, match.id);
       hub.broadcast(match);

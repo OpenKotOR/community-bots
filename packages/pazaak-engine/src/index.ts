@@ -156,7 +156,7 @@ export const MAIN_MENU_PRESET: MainMenuPreset = {
   brandTitle: "PazaakWorld",
   heroTitle: "PAZAAK",
   heroSubtitle: "The legendary card game from Knights of the Old Republic",
-  heroTagline: "First to win 3 rounds wins the game. Get as close to 20 as possible without going over.",
+  heroTagline: "First to win 3 sets wins the game. Recover over-20 draws before your turn ends.",
   rulesTitle: "How to Play Pazaak",
   modeCards: [
     {
@@ -228,19 +228,19 @@ export const MAIN_MENU_PRESET: MainMenuPreset = {
   rules: [
     {
       title: "Objective",
-      body: "Get as close to 20 as possible without going over. First to win 3 rounds wins the game.",
+      body: "Get as close to 20 as possible. You only bust if you are still over 20 when the turn resolves.",
       icon: "target",
       accent: "republic",
     },
     {
       title: "Cards",
-      body: "Main deck cards (1-10) are drawn automatically. Use side deck cards strategically to modify your score.",
+      body: "Main deck cards (1-10) are drawn first. Your four side cards are drawn once and last the whole match.",
       icon: "layers",
       accent: "hyperspace",
     },
     {
       title: "Strategy",
-      body: "Choose when to draw, play side cards, or stand. Special yellow cards have unique effects!",
+      body: "Save negative and gold cards for recovery, exact 20s, ninth-card wins, and tie-break pressure.",
       icon: "star",
       accent: "yellow",
     },
@@ -257,7 +257,7 @@ export interface MatchPlayerState {
   sideDeckLabel: string | null;
   /** 10-card sideboard drawn once per match. */
   sideDeck: SideCard[];
-  /** 4-card hand drawn from sideDeck each set. */
+  /** 4-card hand drawn from sideDeck once at match start. */
   hand: SideCard[];
   usedCardIds: Set<string>;
   board: BoardCard[];
@@ -271,6 +271,7 @@ export interface MatchPlayerState {
 export interface CustomSideDeckChoice {
   tokens: readonly string[];
   label?: string;
+  enforceTokenLimits?: boolean;
 }
 
 export type SideDeckChoice = number | CustomSideDeckChoice;
@@ -306,6 +307,7 @@ export interface PazaakMatch {
   players: [MatchPlayerState, MatchPlayerState];
   activePlayerIndex: number;
   setNumber: number;
+  setsToWin: number;
   mainDeck: number[];
   phase: "turn" | "after-draw" | "after-card" | "completed";
   pendingDraw: number | null;
@@ -368,6 +370,7 @@ export interface CreateDirectMatchInput {
   playerTwoName: string;
   playerTwoDeck?: SideDeckChoice | undefined;
   wager?: number | undefined;
+  setsToWin?: number | undefined;
   aiSeats?: Record<string, AiDifficulty> | undefined;
 }
 
@@ -493,6 +496,40 @@ const sideDeckTokenToTemplateId: Readonly<Record<string, string>> = {
 
 export const CUSTOM_SIDE_DECK_LABEL = "Custom Sideboard";
 export const supportedSideDeckTokens = Object.freeze(Object.keys(sideDeckTokenToTemplateId));
+export const STANDARD_SIDE_DECK_TOKEN_LIMIT = 4;
+export const SPECIAL_SIDE_DECK_TOKEN_LIMIT = 1;
+export const specialSideDeckTokens = Object.freeze(["$$", "TT", "F1", "F2", "VV"] as const);
+
+export const isSpecialSideDeckToken = (token: string): boolean => {
+  return (specialSideDeckTokens as readonly string[]).includes(token);
+};
+
+export const getCustomSideDeckTokenLimit = (token: string): number => {
+  return isSpecialSideDeckToken(token) ? SPECIAL_SIDE_DECK_TOKEN_LIMIT : STANDARD_SIDE_DECK_TOKEN_LIMIT;
+};
+
+export const getCustomSideDeckLimitErrors = (tokens: readonly string[]): string[] => {
+  const counts = new Map<string, number>();
+
+  for (const token of tokens) {
+    counts.set(token, (counts.get(token) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .filter(([token, count]) => count > getCustomSideDeckTokenLimit(token))
+    .map(([token, count]) => {
+      const limit = getCustomSideDeckTokenLimit(token);
+      return `${token} appears ${count} times; custom multiplayer sideboards allow at most ${limit}.`;
+    });
+};
+
+export const assertCustomSideDeckTokenLimits = (tokens: readonly string[]): void => {
+  const errors = getCustomSideDeckLimitErrors(tokens);
+
+  if (errors.length > 0) {
+    throw new Error(errors.join(" "));
+  }
+};
 
 export const normalizeSideDeckToken = (token: string): string | undefined => {
   const collapsed = token.trim().replace(/\s+/g, "");
@@ -529,10 +566,18 @@ export const normalizeSideDeckToken = (token: string): string | undefined => {
       return "TT";
     case "VV":
     case "±1/2":
+    case "1±2":
       return "VV";
     case "F1":
+    case "2&4":
+    case "2AND4":
+    case "2/4":
+      return "F1";
     case "F2":
-      return collapsed.toUpperCase();
+    case "3&6":
+    case "3AND6":
+    case "3/6":
+      return "F2";
     default:
       return undefined;
   }
@@ -616,12 +661,15 @@ export const createCustomSideDeck = (choice: CustomSideDeckChoice): {
     throw new Error(`Custom sideboards must contain exactly ${SIDE_DECK_SIZE} cards.`);
   }
 
+  const normalizedTokens: string[] = [];
   const sideDeck = choice.tokens.map((token, index) => {
     const normalizedToken = normalizeSideDeckToken(token);
 
     if (!normalizedToken) {
       throw new Error(`Unsupported custom Pazaak token: ${token}`);
     }
+
+    normalizedTokens.push(normalizedToken);
 
     const templateId = sideDeckTokenToTemplateId[normalizedToken];
     const template = templateId ? cardTemplateById.get(templateId) : undefined;
@@ -632,6 +680,10 @@ export const createCustomSideDeck = (choice: CustomSideDeckChoice): {
 
     return { ...template, id: `${template.id}_custom_${index}` };
   });
+
+  if (choice.enforceTokenLimits) {
+    assertCustomSideDeckTokenLimits(normalizedTokens);
+  }
 
   return {
     sideDeckId: null,
@@ -817,7 +869,7 @@ export const getAdvisorSnapshotForPlayer = (
 
   const player = getPlayerForUser(match, userId);
 
-  if (!player || player.stood || player.total > WIN_SCORE) {
+  if (!player || player.stood) {
     return null;
   }
 
@@ -833,7 +885,7 @@ export const getAdvisorSnapshotForPlayer = (
     return null;
   }
 
-  const matchContext = getAdvisorMatchContext(player, opponent);
+  const matchContext = getAdvisorMatchContext(player, opponent, getMatchSetsToWin(match));
 
   if (match.phase === "turn") {
     return {
@@ -863,6 +915,37 @@ export const getAdvisorSnapshotForPlayer = (
     category: option.category,
     score: option.score,
   }));
+
+  if (player.total > WIN_SCORE) {
+    if (match.phase === "after-draw" && bestOption) {
+      return {
+        recommendation: {
+          action: "play_side",
+          cardId: bestOption.option.cardId,
+          appliedValue: bestOption.option.appliedValue,
+          displayLabel: bestOption.option.displayLabel,
+          rationale: `${bestOption.rationale} You are currently over ${WIN_SCORE}, so this recovery has to happen before ending the turn.`,
+        },
+        difficulty,
+        category: "recovery",
+        confidence: "high",
+        bustProbability: 1,
+        alternatives,
+      };
+    }
+
+    return {
+      recommendation: {
+        action: "end_turn",
+        rationale: `No safe recovery card is available. Ending the turn confirms the bust at ${player.total}.`,
+      },
+      difficulty,
+      category: "recovery",
+      confidence: "high",
+      bustProbability: 1,
+      alternatives,
+    };
+  }
 
   if (match.phase === "after-draw" && player.board.length === MAX_BOARD_SIZE - 1 && bestOption) {
     return {
@@ -951,15 +1034,13 @@ export const recommendAiMoveForPlayer = (
   };
 };
 
-/** Reset board state for a new set. A fresh hand is always drawn from the sideboard. */
+/** Reset board state for a new set. The original four-card hand persists for the match. */
 export const resetPlayerForSet = (player: MatchPlayerState): void => {
   player.board = [];
   player.sideCardsPlayed = [];
   player.total = 0;
   player.stood = false;
   player.hasTiebreaker = false;
-  player.hand = drawHandFromSideDeck(player.sideDeck);
-  player.usedCardIds = new Set<string>();
 };
 
 interface EvaluatedAdvisorOption {
@@ -984,6 +1065,18 @@ interface AdvisorMatchContext {
   leadingMatch: boolean;
   trailingMatch: boolean;
 }
+
+const normalizeSetsToWin = (value?: number): number => {
+  if (!Number.isFinite(value)) {
+    return SETS_TO_WIN;
+  }
+
+  return Math.max(1, Math.min(9, Math.trunc(value!)));
+};
+
+const getMatchSetsToWin = (match: Pick<PazaakMatch, "setsToWin">): number => {
+  return normalizeSetsToWin(match.setsToWin);
+};
 
 const evaluateAdvisorOption = (
   player: MatchPlayerState,
@@ -1202,6 +1295,10 @@ const shouldStandForAdvisor = (
   hasRecoveryOption: boolean,
   matchContext: AdvisorMatchContext,
 ): boolean => {
+  if (player.total > WIN_SCORE) {
+    return false;
+  }
+
   if (player.total >= WIN_SCORE) {
     return true;
   }
@@ -1283,6 +1380,10 @@ const buildEndTurnRationale = (
   bestOption: EvaluatedAdvisorOption | null,
   matchContext: AdvisorMatchContext,
 ): string => {
+  if (player.total > WIN_SCORE) {
+    return `End the turn only if you accept the bust. You are at ${player.total}, so a recovery side card is the only way out.`;
+  }
+
   if (opponent.stood && player.total < opponent.total) {
     return `End the turn if you want to keep pressing later. You still trail ${opponent.displayName}'s ${opponent.total}, so standing here would probably concede the set.`;
   }
@@ -1314,9 +1415,10 @@ const calculateBustProbability = (currentScore: number): number => {
 const getAdvisorMatchContext = (
   player: MatchPlayerState,
   opponent: MatchPlayerState,
+  setsToWin = SETS_TO_WIN,
 ): AdvisorMatchContext => ({
-  playerOnMatchPoint: player.roundWins >= SETS_TO_WIN - 1,
-  opponentOnMatchPoint: opponent.roundWins >= SETS_TO_WIN - 1,
+  playerOnMatchPoint: player.roundWins >= setsToWin - 1,
+  opponentOnMatchPoint: opponent.roundWins >= setsToWin - 1,
   leadingMatch: player.roundWins > opponent.roundWins,
   trailingMatch: player.roundWins < opponent.roundWins,
 });
@@ -1370,6 +1472,7 @@ export const deserializeMatch = (data: SerializedMatch): PazaakMatch => ({
   players: [deserializePlayer(data.players[0]!), deserializePlayer(data.players[1]!)],
   spectatorMirrors: data.spectatorMirrors ?? (data.spectatorMessageIds ?? []).map((messageId) => ({ messageId, ownerId: "" })),
   initialStarterIndex: data.initialStarterIndex ?? 0,
+  setsToWin: normalizeSetsToWin(data.setsToWin),
   lastSetWinnerIndex: data.lastSetWinnerIndex ?? null,
   consecutiveTies: data.consecutiveTies ?? 0,
   disconnectedSince: data.disconnectedSince ?? {},
@@ -1483,6 +1586,14 @@ export class PazaakCoordinator {
 
     this.pendingChallenges.delete(challengeId);
 
+    if (challengedDeckOverride !== undefined) {
+      this.validateChallengeDeckChoice(
+        "challenged",
+        typeof challengedDeckOverride === "number" ? challengedDeckOverride : undefined,
+        typeof challengedDeckOverride === "object" ? challengedDeckOverride : undefined,
+      );
+    }
+
     const challengedDeckChoice = challengedDeckOverride ?? challenge.challengedCustomDeck ?? challenge.challengedDeckId;
 
     const p1 = createPlayerState(challenge.challengerId, challenge.challengerName, challenge.challengerCustomDeck ?? challenge.challengerDeckId);
@@ -1504,10 +1615,22 @@ export class PazaakCoordinator {
     opponentDeck?: SideDeckChoice | undefined;
     opponentAiDifficulty?: AiDifficulty | undefined;
     wager?: number | undefined;
+    setsToWin?: number | undefined;
   }): PazaakMatch {
     if (this.activeMatchIdsByUserId.has(input.challengerId) || this.activeMatchIdsByUserId.has(input.opponentId)) {
       throw new Error("One of the players is already in an active match.");
     }
+
+    this.validateChallengeDeckChoice(
+      "challenger",
+      typeof input.challengerDeck === "number" ? input.challengerDeck : undefined,
+      typeof input.challengerDeck === "object" ? input.challengerDeck : undefined,
+    );
+    this.validateChallengeDeckChoice(
+      "opponent",
+      typeof input.opponentDeck === "number" ? input.opponentDeck : undefined,
+      typeof input.opponentDeck === "object" ? input.opponentDeck : undefined,
+    );
 
     const p1 = createPlayerState(input.challengerId, input.challengerName, input.challengerDeck);
     const p2 = createPlayerState(input.opponentId, input.opponentName, input.opponentDeck);
@@ -1518,6 +1641,7 @@ export class PazaakCoordinator {
       wager: input.wager ?? 0,
       players: [p1, p2],
       aiSeats,
+      setsToWin: input.setsToWin,
     });
   }
 
@@ -1599,7 +1723,10 @@ export class PazaakCoordinator {
     this.resetTurnClock(match);
 
     if (player.total > WIN_SCORE) {
-      return this.resolveBust(match, playerIndex, `${player.displayName} busts with ${player.total}.`);
+      match.statusLine = `${player.displayName} draws ${drawnCard} and is over ${WIN_SCORE} at ${player.total}. Recover with one side card or end the turn to bust.`;
+      match.phase = "after-draw";
+      this.safePersist(match);
+      return match;
     }
 
     if (player.board.length >= MAX_BOARD_SIZE) {
@@ -1620,6 +1747,11 @@ export class PazaakCoordinator {
     }
 
     const player = playerAt(match, playerIndex);
+
+    if (player.total > WIN_SCORE) {
+      throw new Error("You are over 20. Recover with a side card or end the turn to bust.");
+    }
+
     player.stood = true;
     match.pendingDraw = null;
 
@@ -1829,7 +1961,9 @@ export class PazaakCoordinator {
       try {
         const updated = match.phase === "turn"
           ? this.drawTimedOutTurn(match, activePlayer.userId)
-          : this.stand(match.id, activePlayer.userId);
+          : activePlayer.total > WIN_SCORE
+            ? this.endTurn(match.id, activePlayer.userId)
+            : this.stand(match.id, activePlayer.userId);
         updated.statusLine = `${activePlayer.displayName} timed out. ${updated.statusLine}`;
         updated.updatedAt = at;
         this.safePersist(updated);
@@ -1941,7 +2075,7 @@ export class PazaakCoordinator {
     match.lastSetWinnerIndex = winnerIndex;
     match.consecutiveTies = 0;
 
-    if (winner.roundWins >= SETS_TO_WIN) {
+    if (winner.roundWins >= getMatchSetsToWin(match)) {
       return this.completeMatch(
         match,
         winnerIndex,
@@ -1970,7 +2104,7 @@ export class PazaakCoordinator {
 
     const summary = `${winner.displayName} fills the board with ${MAX_BOARD_SIZE} cards (total ${winner.total}) — automatic set win!`;
 
-    if (winner.roundWins >= SETS_TO_WIN) {
+    if (winner.roundWins >= getMatchSetsToWin(match)) {
       return this.completeMatch(
         match,
         playerIndex,
@@ -2049,7 +2183,7 @@ export class PazaakCoordinator {
     match.lastSetWinnerIndex = winnerIndex;
     match.consecutiveTies = 0;
 
-    if (winner.roundWins >= SETS_TO_WIN) {
+    if (winner.roundWins >= getMatchSetsToWin(match)) {
       return this.completeMatch(
         match,
         winnerIndex,
@@ -2119,6 +2253,7 @@ export class PazaakCoordinator {
     wager: number;
     players: [MatchPlayerState, MatchPlayerState];
     aiSeats?: Record<string, AiDifficulty> | undefined;
+    setsToWin?: number | undefined;
   }): PazaakMatch {
     const initialStarterIndex = Math.random() < 0.5 ? 0 : 1;
     const starter = input.players[initialStarterIndex]!;
@@ -2133,6 +2268,7 @@ export class PazaakCoordinator {
       players: input.players,
       activePlayerIndex: initialStarterIndex,
       setNumber: 1,
+      setsToWin: normalizeSetsToWin(input.setsToWin),
       mainDeck: buildMainDeck(),
       phase: "turn",
       pendingDraw: null,
@@ -2186,7 +2322,7 @@ export class PazaakCoordinator {
   }
 
   private validateChallengeDeckChoice(
-    label: "challenger" | "challenged",
+    label: "challenger" | "challenged" | "opponent",
     deckId?: number,
     customDeck?: CustomSideDeckChoice,
   ): void {
@@ -2199,7 +2335,7 @@ export class PazaakCoordinator {
     }
 
     if (customDeck !== undefined) {
-      createCustomSideDeck(customDeck);
+      createCustomSideDeck({ ...customDeck, enforceTokenLimits: true });
     }
   }
 

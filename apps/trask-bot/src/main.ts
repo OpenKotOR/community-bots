@@ -16,7 +16,7 @@ import { createResearchWizardClient } from "./research-wizard.js";
 
 const logger = createLogger("trask-bot");
 const config = loadTraskBotConfig();
-const searchProvider = createDefaultSearchProvider();
+const searchProvider = createDefaultSearchProvider({ stateDir: config.chunkDir });
 const researchWizard = createResearchWizardClient(config.researchWizard);
 
 const sourceChoices = defaultSourceCatalog.map((source) => ({
@@ -53,7 +53,7 @@ const sourcesCommand = new SlashCommandBuilder()
 
 const reindexCommand = new SlashCommandBuilder()
   .setName("queue-reindex")
-  .setDescription("Queue a source refresh job in the ingest worker stub.")
+  .setDescription("Queue a source refresh job for the ingest worker.")
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
   .addStringOption((option) => {
     return option
@@ -186,7 +186,7 @@ const handleReindexCommand = async (interaction: ChatInputCommandInteraction): P
 
   const embed = buildSuccessEmbed({
     title: "Refresh Queued",
-    description: `Queued ${result.queuedSourceIds.length} source refresh request(s) in stub mode. The ingest worker implementation is the next phase.`,
+    description: `Queued ${result.queuedSourceIds.length} source refresh request(s). The ingest worker queue has been updated.`,
   });
 
   await interaction.reply({

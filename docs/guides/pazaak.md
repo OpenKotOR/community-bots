@@ -8,7 +8,7 @@ Pazaak Bot runs the pazaak table on this server. Pazaak is a card game from Knig
 
 1. Type **`/pazaak wallet`** to see your credits. Every new player starts with **1,000 credits**.
 2. Type **`/pazaak challenge`**, pick someone to play against, and set a wager.
-3. Both of you play sets of cards trying to reach exactly **20** without going over.
+3. Both of you play sets of cards trying to reach exactly **20** without ending the turn over 20.
 4. First person to win **3 sets** wins the match and takes the wager.
 
 ---
@@ -43,6 +43,10 @@ Save or review custom 10-card sideboards. You can keep multiple named sideboards
 - **Find Board** — Opens a small search modal so you can filter large named-sideboard libraries by name.
 - **Build/Edit Sideboard** — Opens a modal with two text areas (slots 1-5 and 6-10) for quick bulk entry using tokens like `+1`, `-2`, `*3`, `$$`, `TT`, `F1`, `F2`, and `VV`.
 - **Clear Sideboard** — Removes your active sideboard, or a named sideboard if you target it from the slash command.
+
+Custom multiplayer sideboards must contain exactly 10 cards. Regular fixed or flip cards can appear up to 4 times each; gold/special cards (`D`/`$$`, `±1T`/`TT`, `1±2`/`VV`, `2&4`/`F1`, `3&6`/`F2`) can appear once each.
+
+These limits are enforced by the multiplayer match engine for public challenges, challenge accept overrides, and private-lobby starts, so invalid custom boards cannot slip through by bypassing UI validation.
 
 The sideboard management screen and the challenged-player deck picker both now include an **Open Activity Lobby** link so you can jump directly into the browser-side quick switcher or full workshop while deciding which saved board should be active.
 
@@ -98,9 +102,14 @@ Your opponent clicks **Accept**. If they were not already seeded with a deck, th
 
 ### Step 2 — Your Sideboard and Hand
 
-At the start of the match, each player receives a **10-card sideboard**. In normal public play that sideboard is either one of the canonical runtime TSL decks (`Very Easy` through `Very Hard`), or the player's active saved custom sideboard if they explicitly chose it. At the start of each set, **4 cards** are drawn from your sideboard into your hand.
+At the start of the match, each player receives a **10-card sideboard**. In normal public play that sideboard is either one of the canonical runtime TSL decks (`Very Easy` through `Very Hard`), or the player's active saved custom sideboard if they explicitly chose it. The game draws **4 cards** from that sideboard into your hand once when the match begins.
 
-Hands are **always refreshed** at the start of every set, including after ties.
+Private Activity lobbies expose a sideboard mode modifier when the host creates the table:
+- `Runtime random` keeps per-seat runtime random sideboards.
+- `Each player active custom` requires every human ready seat to have an active saved custom sideboard; each player keeps their own board.
+- `Host mirrored custom` uses the host's active saved custom sideboard for both ready seats.
+
+Your hand is **not refreshed** between sets or after ties. A side card can be used once per match, so the timing of each card matters.
 
 ### Step 3 — The Board
 
@@ -134,15 +143,15 @@ Each player gets their own **private control panel** that only they can see. Thi
 
 On your turn you **must draw first** — a card from the main deck is added to your board.
 
-**If the draw puts you over 20, you bust and lose the set immediately.** There is no chance to play a side card to recover.
+If the draw puts you over 20, you get one normal side-card window before the turn resolves. A negative, flip, D, VV, or board-flip special can still recover the total. If you end the turn while still over 20, or your one side card still leaves you over 20, you bust and lose the set.
 
-If you are still at 20 or under after drawing, you have three choices:
+After drawing, you have three choices:
 
 1. **Play a side card** — pick one of your side cards to modify your total, then stand or end the turn
 2. **Stand** — stop drawing and lock in your current total for this set
 3. **End Turn** — keep your total as-is and pass the turn
 
-You can only play **one side card per turn**, and each side card can only be used **once per set**. After playing a card you can still stand or end the turn — playing a card does not automatically end your turn.
+You can only play **one side card per turn**, and each side card can only be used **once per match**. After playing a card you can still stand or end the turn — playing a card does not automatically end your turn unless it wins or busts the set.
 
 ### Step 6 — Side Cards (Card Types)
 
@@ -164,6 +173,7 @@ Flip cards show two buttons — one for plus, one for minus — so you choose at
 |---|---|---|
 | **Copy** | `D` | Copies the resolved value of the previous board card. You cannot play it as your first board card. |
 | **Tiebreaker** | `±1T` | You choose `+1` or `-1`. If the set ends in a tie, the player who played the Tiebreaker wins instead. |
+| **Value Change** | `1±2` | You choose `+1`, `+2`, `-1`, or `-2`. In bot token syntax this is `VV`. |
 | **Flip 2&4** | `Flip 2&4` | Occupies a board slot with value `0`, then flips the sign of every 2 and 4 on your board that came from the main deck or a plus/minus card. Flip and other special cards are not affected. |
 | **Flip 3&6** | `Flip 3&6` | Occupies a board slot with value `0`, then flips the sign of positive 3s and 6s on your board. |
 
@@ -177,11 +187,11 @@ Flip cards show two buttons — one for plus, one for minus — so you choose at
 
 A set ends when both players have stood or one player busts:
 
-- If your draw puts you **over 20**, you **bust** and lose the set immediately.
-- If a side card you play puts you over 20, you also bust immediately.
+- If your draw puts you **over 20**, you may recover with one side card before the turn ends.
+- If you end the turn over 20, or a side card you play still leaves you over 20, you bust and lose the set.
 - If both players stand, whoever is **closer to 20** wins the set.
 - If both players stand on the **same total**, the set is a **tie** — unless one player has played a **Tiebreaker** card, in which case that player wins.
-- On a true tie (no tiebreaker), a new set starts with **fresh side cards**.
+- On a true tie (no tiebreaker), a new set starts with the same remaining side hand.
 - If **5 sets tie in a row**, the match is force-resolved by current set record.
 
 ### Step 8 — Who Goes First Next
@@ -222,9 +232,9 @@ Credits are fake. They are just for fun on this server. There is no way to conve
 
 ## Tips
 
-- **Stand early if you are close to 20.** If your total is 17–20 and you have no good side cards, standing is safer than drawing. Drawing over 20 is an instant bust with no recovery.
+- **Stand early if you are close to 20.** If your total is 17–20 and you have no good recovery cards, standing is often safer than drawing.
 - **Play side cards to fine-tune your total before standing.** A `+2` when you are at 18 locks in a perfect 20.
-- **Minus and flip cards shine when you are close to 20 but not over.** Use them to drop your total after a strong draw — but remember, you cannot use them to recover if a draw puts you over 20.
+- **Minus and flip cards are your recovery tools.** They are strongest when a draw pushes you over 20 or when you need to force a safer standing total.
 - **Tiebreaker cards are insurance.** They still win ties, but you can choose either `+1T` or `-1T` when you play them.
 - **D copies your last resolved board value.** If the previous card was negative or came from another side card, D copies that resolved number. You cannot open a board with D.
 - **Flip 2&4 affects main-deck draws and plus/minus cards only.** It will not flip cards placed by other side cards.

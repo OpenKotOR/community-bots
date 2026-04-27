@@ -52,6 +52,7 @@ const createMatch = (
   players: overrides.players ?? [player, opponent],
   activePlayerIndex: overrides.activePlayerIndex ?? 0,
   setNumber: overrides.setNumber ?? 1,
+  setsToWin: overrides.setsToWin ?? 3,
   mainDeck: overrides.mainDeck ?? [],
   phase: overrides.phase ?? "after-draw",
   pendingDraw: overrides.pendingDraw ?? 5,
@@ -306,6 +307,65 @@ test("opponent sideboards build through canonical custom sideboard normalization
   }
 });
 
+test("custom sideboard balance limits are enforced when requested", () => {
+  assert.throws(
+    () => createCustomSideDeck({
+      label: "Too Many Doubles",
+      tokens: ["D", "D", "+1", "+1", "+1", "+1", "-1", "-1", "-1", "-1"],
+      enforceTokenLimits: true,
+    }),
+    /\$\$ appears 2 times/i,
+  );
+
+  assert.throws(
+    () => createCustomSideDeck({
+      label: "Too Many Ones",
+      tokens: ["+1", "+1", "+1", "+1", "+1", "-1", "-1", "-1", "-1", "D"],
+      enforceTokenLimits: true,
+    }),
+    /\+1 appears 5 times/i,
+  );
+});
+
+test("direct matches reject custom sideboards that break duplicate limits", () => {
+  const coordinator = new PazaakCoordinator();
+
+  assert.throws(
+    () => coordinator.createDirectMatch({
+      channelId: "private-lobby",
+      challengerId: "p1",
+      challengerName: "Player 1",
+      challengerDeck: {
+        label: "Unfair Challenger Deck",
+        tokens: ["D", "D", "+1", "+1", "+1", "+1", "-1", "-1", "-1", "-1"],
+      },
+      opponentId: "p2",
+      opponentName: "Player 2",
+    }),
+    /appears 2 times/i,
+  );
+});
+
+test("challenge accepts reject invalid custom override decks", () => {
+  const coordinator = new PazaakCoordinator();
+  const challenge = coordinator.createChallenge({
+    channelId: "public",
+    challengerId: "p1",
+    challengerName: "Player 1",
+    challengedId: "p2",
+    challengedName: "Player 2",
+    wager: 10,
+  });
+
+  assert.throws(
+    () => coordinator.acceptChallenge(challenge.id, "p2", {
+      label: "Too Many TT",
+      tokens: ["TT", "TT", "+1", "+1", "+1", "+1", "-1", "-1", "-1", "-1"],
+    }),
+    /appears 2 times/i,
+  );
+});
+
 test("opponent phrase picker avoids immediate repeats when alternatives exist", () => {
   const opponent = getPazaakOpponentById("revan");
   assert.ok(opponent);
@@ -370,6 +430,115 @@ test("direct matches initialize turn deadlines for cross-platform clients", () =
 
   assert.equal(match.turnStartedAt, 2000);
   assert.equal(match.turnDeadlineAt, 47_000);
+});
+
+test("draws over 20 open a side-card recovery window", () => {
+  const coordinator = new PazaakCoordinator();
+  const match = coordinator.createDirectMatch({
+    channelId: "canonical-rules",
+    challengerId: "p1",
+    challengerName: "Player 1",
+    opponentId: "p2",
+    opponentName: "Player 2",
+  });
+  const player = match.players[match.activePlayerIndex]!;
+  player.total = 16;
+  player.board = [{ value: 10, frozen: false }, { value: 6, frozen: false }];
+  player.hand = [createCard({ id: "minus3", label: "-3", value: 3, type: "minus" })];
+  match.mainDeck = [6];
+
+  const afterDraw = coordinator.draw(match.id, player.userId);
+
+  assert.equal(afterDraw.phase, "after-draw");
+  assert.equal(player.total, 22);
+  assert.match(afterDraw.statusLine, /recover/i);
+  assert.throws(() => coordinator.stand(match.id, player.userId), /recover with a side card/i);
+
+  const afterRecovery = coordinator.playSideCard(match.id, player.userId, "minus3", -3);
+
+  assert.equal(afterRecovery.phase, "after-card");
+  assert.equal(player.total, 19);
+  assert.equal(player.usedCardIds.has("minus3"), true);
+});
+
+test("ending an unresolved over-20 turn confirms the bust", () => {
+  const coordinator = new PazaakCoordinator();
+  const match = coordinator.createDirectMatch({
+    channelId: "canonical-rules",
+    challengerId: "p1",
+    challengerName: "Player 1",
+    opponentId: "p2",
+    opponentName: "Player 2",
+  });
+  const player = match.players[match.activePlayerIndex]!;
+  const opponent = match.players[match.activePlayerIndex === 0 ? 1 : 0]!;
+  player.total = 16;
+  player.board = [{ value: 10, frozen: false }, { value: 6, frozen: false }];
+  match.mainDeck = [6];
+
+  coordinator.draw(match.id, player.userId);
+  const next = coordinator.endTurn(match.id, player.userId);
+
+  assert.equal(opponent.roundWins, 1);
+  assert.equal(next.phase, "turn");
+  assert.match(next.statusLine, /busts with 22/i);
+});
+
+test("side hands and spent cards persist across sets", () => {
+  const coordinator = new PazaakCoordinator();
+  const match = coordinator.createDirectMatch({
+    channelId: "canonical-rules",
+    challengerId: "p1",
+    challengerName: "Player 1",
+    opponentId: "p2",
+    opponentName: "Player 2",
+  });
+  const player = match.players[0]!;
+  const opponent = match.players[1]!;
+  player.hand = [createCard({ id: "minus3", label: "-3", value: 3, type: "minus" })];
+  player.usedCardIds = new Set(["minus3"]);
+  player.total = 18;
+  player.board = [{ value: 10, frozen: false }, { value: 8, frozen: false }];
+  opponent.total = 17;
+  opponent.board = [{ value: 10, frozen: false }, { value: 7, frozen: false }];
+  opponent.stood = true;
+  match.activePlayerIndex = 0;
+  match.phase = "after-draw";
+
+  coordinator.stand(match.id, player.userId);
+
+  assert.equal(player.roundWins, 1);
+  assert.equal(match.setNumber, 2);
+  assert.equal(player.hand.length, 1);
+  assert.equal(player.hand[0]?.id, "minus3");
+  assert.equal(player.usedCardIds.has("minus3"), true);
+});
+
+test("direct matches can override the target sets to win", () => {
+  const coordinator = new PazaakCoordinator();
+  const match = coordinator.createDirectMatch({
+    channelId: "private-lobby",
+    challengerId: "p1",
+    challengerName: "Player 1",
+    opponentId: "p2",
+    opponentName: "Player 2",
+    setsToWin: 1,
+  });
+  const player = match.players[0]!;
+  const opponent = match.players[1]!;
+  player.total = 18;
+  player.board = [{ value: 10, frozen: false }, { value: 8, frozen: false }];
+  opponent.total = 17;
+  opponent.board = [{ value: 10, frozen: false }, { value: 7, frozen: false }];
+  opponent.stood = true;
+  match.activePlayerIndex = 0;
+  match.phase = "after-draw";
+
+  const completed = coordinator.stand(match.id, player.userId);
+
+  assert.equal(completed.setsToWin, 1);
+  assert.equal(completed.phase, "completed");
+  assert.equal(completed.winnerId, "p1");
 });
 
 test("turn timer tick auto-resolves an idle pre-draw turn", () => {
