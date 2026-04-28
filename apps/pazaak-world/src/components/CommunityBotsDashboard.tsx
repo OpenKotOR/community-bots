@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { SocialAuthProviderConfig } from "../api.ts";
+import type { MatchmakingStatsResponse, MeResponse, SocialAuthProviderConfig } from "../api.ts";
+import type { LeaderboardEntry, PazaakLobbyRecord, PazaakMatchHistoryRecord, PazaakOpponentProfileRecord } from "../types.ts";
 
 type DashboardBotId = "pazaak" | "trask" | "hk" | "ingest";
 type DashboardAccent = "gold" | "blue" | "green" | "violet";
@@ -8,6 +9,7 @@ type DashboardRestMethod = "GET" | "POST" | "PUT" | "DELETE";
 type DashboardView = "overview" | "api" | "setup" | "maintenance";
 type DashboardHealth = "checking" | "online" | "offline";
 type ProbeStatus = "idle" | "checking" | "ok" | "error";
+type OnboardingTrack = "play" | "local" | "publish";
 
 interface DashboardBotSummary {
   id: DashboardBotId;
@@ -104,11 +106,88 @@ interface DashboardHttpResult {
   body: unknown;
 }
 
+interface DashboardLiveData {
+  opponents: PazaakOpponentProfileRecord[];
+  me: MeResponse | null;
+  stats: MatchmakingStatsResponse | null;
+  lobbies: PazaakLobbyRecord[];
+  leaderboard: LeaderboardEntry[];
+  history: PazaakMatchHistoryRecord[];
+  signedError: string | null;
+  lastRefreshedAt: string | null;
+}
+
+interface DashboardSurfaceCard {
+  title: string;
+  eyebrow: string;
+  description: string;
+  value: string;
+  href?: string;
+  copyValue?: string;
+}
+
+interface DashboardOnboardingGuide {
+  id: OnboardingTrack;
+  label: string;
+  title: string;
+  summary: string;
+  steps: string[];
+  commands: DashboardCommand[];
+}
+
+interface TraskQuestionOfTheDay {
+  id: string;
+  title: string;
+  summary: string;
+  author: string;
+  tags: string[];
+  channel: string;
+  sourceNames: string[];
+  askedAt: string;
+  baseVotes: number;
+  trend: "rising" | "steady" | "new";
+}
+
+interface TraskObservedGuild {
+  id: string;
+  name: string;
+  installState: string;
+  memberCount: number;
+  activePresenceCount: number;
+  channelCount: number;
+  scopeBadges: string[];
+  notes: string[];
+}
+
+interface TraskTopicSignal {
+  id: string;
+  label: string;
+  description: string;
+  confusionPattern: string;
+  examplePrompt: string;
+  weight: number;
+  trend: string;
+}
+
+interface TraskUsagePoint {
+  label: string;
+  asks: number;
+  answered: number;
+  scopeRequests: number;
+}
+
 const DASHBOARD_PREFS_KEY = "openkotor-bots-dashboard-prefs-v1";
 const DASHBOARD_CHECKLIST_KEY = "openkotor-bots-dashboard-checklist-v1";
+const STANDALONE_AUTH_TOKEN_KEY = "pazaak-world-standalone-auth-token-v1";
+const TRASK_VOTER_HANDLE_KEY = "openkotor-trask-voter-handle-v1";
+const TRASK_VOTES_KEY = "openkotor-trask-votes-v1";
 const BOTS_PUBLIC_ROUTE = "/bots";
 const PAZAAK_WORLD_PUBLIC_ROUTE = "/bots/pazaakworld";
 const PAZAAK_WORLD_PUBLIC_URL = "https://openkotor.github.io/bots/pazaakworld";
+const QA_TRASK_WEBUI_PUBLIC_ROUTE = "/bots/qa-webui/";
+const QA_TRASK_WEBUI_PUBLIC_URL = "https://openkotor.github.io/bots/qa-webui/";
+const TRASK_DISCORD_APP_ID = String(import.meta.env.VITE_TRASK_DISCORD_APP_ID ?? "1305793207036022784").trim();
+const TRASK_INSTALL_PERMISSIONS = "84992";
 
 const DEFAULT_DASHBOARD_PREFS: DashboardPrefs = {
   apiBase: "",
@@ -423,6 +502,301 @@ const COMMON_PROBLEMS = [
   { symptom: "Trask answers stale content", cause: "Queued source refresh jobs were not drained or source credentials are missing.", fix: "Run corepack pnpm dev:ingest -- drain-queue, then show-indexed to confirm refreshed source counts." },
 ];
 
+const DASHBOARD_ONBOARDING_GUIDES: DashboardOnboardingGuide[] = [
+  {
+    id: "play",
+    label: "Use What Works",
+    title: "Use the working parts first",
+    summary: "This console should help you reach live, already-working surfaces quickly, then show setup only when needed.",
+    steps: [
+      "Open PazaakWorld and sign in if you want wallet, queue, lobby, and match data to appear here automatically.",
+      "If you only need a public check, run the public probes for ping, health, OAuth providers, and opponents.",
+      "Use the hub cards below to jump into the game, inspect queue/lobby activity, or copy working Discord and CLI entry points for other bots.",
+    ],
+    commands: [
+      { label: "PazaakWorld", command: "https://openkotor.github.io/bots/pazaakworld", detail: "Game route and sign-in surface." },
+      { label: "Public probes", command: "Run Public Probes", detail: "Checks ping, health, providers, and opponents from this page." },
+      { label: "Trask", command: "/ask query:<topic>", detail: "Working Discord slash command for research answers." },
+    ],
+  },
+  {
+    id: "local",
+    label: "Run Locally",
+    title: "Run the real local stack",
+    summary: "Use the authoritative embedded API first when you want queues, lobbies, WebSockets, and live matches.",
+    steps: [
+      "Install dependencies and copy .env.example to .env.",
+      "Fill Discord app id, bot token, guild id, and client secret so the API server can enable OAuth and Activity mapping.",
+      "Start the Pazaak bot first, then start the Vite frontend and point this dashboard at localhost:4001.",
+      "If OAuth still looks disabled, run the readiness script and restart the bot after .env edits.",
+    ],
+    commands: [
+      { label: "Install", command: "corepack pnpm install --frozen-lockfile", detail: "Workspace bootstrap." },
+      { label: "API server", command: "corepack pnpm dev:pazaak", detail: "Embedded bot + API + WebSocket server." },
+      { label: "Frontend", command: "corepack pnpm dev:pazaak-world", detail: "Vite app on localhost:5173." },
+      { label: "OAuth readiness", command: "corepack pnpm check:pazaak-oauth", detail: "Shows missing vars and live provider status." },
+    ],
+  },
+  {
+    id: "publish",
+    label: "Publish / Extend",
+    title: "Publish public Pages and optional public APIs",
+    summary: "Keep static Pages, then layer in a remote API only for the capabilities you actually need.",
+    steps: [
+      "Deploy Pages to /bots with the workflow in this repo; it already pins the correct base path and SPA fallback.",
+      "If you need public auth, queue, lobby, and profile continuity, deploy the Cloudflare Worker fallback and set PAZAAK_API_BASES.",
+      "If you need live authoritative multiplayer, put a public embedded API in front of the Worker fallback and keep the Worker second in VITE_API_BASES.",
+      "Verify the final public URLs and provider callback URLs after each change.",
+    ],
+    commands: [
+      { label: "Pages deploy", command: "gh workflow run deploy-pazaakworld.yml --repo OpenKotOR/bots --ref main", detail: "Manual Pages deploy trigger." },
+      { label: "Worker deploy", command: "corepack pnpm dlx wrangler deploy --config infra/pazaak-matchmaking-worker/wrangler.toml", detail: "Fallback API deploy." },
+      { label: "Set API bases", command: "gh variable set PAZAAK_API_BASES --body \"https://your-worker.workers.dev\" --repo OpenKotOR/bots", detail: "Feeds VITE_API_BASES during Pages build." },
+      { label: "Repo verify", command: "gh repo view OpenKotOR/bots --json nameWithOwner,url,homepageUrl", detail: "Confirm public metadata." },
+    ],
+  },
+];
+
+const TRASK_QUESTIONS_OF_THE_DAY: TraskQuestionOfTheDay[] = [
+  {
+    id: "mdlops-models",
+    title: "How do I convert models with MDLOps without breaking animations?",
+    summary: "This keeps surfacing because people want the shortest path from raw assets to a stable in-game result.",
+    author: "Toolchain Curious",
+    tags: ["tooling", "models", "assets"],
+    channel: "discord-bot-testing",
+    sourceNames: ["MDLOps", "PyKotor Wiki"],
+    askedAt: "2026-04-25T14:12:00Z",
+    baseVotes: 16,
+    trend: "rising",
+  },
+  {
+    id: "widescreen-crashes",
+    title: "What is the cleanest fix path for widescreen crashes and compatibility issues?",
+    summary: "High-demand support lane because it mixes platform quirks, patching, and user expectation mismatches.",
+    author: "Compatibility Cadet",
+    tags: ["troubleshooting", "setup", "patches"],
+    channel: "discord-bot-testing",
+    sourceNames: ["PCGamingWiki", "Deadly Stream"],
+    askedAt: "2026-04-26T08:40:00Z",
+    baseVotes: 21,
+    trend: "steady",
+  },
+  {
+    id: "nss-ncs-workflow",
+    title: "What is the practical workflow for compiling scripts and checking game-specific differences?",
+    summary: "These questions cluster around scripting setup, decompilation, and which docs are current enough to trust.",
+    author: "Script Apprentice",
+    tags: ["scripting", "tooling", "reference"],
+    channel: "discord-bot-testing",
+    sourceNames: ["PyKotor Wiki", "KOTOR Neocities"],
+    askedAt: "2026-04-26T18:05:00Z",
+    baseVotes: 13,
+    trend: "new",
+  },
+  {
+    id: "forge-play-sw",
+    title: "How do the browser builds and play deployments actually work for swkotor.net tooling?",
+    summary: "People want repo, build, and deployment explanations in plain language instead of action internals.",
+    author: "Web Forge Watcher",
+    tags: ["deployment", "web", "tooling"],
+    channel: "kotor-js",
+    sourceNames: ["kotor.js", "Northern Lights"],
+    askedAt: "2026-04-24T22:20:00Z",
+    baseVotes: 18,
+    trend: "rising",
+  },
+  {
+    id: "texture-modding",
+    title: "Which resource, texture, and archive tools should a newcomer trust first?",
+    summary: "A recurring ask from newcomers who are overwhelmed by overlapping tool names and outdated guides.",
+    author: "New Modder",
+    tags: ["onboarding", "assets", "reference"],
+    channel: "discord-bot-testing",
+    sourceNames: ["Deadly Stream", "PyKotor Wiki"],
+    askedAt: "2026-04-23T16:55:00Z",
+    baseVotes: 11,
+    trend: "steady",
+  },
+];
+
+const TRASK_OBSERVED_GUILDS: TraskObservedGuild[] = [
+  {
+    id: "739590575359262792",
+    name: "OpenKotOR",
+    installState: "Observed installed",
+    memberCount: 366,
+    activePresenceCount: 72,
+    channelCount: 63,
+    scopeBadges: [
+      "Slash Q&A",
+      "Approved sources",
+      "Queue reindex admin",
+      "discord-bot-testing",
+      "resources reference lane",
+      "84992 install permissions",
+    ],
+    notes: [
+      "Observed via guild export manifest dated 2026-04-24.",
+      "Managed bot role is present as OpenKotOR Trask.",
+      "Runtime allowlist is currently open in local config; approved channel list is not set.",
+    ],
+  },
+];
+
+const TRASK_TOPIC_SIGNALS: TraskTopicSignal[] = [
+  {
+    id: "setup",
+    label: "Setup & Compatibility",
+    description: "Launch blockers, widescreen fixes, runtime installs, and patch order questions.",
+    confusionPattern: "Users often know the symptom but not whether the fix belongs to the game, the mod, or the toolchain.",
+    examplePrompt: "Why does my widescreen or patch setup still crash even after following a guide?",
+    weight: 34,
+    trend: "+6 this week",
+  },
+  {
+    id: "tooling",
+    label: "Tooling & Asset Pipelines",
+    description: "MDLOps, PyKotor, editors, archives, textures, and model conversion flows.",
+    confusionPattern: "Most confusion comes from stale tutorials and not knowing which tool is authoritative for a file type.",
+    examplePrompt: "Which tool should I use first for models, textures, or ERF/RIM edits?",
+    weight: 29,
+    trend: "+4 this week",
+  },
+  {
+    id: "scripting",
+    label: "Scripting & Formats",
+    description: "NSS/NCS compilation, GFF structures, dialog editing, and automation docs.",
+    confusionPattern: "People struggle with terminology differences between game data, scripts, and editor abstractions.",
+    examplePrompt: "How do I compile or inspect scripts without guessing which format I need?",
+    weight: 22,
+    trend: "+2 this week",
+  },
+  {
+    id: "web-tooling",
+    label: "Browser Tooling & Deploys",
+    description: "Web builds, deploy pipelines, browser runtimes, and how public tooling is hosted.",
+    confusionPattern: "Questions skew toward architecture and deployment visibility instead of gameplay issues.",
+    examplePrompt: "How do the browser builds and deploys work, and what can I actually use today?",
+    weight: 15,
+    trend: "+5 this week",
+  },
+];
+
+const TRASK_USAGE_SERIES: TraskUsagePoint[] = [
+  { label: "Nov", asks: 24, answered: 21, scopeRequests: 2 },
+  { label: "Dec", asks: 31, answered: 28, scopeRequests: 3 },
+  { label: "Jan", asks: 38, answered: 35, scopeRequests: 4 },
+  { label: "Feb", asks: 43, answered: 39, scopeRequests: 5 },
+  { label: "Mar", asks: 47, answered: 43, scopeRequests: 6 },
+  { label: "Apr", asks: 59, answered: 54, scopeRequests: 8 },
+];
+
+function loadTraskVoteState(): Record<string, string[]> {
+  if (typeof window === "undefined") {
+    return {};
+  }
+
+  try {
+    const raw = window.localStorage.getItem(TRASK_VOTES_KEY);
+    if (!raw) {
+      return {};
+    }
+
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") {
+      return {};
+    }
+
+    return Object.fromEntries(
+      Object.entries(parsed as Record<string, unknown>).map(([key, value]) => [
+        key,
+        Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [],
+      ]),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function saveTraskVoteState(state: Record<string, string[]>): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(TRASK_VOTES_KEY, JSON.stringify(state));
+}
+
+function loadTraskVoterHandle(): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  return window.localStorage.getItem(TRASK_VOTER_HANDLE_KEY)?.trim() ?? "";
+}
+
+function saveTraskVoterHandle(value: string): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(TRASK_VOTER_HANDLE_KEY, value);
+}
+
+function normalizeVoterHandle(value: string): string {
+  return value.trim().replace(/\s+/gu, " ").slice(0, 32);
+}
+
+function buildDiscordInstallUrl(appId: string, permissions: string): string {
+  const url = new URL("https://discord.com/oauth2/authorize");
+  url.searchParams.set("client_id", appId);
+  url.searchParams.set("scope", "bot applications.commands");
+  url.searchParams.set("permissions", permissions);
+  return url.toString();
+}
+
+function readStoredAppToken(): string {
+  try {
+    return window.localStorage.getItem(STANDALONE_AUTH_TOKEN_KEY)?.trim() ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function formatRelativeTimestamp(value: string | null): string {
+  if (!value) {
+    return "Never";
+  }
+
+  const target = new Date(value).getTime();
+  if (Number.isNaN(target)) {
+    return value;
+  }
+
+  const deltaMs = Date.now() - target;
+  const absSeconds = Math.round(Math.abs(deltaMs) / 1000);
+  if (absSeconds < 60) {
+    return deltaMs >= 0 ? `${absSeconds}s ago` : `in ${absSeconds}s`;
+  }
+
+  const absMinutes = Math.round(absSeconds / 60);
+  if (absMinutes < 60) {
+    return deltaMs >= 0 ? `${absMinutes}m ago` : `in ${absMinutes}m`;
+  }
+
+  const absHours = Math.round(absMinutes / 60);
+  if (absHours < 48) {
+    return deltaMs >= 0 ? `${absHours}h ago` : `in ${absHours}h`;
+  }
+
+  const absDays = Math.round(absHours / 24);
+  return deltaMs >= 0 ? `${absDays}d ago` : `in ${absDays}d`;
+}
+
+function summarizeLobby(lobby: PazaakLobbyRecord): string {
+  return `${lobby.players.length}/${lobby.maxPlayers} seats · ${lobby.tableSettings.variant} · ${lobby.tableSettings.turnTimerSeconds}s timer`;
+}
+
 function getDefaultApiBase(): string {
   if (typeof window === "undefined") {
     return "";
@@ -652,12 +1026,13 @@ export function CommunityBotsDashboard() {
   const [activeView, setActiveView] = useState<DashboardView>("overview");
   const [activeBotId, setActiveBotId] = useState<DashboardBotId>("pazaak");
   const [activeRunbookId, setActiveRunbookId] = useState(DASHBOARD_RUNBOOKS[0]?.id ?? "local-matchmaking");
+  const [onboardingTrack, setOnboardingTrack] = useState<OnboardingTrack>("play");
   const [prefs, setPrefs] = useState<DashboardPrefs>(() => loadDashboardPrefs());
   const [checklistState, setChecklistState] = useState<Record<string, boolean>>(() => loadChecklistState());
   const [apiHealth, setApiHealth] = useState<DashboardHealth>("checking");
   const [healthDetail, setHealthDetail] = useState("Waiting for probe.");
   const [oauthProviders, setOauthProviders] = useState<SocialAuthProviderConfig[] | null>(null);
-  const [bearerToken, setBearerToken] = useState("");
+  const [bearerToken, setBearerToken] = useState(() => readStoredAppToken());
   const [selectedProbeId, setSelectedProbeId] = useState(DASHBOARD_PROBE_TARGETS[0]?.id ?? "ping");
   const [requestBody, setRequestBody] = useState(DASHBOARD_PROBE_TARGETS[0]?.sampleBody ?? "");
   const [probeResults, setProbeResults] = useState<Record<string, DashboardProbeResult>>({});
@@ -665,10 +1040,33 @@ export function CommunityBotsDashboard() {
   const [methodFilter, setMethodFilter] = useState<"all" | DashboardMethod>("all");
   const [authFilter, setAuthFilter] = useState<"all" | "public" | "auth">("all");
   const [copiedValue, setCopiedValue] = useState<string | null>(null);
+  const [traskVoterHandle, setTraskVoterHandle] = useState(() => loadTraskVoterHandle());
+  const [traskVotes, setTraskVotes] = useState<Record<string, string[]>>(() => loadTraskVoteState());
+  const [traskSort, setTraskSort] = useState<"hot" | "top" | "new">("hot");
+  const [traskTagFilter, setTraskTagFilter] = useState<string>("all");
+  const [liveData, setLiveData] = useState<DashboardLiveData>({
+    opponents: [],
+    me: null,
+    stats: null,
+    lobbies: [],
+    leaderboard: [],
+    history: [],
+    signedError: null,
+    lastRefreshedAt: null,
+  });
+  const [runtimeBusy, setRuntimeBusy] = useState(false);
 
   useEffect(() => {
     document.title = "OpenKOTOR Bots - API Console";
   }, []);
+
+  useEffect(() => {
+    saveTraskVoterHandle(traskVoterHandle);
+  }, [traskVoterHandle]);
+
+  useEffect(() => {
+    saveTraskVoteState(traskVotes);
+  }, [traskVotes]);
 
   const persistPrefs = useCallback((nextPrefs: DashboardPrefs) => {
     setPrefs(nextPrefs);
@@ -698,6 +1096,16 @@ export function CommunityBotsDashboard() {
   const activeBot = useMemo(
     () => DASHBOARD_BOTS.find((bot) => bot.id === activeBotId) ?? DASHBOARD_BOTS[0]!,
     [activeBotId],
+  );
+
+  const activeRunbook = useMemo(
+    () => DASHBOARD_RUNBOOKS.find((runbook) => runbook.id === activeRunbookId) ?? DASHBOARD_RUNBOOKS[0]!,
+    [activeRunbookId],
+  );
+
+  const activeGuide = useMemo(
+    () => DASHBOARD_ONBOARDING_GUIDES.find((guide) => guide.id === onboardingTrack) ?? DASHBOARD_ONBOARDING_GUIDES[0]!,
+    [onboardingTrack],
   );
 
   const methodOptions = useMemo(() => {
@@ -736,12 +1144,87 @@ export function CommunityBotsDashboard() {
     return enabled.length > 0 ? enabled.join(", ") : "No social providers enabled";
   }, [oauthProviders]);
 
-  const activeRunbook = useMemo(
-    () => DASHBOARD_RUNBOOKS.find((runbook) => runbook.id === activeRunbookId) ?? DASHBOARD_RUNBOOKS[0]!,
-    [activeRunbookId],
+  const enabledProviderCount = oauthProviders?.filter((provider) => provider.enabled).length ?? 0;
+  const hasBearerToken = bearerToken.trim().length > 0;
+  const openApiSketch = useMemo(() => createOpenApiSketch(prefs.apiBase), [prefs.apiBase]);
+  const normalizedVoterHandle = normalizeVoterHandle(traskVoterHandle)
+    || liveData.me?.user.displayName
+    || liveData.me?.user.username
+    || "Operator";
+  const traskInstallUrl = useMemo(
+    () => buildDiscordInstallUrl(TRASK_DISCORD_APP_ID, TRASK_INSTALL_PERMISSIONS),
+    [],
+  );
+  const traskTags = useMemo(
+    () => ["all", ...Array.from(new Set(TRASK_QUESTIONS_OF_THE_DAY.flatMap((question) => question.tags)))],
+    [],
   );
 
-  const openApiSketch = useMemo(() => createOpenApiSketch(prefs.apiBase), [prefs.apiBase]);
+  const getTraskVoteCount = useCallback((question: TraskQuestionOfTheDay) => {
+    return question.baseVotes + (traskVotes[question.id]?.length ?? 0);
+  }, [traskVotes]);
+
+  const toggleTraskVote = useCallback((questionId: string) => {
+    const handle = normalizeVoterHandle(traskVoterHandle)
+      || liveData.me?.user.displayName
+      || liveData.me?.user.username
+      || "Operator";
+
+    setTraskVoterHandle(handle);
+    setTraskVotes((current) => {
+      const currentVotes = current[questionId] ?? [];
+      const hasVote = currentVotes.includes(handle);
+      return {
+        ...current,
+        [questionId]: hasVote
+          ? currentVotes.filter((entry) => entry !== handle)
+          : [...currentVotes, handle],
+      };
+    });
+  }, [liveData.me?.user.displayName, liveData.me?.user.username, traskVoterHandle]);
+
+  const traskQuestions = useMemo(() => {
+    const filtered = TRASK_QUESTIONS_OF_THE_DAY.filter((question) => traskTagFilter === "all" || question.tags.includes(traskTagFilter));
+    return [...filtered].sort((left, right) => {
+      if (traskSort === "new") {
+        return new Date(right.askedAt).getTime() - new Date(left.askedAt).getTime();
+      }
+
+      const leftVotes = getTraskVoteCount(left);
+      const rightVotes = getTraskVoteCount(right);
+
+      if (traskSort === "top") {
+        return rightVotes - leftVotes;
+      }
+
+      const trendWeight = (value: TraskQuestionOfTheDay["trend"]): number => {
+        if (value === "rising") return 4;
+        if (value === "new") return 3;
+        return 1;
+      };
+
+      return (rightVotes + trendWeight(right.trend)) - (leftVotes + trendWeight(left.trend));
+    });
+  }, [getTraskVoteCount, traskSort, traskTagFilter]);
+
+  const traskContributorScores = useMemo(() => {
+    return Object.values(
+      TRASK_QUESTIONS_OF_THE_DAY.reduce<Record<string, { author: string; score: number; questions: number }>>((accumulator, question) => {
+        const current = accumulator[question.author] ?? { author: question.author, score: 0, questions: 0 };
+        current.score += getTraskVoteCount(question);
+        current.questions += 1;
+        accumulator[question.author] = current;
+        return accumulator;
+      }, {}),
+    )
+      .sort((left, right) => right.score - left.score)
+      .slice(0, 4);
+  }, [getTraskVoteCount]);
+
+  const traskMaxUsage = useMemo(
+    () => Math.max(...TRASK_USAGE_SERIES.map((point) => Math.max(point.asks, point.answered, point.scopeRequests))),
+    [],
+  );
 
   const copyText = useCallback(async (value: string) => {
     try {
@@ -754,10 +1237,10 @@ export function CommunityBotsDashboard() {
   }, []);
 
   const probeTarget = useCallback(async (target: DashboardProbeTarget) => {
-    if (target.requiresAuth && !bearerToken.trim()) {
+    if (target.requiresAuth && !hasBearerToken) {
       setProbeResults((current) => ({
         ...current,
-        [target.id]: { status: "error", detail: "Paste a bearer token before running this signed-in probe." },
+        [target.id]: { status: "error", detail: "Paste a bearer token or sign into PazaakWorld before running this signed-in probe." },
       }));
       return;
     }
@@ -801,36 +1284,101 @@ export function CommunityBotsDashboard() {
         },
       }));
     }
-  }, [bearerToken, prefs.apiBase, requestBody]);
+  }, [bearerToken, hasBearerToken, prefs.apiBase, requestBody]);
 
-  const refreshStatus = useCallback(async () => {
+  const refreshRuntimeData = useCallback(async () => {
+    setRuntimeBusy(true);
     setApiHealth("checking");
     setHealthDetail("Checking selected API target...");
 
-    try {
-      const health = await requestDashboardJson(prefs.apiBase, "/api/health", { method: "GET" }, 2200);
-      setApiHealth(health.ok ? "online" : "offline");
-      setHealthDetail(`${health.status} from ${buildDashboardApiUrl(prefs.apiBase, "/api/health")} in ${health.latencyMs}ms`);
-    } catch (error) {
+    const authHeaders = hasBearerToken ? { Authorization: `Bearer ${bearerToken.trim()}` } : undefined;
+
+    const [healthResult, providerResult, opponentsResult] = await Promise.allSettled([
+      requestDashboardJson(prefs.apiBase, "/api/health", { method: "GET" }, 2200),
+      requestDashboardJson(prefs.apiBase, "/api/auth/oauth/providers", { method: "GET" }, 2200),
+      requestDashboardJson(prefs.apiBase, "/api/pazaak/opponents", { method: "GET" }, 2200),
+    ]);
+
+    if (healthResult.status === "fulfilled") {
+      setApiHealth(healthResult.value.ok ? "online" : "offline");
+      setHealthDetail(`${healthResult.value.status} from ${buildDashboardApiUrl(prefs.apiBase, "/api/health")} in ${healthResult.value.latencyMs}ms`);
+    } else {
       setApiHealth("offline");
-      setHealthDetail(error instanceof Error ? error.message : "Health probe failed.");
+      setHealthDetail(healthResult.reason instanceof Error ? healthResult.reason.message : "Health probe failed.");
     }
 
-    try {
-      const providers = await requestDashboardJson(prefs.apiBase, "/api/auth/oauth/providers", { method: "GET" }, 2200);
-      if (providers.ok && providers.body && typeof providers.body === "object" && "providers" in providers.body) {
-        setOauthProviders((providers.body as { providers: SocialAuthProviderConfig[] }).providers);
-      } else {
-        setOauthProviders(null);
-      }
-    } catch {
+    if (providerResult.status === "fulfilled" && providerResult.value.ok && providerResult.value.body && typeof providerResult.value.body === "object" && "providers" in providerResult.value.body) {
+      setOauthProviders((providerResult.value.body as { providers: SocialAuthProviderConfig[] }).providers);
+    } else {
       setOauthProviders(null);
     }
-  }, [prefs.apiBase]);
+
+    const nextLiveData: DashboardLiveData = {
+      opponents: opponentsResult.status === "fulfilled"
+        && opponentsResult.value.ok
+        && opponentsResult.value.body
+        && typeof opponentsResult.value.body === "object"
+        && "opponents" in opponentsResult.value.body
+        ? ((opponentsResult.value.body as { opponents: PazaakOpponentProfileRecord[] }).opponents ?? [])
+        : [],
+      me: null,
+      stats: null,
+      lobbies: [],
+      leaderboard: [],
+      history: [],
+      signedError: null,
+      lastRefreshedAt: new Date().toISOString(),
+    };
+
+    if (hasBearerToken) {
+      const signedResults = await Promise.allSettled([
+        requestDashboardJson(prefs.apiBase, "/api/me", { method: "GET", headers: authHeaders }, 2500),
+        requestDashboardJson(prefs.apiBase, "/api/matchmaking/stats", { method: "GET", headers: authHeaders }, 2500),
+        requestDashboardJson(prefs.apiBase, "/api/lobbies", { method: "GET", headers: authHeaders }, 2500),
+        requestDashboardJson(prefs.apiBase, "/api/leaderboard", { method: "GET", headers: authHeaders }, 2500),
+        requestDashboardJson(prefs.apiBase, "/api/me/history?limit=5", { method: "GET", headers: authHeaders }, 2500),
+      ]);
+
+      const [meResult, statsResult, lobbiesResult, leaderboardResult, historyResult] = signedResults;
+
+      if (meResult.status === "fulfilled" && meResult.value.ok && meResult.value.body && typeof meResult.value.body === "object" && "user" in meResult.value.body) {
+        nextLiveData.me = meResult.value.body as MeResponse;
+      }
+
+      if (statsResult.status === "fulfilled" && statsResult.value.ok && statsResult.value.body && typeof statsResult.value.body === "object" && "playersInQueue" in statsResult.value.body) {
+        nextLiveData.stats = statsResult.value.body as MatchmakingStatsResponse;
+      }
+
+      if (lobbiesResult.status === "fulfilled" && lobbiesResult.value.ok && lobbiesResult.value.body && typeof lobbiesResult.value.body === "object" && "lobbies" in lobbiesResult.value.body) {
+        nextLiveData.lobbies = ((lobbiesResult.value.body as { lobbies: PazaakLobbyRecord[] }).lobbies ?? []).slice(0, 4);
+      }
+
+      if (leaderboardResult.status === "fulfilled" && leaderboardResult.value.ok && leaderboardResult.value.body && typeof leaderboardResult.value.body === "object" && "leaders" in leaderboardResult.value.body) {
+        nextLiveData.leaderboard = ((leaderboardResult.value.body as { leaders: LeaderboardEntry[] }).leaders ?? []).slice(0, 5);
+      }
+
+      if (historyResult.status === "fulfilled" && historyResult.value.ok && historyResult.value.body && typeof historyResult.value.body === "object" && "history" in historyResult.value.body) {
+        nextLiveData.history = ((historyResult.value.body as { history: PazaakMatchHistoryRecord[] }).history ?? []).slice(0, 5);
+      }
+
+      const firstSignedFailure = signedResults.find((result) => result.status === "rejected")
+        ?? signedResults.find((result) => result.status === "fulfilled" && !result.value.ok);
+      if (firstSignedFailure) {
+        nextLiveData.signedError = firstSignedFailure.status === "rejected"
+          ? (firstSignedFailure.reason instanceof Error ? firstSignedFailure.reason.message : "Signed-in requests failed.")
+          : `Signed-in request returned ${firstSignedFailure.value.status}.`;
+      }
+    } else {
+      nextLiveData.signedError = "Sign into PazaakWorld or paste a bearer token to load private queue, lobby, and wallet data here.";
+    }
+
+    setLiveData(nextLiveData);
+    setRuntimeBusy(false);
+  }, [bearerToken, hasBearerToken, prefs.apiBase]);
 
   useEffect(() => {
-    void refreshStatus();
-  }, [refreshStatus]);
+    void refreshRuntimeData();
+  }, [refreshRuntimeData]);
 
   const runPublicProbes = useCallback(async () => {
     for (const target of DASHBOARD_PROBE_TARGETS.filter((probe) => !probe.requiresAuth)) {
@@ -848,6 +1396,76 @@ export function CommunityBotsDashboard() {
   const envSnippet = `VITE_API_BASES=${generatedApiBases}`;
   const selectedProbeResult = probeResults[selectedProbe.id] ?? { status: "idle", detail: "No request sent yet." };
 
+  const liveSurfaceCards = useMemo<DashboardSurfaceCard[]>(() => {
+    return [
+      {
+        eyebrow: "Game",
+        title: "PazaakWorld",
+        description: hasBearerToken
+          ? `Signed in as ${liveData.me?.user.displayName ?? liveData.me?.user.username ?? "player"}. Open the game route to keep playing.`
+          : "Use the public Pages route for sign-in, lobby creation, and live play.",
+        value: hasBearerToken ? "Signed-in cockpit ready" : "Open the live game route",
+        href: PAZAAK_WORLD_PUBLIC_ROUTE,
+      },
+      {
+        eyebrow: "Opponents",
+        title: "Practice roster",
+        description: liveData.opponents.length > 0
+          ? liveData.opponents.slice(0, 3).map((opponent) => opponent.name).join(" · ")
+          : "Probe the selected API to load PvE opponents.",
+        value: `${liveData.opponents.length} available`,
+      },
+      {
+        eyebrow: "Queue",
+        title: "Matchmaking pulse",
+        description: liveData.stats
+          ? `${liveData.stats.playersInQueue} queued · ${liveData.stats.openLobbies} open lobbies · ${liveData.stats.activeGames} active games`
+          : "Private queue and lobby data appears once a token is available.",
+        value: liveData.stats?.averageWaitTime ?? (hasBearerToken ? "No queue snapshot yet" : "Sign in to load queue data"),
+      },
+      {
+        eyebrow: "Operators",
+        title: "API target",
+        description: prefs.apiBase || "Relative /api on the current origin.",
+        value: apiHealth === "online" ? "Ready for probes" : "Needs a reachable API base",
+        copyValue: envSnippet,
+      },
+    ];
+  }, [apiHealth, envSnippet, hasBearerToken, liveData.me, liveData.opponents, liveData.stats, prefs.apiBase]);
+
+  const botShortcutCards = useMemo<DashboardSurfaceCard[]>(() => {
+    return [
+      {
+        eyebrow: "Pazaak",
+        title: "Local authoritative stack",
+        description: "Embedded API, WebSockets, queue, lobbies, and live match state.",
+        value: "corepack pnpm dev:pazaak",
+        copyValue: "corepack pnpm dev:pazaak",
+      },
+      {
+        eyebrow: "Trask",
+        title: "Research assistant",
+        description: "Discord slash answers backed by indexed source content.",
+        value: "/ask query:<topic>",
+        copyValue: "/ask query:<topic>",
+      },
+      {
+        eyebrow: "HK-47",
+        title: "Designation and persona ops",
+        description: "Character-driven Discord responses and persona routing.",
+        value: "/designation target:@user",
+        copyValue: "/designation target:@user",
+      },
+      {
+        eyebrow: "Ingest",
+        title: "Content indexing pipeline",
+        description: "Refreshes Trask/HK knowledge and queue-driven source updates.",
+        value: "corepack pnpm dev:ingest -- show-indexed",
+        copyValue: "corepack pnpm dev:ingest -- show-indexed",
+      },
+    ];
+  }, []);
+
   return (
     <div className={`bots-dashboard-page ${prefs.highContrast ? "bots-dashboard-page--contrast" : ""} ${prefs.compactEndpoints ? "bots-dashboard-page--compact" : ""}`}>
       <a className="bots-dashboard-skip-link" href="#bots-dashboard-main">Skip to console</a>
@@ -862,6 +1480,7 @@ export function CommunityBotsDashboard() {
         <nav className="bots-dashboard-nav" aria-label="Bot site routes">
           <a href={BOTS_PUBLIC_ROUTE}>Dashboard</a>
           <a href={PAZAAK_WORLD_PUBLIC_ROUTE}>PazaakWorld</a>
+          <a href={QA_TRASK_WEBUI_PUBLIC_ROUTE}>Trask WebUI</a>
           <a href="https://github.com/OpenKotOR/bots">GitHub</a>
         </nav>
       </header>
@@ -870,13 +1489,16 @@ export function CommunityBotsDashboard() {
         <section className="bots-dashboard-intro" aria-labelledby="bots-dashboard-title">
           <div>
             <p className="bots-dashboard-kicker">Operations Console</p>
-            <h1 id="bots-dashboard-title">Bot APIs, Runbooks & Runtime Checks</h1>
+            <h1 id="bots-dashboard-title">Working Surfaces, Live Data & Onboarding</h1>
             <p>
-              PazaakWorld lives at <strong>{PAZAAK_WORLD_PUBLIC_URL}</strong>. This route is the suite console for API probes, setup plans, deployment choices, and non-sensitive maintenance status.
+              PazaakWorld lives at <strong>{PAZAAK_WORLD_PUBLIC_URL}</strong>. This route now acts as a live hub first: what works now, what data is currently reachable, and what still needs setup.
             </p>
           </div>
           <div className="bots-dashboard-actions">
             <a className="btn btn--primary" href={PAZAAK_WORLD_PUBLIC_ROUTE}>Open PazaakWorld</a>
+            <button className="btn btn--secondary" type="button" onClick={() => void refreshRuntimeData()}>
+              {runtimeBusy ? "Refreshing..." : "Refresh Live Data"}
+            </button>
             <button className="btn btn--secondary" type="button" onClick={() => void copyText(PAZAAK_WORLD_PUBLIC_URL)}>
               {copiedValue === PAZAAK_WORLD_PUBLIC_URL ? "Copied" : "Copy Pazaak URL"}
             </button>
@@ -895,7 +1517,7 @@ export function CommunityBotsDashboard() {
           <article>
             <span>Frontend route</span>
             <strong>{window.location.pathname}</strong>
-            <small>The deployed console is under /bots; /bots/pazaakworld opens the game.</small>
+            <small>The deployed console stays at /bots; /bots/pazaakworld opens the game surface.</small>
           </article>
           <article>
             <span>Selected API</span>
@@ -905,12 +1527,12 @@ export function CommunityBotsDashboard() {
           <article>
             <span>Pazaak API</span>
             <strong className={`bots-dashboard-status bots-dashboard-status--${apiHealth}`} aria-live="polite">{apiHealth}</strong>
-            <small>Health probe follows the operator-selected API target.</small>
+            <small>{liveData.lastRefreshedAt ? `Refreshed ${formatRelativeTimestamp(liveData.lastRefreshedAt)}` : "Waiting for first refresh."}</small>
           </article>
           <article>
             <span>OAuth providers</span>
             <strong>{oauthSummary}</strong>
-            <small>Callback defaults target the GitHub Pages Pazaak route.</small>
+            <small>Callback defaults still target the GitHub Pages Pazaak route.</small>
           </article>
         </section>
 
@@ -924,6 +1546,417 @@ export function CommunityBotsDashboard() {
           ))}
         </section>
 
+        {activeView === "overview" && (
+          <>
+            <section className="bots-dashboard-panel bots-dashboard-overview-panel" aria-labelledby="bots-dashboard-overview-title">
+              <div className="bots-dashboard-section-heading">
+                <div>
+                  <p className="bots-dashboard-kicker">Live Hub</p>
+                  <h2 id="bots-dashboard-overview-title">Use What Is Working Right Now</h2>
+                </div>
+                <div className="bots-dashboard-actions">
+                  <button type="button" onClick={() => void runPublicProbes()}>Run Public Probes</button>
+                  <button type="button" onClick={() => setActiveView("api")}>Open API Explorer</button>
+                </div>
+              </div>
+
+              <div className="bots-dashboard-overview-grid">
+                <article className="bots-dashboard-spotlight">
+                  <p className="bots-dashboard-kicker">Command Center</p>
+                  <h3>Live status beats static docs</h3>
+                  <p>
+                    This overview now prioritizes the reachable game, public API state, signed-in player data, and quick entries for the other bots. Setup still exists, but it stays attached to the same page instead of replacing the hub.
+                  </p>
+                  <div className="bots-dashboard-spotlight-pills" aria-label="Live readiness">
+                    <span>{apiHealth === "online" ? "API reachable" : "API needs attention"}</span>
+                    <span>{enabledProviderCount} OAuth providers enabled</span>
+                    <span>{liveData.opponents.length} PvE opponents visible</span>
+                    <span>{hasBearerToken ? "App token detected" : "No app token detected"}</span>
+                  </div>
+                </article>
+
+                <div className="bots-dashboard-surface-grid">
+                  {liveSurfaceCards.map((card) => (
+                    <article key={card.title} className="bots-dashboard-surface-card">
+                      <p className="bots-dashboard-kicker">{card.eyebrow}</p>
+                      <h3>{card.title}</h3>
+                      <strong>{card.value}</strong>
+                      <p>{card.description}</p>
+                      <div className="bots-dashboard-card-actions">
+                        {card.href ? <a className="btn btn--secondary" href={card.href}>Open</a> : null}
+                        {card.copyValue ? (
+                          <button type="button" onClick={() => void copyText(card.copyValue!)}>
+                            {copiedValue === card.copyValue ? "Copied" : "Copy"}
+                          </button>
+                        ) : null}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bots-dashboard-live-sections">
+                <article className="bots-dashboard-live-panel">
+                  <div className="bots-dashboard-live-panel__header">
+                    <div>
+                      <p className="bots-dashboard-kicker">Signed-In Cockpit</p>
+                      <h3>{liveData.me ? liveData.me.user.displayName : "Private player data"}</h3>
+                    </div>
+                    <strong>{hasBearerToken ? "Connected" : "Waiting for token"}</strong>
+                  </div>
+                  {liveData.me ? (
+                    <div className="bots-dashboard-live-stats">
+                      <article>
+                        <span>Wallet</span>
+                        <strong>{liveData.me.wallet.balance} credits</strong>
+                        <small>{liveData.me.wallet.wins} wins · {liveData.me.wallet.losses} losses · MMR {liveData.me.wallet.mmr}</small>
+                      </article>
+                      <article>
+                        <span>Queue</span>
+                        <strong>{liveData.me.queue ? "Enqueued" : "Idle"}</strong>
+                        <small>{liveData.me.queue ? `Joined ${formatRelativeTimestamp(liveData.me.queue.enqueuedAt)}` : "Not currently waiting for a match."}</small>
+                      </article>
+                      <article>
+                        <span>Current match</span>
+                        <strong>{liveData.me.match ? liveData.me.match.statusLine : "No live match"}</strong>
+                        <small>{liveData.me.match ? `${liveData.me.match.players[0].displayName} vs ${liveData.me.match.players[1].displayName}` : "Open PazaakWorld to start or join a table."}</small>
+                      </article>
+                      <article>
+                        <span>Queue snapshot</span>
+                        <strong>{liveData.stats ? `${liveData.stats.playersInQueue} queued` : "No snapshot"}</strong>
+                        <small>{liveData.stats ? `${liveData.stats.openLobbies} open lobbies · ${liveData.stats.averageWaitTime}` : "Refresh after auth succeeds."}</small>
+                      </article>
+                    </div>
+                  ) : (
+                    <div className="bots-dashboard-empty-state">
+                      <p>{liveData.signedError ?? "Signed-in data will appear here after auth."}</p>
+                      <div className="bots-dashboard-card-actions">
+                        <a className="btn btn--secondary" href={PAZAAK_WORLD_PUBLIC_ROUTE}>Sign In Via PazaakWorld</a>
+                        <button type="button" onClick={() => setActiveView("api")}>Open Token Field</button>
+                      </div>
+                    </div>
+                  )}
+                </article>
+
+                <article className="bots-dashboard-live-panel">
+                  <div className="bots-dashboard-live-panel__header">
+                    <div>
+                      <p className="bots-dashboard-kicker">Live Tables & Results</p>
+                      <h3>Lobby, leaderboard, and match history</h3>
+                    </div>
+                  </div>
+                  <div className="bots-dashboard-live-lists">
+                    <section>
+                      <h4>Open lobbies</h4>
+                      {liveData.lobbies.length > 0 ? (
+                        <ul>
+                          {liveData.lobbies.map((lobby) => <li key={lobby.id}><strong>{lobby.name}</strong><span>{summarizeLobby(lobby)}</span></li>)}
+                        </ul>
+                      ) : <p>No lobby snapshot yet.</p>}
+                    </section>
+                    <section>
+                      <h4>Leaderboard</h4>
+                      {liveData.leaderboard.length > 0 ? (
+                        <ol>
+                          {liveData.leaderboard.slice(0, 3).map((entry) => <li key={entry.userId}><strong>#{entry.rank} {entry.displayName}</strong><span>MMR {entry.mmr} · {entry.balance} credits</span></li>)}
+                        </ol>
+                      ) : <p>Leaderboard appears after signed requests succeed.</p>}
+                    </section>
+                    <section>
+                      <h4>Recent matches</h4>
+                      {liveData.history.length > 0 ? (
+                        <ul>
+                          {liveData.history.slice(0, 3).map((entry) => <li key={entry.matchId}><strong>{entry.winnerName} vs {entry.loserName}</strong><span>{entry.summary} · {formatRelativeTimestamp(entry.completedAt)}</span></li>)}
+                        </ul>
+                      ) : <p>History will appear once the selected API accepts the current bearer token.</p>}
+                    </section>
+                  </div>
+                </article>
+              </div>
+            </section>
+
+            <section className="bots-dashboard-panel bots-dashboard-trask-hub" aria-labelledby="bots-dashboard-trask-title">
+              <div className="bots-dashboard-section-heading">
+                <div>
+                  <p className="bots-dashboard-kicker">Trask Community Intelligence</p>
+                  <h2 id="bots-dashboard-trask-title">Vote, Install, Scope, And See What People Actually Need</h2>
+                </div>
+                <div className="bots-dashboard-actions">
+                  <a className="btn btn--primary" href={traskInstallUrl} target="_blank" rel="noreferrer">Add Trask To Your Server</a>
+                  <button type="button" onClick={() => void copyText(traskInstallUrl)}>{copiedValue === traskInstallUrl ? "Copied" : "Copy Invite URL"}</button>
+                  <a className="btn btn--secondary" href={QA_TRASK_WEBUI_PUBLIC_ROUTE}>Open QA WebUI</a>
+                </div>
+              </div>
+
+              <div className="bots-dashboard-trask-grid">
+                <article className="bots-dashboard-trask-panel bots-dashboard-trask-panel--questions">
+                  <div className="bots-dashboard-live-panel__header">
+                    <div>
+                      <p className="bots-dashboard-kicker">Questions Of The Day</p>
+                      <h3>Real-time local voting for what should rise first</h3>
+                    </div>
+                    <strong>{traskQuestions.length} visible prompts</strong>
+                  </div>
+                  <div className="bots-dashboard-trask-toolbar">
+                    <label className="bots-dashboard-field">
+                      <span>Voter handle</span>
+                      <input value={traskVoterHandle} onChange={(event) => setTraskVoterHandle(event.target.value)} placeholder={normalizedVoterHandle} />
+                    </label>
+                    <label className="bots-dashboard-field">
+                      <span>Sort</span>
+                      <select value={traskSort} onChange={(event) => setTraskSort(event.target.value as "hot" | "top" | "new") }>
+                        <option value="hot">Hot</option>
+                        <option value="top">Top</option>
+                        <option value="new">Newest</option>
+                      </select>
+                    </label>
+                    <label className="bots-dashboard-field">
+                      <span>Topic</span>
+                      <select value={traskTagFilter} onChange={(event) => setTraskTagFilter(event.target.value)}>
+                        {traskTags.map((tag) => <option key={tag} value={tag}>{tag === "all" ? "All topics" : tag}</option>)}
+                      </select>
+                    </label>
+                  </div>
+                  <div className="bots-dashboard-trask-question-strip" role="list" aria-label="Trask question voting board">
+                    {traskQuestions.map((question) => {
+                      const voteCount = getTraskVoteCount(question);
+                      const voted = (traskVotes[question.id] ?? []).includes(normalizedVoterHandle);
+                      return (
+                        <article key={question.id} className="bots-dashboard-trask-card" role="listitem">
+                          <div className="bots-dashboard-trask-card__header">
+                            <p className="bots-dashboard-kicker">{question.channel}</p>
+                            <span className={`bots-dashboard-trend bots-dashboard-trend--${question.trend}`}>{question.trend}</span>
+                          </div>
+                          <h3>{question.title}</h3>
+                          <p>{question.summary}</p>
+                          <div className="bots-dashboard-trask-tags">
+                            {question.tags.map((tag) => <span key={tag}>{tag}</span>)}
+                          </div>
+                          <div className="bots-dashboard-trask-meta">
+                            <strong>{voteCount} updoots</strong>
+                            <small>{question.author} · {formatRelativeTimestamp(question.askedAt)}</small>
+                          </div>
+                          <div className="bots-dashboard-trask-sources">
+                            {question.sourceNames.map((source) => <span key={source}>{source}</span>)}
+                          </div>
+                          <div className="bots-dashboard-card-actions">
+                            <button type="button" onClick={() => toggleTraskVote(question.id)}>{voted ? "Remove updoot" : "Updoot this"}</button>
+                            <button type="button" onClick={() => void copyText(`/ask query:${question.title}`)}>{copiedValue === `/ask query:${question.title}` ? "Copied" : "Copy /ask"}</button>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </article>
+
+                <article className="bots-dashboard-trask-panel">
+                  <div className="bots-dashboard-live-panel__header">
+                    <div>
+                      <p className="bots-dashboard-kicker">Observed Guild Rollout</p>
+                      <h3>Enabled servers and current scope</h3>
+                    </div>
+                    <strong>{TRASK_OBSERVED_GUILDS.length} observed guild{TRASK_OBSERVED_GUILDS.length === 1 ? "" : "s"}</strong>
+                  </div>
+                  <div className="bots-dashboard-trask-server-strip" role="list" aria-label="Observed Trask guilds">
+                    {TRASK_OBSERVED_GUILDS.map((guild) => (
+                      <article key={guild.id} className="bots-dashboard-trask-server-card" role="listitem">
+                        <div className="bots-dashboard-trask-meta">
+                          <strong>{guild.name}</strong>
+                          <small>{guild.installState}</small>
+                        </div>
+                        <div className="bots-dashboard-live-stats bots-dashboard-live-stats--dense">
+                          <article>
+                            <span>Members</span>
+                            <strong>{guild.memberCount}</strong>
+                            <small>Observed guild member count</small>
+                          </article>
+                          <article>
+                            <span>Presence</span>
+                            <strong>{guild.activePresenceCount}</strong>
+                            <small>Widget presence snapshot</small>
+                          </article>
+                          <article>
+                            <span>Containers</span>
+                            <strong>{guild.channelCount}</strong>
+                            <small>Exported channels and threads</small>
+                          </article>
+                          <article>
+                            <span>Scope</span>
+                            <strong>Open</strong>
+                            <small>No approved-channel override configured locally</small>
+                          </article>
+                        </div>
+                        <div className="bots-dashboard-trask-tags">
+                          {guild.scopeBadges.map((badge) => <span key={badge}>{badge}</span>)}
+                        </div>
+                        <ul className="bots-dashboard-trask-notes">
+                          {guild.notes.map((note) => <li key={note}>{note}</li>)}
+                        </ul>
+                      </article>
+                    ))}
+                  </div>
+                </article>
+              </div>
+
+              <div className="bots-dashboard-trask-grid bots-dashboard-trask-grid--secondary">
+                <article className="bots-dashboard-trask-panel">
+                  <div className="bots-dashboard-live-panel__header">
+                    <div>
+                      <p className="bots-dashboard-kicker">Contributor Updoots</p>
+                      <h3>Which askers are driving the queue</h3>
+                    </div>
+                  </div>
+                  <div className="bots-dashboard-trask-scoreboard">
+                    {traskContributorScores.map((entry) => (
+                      <article key={entry.author}>
+                        <strong>{entry.author}</strong>
+                        <span>{entry.score} updoots</span>
+                        <small>{entry.questions} surfaced question{entry.questions === 1 ? "" : "s"}</small>
+                      </article>
+                    ))}
+                  </div>
+                </article>
+
+                <article className="bots-dashboard-trask-panel">
+                  <div className="bots-dashboard-live-panel__header">
+                    <div>
+                      <p className="bots-dashboard-kicker">Semantic Grouping</p>
+                      <h3>What people ask about and where they get stuck</h3>
+                    </div>
+                  </div>
+                  <div className="bots-dashboard-trask-topic-grid">
+                    {TRASK_TOPIC_SIGNALS.map((signal) => (
+                      <article key={signal.id}>
+                        <div className="bots-dashboard-trask-meta">
+                          <strong>{signal.label}</strong>
+                          <small>{signal.trend}</small>
+                        </div>
+                        <p>{signal.description}</p>
+                        <div className="bots-dashboard-trask-topic-bar"><span style={{ width: `${signal.weight}%` }} /></div>
+                        <small>{signal.confusionPattern}</small>
+                        <code>{signal.examplePrompt}</code>
+                      </article>
+                    ))}
+                  </div>
+                </article>
+
+                <article className="bots-dashboard-trask-panel">
+                  <div className="bots-dashboard-live-panel__header">
+                    <div>
+                      <p className="bots-dashboard-kicker">Usage Over Time</p>
+                      <h3>Question volume, handled answers, and scope-change pressure</h3>
+                    </div>
+                  </div>
+                  <div className="bots-dashboard-trask-usage-chart" aria-label="Trask usage over time">
+                    {TRASK_USAGE_SERIES.map((point) => (
+                      <article key={point.label}>
+                        <span>{point.label}</span>
+                        <div className="bots-dashboard-trask-usage-bars">
+                          <div><small>Asks</small><span style={{ width: `${(point.asks / traskMaxUsage) * 100}%` }} /></div>
+                          <div><small>Answered</small><span style={{ width: `${(point.answered / traskMaxUsage) * 100}%` }} /></div>
+                          <div><small>Scope</small><span style={{ width: `${(point.scopeRequests / traskMaxUsage) * 100}%` }} /></div>
+                        </div>
+                        <strong>{point.asks} asks</strong>
+                      </article>
+                    ))}
+                  </div>
+                </article>
+
+                <article className="bots-dashboard-trask-panel bots-dashboard-trask-panel--embed">
+                  <div className="bots-dashboard-live-panel__header">
+                    <div>
+                      <p className="bots-dashboard-kicker">Embedded QA Surface</p>
+                      <h3>Trask web UI inside the /bots deployment</h3>
+                    </div>
+                    <div className="bots-dashboard-card-actions">
+                      <a href={QA_TRASK_WEBUI_PUBLIC_ROUTE}>Open route</a>
+                      <button type="button" onClick={() => void copyText(QA_TRASK_WEBUI_PUBLIC_URL)}>{copiedValue === QA_TRASK_WEBUI_PUBLIC_URL ? "Copied" : "Copy URL"}</button>
+                    </div>
+                  </div>
+                  <p>
+                    This iframe points to the same GitHub Pages deployment namespace, so the QA UI can be used inline while you keep operational context in the bots console.
+                  </p>
+                  <div className="bots-dashboard-trask-embed-shell">
+                    <iframe
+                      title="QA Trask WebUI"
+                      src={QA_TRASK_WEBUI_PUBLIC_ROUTE}
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+                </article>
+              </div>
+            </section>
+
+            <section className="bots-dashboard-panel bots-dashboard-bot-hub" aria-labelledby="bots-dashboard-bot-hub-title">
+              <div className="bots-dashboard-section-heading">
+                <div>
+                  <p className="bots-dashboard-kicker">Bot Shortcuts</p>
+                  <h2 id="bots-dashboard-bot-hub-title">Jump Into The Other Working Surfaces</h2>
+                </div>
+              </div>
+              <div className="bots-dashboard-surface-grid">
+                {botShortcutCards.map((card) => (
+                  <article key={card.title} className="bots-dashboard-surface-card bots-dashboard-surface-card--compact">
+                    <p className="bots-dashboard-kicker">{card.eyebrow}</p>
+                    <h3>{card.title}</h3>
+                    <strong>{card.value}</strong>
+                    <p>{card.description}</p>
+                    {card.copyValue ? (
+                      <button type="button" onClick={() => void copyText(card.copyValue ?? "") }>
+                        {copiedValue === card.copyValue ? "Copied" : "Copy Command"}
+                      </button>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <section className="bots-dashboard-panel bots-dashboard-onboarding-panel" aria-labelledby="bots-dashboard-onboarding-title">
+              <div className="bots-dashboard-section-heading">
+                <div>
+                  <p className="bots-dashboard-kicker">Embedded Onboarding</p>
+                  <h2 id="bots-dashboard-onboarding-title">Setup Stays On The Same Page</h2>
+                </div>
+              </div>
+              <div className="bots-dashboard-runbook-tabs" role="tablist" aria-label="Onboarding selector">
+                {DASHBOARD_ONBOARDING_GUIDES.map((guide) => (
+                  <button key={guide.id} type="button" role="tab" aria-selected={onboardingTrack === guide.id} onClick={() => setOnboardingTrack(guide.id)}>
+                    {guide.label}
+                  </button>
+                ))}
+              </div>
+              <article className="bots-dashboard-onboarding-guide" role="tabpanel">
+                <div className="bots-dashboard-onboarding-guide__intro">
+                  <h3>{activeGuide.title}</h3>
+                  <p>{activeGuide.summary}</p>
+                </div>
+                <div className="bots-dashboard-onboarding-grid">
+                  <section>
+                    <h4>Steps</h4>
+                    <ol>
+                      {activeGuide.steps.map((step) => <li key={step}>{step}</li>)}
+                    </ol>
+                  </section>
+                  <section>
+                    <h4>Commands & entries</h4>
+                    {activeGuide.commands.map((command) => (
+                      <div className="bots-dashboard-command" key={command.command}>
+                        <div>
+                          <strong>{command.label}</strong>
+                          <small>{command.detail}</small>
+                        </div>
+                        <code>{command.command}</code>
+                        <button type="button" onClick={() => void copyText(command.command)}>{copiedValue === command.command ? "Copied" : "Copy"}</button>
+                      </div>
+                    ))}
+                  </section>
+                </div>
+              </article>
+            </section>
+          </>
+        )}
+
         {(activeView === "overview" || activeView === "api") && (
           <section className="bots-dashboard-panel bots-dashboard-config-panel" aria-labelledby="bots-dashboard-config-title">
             <div className="bots-dashboard-section-heading">
@@ -932,7 +1965,7 @@ export function CommunityBotsDashboard() {
                 <h2 id="bots-dashboard-config-title">API Target & Probe Console</h2>
               </div>
               <div className="bots-dashboard-actions">
-                <button type="button" onClick={() => void refreshStatus()}>Refresh Status</button>
+                <button type="button" onClick={() => void refreshRuntimeData()}>Refresh Status</button>
                 <button type="button" onClick={() => void runPublicProbes()}>Run Public Probes</button>
               </div>
             </div>
@@ -956,7 +1989,7 @@ export function CommunityBotsDashboard() {
                 </label>
                 <label className="bots-dashboard-field">
                   <span>Bearer token for signed probes</span>
-                  <input value={bearerToken} onChange={(event) => setBearerToken(event.target.value)} type="password" placeholder="Paste token for local testing only" autoComplete="off" />
+                  <input value={bearerToken} onChange={(event) => setBearerToken(event.target.value)} type="password" placeholder="Auto-loads from the standalone app when available" autoComplete="off" />
                 </label>
                 <div className="bots-dashboard-toggle-grid" aria-label="Console preferences">
                   <label><input type="checkbox" checked={prefs.compactEndpoints} onChange={(event) => updatePrefs({ compactEndpoints: event.target.checked })} /> Compact endpoint cards</label>

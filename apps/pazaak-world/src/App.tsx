@@ -976,6 +976,11 @@ function ModeSelectionScreen({
     onStartLocalGame(localDifficulty, selectedLocalOpponentId);
   };
 
+  const handleLocalOpponentDoubleClick = (opponent: LocalOpponentProfile) => {
+    handleLocalOpponentChange(opponent.id);
+    onStartLocalGame(opponent.difficulty, opponent.id);
+  };
+
   return (
     <div className="pazaak-world-page">
       <nav className="pazaak-world-nav">
@@ -1093,6 +1098,7 @@ function ModeSelectionScreen({
             <div>
               <h2 id="pazaak-opponent-catalogue-title"><span aria-hidden="true">{menuIcon("user")}</span>Opponent Catalogue</h2>
               <p>{availableOpponents.length} merged profiles from HoloPazaak, PazaakWorld, and Activity practice.</p>
+              <p className="pazaak-world-opponents__hint">Double-click any opponent card to challenge instantly.</p>
             </div>
             <button className="pazaak-world-button pazaak-world-button--galaxy" onClick={() => onStartLocalGame(selectedOpponent.difficulty, selectedOpponent.id)}>
               <span aria-hidden="true">{menuIcon("target")}</span>
@@ -1111,7 +1117,9 @@ function ModeSelectionScreen({
                         key={opponent.id}
                         className={`pazaak-world-opponent-chip ${opponent.id === selectedOpponent.id ? "pazaak-world-opponent-chip--active" : ""}`}
                         onClick={() => handleLocalOpponentChange(opponent.id)}
+                        onDoubleClick={() => handleLocalOpponentDoubleClick(opponent)}
                         aria-pressed={opponent.id === selectedOpponent.id}
+                        title="Double-click to challenge instantly"
                       >
                         <span>{opponent.name}</span>
                         <small>{opponent.archetype}</small>
