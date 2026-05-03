@@ -1684,6 +1684,7 @@ function MatchmakingScreen({
         const match = await fetchMyMatch(accessToken);
         if (!active) return;
         if (match) {
+          await leaveMatchmaking(accessToken);
           onEnterMatch(match);
           return;
         }

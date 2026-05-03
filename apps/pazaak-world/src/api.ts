@@ -209,11 +209,11 @@ let nakamaMatchmakingSession: {
   queue: MatchmakingQueueRecord;
 } | null = null;
 
-function nakamaClearMatchmakingSocket(accessToken: string): boolean {
+async function nakamaDisconnectMatchmaking(accessToken: string): Promise<boolean> {
   const cur = nakamaMatchmakingSession;
   if (!cur || cur.accessToken !== accessToken) return false;
   try {
-    void cur.socket.removeMatchmaker(cur.ticket);
+    await cur.socket.removeMatchmaker(cur.ticket);
   } catch {
     /* ticket may already be consumed */
   }
@@ -536,15 +536,47 @@ export async function enqueueMatchmaking(
   preferredRegions?: string[],
 ): Promise<EnqueueMatchmakingResult> {
   if (isNakamaBackend()) {
-    const data = await nakamaRpc<{ queue: MatchmakingQueueRecord | null; match?: SerializedMatch | null }>(
-      accessToken,
-      "pazaak.matchmaking_enqueue",
-      {
-        preferredMaxPlayers,
-        ...(preferredRegions?.length ? { preferredRegions } : {}),
-      },
-    );
-    return { queue: data.queue ?? null, match: data.match ?? null };
+    await nakamaDisconnectMatchmaking(accessToken);
+
+    const me = await nakamaRpc<MeResponse>(accessToken, "pazaak.me", {});
+    const session = await sessionFromPazaakAccessToken(accessToken);
+    const socket = getNakamaClient().createSocket(nakamaUseSsl()) as DefaultSocket;
+
+    const partySize = Math.max(2, Math.min(8, Math.floor(preferredMaxPlayers) || 2));
+    const minOpponents = partySize - 1;
+    const maxOpponents = minOpponents;
+
+    const stringProps: Record<string, string> = {};
+    if (preferredRegions?.length) stringProps.region = preferredRegions[0]!;
+
+    await socket.connect(session, false);
+    const ticketRes = await socket.addMatchmaker("*", minOpponents, maxOpponents, stringProps);
+    const ticket = ticketRes.ticket;
+
+    const queue: MatchmakingQueueRecord = {
+      userId: me.user.id,
+      displayName: me.user.displayName,
+      mmr: me.wallet.mmr,
+      preferredMaxPlayers: partySize,
+      enqueuedAt: new Date().toISOString(),
+    };
+
+    nakamaMatchmakingSession = { accessToken, socket, ticket, queue };
+
+    socket.onmatchmakermatched = async (mm) => {
+      const held = nakamaMatchmakingSession;
+      if (!held || held.socket !== socket) return;
+      try {
+        await socket.joinMatch(undefined, mm.token);
+      } catch {
+        /* presence may already be joined via another path */
+      } finally {
+        socket.disconnect(false);
+        if (nakamaMatchmakingSession?.socket === socket) nakamaMatchmakingSession = null;
+      }
+    };
+
+    return { queue, match: null };
   }
   const data = await apiFetch<QueueResponse & { match?: SerializedMatch | null }>("/api/matchmaking/enqueue", accessToken, {
     method: "POST",
@@ -558,8 +590,13 @@ export async function enqueueMatchmaking(
 
 export async function leaveMatchmaking(accessToken: string): Promise<boolean> {
   if (isNakamaBackend()) {
-    const data = await nakamaRpc<{ removed: boolean }>(accessToken, "pazaak.matchmaking_leave", {});
-    return data.removed;
+    const removed = await nakamaDisconnectMatchmaking(accessToken);
+    try {
+      await nakamaRpc<{ removed: boolean }>(accessToken, "pazaak.matchmaking_leave", {});
+    } catch {
+      /* ignore */
+    }
+    return removed;
   }
   const data = await apiFetch<{ removed: boolean }>("/api/matchmaking/leave", accessToken, { method: "POST" });
   return data.removed;
@@ -567,6 +604,8 @@ export async function leaveMatchmaking(accessToken: string): Promise<boolean> {
 
 export async function fetchMatchmakingStatus(accessToken: string): Promise<MatchmakingQueueRecord | null> {
   if (isNakamaBackend()) {
+    const local = nakamaMatchmakingSession?.accessToken === accessToken ? nakamaMatchmakingSession.queue : null;
+    if (local) return local;
     const data = await nakamaRpc<QueueResponse>(accessToken, "pazaak.matchmaking_status", {});
     return data.queue ?? null;
   }
