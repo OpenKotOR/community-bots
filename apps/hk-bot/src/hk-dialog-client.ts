@@ -97,7 +97,8 @@ export const createHkDialogClient = (options: HkDialogClientOptions): HkDialogCl
             }),
             options.timeoutMs,
           );
-          const raw = completion.choices[0].message.content;
+          const firstChoice = completion.choices.at(0);
+          const raw = firstChoice?.message.content;
           if (raw) {
             return sanitizeHkDialogReply(raw, options.maxReplyChars);
           }
