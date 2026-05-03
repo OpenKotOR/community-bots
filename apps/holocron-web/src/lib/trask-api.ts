@@ -91,11 +91,11 @@ export async function traskLogout(): Promise<void> {
   await fetch(`${apiBase()}/api/trask/auth/logout`, traskRequestInit(undefined, { method: 'POST' }))
 }
 
-/** Public capability URL: persisted threads only (e.g. opened from Discord). */
-export async function traskGetThread(threadId: string): Promise<TraskHistoryRecordDto[]> {
+/** Thread history for the authenticated session (same auth as `/history` / `/ask`). */
+export async function traskGetThread(threadId: string, apiKey?: string): Promise<TraskHistoryRecordDto[]> {
   const res = await fetch(
     `${apiBase()}/api/trask/thread/${encodeURIComponent(threadId)}`,
-    traskRequestInit(undefined, { method: 'GET' }),
+    traskRequestInit(apiKey, { method: 'GET' }),
   )
   const data = (await res.json()) as { history?: TraskHistoryRecordDto[]; error?: string }
   if (!res.ok) {
@@ -132,7 +132,7 @@ export async function traskListHistory(
 
 /**
  * Starts a Trask retrieval. When the server persists queries (logged-in / API-key sessions),
- * responds with **202** and `pending`; poll `traskGetThread(threadId)` until `complete` | `failed`.
+ * responds with **202** and `pending`; poll `traskGetThread(threadId, apiKey)` until `complete` | `failed`.
  * Anonymous non-persist mode returns **201** with a finished record in one shot.
  */
 export async function traskAsk(

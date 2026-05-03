@@ -328,33 +328,27 @@ export const createTraskHttpRouter = <TUser extends TraskHttpUser = TraskHttpUse
 
 
 
-  router.get("/thread/:threadId", async (req: Request, res: Response) => {
+  router.get(
+    "/thread/:threadId",
+    options.auth.requireAuth(async (req, res, user) => {
+      try {
+        const threadId = typeof req.params.threadId === "string" ? req.params.threadId.trim() : "";
 
-    try {
+        if (!isTraskThreadId(threadId)) {
+          res.status(400).json({ error: "Invalid thread id." });
+          return;
+        }
 
-      const threadId = typeof req.params.threadId === "string" ? req.params.threadId.trim() : "";
+        const trask = requireRuntime();
+        // Scope to the authenticated principal so UUID thread ids are not a public capability URL.
+        const history = await trask.queryRepository.listForUser(user.id, 100, threadId);
 
-      if (!isTraskThreadId(threadId)) {
-
-        res.status(400).json({ error: "Invalid thread id." });
-
-        return;
-
+        res.json({ history: history.map(mapTraskQueryRecord) });
+      } catch (err) {
+        handleTraskError(res, err as AuthHandlerThrown);
       }
-
-      const trask = requireRuntime();
-
-      const history = await trask.queryRepository.listForThread(threadId);
-
-      res.json({ history: history.map(mapTraskQueryRecord) });
-
-    } catch (err) {
-
-      handleTraskError(res, err as AuthHandlerThrown);
-
-    }
-
-  });
+    }),
+  );
 
 
 

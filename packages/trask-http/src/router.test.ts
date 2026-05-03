@@ -247,7 +247,7 @@ test("POST /ask persists, returns 202, completes asynchronously", async () => {
   assert.ok(String(row?.answer).includes("Stub answer"));
 });
 
-test("GET /thread/:threadId returns persisted rows", async () => {
+test("GET /thread/:threadId returns persisted rows for the authenticated user", async () => {
   const queryRepository = new JsonTraskQueryRepository(path.join(tmpDir, `q3-${Math.random()}.json`));
   const searchProvider = {
     async listSources() {
@@ -272,18 +272,26 @@ test("GET /thread/:threadId returns persisted rows", async () => {
         queryRepository,
       },
       auth: {
-        requireAuth: (handler) => async (req, res) => handler(req, res, { id: "user-1" }),
+        requireAuth: (handler) => async (req, res) => {
+          const raw = req.headers["x-test-user"];
+          const id = typeof raw === "string" && raw.trim() ? raw.trim() : "user-1";
+          await handler(req, res, { id });
+        },
       },
     }),
   );
 
-  const created = await request(app).post("/api/trask/ask").send({ query: "Threaded?" });
+  const created = await request(app).post("/api/trask/ask").set("X-Test-User", "alice").send({ query: "Threaded?" });
   assert.equal(created.status, 202);
   const threadId = created.body.query?.threadId as string;
 
+  const alien = await request(app).get(`/api/trask/thread/${threadId}`).set("X-Test-User", "bob");
+  assert.equal(alien.status, 200);
+  assert.equal(alien.body.history?.length, 0);
+
   let pubRow: { query?: string; status?: string } | undefined;
   for (let i = 0; i < 40; i++) {
-    const pub = await request(app).get(`/api/trask/thread/${threadId}`);
+    const pub = await request(app).get(`/api/trask/thread/${threadId}`).set("X-Test-User", "alice");
     assert.equal(pub.status, 200);
     assert.equal(pub.body.history?.length, 1);
     pubRow = pub.body.history[0];
@@ -292,6 +300,50 @@ test("GET /thread/:threadId returns persisted rows", async () => {
   }
   assert.equal(pubRow?.query, "Threaded?");
   assert.equal(pubRow?.status, "complete");
+});
+
+test("GET /thread/:threadId requires authentication", async () => {
+  const queryRepository = new JsonTraskQueryRepository(path.join(tmpDir, `q3b-${Math.random()}.json`));
+  const searchProvider = {
+    async listSources() {
+      return [];
+    },
+    async search() {
+      return [];
+    },
+    async queueReindex() {
+      return { queuedSourceIds: [] as string[], mode: "file-queue" as const };
+    },
+  };
+
+  const app = express();
+  app.use(express.json());
+  app.use(
+    "/api/trask",
+    createTraskHttpRouter({
+      runtime: {
+        searchProvider,
+        researchWizard: mockWizard,
+        queryRepository,
+      },
+      auth: {
+        requireAuth: (handler) => async (req, res) => {
+          if (req.headers.authorization !== "Bearer ok") {
+            res.status(401).json({ error: "nope" });
+            return;
+          }
+          await handler(req, res, { id: "user-1" });
+        },
+      },
+    }),
+  );
+
+  const tid = "aaaaaaaa-bbbb-4ccc-dddd-eeeeeeeeeeee";
+  const unauth = await request(app).get(`/api/trask/thread/${tid}`);
+  assert.equal(unauth.status, 401);
+
+  const auth = await request(app).get(`/api/trask/thread/${tid}`).set("Authorization", "Bearer ok");
+  assert.equal(auth.status, 200);
 });
 
 test("anonymous persistQueries=false skips disk but still returns threadId", async () => {
