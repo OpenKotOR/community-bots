@@ -10,6 +10,8 @@ on:
       - "apps/holocron-web/**"
       - "apps/trask-http-server/**"
       - "packages/**"
+      - "vendor/**"
+      - "wiki/**"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - ".gitmodules"
