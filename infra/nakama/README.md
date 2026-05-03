@@ -26,6 +26,16 @@ The local stack intentionally uses `defaultkey` for development. Use unique
 server keys, session encryption keys, runtime HTTP keys, and managed secret
 injection for any shared or production environment.
 
+**Security:** the client uses Nakama `authenticateCustom` with an `openkotor:*`
+stable id for Discord-linked accounts without a server-side token exchange in
+this dev path. For production, add a `beforeAuthenticateCustom` hook (or exchange
+Discord OAuth on your API and mint signed credentials) so accounts cannot be
+impersonated.
+
+**Live tournament WebSocket feeds** (`subscribeToTournaments`) still require the
+legacy Worker or bot relay; Nakama RPC polling covers CRUD until a socket story
+is added (e.g. Nakama realtime channel).
+
 ## Runtime surface
 
 The bundled runtime registers:

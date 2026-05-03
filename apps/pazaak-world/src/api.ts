@@ -201,6 +201,27 @@ function nakamaUseSsl(): boolean {
   return raw === "1" || raw === "true" || raw === "yes";
 }
 
+/** Nakama ranked queue uses the built-in matchmaker; ticket is tied to this socket until matched or cancelled. */
+let nakamaMatchmakingSession: {
+  accessToken: string;
+  socket: DefaultSocket;
+  ticket: string;
+  queue: MatchmakingQueueRecord;
+} | null = null;
+
+function nakamaClearMatchmakingSocket(accessToken: string): boolean {
+  const cur = nakamaMatchmakingSession;
+  if (!cur || cur.accessToken !== accessToken) return false;
+  try {
+    void cur.socket.removeMatchmaker(cur.ticket);
+  } catch {
+    /* ticket may already be consumed */
+  }
+  cur.socket.disconnect(false);
+  nakamaMatchmakingSession = null;
+  return true;
+}
+
 const NAKAMA_OP_SNAPSHOT = 1;
 const NAKAMA_OP_COMMAND = 2;
 const NAKAMA_OP_CHAT = 3;
