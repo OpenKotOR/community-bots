@@ -62,6 +62,15 @@ const readBooleanEnv = (name: string, env: NodeJS.ProcessEnv = process.env): boo
   throw new Error(`Invalid boolean value for environment variable ${name}: ${value}`);
 };
 
+/** Holocron browser sessions: anonymous OK when no `TRASK_WEB_API_KEY` unless explicitly disabled. */
+const resolveTraskWebAllowAnonymous = (env: NodeJS.ProcessEnv): boolean => {
+  const explicit = readBooleanEnv("TRASK_WEB_ALLOW_ANONYMOUS", env);
+  if (explicit !== undefined) {
+    return explicit;
+  }
+  return !Boolean(readOptionalEnv("TRASK_WEB_API_KEY", env)?.trim());
+};
+
 const readListEnv = (name: string, env: NodeJS.ProcessEnv = process.env): string[] => {
   const value = readOptionalEnv(name, env);
 
@@ -152,14 +161,48 @@ const resolveGptResearcherRoot = (env: NodeJS.ProcessEnv): string | undefined =>
   return undefined;
 };
 
+/**
+ * Prefer the monorepo bootstrap venv (scripts/bootstrap_trask_gpt_researcher.*) when
+ * `TRASK_GPT_RESEARCHER_PYTHON` is unset so Trask HTTP / Discord match `smoke_trask_headless_gptr.py`.
+ */
+const resolveTraskHeadlessPythonExecutable = (
+  gptResearcherRoot: string | undefined,
+  env: NodeJS.ProcessEnv,
+): string => {
+  const explicit = readOptionalEnv("TRASK_GPT_RESEARCHER_PYTHON", env)?.trim();
+  if (explicit) {
+    return explicit;
+  }
+
+  if (!gptResearcherRoot) {
+    return "python";
+  }
+
+  const vendorDir = dirname(gptResearcherRoot);
+  const repoRoot = dirname(vendorDir);
+  const winPy = join(repoRoot, ".venv-trask-gptr", "Scripts", "python.exe");
+  const unixPy = join(repoRoot, ".venv-trask-gptr", "bin", "python");
+
+  if (process.platform === "win32" && existsSync(winPy)) {
+    return winPy;
+  }
+
+  if (existsSync(unixPy)) {
+    return unixPy;
+  }
+
+  return "python";
+};
+
 export const loadResearchWizardRuntimeConfig = (env: NodeJS.ProcessEnv = process.env): ResearchWizardRuntimeConfig => {
   const scriptRaw = readOptionalEnv("TRASK_GPT_RESEARCHER_SCRIPT", env);
+  const gptResearcherRoot = resolveGptResearcherRoot(env);
 
   return {
-    gptResearcherRoot: resolveGptResearcherRoot(env),
-    pythonExecutable: readOptionalEnv("TRASK_GPT_RESEARCHER_PYTHON", env)?.trim() ?? "python",
+    gptResearcherRoot,
+    pythonExecutable: resolveTraskHeadlessPythonExecutable(gptResearcherRoot, env),
     headlessScriptPath: scriptRaw ? resolve(scriptRaw.trim()) : undefined,
-    timeoutMs: integerish.parse(readOptionalEnv("TRASK_RESEARCHWIZARD_TIMEOUT_MS", env) ?? "120000"),
+    timeoutMs: integerish.parse(readOptionalEnv("TRASK_RESEARCHWIZARD_TIMEOUT_MS", env) ?? "180000"),
   };
 };
 
@@ -333,7 +376,7 @@ export const loadTraskBotConfig = (env: NodeJS.ProcessEnv = process.env): TraskB
     webSessionSecret: readOptionalEnv("TRASK_SESSION_SECRET", env),
     webOAuthRedirectUri: readOptionalEnv("TRASK_WEB_OAUTH_REDIRECT_URI", env),
     webApiKey: readOptionalEnv("TRASK_WEB_API_KEY", env),
-    webAllowAnonymous: readBooleanEnv("TRASK_WEB_ALLOW_ANONYMOUS", env) ?? false,
+    webAllowAnonymous: resolveTraskWebAllowAnonymous(env),
     webDefaultUserId: readOptionalEnv("TRASK_WEB_DEFAULT_USER_ID", env) ?? "qa-webui",
     holocronPublicUrl: readOptionalEnv("TRASK_HOLOCRON_PUBLIC_URL", env),
     proactive: {
@@ -415,7 +458,7 @@ export const loadTraskHttpServerConfig = (env: NodeJS.ProcessEnv = process.env):
     ai: loadSharedAiConfig(env),
     dataDir: readOptionalEnv("TRASK_HTTP_DATA_DIR", env) ?? "data/trask-http-server",
     webApiKey: readOptionalEnv("TRASK_WEB_API_KEY", env),
-    webAllowAnonymous: readBooleanEnv("TRASK_WEB_ALLOW_ANONYMOUS", env) ?? false,
+    webAllowAnonymous: resolveTraskWebAllowAnonymous(env),
     webDefaultUserId: readOptionalEnv("TRASK_WEB_DEFAULT_USER_ID", env) ?? "qa-webui",
     chunkDir: readOptionalEnv("INGEST_STATE_DIR", env) ?? "data/ingest-worker",
     publicWebOrigin: readOptionalEnv("TRASK_PUBLIC_WEB_ORIGIN", env),

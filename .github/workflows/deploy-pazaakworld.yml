@@ -7,6 +7,8 @@ on:
     paths:
       - "apps/pazaak-world/**"
       - "apps/hk86-web/**"
+      - "apps/holocron-web/**"
+      - "apps/trask-http-server/**"
       - "packages/**"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"

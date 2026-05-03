@@ -64,6 +64,65 @@ const runtime = {
 };
 
 const app = express();
+
+/** In-memory Spark KV shim so qa-webui static builds stop hammering 404 on `/__spark-kv/*`. */
+const sparkKvStore = new Map<string, string>();
+const readSparkKvBody = (req: Request): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk: Buffer) => chunks.push(chunk));
+    req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    req.on("error", reject);
+  });
+
+app.use((req, res, next) => {
+  const pathname = (req.path.split("?")[0] ?? "").replace(/\/+$/, "") || "/";
+  if (!pathname.startsWith("/__spark-kv")) {
+    next();
+    return;
+  }
+
+  let subpath = pathname.slice("/__spark-kv".length);
+  if (subpath.startsWith("/")) {
+    subpath = subpath.slice(1);
+  }
+  const key = subpath ? decodeURIComponent(subpath.split("/")[0]!) : "";
+
+  void (async () => {
+    try {
+      if (req.method === "GET" && !key) {
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify([...sparkKvStore.keys()]));
+        return;
+      }
+      if (req.method === "GET" && key) {
+        const value = sparkKvStore.get(key);
+        if (value === undefined) {
+          res.status(404).end();
+          return;
+        }
+        res.setHeader("Content-Type", "text/plain");
+        res.end(value);
+        return;
+      }
+      if (req.method === "POST" && key) {
+        const body = await readSparkKvBody(req);
+        sparkKvStore.set(key, body);
+        res.status(200).end();
+        return;
+      }
+      if (req.method === "DELETE" && key) {
+        sparkKvStore.delete(key);
+        res.status(204).end();
+        return;
+      }
+      res.status(405).end();
+    } catch {
+      res.status(500).end();
+    }
+  })();
+});
+
 app.use(express.json());
 
 const allowedCorsOrigins = buildBrowserCorsAllowedOrigins({
@@ -101,7 +160,7 @@ if (existsSync(webUiDist)) {
   app.use(express.static(webUiDist));
   app.use((req, res, next) => {
     if (req.method !== "GET" && req.method !== "HEAD") return next();
-    if (req.path.startsWith("/api")) return next();
+    if (req.path.startsWith("/api") || req.path.startsWith("/__spark-kv")) return next();
     res.sendFile(path.join(webUiDist, "index.html"));
   });
   logger.info(`Serving Holocron web static files from ${webUiDist}`);
