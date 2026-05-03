@@ -101,15 +101,15 @@ export const buildReactionsStatusEmbed = (opts: {
 
   const snap = opts.snapshot;
   const lines = snap.panels.map((p, i) => {
-    const mapCount = p.mappings.length;
-    return `**${i + 1}.** ch \`${p.channelId}\` · msg \`${p.messageId}\` · ${mapCount} mapping(s) · announce **${p.announceMode}**`;
+    const mapCount = String(p.mappings.length);
+    return `**${String(i + 1)}.** ch \`${p.channelId}\` · msg \`${p.messageId}\` · ${mapCount} mapping(s) · announce **${p.announceMode}**`;
   });
 
   return buildInfoEmbed({
     title: "Reaction config status",
     description: [
       `**File:** \`${path}\``,
-      `**Default announce:** ${snap.defaultAnnounceMode} · **Cooldown:** ${snap.replyCooldownMs}ms`,
+      `**Default announce:** ${snap.defaultAnnounceMode} · **Cooldown:** ${String(snap.replyCooldownMs)}ms`,
       snap.panels.length ? ["**Panels:**", ...lines].join("\n") : "**Panels:** none (empty array — no reaction routing).",
     ].join("\n\n"),
   });

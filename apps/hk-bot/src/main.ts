@@ -16,6 +16,9 @@ import { JsonDesignationPresetRepository, resolveDataFile } from "@openkotor/per
 import { asBulletList, buildErrorEmbed, buildInfoEmbed, buildSuccessEmbed, buildWarningEmbed } from "@openkotor/discord-ui";
 import { findCuratedRoleById, groupCuratedRolesByCategory, hkCuratedRoles, personaProfiles } from "@openkotor/personas";
 
+import { HkGuardConfigLoader } from "./guard-config.js";
+import { registerHkGuardHandlers } from "./guard-handlers.js";
+import { createHkDialogClient } from "./hk-dialog-client.js";
 import { getBotMember, mutateMemberRole } from "./member-role-mutate.js";
 import { ReactionRoleConfigLoader } from "./reaction-role-config.js";
 import { registerReactionRoleHandlers } from "./reaction-role-handlers.js";
@@ -28,6 +31,14 @@ const reactionRoleConfigLoader = new ReactionRoleConfigLoader(
   resolveDataFile(config.dataDir, "reaction-role-panels.json"),
   logger,
 );
+const guardConfigLoader = new HkGuardConfigLoader(resolveDataFile(config.dataDir, "hk-guard.json"), logger);
+const hkDialog = createHkDialogClient({
+  enabled: config.llm.enabled,
+  ai: config.ai,
+  maxReplyChars: config.llm.maxReplyChars,
+  timeoutMs: config.llm.timeoutMs,
+  logger,
+});
 
 const designationChoices = hkCuratedRoles.map((role) => ({
   name: role.name,
@@ -275,22 +286,30 @@ const replyWithSelectionSummary = async (
   });
 };
 
-const client = createBotClient({ guildMembers: true, guildMessageReactions: true });
+const client = createBotClient({
+  guildMembers: true,
+  guildMessages: true,
+  guildMessageReactions: true,
+  messageContent: true,
+});
 
-registerReactionRoleHandlers(client, logger, reactionRoleConfigLoader);
+registerReactionRoleHandlers(client, logger, reactionRoleConfigLoader, hkDialog);
+registerHkGuardHandlers(client, logger, guardConfigLoader);
 
 client.once("ready", (readyClient) => {
   logger.info("HK designation unit online.", {
     user: readyClient.user.tag,
     designationCount: hkCuratedRoles.length,
     reactionRolePanelsPath: resolveDataFile(config.dataDir, "reaction-role-panels.json"),
+    guardConfigPath: guardConfigLoader.configPath,
   });
 });
 
-client.on("interactionCreate", async (interaction) => {
+client.on("interactionCreate", (interaction) => {
+  void (async () => {
   try {
     if (interaction.isChatInputCommand()) {
-      if (!interaction.inGuild() || !interaction.member) {
+      if (!interaction.inGuild()) {
         await interaction.reply({
           embeds: [
             buildErrorEmbed({
@@ -332,7 +351,7 @@ client.on("interactionCreate", async (interaction) => {
         }
 
         if (reactionSub === "status") {
-          if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+          if (!interaction.memberPermissions.has(PermissionFlagsBits.ManageGuild)) {
             await interaction.reply({
               embeds: [
                 buildErrorEmbed({
@@ -376,7 +395,7 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       if (subcommand === "onboarding") {
-        if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+        if (!interaction.memberPermissions.has(PermissionFlagsBits.ManageGuild)) {
           await interaction.reply({
             embeds: [
               buildErrorEmbed({
@@ -403,9 +422,7 @@ client.on("interactionCreate", async (interaction) => {
           ephemeral: true,
         });
         if (!sendEphemeral) {
-          await interaction.channel?.send({
-            ...panel,
-          });
+          await interaction.channel?.send(panel);
         }
         return;
       }
@@ -487,6 +504,7 @@ client.on("interactionCreate", async (interaction) => {
       }
     }
   }
+  })();
 });
 
 const deployables = [designationsCommand.toJSON() as RESTPostAPIApplicationCommandsJSONBody];
