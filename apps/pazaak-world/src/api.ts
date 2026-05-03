@@ -542,16 +542,21 @@ export async function enqueueMatchmaking(
     const session = await sessionFromPazaakAccessToken(accessToken);
     const socket = getNakamaClient().createSocket(nakamaUseSsl()) as DefaultSocket;
 
+    /** Nakama counts total players in the formed match (see Heroic matchmaker docs), not “opponents only”. */
     const partySize = Math.max(2, Math.min(8, Math.floor(preferredMaxPlayers) || 2));
-    const minOpponents = partySize - 1;
-    const maxOpponents = minOpponents;
 
     const stringProps: Record<string, string> = {};
     if (preferredRegions?.length) stringProps.region = preferredRegions[0]!;
 
     await socket.connect(session, false);
-    const ticketRes = await socket.addMatchmaker("*", minOpponents, maxOpponents, stringProps);
-    const ticket = ticketRes.ticket;
+    let ticket: string;
+    try {
+      const ticketRes = await socket.addMatchmaker("*", partySize, partySize, stringProps);
+      ticket = ticketRes.ticket;
+    } catch (err) {
+      socket.disconnect(false);
+      throw err;
+    }
 
     const queue: MatchmakingQueueRecord = {
       userId: me.user.id,

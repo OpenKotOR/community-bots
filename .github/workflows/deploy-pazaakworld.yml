@@ -90,6 +90,7 @@ jobs:
         env:
           BASE: /bots/hk86/
           VITE_REPO_BASE_URL: https://github.com/${{ github.repository }}
+          VITE_WIKI_BASE_URL: ${{ vars.WIKI_BASE_URL }}
           VITE_TRASK_DISCORD_APPLICATION_ID: ${{ vars.TRASK_DISCORD_APP_ID }}
           VITE_HK_DISCORD_APPLICATION_ID: ${{ vars.HK86_DISCORD_APP_ID }}
           VITE_DISCORD_APPLICATION_ID: ${{ vars.HK86_DISCORD_APP_ID }}

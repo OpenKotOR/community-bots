@@ -17,6 +17,14 @@ const DEFAULT_REPO_BASE = "https://github.com/OpenKotOR/bots";
 const repoBaseRaw = (import.meta.env.VITE_REPO_BASE_URL ?? "").trim();
 const repoBase = (repoBaseRaw || DEFAULT_REPO_BASE).replace(/\/$/, "");
 
+/** HK user guide lives on the wiki submodule (`community-bots.wiki`), not in repo `docs/guides`. */
+const DEFAULT_WIKI_BASE = "https://github.com/OpenKotOR/community-bots/wiki";
+const wikiBaseRaw = (import.meta.env.VITE_WIKI_BASE_URL ?? "").trim();
+const wikiBase = (wikiBaseRaw || DEFAULT_WIKI_BASE).replace(/\/$/, "");
+
+const wikiPage = (slug: string): string => `${wikiBase}/${slug.replace(/^\/+/, "")}`;
+const HK_GUIDE_WIKI_SLUG = "docs/guides/hk-86";
+
 function wireInvite(opts: {
   appId: string;
   inviteElId: string;
@@ -74,8 +82,8 @@ const guide = (path: string) => `${blob(path)}#quick-start`;
 const pairs: Array<[string, string]> = [
   ["trask-docs", blob("/docs/guides/trask.md")],
   ["trask-quickstart", guide("/docs/guides/trask.md")],
-  ["hk-docs", blob("/docs/guides/hk-86.md")],
-  ["hk-quickstart", guide("/docs/guides/hk-86.md")],
+  ["hk-docs", wikiPage(HK_GUIDE_WIKI_SLUG)],
+  ["hk-quickstart", `${wikiPage(HK_GUIDE_WIKI_SLUG)}#quick-start`],
   ["hk-panels-json", blob("/apps/hk-bot/reaction-role-panels.example.json")],
   ["pazaak-docs", blob("/docs/guides/pazaak.md")],
   ["pazaak-quickstart", guide("/docs/guides/pazaak.md")],
