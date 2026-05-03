@@ -7,6 +7,14 @@ import type { ReactionRoleConfigLoader, ReactionRolePanelsSnapshot } from "./rea
 /** Bitfield for OAuth invite: Manage Roles, Send Messages, Embed, History, Reactions, Slash, External Emojis, View Channel. */
 export const HK_REACTION_BOT_PERMISSIONS = "2416266304";
 
+/** Canonical HK user + operator guide (wiki submodule `community-bots.wiki`). */
+export const HK_USER_GUIDE_WIKI_URL =
+  "https://github.com/OpenKotOR/community-bots/wiki/docs/guides/hk-86";
+
+/** Example reaction panels JSON in this monorepo (`bots`). */
+export const HK_REACTION_PANELS_EXAMPLE_BLOB_URL =
+  "https://github.com/OpenKotOR/bots/blob/main/apps/hk-bot/reaction-role-panels.example.json";
+
 export const buildReactionSetupInviteUrl = (appId: string): string => {
   const params = new URLSearchParams({
     client_id: appId,
@@ -55,7 +63,8 @@ export const buildReactionsHelpEmbed = (opts: { appId: string; configPath: strin
         name: "5. Config file",
         value: [
           `- Path on the host: \`${opts.configPath}\``,
-          "- Copy `apps/hk-bot/reaction-role-panels.example.json` from this repo to that path (rename to `reaction-role-panels.json`) and replace placeholders.",
+          `- Full guide: ${HK_USER_GUIDE_WIKI_URL}`,
+          `- Example JSON: ${HK_REACTION_PANELS_EXAMPLE_BLOB_URL} — copy to that path as \`reaction-role-panels.json\` and replace placeholders.`,
           "- Prefer **`roleId`** per mapping so Discord role renames never break links.",
           "- Save the file — the bot reloads on **mtime change** (next reaction or `/designations reactions status`).",
         ].join("\n"),

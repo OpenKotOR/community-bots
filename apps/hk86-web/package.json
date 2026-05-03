@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -p tsconfig.json && vite build",
+    "build:pages": "tsc -p tsconfig.json && node scripts/build-pages.mjs",
     "preview": "vite preview"
   },
   "devDependencies": {

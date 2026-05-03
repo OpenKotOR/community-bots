@@ -14,10 +14,23 @@ import {
   updateRatingAfterGame,
   type RatingSnapshot,
 } from "@openkotor/pazaak-rating";
+import {
+  advanceTournament,
+  buildBracketView,
+  computeSwissStandings,
+  createTournament,
+  registerParticipant,
+  startTournament,
+  withdrawParticipant,
+  type TournamentFormat,
+  type TournamentState,
+} from "@openkotor/pazaak-tournament";
 
 const SYSTEM_USER_ID = "00000000-0000-0000-0000-000000000000";
 const MATCH_HANDLER = "pazaak_authoritative";
 const LEADERBOARD_ID = "pazaak_ranked_mmr";
+const TOURNAMENT_COLLECTION = "pazaak_tournaments";
+const TOURNAMENT_IDS_KEY = "tournament_ids";
 
 const enum Opcode {
   Snapshot = 1,
@@ -351,6 +364,61 @@ function saveGlobalList<T>(nk: nkruntime.Nakama, ctx: nkruntime.Context, key: st
   writeStorage(nk, ctx, "pazaak_global", key, SYSTEM_USER_ID, { items });
 }
 
+function readTournamentIdList(nk: nkruntime.Nakama, ctx: nkruntime.Context): string[] {
+  const cur = readStorage<{ ids?: unknown[] }>(nk, ctx, "pazaak_global", TOURNAMENT_IDS_KEY, SYSTEM_USER_ID);
+  return Array.isArray(cur?.ids) ? cur.ids.filter((x): x is string => typeof x === "string") : [];
+}
+
+function writeTournamentIdList(nk: nkruntime.Nakama, ctx: nkruntime.Context, ids: string[]): void {
+  writeStorage(nk, ctx, "pazaak_global", TOURNAMENT_IDS_KEY, SYSTEM_USER_ID, { ids });
+}
+
+function appendTournamentId(nk: nkruntime.Nakama, ctx: nkruntime.Context, id: string): void {
+  const ids = readTournamentIdList(nk, ctx);
+  if (!ids.includes(id)) {
+    ids.unshift(id);
+    writeTournamentIdList(nk, ctx, ids);
+  }
+}
+
+function loadTournament(nk: nkruntime.Nakama, ctx: nkruntime.Context, id: string): TournamentState | null {
+  const v = readStorage<JsonObject>(nk, ctx, TOURNAMENT_COLLECTION, id, SYSTEM_USER_ID);
+  if (!v || typeof v.id !== "string") return null;
+  return v as unknown as TournamentState;
+}
+
+function saveTournamentState(nk: nkruntime.Nakama, ctx: nkruntime.Context, state: TournamentState): void {
+  writeStorage(nk, ctx, TOURNAMENT_COLLECTION, state.id, SYSTEM_USER_ID, state as unknown as JsonObject);
+}
+
+function summarizeTournamentState(state: TournamentState): JsonObject {
+  return {
+    id: state.id,
+    name: state.name,
+    guildId: state.guildId,
+    channelId: state.channelId,
+    format: state.format,
+    gameMode: state.gameMode,
+    status: state.status,
+    currentRound: state.currentRound,
+    participants: Object.values(state.participants).map((entry) => ({
+      userId: entry.userId,
+      displayName: entry.displayName,
+      seed: entry.seed,
+      status: entry.status,
+      mmr: entry.mmr,
+    })),
+    championUserId: state.championUserId,
+    setsPerMatch: state.setsPerMatch,
+    rounds: state.rounds,
+    maxParticipants: state.maxParticipants,
+    organizerId: state.organizerId,
+    organizerName: state.organizerName,
+    createdAt: state.createdAt,
+    updatedAt: state.updatedAt,
+  };
+}
+
 function getMatchIndex(nk: nkruntime.Nakama, ctx: nkruntime.Context, matchId: string): RuntimeMatchIndex | null {
   return readStorage<RuntimeMatchIndex & JsonObject>(nk, ctx, "pazaak_matches", `index:${matchId}`, SYSTEM_USER_ID);
 }
@@ -460,6 +528,45 @@ function createHostedMatch(
     updatedAt: nowIso(),
   });
   return { match: snapshot, nakamaMatchId };
+}
+
+function matchmakerMatched(
+  ctx: nkruntime.Context,
+  logger: nkruntime.Logger,
+  nk: nkruntime.Nakama,
+  matches: nkruntime.MatchmakerResult[],
+): string {
+  if (matches.length < 2) {
+    logger.warn("matchmakerMatched: expected at least 2 players, got %d", matches.length);
+    throw new Error("Invalid matchmaker group size.");
+  }
+  const sorted = [...matches].sort((a, b) => String(a.presence.userId).localeCompare(String(b.presence.userId)));
+  const first = sorted[0]!;
+  const second = sorted[1]!;
+  const p1Id = String(first.presence.userId);
+  const p2Id = String(second.presence.userId);
+  const logicalMatchId = randomId();
+  const params: Record<string, string> = {
+    matchId: logicalMatchId,
+    playerOneId: p1Id,
+    playerOneName: displayNameFor(nk, ctx, p1Id),
+    playerTwoId: p2Id,
+    playerTwoName: displayNameFor(nk, ctx, p2Id),
+    gameMode: "canonical",
+    setsToWin: "3",
+    wager: "0",
+  };
+  const nakamaMatchId = nk.matchCreate(ctx, MATCH_HANDLER, params);
+  saveMatchIndex(nk, ctx, {
+    matchId: logicalMatchId,
+    nakamaMatchId,
+    playerIds: [p1Id, p2Id],
+    completed: false,
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  });
+  logger.info("matchmakerMatched created match %s nakama=%s", logicalMatchId, nakamaMatchId);
+  return nakamaMatchId;
 }
 
 function settleIfNeeded(
@@ -747,58 +854,31 @@ function rpcHistory(ctx: nkruntime.Context, _logger: nkruntime.Logger, nk: nkrun
   return json({ history: (current?.history ?? []).slice(0, Math.max(1, Math.min(100, limit))) });
 }
 
-function rpcQueueEnqueue(ctx: nkruntime.Context, _logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
-  const userId = requireUser(ctx);
-  const body = parsePayload(payload);
-  const wallet = getWallet(nk, ctx, userId);
-  const queue = getGlobalList<RuntimeQueueRecord>(nk, ctx, "queue").filter((item) => item.userId !== userId);
-  const preferredRegions = Array.isArray(body.preferredRegions) ? body.preferredRegions.map(String) : [];
-  const entry: RuntimeQueueRecord = {
-    userId,
-    displayName: wallet.displayName,
-    mmr: wallet.mmr,
-    preferredMaxPlayers: Number(body.preferredMaxPlayers ?? 2),
-    enqueuedAt: nowIso(),
-    ...(preferredRegions.length > 0 ? { preferredRegions } : {}),
-  };
-
-  const opponentIndex = queue.findIndex((item) => item.userId !== userId);
-  if (opponentIndex !== -1) {
-    const opponent = queue.splice(opponentIndex, 1)[0]!;
-    saveGlobalList(nk, ctx, "queue", queue);
-    const hosted = createHostedMatch(nk, ctx, {
-      playerOneId: opponent.userId,
-      playerOneName: opponent.displayName,
-      playerTwoId: userId,
-      playerTwoName: wallet.displayName,
-      gameMode: "canonical",
-    });
-    return json({ queue: null, match: { ...hosted.match, nakamaMatchId: hosted.nakamaMatchId } });
-  }
-
-  queue.push(entry);
-  saveGlobalList(nk, ctx, "queue", queue);
-  return json({ queue: entry });
+function rpcQueueEnqueue(ctx: nkruntime.Context, _logger: nkruntime.Logger, _nk: nkruntime.Nakama, payload: string): string {
+  requireUser(ctx);
+  void parsePayload(payload);
+  return json({
+    queue: null,
+    match: null,
+    nakamaMatchmaker: true,
+    message: "Ranked queue uses the Nakama realtime matchmaker (socket.addMatchmaker); this RPC is unused.",
+  });
 }
 
-function rpcQueueLeave(ctx: nkruntime.Context, _logger: nkruntime.Logger, nk: nkruntime.Nakama): string {
-  const userId = requireUser(ctx);
-  const before = getGlobalList<RuntimeQueueRecord>(nk, ctx, "queue");
-  const after = before.filter((item) => item.userId !== userId);
-  saveGlobalList(nk, ctx, "queue", after);
-  return json({ removed: before.length !== after.length });
+function rpcQueueLeave(ctx: nkruntime.Context, _logger: nkruntime.Logger, _nk: nkruntime.Nakama): string {
+  requireUser(ctx);
+  return json({ removed: false, nakamaMatchmaker: true });
 }
 
-function rpcQueueStatus(ctx: nkruntime.Context, _logger: nkruntime.Logger, nk: nkruntime.Nakama): string {
-  const userId = requireUser(ctx);
-  return json({ queue: getGlobalList<RuntimeQueueRecord>(nk, ctx, "queue").find((item) => item.userId === userId) ?? null });
+function rpcQueueStatus(ctx: nkruntime.Context, _logger: nkruntime.Logger, _nk: nkruntime.Nakama): string {
+  requireUser(ctx);
+  return json({ queue: null });
 }
 
 function rpcQueueStats(ctx: nkruntime.Context, _logger: nkruntime.Logger, nk: nkruntime.Nakama): string {
-  const queue = getGlobalList<RuntimeQueueRecord>(nk, ctx, "queue");
   const lobbies = getGlobalList<RuntimeLobby>(nk, ctx, "lobbies").filter((lobby) => lobby.status !== "closed");
   return json({
-    playersInQueue: queue.length,
+    playersInQueue: 0,
     openLobbies: lobbies.length,
     activeGames: 0,
     averageWaitSeconds: 0,
@@ -992,12 +1072,144 @@ function rpcMatchGet(ctx: nkruntime.Context, _logger: nkruntime.Logger, nk: nkru
   return json({ match: snapshot ? { ...snapshot, nakamaMatchId: index?.nakamaMatchId } : null });
 }
 
-function rpcTournamentsList(): string {
-  return json({ tournaments: [] });
+function rpcTournamentsList(ctx: nkruntime.Context, _logger: nkruntime.Logger, nk: nkruntime.Nakama, _payload: string): string {
+  const ids = readTournamentIdList(nk, ctx);
+  const tournaments: JsonObject[] = [];
+  for (const id of ids) {
+    const t = loadTournament(nk, ctx, id);
+    if (t) tournaments.push(summarizeTournamentState(t));
+  }
+  tournaments.sort((a, b) => Number(b.createdAt) - Number(a.createdAt));
+  return json({ tournaments });
 }
 
-function rpcTournamentDetail(): string {
-  return json({ tournament: null, bracket: { rounds: [] }, standings: null });
+function rpcTournamentDetail(ctx: nkruntime.Context, _logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
+  const id = String(parsePayload(payload).tournamentId ?? "");
+  const tournament = id ? loadTournament(nk, ctx, id) : null;
+  if (!tournament) {
+    return json({ tournament: null, bracket: { columns: [] }, standings: null });
+  }
+  return json({
+    tournament: tournament as unknown as JsonObject,
+    bracket: buildBracketView(tournament),
+    standings: tournament.format === "swiss" ? computeSwissStandings(tournament) : null,
+  });
+}
+
+function rpcTournamentCreate(ctx: nkruntime.Context, _logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
+  const userId = requireUser(ctx);
+  const body = parsePayload(payload);
+  const formatRaw = String(body.format ?? "single_elim");
+  const format: TournamentFormat =
+    formatRaw === "double_elim" || formatRaw === "swiss" ? formatRaw : "single_elim";
+  const modeRaw = String(body.gameMode ?? body.mode ?? "canonical");
+  const gameMode = modeRaw === "wacky" ? "wacky" : "canonical";
+  const organizerName = displayNameFor(nk, ctx, userId);
+  const tournament = createTournament({
+    name: String(body.name ?? "Unnamed Tournament").slice(0, 64),
+    organizerId: userId,
+    organizerName,
+    format,
+    gameMode,
+    setsPerMatch: Math.max(1, Math.min(9, Number(body.setsPerMatch ?? 3) || 3)),
+    rounds: Math.max(2, Math.min(12, Number(body.rounds ?? 5) || 5)),
+    maxParticipants: typeof body.maxParticipants === "number" ? body.maxParticipants : null,
+    guildId: null,
+    channelId: null,
+  });
+  appendTournamentId(nk, ctx, tournament.id);
+  saveTournamentState(nk, ctx, tournament);
+  return json({ tournament: tournament as unknown as JsonObject });
+}
+
+function rpcTournamentJoin(ctx: nkruntime.Context, _logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
+  const userId = requireUser(ctx);
+  const id = String(parsePayload(payload).tournamentId ?? "");
+  const tournament = id ? loadTournament(nk, ctx, id) : null;
+  if (!tournament) throw new Error("Tournament not found.");
+  const wallet = getWallet(nk, ctx, userId);
+  let next: TournamentState;
+  try {
+    next = registerParticipant(tournament, {
+      userId,
+      displayName: wallet.displayName,
+      mmr: wallet.mmr,
+    });
+  } catch (err) {
+    throw new Error(err instanceof Error ? err.message : "Registration failed.");
+  }
+  saveTournamentState(nk, ctx, next);
+  return json({ tournament: next as unknown as JsonObject });
+}
+
+function rpcTournamentLeave(ctx: nkruntime.Context, _logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
+  const userId = requireUser(ctx);
+  const id = String(parsePayload(payload).tournamentId ?? "");
+  const tournament = id ? loadTournament(nk, ctx, id) : null;
+  if (!tournament) throw new Error("Tournament not found.");
+  const next = withdrawParticipant(tournament, userId);
+  saveTournamentState(nk, ctx, next);
+  return json({ tournament: next as unknown as JsonObject });
+}
+
+function rpcTournamentStart(ctx: nkruntime.Context, _logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
+  const userId = requireUser(ctx);
+  const id = String(parsePayload(payload).tournamentId ?? "");
+  const tournament = id ? loadTournament(nk, ctx, id) : null;
+  if (!tournament) throw new Error("Tournament not found.");
+  if (tournament.organizerId !== userId) {
+    throw new Error("Only the organizer can start this tournament.");
+  }
+  let started: TournamentState;
+  try {
+    started = startTournament(tournament);
+  } catch (err) {
+    throw new Error(err instanceof Error ? err.message : "Unable to start.");
+  }
+  saveTournamentState(nk, ctx, started);
+  return json({ tournament: started as unknown as JsonObject });
+}
+
+function rpcTournamentReport(ctx: nkruntime.Context, _logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
+  const userId = requireUser(ctx);
+  const body = parsePayload(payload);
+  const id = String(body.tournamentId ?? "");
+  const tournament = id ? loadTournament(nk, ctx, id) : null;
+  if (!tournament) throw new Error("Tournament not found.");
+  const matchId = String(body.matchId ?? "");
+  const winnerRaw = body.winnerUserId;
+  const winnerUserId = winnerRaw === null || winnerRaw === undefined ? null : String(winnerRaw);
+  const match = tournament.matches.find((entry) => entry.id === matchId);
+  if (!match) throw new Error("Match not found.");
+  const isParticipant = userId === match.participantAId || userId === match.participantBId;
+  const isOrganizer = userId === tournament.organizerId;
+  if (!isParticipant && !isOrganizer) {
+    throw new Error("Only the match participants or the organizer can report this match.");
+  }
+  let result;
+  try {
+    result = advanceTournament(tournament, { matchId, winnerUserId });
+  } catch (err) {
+    throw new Error(err instanceof Error ? err.message : "Advance failed.");
+  }
+  saveTournamentState(nk, ctx, result.state);
+  return json({
+    tournament: result.state as unknown as JsonObject,
+    tournamentCompleted: result.tournamentCompleted,
+  });
+}
+
+function rpcTournamentCancel(ctx: nkruntime.Context, _logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
+  const userId = requireUser(ctx);
+  const id = String(parsePayload(payload).tournamentId ?? "");
+  const tournament = id ? loadTournament(nk, ctx, id) : null;
+  if (!tournament) throw new Error("Tournament not found.");
+  if (tournament.organizerId !== userId) {
+    throw new Error("Only the organizer can cancel this tournament.");
+  }
+  const cancelled: TournamentState = { ...tournament, status: "cancelled", updatedAt: Date.now() };
+  saveTournamentState(nk, ctx, cancelled);
+  return json({ tournament: cancelled as unknown as JsonObject });
 }
 
 function rpcChatSend(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
@@ -1032,12 +1244,9 @@ function rpcChatHistory(ctx: nkruntime.Context, _logger: nkruntime.Logger, nk: n
   return json({ messages: Array.isArray(current?.messages) ? current.messages : [] });
 }
 
-function notImplemented(name: string): nkruntime.RpcFunction {
-  return () => json({ error: `${name} is not implemented in the Nakama cutover yet.` });
-}
-
 function InitModule(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, initializer: nkruntime.Initializer): void {
   initializer.registerMatch(MATCH_HANDLER, matchHandler);
+  initializer.registerMatchmakerMatched(matchmakerMatched);
   initializer.registerRpc("pazaak.config_public", rpcConfigPublic);
   initializer.registerRpc("pazaak.me", rpcMe);
   initializer.registerRpc("pazaak.settings_get", rpcSettingsGet);
@@ -1065,12 +1274,12 @@ function InitModule(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkrunt
   initializer.registerRpc("pazaak.match_resolve", rpcMatchResolve);
   initializer.registerRpc("pazaak.tournaments_list", rpcTournamentsList);
   initializer.registerRpc("pazaak.tournament_detail", rpcTournamentDetail);
-  initializer.registerRpc("pazaak.tournament_create", notImplemented("tournament_create"));
-  initializer.registerRpc("pazaak.tournament_join", notImplemented("tournament_join"));
-  initializer.registerRpc("pazaak.tournament_leave", notImplemented("tournament_leave"));
-  initializer.registerRpc("pazaak.tournament_start", notImplemented("tournament_start"));
-  initializer.registerRpc("pazaak.tournament_report", notImplemented("tournament_report"));
-  initializer.registerRpc("pazaak.tournament_cancel", notImplemented("tournament_cancel"));
+  initializer.registerRpc("pazaak.tournament_create", rpcTournamentCreate);
+  initializer.registerRpc("pazaak.tournament_join", rpcTournamentJoin);
+  initializer.registerRpc("pazaak.tournament_leave", rpcTournamentLeave);
+  initializer.registerRpc("pazaak.tournament_start", rpcTournamentStart);
+  initializer.registerRpc("pazaak.tournament_report", rpcTournamentReport);
+  initializer.registerRpc("pazaak.tournament_cancel", rpcTournamentCancel);
   initializer.registerRpc("pazaak.chat_send", rpcChatSend);
   initializer.registerRpc("pazaak.chat_history", rpcChatHistory);
 

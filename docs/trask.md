@@ -154,6 +154,31 @@ spawns `trask_headless_research.py`.
 
 pnpm wrappers (repo root): **`pnpm smoke:trask-gptr-dry`** and **`pnpm smoke:trask-gptr`**.
 
+### Holocron browser E2E (Playwright)
+
+End-to-end UI checks run against **built** `vendor/qa-webui` served by **`trask-http-server`** on **4010**
+(the same integrated layout as production Holocron behind the API).
+
+```bash
+pnpm exec playwright install chromium   # once per machine (repo root)
+pnpm holocron:e2e
+```
+
+This exercises the composer, relevance gating, and at least one full **`/api/trask/ask`** round-trip
+(answer with **Sources**, or **Research service error** if Python GPT Researcher keys are missing).
+
+### Discord bot slash commands (REST smoke)
+
+Automating Discord’s **web client** requires a logged-in session; this repo ships a small **REST** probe instead:
+
+```bash
+set TRASK_DISCORD_BOT_TOKEN=...
+set TRASK_DISCORD_APP_ID=...
+node scripts/discord_trask_commands_smoke.mjs
+```
+
+Guild-scoped commands may not appear here if your deploy registers only per-guild — the script still validates token/app pairing.
+
 ### Proactive channel replies (optional)
 
 When **`TRASK_PROACTIVE_ENABLED=1`**, Trask registers **privileged intents** (`Guild Messages`, `Message Content`),
@@ -247,7 +272,7 @@ Point both processes at the same JSON store: set **`TRASK_HTTP_DATA_DIR`** on `t
 - **Env:** `VITE_TRASK_API_BASE` (optional absolute API origin), `VITE_TRASK_API_KEY` (optional build-time bearer), `VITE_TRASK_LEGACY_SPARK=1` to restore the old Spark + simulated multi-agent path.
 
 ```bash
-cd vendor/qa-webui && pnpm install && pnpm build
+`pnpm install` at the **monorepo root** (includes `vendor/qa-webui`), then `pnpm --filter spark-template build`
 ```
 
 Then either open the app via `trask-http-server` (static) or run `pnpm dev` with `trask-http-server` on port 4010.

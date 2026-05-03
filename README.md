@@ -92,7 +92,7 @@ infra/
 4. Run one bot at a time with one of:
    - `corepack pnpm dev:trask`
    - `corepack pnpm dev:trask-http` (REST + optional static `vendor/qa-webui` build)
-   - `corepack pnpm dev:hk` (see `docs/guides/hk-86.md`; reaction panels use `data/hk-bot/reaction-role-panels.json` — start from `apps/hk-bot/reaction-role-panels.example.json`; `/designations reactions help` in Discord prints setup steps; static operator page when deployed: https://openkotor.github.io/bots/hk86)
+   - `corepack pnpm dev:hk` (HK guide on the [wiki](https://github.com/OpenKotOR/community-bots/wiki/docs/guides/hk-86); reaction panels use `data/hk-bot/reaction-role-panels.json` — start from `apps/hk-bot/reaction-role-panels.example.json`; `/designations reactions help` in Discord prints setup steps; static Discord bots hub when deployed: https://openkotor.github.io/bots/hk86)
    - `corepack pnpm dev:pazaak`
    - `corepack pnpm dev:ingest`
 

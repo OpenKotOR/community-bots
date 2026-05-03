@@ -26,13 +26,23 @@ The local stack intentionally uses `defaultkey` for development. Use unique
 server keys, session encryption keys, runtime HTTP keys, and managed secret
 injection for any shared or production environment.
 
+**Security:** the client uses Nakama `authenticateCustom` with an `openkotor:*`
+stable id for Discord-linked accounts without a server-side token exchange in
+this dev path. For production, add a `beforeAuthenticateCustom` hook (or exchange
+Discord OAuth on your API and mint signed credentials) so accounts cannot be
+impersonated.
+
+**Live tournament WebSocket feeds** (`subscribeToTournaments`) still require the
+legacy Worker or bot relay; Nakama RPC polling covers CRUD until a socket story
+is added (e.g. Nakama realtime channel).
+
 ## Runtime surface
 
 The bundled runtime registers:
 
 - `pazaak_authoritative` match handler for server-owned Pazaak games.
 - `pazaak.*` RPCs for profiles, settings, sideboards, lobby lifecycle,
-  matchmaking queue, leaderboard/history, tournament placeholders, and chat.
+  matchmaking queue, leaderboard/history, **tournaments** (create/join/leave/start/report/cancel), and chat.
 - Authoritative MMR settlement on match completion with Nakama leaderboards.
 
 ## Cutover note

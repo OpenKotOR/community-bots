@@ -30,7 +30,7 @@ body {
 }
 
 .wrap {
-  max-width: 52rem;
+  max-width: 56rem;
   margin: 0 auto;
   padding: 2.5rem 1.25rem 3rem;
 }
@@ -143,6 +143,99 @@ h1 {
 
 .btn.primary:hover {
   filter: brightness(1.06);
+}
+
+.btn.ghost {
+  background: transparent;
+  color: var(--accent);
+  border-color: var(--border);
+}
+
+.btn.ghost:hover {
+  background: rgba(255, 140, 66, 0.08);
+  border-color: var(--accent-dim);
+}
+
+.hub-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+}
+
+.bot-panel-head h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.bot-tagline {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.94rem;
+}
+
+.bot-tagline code {
+  font-size: 0.88em;
+}
+
+.bot-link-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.65rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bot-link-row li {
+  margin: 0;
+}
+
+.perm-foot {
+  margin: 0.65rem 0 0;
+  font-size: 0.82rem;
+}
+
+.perm-foot code {
+  font-size: 0.92em;
+}
+
+.hk-note {
+  margin: 0.45rem 0 0;
+  font-size: 0.8rem;
+}
+
+.hk-extra {
+  margin: 0.65rem 0 0;
+  font-size: 0.88rem;
+}
+
+.text-link {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.text-link:hover {
+  text-decoration: underline;
+}
+
+.hk-details {
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.hk-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.hk-details .steps {
+  margin-top: 0.65rem;
 }
 
 .links {
