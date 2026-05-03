@@ -104,7 +104,7 @@ const parseAnnounceMode = (raw: JsonValue | undefined, fallback: AnnounceMode): 
     return raw;
   }
 
-  throw new Error(`Invalid announceMode: ${String(raw)}`);
+  throw new Error(`Invalid announceMode: ${JSON.stringify(raw)}`);
 };
 
 export const parseReactionRolePanelsJson = (
@@ -138,7 +138,7 @@ export const parseReactionRolePanelsJson = (
   const panels: ParsedReactionPanel[] = [];
 
   for (const entry of root.panels as RawPanel[]) {
-    if (typeof entry?.channelId !== "string" || !isSnowflake(entry.channelId)) {
+    if (typeof entry.channelId !== "string" || !isSnowflake(entry.channelId)) {
       logger?.warn("Skipping reaction-role panel: invalid channelId.", { entry });
       continue;
     }
@@ -171,12 +171,12 @@ export const parseReactionRolePanelsJson = (
     for (const m of entry.mappings as RawMapping[]) {
       const emojiRawList: JsonValue[] = [];
 
-      if (m?.emoji !== undefined && m?.emoji !== null) {
-        emojiRawList.push(m.emoji as JsonValue);
+      if (m.emoji !== undefined && m.emoji !== null) {
+        emojiRawList.push(m.emoji);
       }
 
-      if (Array.isArray(m?.emojis)) {
-        emojiRawList.push(...(m.emojis as JsonValue[]));
+      if (Array.isArray(m.emojis)) {
+        emojiRawList.push(...m.emojis);
       }
 
       const emojiKeys: string[] = [];
@@ -206,11 +206,11 @@ export const parseReactionRolePanelsJson = (
         continue;
       }
 
-      const roleId = m.roleId !== undefined && m.roleId !== null ? String(m.roleId).trim() : undefined;
+      const roleId = typeof m.roleId === "string" ? m.roleId.trim() : undefined;
       const curatedRoleId =
-        m.curatedRoleId !== undefined && m.curatedRoleId !== null ? String(m.curatedRoleId).trim() : undefined;
+        typeof m.curatedRoleId === "string" ? m.curatedRoleId.trim() : undefined;
       const roleNameHint =
-        m.roleNameHint !== undefined && m.roleNameHint !== null ? String(m.roleNameHint).trim() : undefined;
+        typeof m.roleNameHint === "string" ? m.roleNameHint.trim() : undefined;
 
       const hasRole = roleId !== undefined && roleId.length > 0;
       const hasCurated = curatedRoleId !== undefined && curatedRoleId.length > 0;

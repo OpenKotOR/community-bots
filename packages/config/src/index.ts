@@ -216,7 +216,13 @@ export interface TraskBotConfig {
 
 export interface HkBotConfig {
   discord: DiscordRuntimeConfig;
+  ai: SharedAiConfig;
   dataDir: string;
+  llm: {
+    enabled: boolean;
+    timeoutMs: number;
+    maxReplyChars: number;
+  };
 }
 
 export interface PazaakBotConfig {
@@ -349,7 +355,13 @@ export const loadTraskBotConfig = (env: NodeJS.ProcessEnv = process.env): TraskB
 export const loadHkBotConfig = (env: NodeJS.ProcessEnv = process.env): HkBotConfig => {
   return {
     discord: loadDiscordRuntimeConfig("HK", env),
+    ai: loadSharedAiConfig(env),
     dataDir: readOptionalEnv("HK_DATA_DIR", env) ?? "data/hk-bot",
+    llm: {
+      enabled: readBooleanEnv("HK_LLM_ENABLED", env) ?? false,
+      timeoutMs: integerish.parse(readOptionalEnv("HK_LLM_TIMEOUT_MS", env) ?? "6000"),
+      maxReplyChars: integerish.parse(readOptionalEnv("HK_LLM_MAX_REPLY_CHARS", env) ?? "420"),
+    },
   };
 };
 

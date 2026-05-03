@@ -26,6 +26,7 @@ import {
   pickReactionNoopLine,
   pickReactionSuccessLine,
 } from "./reaction-role-replies.js";
+import type { HkDialogClient } from "./hk-dialog-client.js";
 
 const lastReplyAt = new Map<string, number>();
 
@@ -122,6 +123,7 @@ const finalizeReaction = async (
   direction: "add" | "remove",
   logger: Logger,
   configLoader: ReactionRoleConfigLoader,
+  dialogClient?: HkDialogClient,
 ): Promise<void> => {
   const message = reaction.message;
 
@@ -171,10 +173,15 @@ const finalizeReaction = async (
       cooldownMs: snapshot.replyCooldownMs,
       embed: buildWarningEmbed({
         title: "Designation Failure",
-        description: pickReactionErrorLine("missing", roleLabel, {
-          displayName: member.displayName,
-          emojiLabel,
-        }),
+        description: await decorateReactionLine(
+          dialogClient,
+          pickReactionErrorLine("missing", roleLabel, {
+            displayName: member.displayName,
+            emojiLabel,
+          }),
+          "Explain that a reaction-role mapping points at a missing guild role.",
+          [`User display name: ${member.displayName}`, `Role: ${roleLabel}`, `Emoji: ${emojiLabel}`],
+        ),
       }),
       logger,
     });
@@ -202,10 +209,15 @@ const finalizeReaction = async (
       cooldownMs: snapshot.replyCooldownMs,
       embed: buildWarningEmbed({
         title: "Designation Failure",
-        description: pickReactionErrorLine("blocked", mutation.roleName, {
-          displayName: member.displayName,
-          emojiLabel,
-        }),
+        description: await decorateReactionLine(
+          dialogClient,
+          pickReactionErrorLine("blocked", mutation.roleName, {
+            displayName: member.displayName,
+            emojiLabel,
+          }),
+          "Explain that role hierarchy blocked a reaction-role update.",
+          [`User display name: ${member.displayName}`, `Role: ${mutation.roleName}`, `Emoji: ${emojiLabel}`],
+        ),
       }),
       logger,
     });
@@ -220,10 +232,21 @@ const finalizeReaction = async (
       cooldownMs: snapshot.replyCooldownMs,
       embed: buildSuccessEmbed({
         title: "Designation Update",
-        description: pickReactionNoopLine(direction, mutation.roleName, {
-          displayName: member.displayName,
-          emojiLabel,
-        }),
+        description: await decorateReactionLine(
+          dialogClient,
+          pickReactionNoopLine(direction, mutation.roleName, {
+            displayName: member.displayName,
+            emojiLabel,
+          }),
+          "Rewrite a no-op reaction-role result without changing the outcome.",
+          [
+            `Action: ${direction}`,
+            `User display name: ${member.displayName}`,
+            `Role: ${mutation.roleName}`,
+            `Emoji: ${emojiLabel}`,
+            "Outcome: no role change was needed",
+          ],
+        ),
       }),
       logger,
     });
@@ -242,10 +265,41 @@ const finalizeReaction = async (
     cooldownMs: snapshot.replyCooldownMs,
     embed: buildSuccessEmbed({
       title: direction === "add" ? "Designation Assigned" : "Designation Removed",
-      description: line,
+      description: await decorateReactionLine(
+        dialogClient,
+        line,
+        "Rewrite a successful reaction-role assignment/removal without changing the outcome.",
+        [
+          `Action: ${direction}`,
+          `User display name: ${member.displayName}`,
+          `Role: ${mutation.roleName}`,
+          `Emoji: ${emojiLabel}`,
+          ...(curatedDef ? [`Role flavor: ${curatedDef.flavor}`] : []),
+        ],
+      ),
     }),
     logger,
   });
+};
+
+const decorateReactionLine = async (
+  dialogClient: HkDialogClient | undefined,
+  draft: string,
+  task: string,
+  facts: readonly string[],
+): Promise<string> => {
+  if (!dialogClient) {
+    return draft;
+  }
+
+  const generated = await dialogClient.generate({
+    task,
+    facts,
+    draft,
+    maxCharacters: 420,
+  });
+
+  return generated ?? draft;
 };
 
 const announceOutcome = async (opts: {
@@ -323,13 +377,18 @@ const hydrateUser = async (user: User | PartialUser): Promise<User | null> => {
       return await user.fetch();
     }
 
-    return user as User;
+    return user;
   } catch {
     return null;
   }
 };
 
-export const registerReactionRoleHandlers = (client: Client, logger: Logger, configLoader: ReactionRoleConfigLoader): void => {
+export const registerReactionRoleHandlers = (
+  client: Client,
+  logger: Logger,
+  configLoader: ReactionRoleConfigLoader,
+  dialogClient?: HkDialogClient,
+): void => {
   const handle = async (
     reaction: MessageReaction | PartialMessageReaction,
     user: User | PartialUser,
@@ -347,7 +406,7 @@ export const registerReactionRoleHandlers = (client: Client, logger: Logger, con
       return;
     }
 
-    await finalizeReaction(fullReaction, fullUser, direction, logger, configLoader);
+    await finalizeReaction(fullReaction, fullUser, direction, logger, configLoader, dialogClient);
   };
 
   client.on(Events.MessageReactionAdd, (reaction, user) => {

@@ -7,37 +7,37 @@ import {
   parseReactionRolePanelsJson,
 } from "./reaction-role-config.js";
 
-test("discordEmojiKey uses name:id for custom emoji", () => {
+void test("discordEmojiKey uses name:id for custom emoji", () => {
   assert.equal(discordEmojiKey({ id: "123456789012345678", name: "hkrole" }), "hkrole:123456789012345678");
 });
 
-test("discordEmojiKey uses name only for unicode", () => {
+void test("discordEmojiKey uses name only for unicode", () => {
   assert.equal(discordEmojiKey({ id: null, name: "✅" }), "✅");
 });
 
-test("normalizeConfigEmoji accepts unicode literal", () => {
+void test("normalizeConfigEmoji accepts unicode literal", () => {
   const r = normalizeConfigEmoji(" ✅ ");
   assert.equal(r.ok, true);
-  if (r.ok) assert.equal(r.key, "✅");
+  assert.deepEqual(r, { ok: true, key: "✅" });
 });
 
-test("normalizeConfigEmoji accepts custom name:snowflake", () => {
+void test("normalizeConfigEmoji accepts custom name:snowflake", () => {
   const r = normalizeConfigEmoji("hkrole:123456789012345678");
   assert.equal(r.ok, true);
-  if (r.ok) assert.equal(r.key, "hkrole:123456789012345678");
+  assert.deepEqual(r, { ok: true, key: "hkrole:123456789012345678" });
 });
 
-test("normalizeConfigEmoji rejects bad custom id", () => {
+void test("normalizeConfigEmoji rejects bad custom id", () => {
   const r = normalizeConfigEmoji("hkrole:notanid");
   assert.equal(r.ok, false);
 });
 
-test("normalizeConfigEmoji rejects empty", () => {
+void test("normalizeConfigEmoji rejects empty", () => {
   const r = normalizeConfigEmoji("   ");
   assert.equal(r.ok, false);
 });
 
-test("parseReactionRolePanelsJson parses panels and mappings", () => {
+void test("parseReactionRolePanelsJson parses panels and mappings", () => {
   const snap = parseReactionRolePanelsJson(`{
     "version": 1,
     "defaultAnnounceMode": "dm",
@@ -67,7 +67,7 @@ test("parseReactionRolePanelsJson parses panels and mappings", () => {
   assert.deepEqual(panel.mappings[1], { emojiKeys: ["custom:444444444444444444"], curatedRoleId: "reone" });
 });
 
-test("parseReactionRolePanelsJson inherits default announce mode", () => {
+void test("parseReactionRolePanelsJson inherits default announce mode", () => {
   const snap = parseReactionRolePanelsJson(`{
     "panels": [
       {
@@ -81,7 +81,7 @@ test("parseReactionRolePanelsJson inherits default announce mode", () => {
   assert.equal(snap.panels[0]!.announceMode, "reply");
 });
 
-test("parseReactionRolePanelsJson merges emoji and emojis with dedupe", () => {
+void test("parseReactionRolePanelsJson merges emoji and emojis with dedupe", () => {
   const snap = parseReactionRolePanelsJson(`{
     "panels": [
       {
@@ -101,7 +101,7 @@ test("parseReactionRolePanelsJson merges emoji and emojis with dedupe", () => {
   assert.deepEqual(snap.panels[0]!.mappings[0]!.emojiKeys, ["🎮", "✅"]);
 });
 
-test("parseReactionRolePanelsJson accepts roleNameHint alone", () => {
+void test("parseReactionRolePanelsJson accepts roleNameHint alone", () => {
   const snap = parseReactionRolePanelsJson(`{
     "panels": [
       {

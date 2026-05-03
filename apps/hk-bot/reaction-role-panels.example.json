@@ -1,5 +1,6 @@
 {
   "_readme": "Copy to HK_DATA_DIR/reaction-role-panels.json (default data/hk-bot/). Replace placeholders. Hot reload: file watch + mtime (no bot restart). Extra keys like _readme are ignored.",
+  "_llm": "Optional: set HK_LLM_ENABLED=true plus OpenRouter-compatible env. HK will only try explicit free models returned by vendor/llm_fallbacks; otherwise deterministic replies remain active.",
   "version": 1,
   "defaultAnnounceMode": "reply",
   "replyCooldownMs": 3000,

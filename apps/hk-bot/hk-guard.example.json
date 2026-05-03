@@ -1,0 +1,33 @@
+{
+  "_readme": "Copy to HK_DATA_DIR/hk-guard.json (default data/hk-bot/). HK loads this with mtime caching. Honeypot quarantine is intentionally conservative: it applies a role and logs; it does not ban.",
+  "version": 1,
+  "enabled": false,
+  "logChannelId": "000000000000000000",
+  "trustedRoleIds": [
+    "000000000000000000"
+  ],
+  "honeypot": {
+    "_note": "Point channelIds at hidden/tempting channels spambots can see during onboarding. Fresh accounts that post here can be quarantined.",
+    "channelIds": [
+      "000000000000000000"
+    ],
+    "quarantineRoleId": "000000000000000000",
+    "deleteTriggerMessage": true,
+    "ignoreMembersOlderThanMs": 86400000,
+    "ignoreAccountsOlderThanMs": 604800000
+  },
+  "labyrinth": {
+    "_note": "entryRoleId is applied on join; verifiedRoleIds are documented for operator workflows and future verification panels.",
+    "entryRoleId": "000000000000000000",
+    "verifiedRoleIds": [
+      "000000000000000000"
+    ]
+  },
+  "welcome": {
+    "channelId": "000000000000000000",
+    "message": "Statement: $mention has entered $server. Proceed through the onboarding labyrinth, meatbag."
+  },
+  "autoroles": [
+    "000000000000000000"
+  ]
+}

@@ -5,7 +5,7 @@ import { pickReactionErrorLine, pickReactionNoopLine, pickReactionSuccessLine } 
 
 const hints = { displayName: "Revanchist", emojiLabel: ":pazaak:" };
 
-test("pickReactionSuccessLine references user and emoji choice", () => {
+void test("pickReactionSuccessLine references user and emoji choice", () => {
   const orig = Math.random;
   Math.random = () => 0;
 
@@ -19,7 +19,7 @@ test("pickReactionSuccessLine references user and emoji choice", () => {
   }
 });
 
-test("pickReactionErrorLine blocked mentions hierarchy", () => {
+void test("pickReactionErrorLine blocked mentions hierarchy", () => {
   const orig = Math.random;
   Math.random = () => 0;
 
@@ -33,7 +33,7 @@ test("pickReactionErrorLine blocked mentions hierarchy", () => {
   }
 });
 
-test("pickReactionNoopLine add path", () => {
+void test("pickReactionNoopLine add path", () => {
   const orig = Math.random;
   Math.random = () => 0;
 

@@ -15,6 +15,8 @@ export interface CuratedRoleDefinition {
   flavor: string;
 }
 
+export * from "./hk-dialog.js";
+
 export const personaProfiles: Record<PersonaProfile["id"], PersonaProfile> = {
   trask: {
     id: "trask",
