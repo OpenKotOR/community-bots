@@ -8,7 +8,3 @@
 	path = vendor/HoloPazaak
 	url = https://github.com/OpenKotOR/HoloPazaak
 	branch = master
-[submodule "wiki"]
-	path = wiki
-	url = https://github.com/OpenKotOR/community-bots.wiki.git
-	branch = master
