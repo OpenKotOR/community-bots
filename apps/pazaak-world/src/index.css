@@ -143,7 +143,7 @@ html[data-kotor-shell="light"] {
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.65);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -151,17 +151,18 @@ html[data-kotor-shell="light"] {
   animation: fadeIn 0.2s ease-out;
 }
 
+/* ── Modal shell ─────────────────────────────────────────────── */
 .settings-modal {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-  max-width: 500px;
-  width: 90%;
-  max-height: 80vh;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  width: min(760px, 94vw);
+  max-height: 88vh;
   display: flex;
   flex-direction: column;
   animation: slideUp 0.3s ease-out;
+  overflow: hidden;
 }
 
 .admin-policy-modal {
@@ -182,35 +183,49 @@ html[data-kotor-shell="light"] {
   min-height: 280px;
 }
 
+/* ── Header ──────────────────────────────────────────────────── */
 .settings-modal-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  padding: 20px;
+  padding: 18px 20px 14px;
   border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.settings-modal-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .settings-modal-header h2 {
-  font-size: 18px;
+  font-size: 17px;
   margin: 0;
   color: var(--text);
   font-family: "Orbitron", monospace;
+}
+
+.settings-modal-subtitle {
+  font-size: 12px;
+  color: var(--text-dim);
 }
 
 .settings-modal-close {
   background: transparent;
   border: none;
   color: var(--text-muted);
-  font-size: 24px;
+  font-size: 22px;
   cursor: pointer;
   padding: 0;
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 4px;
-  transition: background 0.2s, color 0.2s;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
 }
 
 .settings-modal-close:hover {
@@ -218,36 +233,403 @@ html[data-kotor-shell="light"] {
   color: var(--text);
 }
 
-.settings-modal-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px;
+/* ── Body: nav + content ─────────────────────────────────────── */
+.settings-modal-body {
   display: flex;
-  flex-direction: column;
-  gap: 20px;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
 }
 
+/* Left sidebar nav */
+.settings-nav {
+  width: 172px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  padding: 10px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+}
+
+.settings-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 14px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, color 0.15s;
+  border-left: 3px solid transparent;
+}
+
+.settings-nav-item:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.settings-nav-item.active {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  border-left-color: var(--accent);
+}
+
+.settings-nav-icon {
+  font-size: 15px;
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.settings-nav-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Right scrollable content */
+.settings-tab-content {
+  flex: 1;
+  overflow-y: auto;
+  min-width: 0;
+}
+
+.settings-tab-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ── Section blocks ──────────────────────────────────────────── */
+.settings-section {
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-section:last-child {
+  border-bottom: none;
+}
+
+.settings-section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 4px 0;
+  font-family: "Orbitron", monospace;
+  letter-spacing: 0.3px;
+}
+
+.settings-section-desc {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin: 0 0 14px 0;
+}
+
+/* ── Toggle switch rows ──────────────────────────────────────── */
+.settings-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+}
+
+.settings-toggle-row:last-child {
+  border-bottom: none;
+}
+
+.settings-toggle-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-toggle-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.settings-toggle-desc {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+
+/* CSS toggle switch */
+.settings-toggle {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.settings-toggle.on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.settings-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: var(--text-dim);
+  border-radius: 50%;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.settings-toggle.on .settings-toggle-thumb {
+  transform: translateX(18px);
+  background: #fff;
+}
+
+/* ── Table theme swatch grid ─────────────────────────────────── */
+.settings-swatch-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.settings-swatch {
+  aspect-ratio: 1;
+  border-radius: 4px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s, transform 0.1s;
+}
+
+.settings-swatch:hover {
+  transform: scale(1.08);
+}
+
+.settings-swatch.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.settings-swatch-check {
+  font-size: 11px;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+  font-weight: 700;
+}
+
+.settings-swatch-labels {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+
+.settings-swatch-label-text {
+  font-size: 10px;
+  color: var(--text-dim);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-swatch-label-text.active {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ── Card back style grid ────────────────────────────────────── */
+.settings-card-style-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.settings-card-style-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 6px 8px;
+  background: var(--bg-surface);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  text-align: center;
+}
+
+.settings-card-style-tile:hover {
+  background: var(--bg-hover);
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--border));
+}
+
+.settings-card-style-tile.selected {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-surface));
+}
+
+.settings-card-style-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.settings-card-style-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.settings-card-style-desc {
+  font-size: 10px;
+  color: var(--text-dim);
+  line-height: 1.3;
+}
+
+/* ── Ambience preset list ────────────────────────────────────── */
+.settings-ambience-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-ambience-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  background: var(--bg-surface);
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s;
+  user-select: none;
+}
+
+.settings-ambience-item:hover {
+  background: var(--bg-hover);
+}
+
+.settings-ambience-item.selected {
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-surface));
+  border-color: var(--accent);
+}
+
+.settings-ambience-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  flex: 1;
+}
+
+.settings-ambience-desc {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.settings-ambience-check {
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 700;
+  margin-left: auto;
+}
+
+/* ── Radio group (Comms) ─────────────────────────────────────── */
+.settings-radio-group {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-radio-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  background: var(--bg-surface);
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s;
+  user-select: none;
+}
+
+.settings-radio-item:hover {
+  background: var(--bg-hover);
+}
+
+.settings-radio-item.selected {
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-surface));
+  border-color: var(--accent);
+}
+
+.settings-radio-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  margin-top: 3px;
+  flex-shrink: 0;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.settings-radio-item.selected .settings-radio-dot {
+  border-color: var(--accent);
+  background: var(--accent);
+  box-shadow: inset 0 0 0 3px var(--bg-surface);
+}
+
+.settings-radio-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.settings-radio-desc {
+  display: block;
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.4;
+  margin-top: 2px;
+}
+
+/* ── Settings group (selects) ────────────────────────────────── */
 .settings-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
-.settings-group label {
-  color: var(--text);
+.settings-group-label {
   font-size: 13px;
   font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-}
-
-.settings-group input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-  accent-color: var(--accent);
+  color: var(--text-muted);
 }
 
 .settings-group select {
@@ -258,7 +640,7 @@ html[data-kotor-shell="light"] {
   border-radius: var(--radius);
   font-size: 13px;
   cursor: pointer;
-  transition: border-color 0.2s;
+  transition: border-color 0.15s;
 }
 
 .settings-group select:hover {
@@ -270,50 +652,37 @@ html[data-kotor-shell="light"] {
   outline-offset: 2px;
 }
 
-.settings-info {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 12px;
-}
-
-.settings-info h3 {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--accent);
-  margin: 0 0 6px 0;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
+/* ── Info / about block ──────────────────────────────────────── */
 .settings-info p {
   font-size: 12px;
-  color: var(--text-muted);
-  margin: 2px 0;
+  color: var(--text-dim);
+  margin: 4px 0 0 0;
 }
 
+/* ── Footer ──────────────────────────────────────────────────── */
 .settings-modal-error {
   margin: 0 20px;
-  padding: 10px 12px;
+  padding: 8px 12px;
   border: 1px solid color-mix(in srgb, var(--danger) 60%, var(--border));
   border-radius: var(--radius);
-  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
   color: #ffd4d4;
   font-size: 12px;
 }
 
 .settings-modal-hint {
-  margin: 0 20px 12px;
+  margin: 0 20px 10px;
   color: var(--text-dim);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .settings-modal-footer {
   display: flex;
   gap: 10px;
-  padding: 16px 20px;
+  padding: 14px 20px;
   border-top: 1px solid var(--border);
   justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 .settings-modal-cancel,
@@ -370,8 +739,44 @@ html[data-kotor-shell="light"] {
 .settings-modal-cancel:disabled,
 .settings-modal-save:disabled,
 .settings-modal-reset:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Responsive: collapse nav on small screens */
+@media (max-width: 520px) {
+  .settings-modal-body {
+    flex-direction: column;
+  }
+  .settings-nav {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 4px 8px;
+    gap: 0;
+  }
+  .settings-nav-item {
+    border-left: none;
+    border-bottom: 3px solid transparent;
+    padding: 8px 10px;
+    flex-shrink: 0;
+  }
+  .settings-nav-item.active {
+    border-bottom-color: var(--accent);
+    border-left-color: transparent;
+  }
+  .settings-nav-label {
+    display: none;
+  }
+  .settings-swatch-grid,
+  .settings-swatch-labels {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .settings-card-style-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 /* ============================================================

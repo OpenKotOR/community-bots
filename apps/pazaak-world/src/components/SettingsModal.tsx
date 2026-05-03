@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { soundManager } from "../utils/soundManager.ts";
 import type {
+  AdvisorDifficulty,
   PazaakCardBackStyle,
   PazaakChatAudience,
   PazaakSoundTheme,
@@ -8,6 +9,42 @@ import type {
   PazaakTableTheme,
   PazaakUserSettings,
 } from "../types.ts";
+
+// ── Theme & style catalogues ──────────────────────────────────────────────────
+
+const TABLE_THEMES: { id: PazaakTableTheme; label: string; primary: string; secondary: string }[] = [
+  { id: "ebon-hawk",  label: "Ebon Hawk",   primary: "#3d4a56", secondary: "#1e2d38" },
+  { id: "coruscant",  label: "Coruscant",   primary: "#4a3060", secondary: "#271540" },
+  { id: "tatooine",  label: "Tatooine",    primary: "#c9963e", secondary: "#7a5b1a" },
+  { id: "manaan",    label: "Manaan",      primary: "#1a6a7a", secondary: "#0e3a4a" },
+  { id: "dantooine", label: "Dantooine",   primary: "#3a6a30", secondary: "#1a3e18" },
+  { id: "malachor",  label: "Malachor",    primary: "#5a1a1a", secondary: "#1a0808" },
+];
+
+const CARD_BACK_STYLES: { id: PazaakCardBackStyle; label: string; icon: string; desc: string }[] = [
+  { id: "classic",      label: "Classic",      icon: "🃏", desc: "HoloPazaak Standard" },
+  { id: "holographic",  label: "Holographic",  icon: "💠", desc: "Blue holo-matrix" },
+  { id: "mandalorian",  label: "Mandalorian",  icon: "⚔️", desc: "Beskar steel pattern" },
+  { id: "republic",     label: "Republic",     icon: "🔴", desc: "Red & gold crest" },
+  { id: "sith",         label: "Sith",         icon: "🔥", desc: "Dark-side runes" },
+];
+
+const TABLE_AMBIENCES: { id: PazaakTableAmbience; label: string; desc: string }[] = [
+  { id: "cantina",      label: "Cantina Standard",   desc: "Classic warm cantina lighting" },
+  { id: "ebon-hawk",    label: "Ebon Hawk",          desc: "Steel cargo-hold atmosphere" },
+  { id: "jedi-archives",label: "Jedi Archives",      desc: "Cool blue knowledge vaults" },
+  { id: "outer-rim",    label: "Outer Rim Drifter",  desc: "Dusty amber starport glow" },
+  { id: "sith-sanctum", label: "Sith Sanctum",       desc: "Deep void, crimson sparks" },
+];
+
+const SOUND_THEMES: { id: PazaakSoundTheme; label: string; desc: string }[] = [
+  { id: "default",  label: "Default",       desc: "Standard HoloPazaak tones" },
+  { id: "cantina",  label: "Cantina Bar",   desc: "Mos Eisley tavern ambience" },
+  { id: "droid",    label: "Droid Beeps",   desc: "R2-style mechanical blips" },
+  { id: "force",    label: "Force Calm",    desc: "Meditative Jedi tones" },
+];
+
+// ── Defaults & equality ───────────────────────────────────────────────────────
 
 const DEFAULT_MODAL_SETTINGS: PazaakUserSettings = {
   tableTheme: "ebon-hawk",
@@ -51,6 +88,18 @@ const areSettingsEqual = (left: PazaakUserSettings, right: PazaakUserSettings): 
   return SETTINGS_EQUALITY_KEYS.every((key) => left[key] === right[key]);
 };
 
+// ── Tab definitions ───────────────────────────────────────────────────────────
+
+type SettingsTab = "table" | "combat" | "interface" | "comms" | "accessibility";
+
+const SETTINGS_TABS: { id: SettingsTab; icon: string; label: string }[] = [
+  { id: "table",        icon: "🃏", label: "Table & Cards"  },
+  { id: "combat",       icon: "⚔️", label: "Combat Rules"   },
+  { id: "interface",    icon: "🖥️", label: "Interface"      },
+  { id: "comms",        icon: "📡", label: "Comms"          },
+  { id: "accessibility",icon: "♿", label: "Accessibility"  },
+];
+
 interface SettingsModalProps {
   isOpen: boolean;
   currentSettings: PazaakUserSettings;
@@ -62,6 +111,7 @@ export function SettingsModal({ isOpen, currentSettings, onClose, onSave }: Sett
   const [settings, setSettings] = useState<PazaakUserSettings>(currentSettings);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<SettingsTab>("table");
   const modalRef = useRef<HTMLDivElement | null>(null);
   const hasChanges = !areSettingsEqual(settings, currentSettings);
 
@@ -75,24 +125,20 @@ export function SettingsModal({ isOpen, currentSettings, onClose, onSave }: Sett
     if (!isOpen) {
       return;
     }
-
     setSettings(currentSettings);
     setSaveError(null);
   }, [currentSettings, isOpen]);
 
-  // Escape to close + focus trap
+  // Escape to close + Ctrl+Enter to save
   useEffect(() => {
     if (!isOpen) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        if (!isSaving) {
-          requestClose();
-        }
+        if (!isSaving) requestClose();
         return;
       }
-
       if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
         if (!isSaving && hasChanges) {
           event.preventDefault();
@@ -100,23 +146,19 @@ export function SettingsModal({ isOpen, currentSettings, onClose, onSave }: Sett
         }
         return;
       }
-
       if (event.key !== "Tab") return;
 
       const modal = modalRef.current;
       if (!modal) return;
-
       const focusable = Array.from(
         modal.querySelectorAll<HTMLElement>(
           "button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex=\"-1\"])"
         )
       );
       if (focusable.length === 0) return;
-
       const first = focusable[0]!;
       const last = focusable[focusable.length - 1]!;
       const active = document.activeElement as HTMLElement | null;
-
       if (event.shiftKey) {
         if (!active || active === first || !modal.contains(active)) {
           event.preventDefault();
@@ -131,8 +173,6 @@ export function SettingsModal({ isOpen, currentSettings, onClose, onSave }: Sett
     };
 
     window.addEventListener("keydown", handleKeyDown);
-
-    // Auto-focus first focusable element when modal opens
     const rafId = requestAnimationFrame(() => {
       const modal = modalRef.current;
       if (!modal) return;
@@ -141,7 +181,6 @@ export function SettingsModal({ isOpen, currentSettings, onClose, onSave }: Sett
       );
       first?.focus();
     });
-
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
       window.cancelAnimationFrame(rafId);
@@ -157,10 +196,7 @@ export function SettingsModal({ isOpen, currentSettings, onClose, onSave }: Sett
   }, [isOpen]);
 
   const handleSave = useCallback(async () => {
-    if (!hasChanges) {
-      return;
-    }
-
+    if (!hasChanges) return;
     setIsSaving(true);
     setSaveError(null);
     try {
@@ -183,6 +219,299 @@ export function SettingsModal({ isOpen, currentSettings, onClose, onSave }: Sett
 
   if (!isOpen) return null;
 
+  // ── Helper sub-components ────────────────────────────────────────────
+
+  const ToggleRow = ({
+    label,
+    desc,
+    value,
+    onChange,
+  }: {
+    label: string;
+    desc?: string;
+    value: boolean;
+    onChange: (v: boolean) => void;
+  }) => (
+    <div className="settings-toggle-row">
+      <div className="settings-toggle-text">
+        <span className="settings-toggle-label">{label}</span>
+        {desc && <span className="settings-toggle-desc">{desc}</span>}
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={value}
+        className={`settings-toggle${value ? " on" : ""}`}
+        onClick={() => onChange(!value)}
+      >
+        <span className="settings-toggle-thumb" />
+      </button>
+    </div>
+  );
+
+  // ── Tab content renderers ────────────────────────────────────────────
+
+  const renderTableCards = () => (
+    <div className="settings-tab-pane">
+      <div className="settings-section">
+        <h3 className="settings-section-title">Table Theme</h3>
+        <p className="settings-section-desc">Choose the colour palette for your card table.</p>
+        <div className="settings-swatch-grid">
+          {TABLE_THEMES.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              title={t.label}
+              aria-label={`${t.label}${settings.tableTheme === t.id ? " (selected)" : ""}`}
+              className={`settings-swatch${settings.tableTheme === t.id ? " selected" : ""}`}
+              style={{
+                background: `linear-gradient(135deg, ${t.primary} 0%, ${t.secondary} 100%)`,
+              }}
+              onClick={() => setSettings({ ...settings, tableTheme: t.id })}
+            >
+              {settings.tableTheme === t.id && <span className="settings-swatch-check">✔</span>}
+            </button>
+          ))}
+        </div>
+        <div className="settings-swatch-labels">
+          {TABLE_THEMES.map((t) => (
+            <span
+              key={t.id}
+              className={`settings-swatch-label-text${settings.tableTheme === t.id ? " active" : ""}`}
+            >
+              {t.label}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className="settings-section">
+        <h3 className="settings-section-title">Card Back Style</h3>
+        <p className="settings-section-desc">Customise the artwork on the reverse of your cards.</p>
+        <div className="settings-card-style-grid">
+          {CARD_BACK_STYLES.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              className={`settings-card-style-tile${settings.cardBackStyle === s.id ? " selected" : ""}`}
+              onClick={() => setSettings({ ...settings, cardBackStyle: s.id })}
+              aria-pressed={settings.cardBackStyle === s.id}
+            >
+              <span className="settings-card-style-icon">{s.icon}</span>
+              <span className="settings-card-style-name">{s.label}</span>
+              <span className="settings-card-style-desc">{s.desc}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="settings-section">
+        <h3 className="settings-section-title">Ambience Preset</h3>
+        <p className="settings-section-desc">Set the background atmosphere behind the board.</p>
+        <ul className="settings-ambience-list" role="listbox" aria-label="Ambience preset">
+          {TABLE_AMBIENCES.map((a) => (
+            <li
+              key={a.id}
+              role="option"
+              aria-selected={settings.tableAmbience === a.id}
+              className={`settings-ambience-item${settings.tableAmbience === a.id ? " selected" : ""}`}
+              onClick={() => setSettings({ ...settings, tableAmbience: a.id })}
+              tabIndex={0}
+              onKeyDown={(e) => e.key === "Enter" && setSettings({ ...settings, tableAmbience: a.id })}
+            >
+              <span className="settings-ambience-name">{a.label}</span>
+              <span className="settings-ambience-desc">{a.desc}</span>
+              {settings.tableAmbience === a.id && <span className="settings-ambience-check">✔</span>}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+
+  const renderCombatRules = () => (
+    <div className="settings-tab-pane">
+      <div className="settings-section">
+        <h3 className="settings-section-title">General</h3>
+        <p className="settings-section-desc">Manage gameplay behaviour, turn timers, and Droid opponents.</p>
+        <ToggleRow
+          label="Confirm forfeit / offer tie?"
+          desc="You will be asked to confirm before conceding a set or proposing a draw."
+          value={settings.confirmForfeit}
+          onChange={(v) => setSettings({ ...settings, confirmForfeit: v })}
+        />
+        <ToggleRow
+          label="Highlight valid card plays"
+          desc="Glow on side-deck cards you can legally play this turn."
+          value={settings.highlightValidPlays}
+          onChange={(v) => setSettings({ ...settings, highlightValidPlays: v })}
+        />
+        <ToggleRow
+          label="Focus Mode"
+          desc="Hide the sidebar, streaks, and decorative elements while in a match."
+          value={settings.focusMode}
+          onChange={(v) => setSettings({ ...settings, focusMode: v })}
+        />
+      </div>
+
+      <div className="settings-section">
+        <h3 className="settings-section-title">Turn Timer</h3>
+        <div className="settings-group">
+          <label htmlFor="timer-select" className="settings-group-label">Seconds per turn</label>
+          <select
+            id="timer-select"
+            value={settings.turnTimerSeconds}
+            onChange={(e) => setSettings({ ...settings, turnTimerSeconds: parseInt(e.target.value) })}
+          >
+            <option value="0">Untimed — Casual</option>
+            <option value="30">Lightning — 30 s</option>
+            <option value="45">Standard — 45 s</option>
+            <option value="60">Relaxed — 60 s</option>
+            <option value="90">Galaxy Standard — 90 s</option>
+            <option value="120">Scholar — 2 min</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="settings-section">
+        <h3 className="settings-section-title">Droid Opponents</h3>
+        <div className="settings-group">
+          <label htmlFor="ai-difficulty-select" className="settings-group-label">Default difficulty</label>
+          <select
+            id="ai-difficulty-select"
+            value={settings.preferredAiDifficulty}
+            onChange={(e) => setSettings({ ...settings, preferredAiDifficulty: e.target.value as AdvisorDifficulty })}
+          >
+            <option value="easy">Padawan — Easy</option>
+            <option value="hard">Knight — Hard</option>
+            <option value="professional">Master — Professional</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderInterface = () => (
+    <div className="settings-tab-pane">
+      <div className="settings-section">
+        <h3 className="settings-section-title">Display</h3>
+        <p className="settings-section-desc">Control what information is shown on-screen during play.</p>
+        <ToggleRow
+          label="Show credit balance during match"
+          desc="Display your and your opponent's credit wallet while cards are dealt."
+          value={settings.showRatingsInGame}
+          onChange={(v) => setSettings({ ...settings, showRatingsInGame: v })}
+        />
+        <ToggleRow
+          label="Show guild rank emblems"
+          desc="Display membership icons next to player names."
+          value={settings.showGuildEmblems}
+          onChange={(v) => setSettings({ ...settings, showGuildEmblems: v })}
+        />
+      </div>
+
+      <div className="settings-section">
+        <h3 className="settings-section-title">Features</h3>
+        <ToggleRow
+          label="Show Holocron Streaks"
+          desc="Track your daily login streak with a glowing Holocron icon. 🔥"
+          value={settings.showHolocronStreaks}
+          onChange={(v) => setSettings({ ...settings, showHolocronStreaks: v })}
+        />
+        <ToggleRow
+          label="Show post-match debrief"
+          desc="See an advisor summary at the end of every match — key plays, risk moments, and credit swing."
+          value={settings.showPostMatchDebrief}
+          onChange={(v) => setSettings({ ...settings, showPostMatchDebrief: v })}
+        />
+      </div>
+    </div>
+  );
+
+  const renderComms = () => (
+    <div className="settings-tab-pane">
+      <div className="settings-section">
+        <h3 className="settings-section-title">In-Match Chat</h3>
+        <p className="settings-section-desc">Control who can send you messages during a live match.</p>
+        <ul className="settings-radio-group" role="radiogroup" aria-label="Chat audience">
+          {(["everyone", "guild", "silent"] as const).map((val) => (
+            <li
+              key={val}
+              role="radio"
+              aria-checked={settings.chatAudience === val}
+              className={`settings-radio-item${settings.chatAudience === val ? " selected" : ""}`}
+              onClick={() => setSettings({ ...settings, chatAudience: val })}
+              tabIndex={0}
+              onKeyDown={(e) => e.key === "Enter" && setSettings({ ...settings, chatAudience: val })}
+            >
+              <span className="settings-radio-dot" />
+              <div>
+                <span className="settings-radio-label">
+                  {val === "everyone" ? "Everyone" : val === "guild" ? "Guild Members Only" : "Silent — No chat"}
+                </span>
+                <span className="settings-radio-desc">
+                  {val === "everyone"
+                    ? "Any player you face can send you in-match messages."
+                    : val === "guild"
+                    ? "Only players in your Discord server can message you mid-game."
+                    : "Disable all in-match chat — pure card play, no banter."}
+                </span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+
+  const renderAccessibility = () => (
+    <div className="settings-tab-pane">
+      <div className="settings-section">
+        <h3 className="settings-section-title">Sounds</h3>
+        <ToggleRow
+          label="Play sound effects"
+          desc="Card slaps, shuffle clicks, and win chimes."
+          value={settings.soundEnabled}
+          onChange={(v) => {
+            setSettings({ ...settings, soundEnabled: v });
+            soundManager.setEnabled(v);
+          }}
+        />
+        {settings.soundEnabled && (
+          <div className="settings-group" style={{ marginTop: 12 }}>
+            <label htmlFor="sound-theme-select" className="settings-group-label">Sound theme</label>
+            <select
+              id="sound-theme-select"
+              value={settings.soundTheme}
+              onChange={(e) => setSettings({ ...settings, soundTheme: e.target.value as PazaakSoundTheme })}
+            >
+              {SOUND_THEMES.map((st) => (
+                <option key={st.id} value={st.id}>{st.label} — {st.desc}</option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
+      <div className="settings-section">
+        <h3 className="settings-section-title">Visual</h3>
+        <ToggleRow
+          label="Reduced Motion"
+          desc="Minimise animations for players sensitive to motion effects."
+          value={settings.reducedMotionEnabled}
+          onChange={(v) => setSettings({ ...settings, reducedMotionEnabled: v })}
+        />
+      </div>
+
+      <div className="settings-section settings-info">
+        <h3 className="settings-section-title">About</h3>
+        <p>Pazaak World v0.1 — The legendary card game from Knights of the Old Republic</p>
+      </div>
+    </div>
+  );
+
+  // ── Render ────────────────────────────────────────────────────────────
+
   return (
     <div className="settings-modal-overlay" onClick={requestClose} role="presentation">
       <div
@@ -194,8 +523,12 @@ export function SettingsModal({ isOpen, currentSettings, onClose, onSave }: Sett
         aria-busy={isSaving}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Header */}
         <div className="settings-modal-header">
-          <h2 id="settings-modal-title">Settings</h2>
+          <div className="settings-modal-title-group">
+            <h2 id="settings-modal-title">⚙ Preferences</h2>
+            <span className="settings-modal-subtitle">Customise your Pazaak World experience.</span>
+          </div>
           <button
             className="settings-modal-close"
             onClick={requestClose}
@@ -206,244 +539,37 @@ export function SettingsModal({ isOpen, currentSettings, onClose, onSave }: Sett
           </button>
         </div>
 
-        <div className="settings-modal-content">
-          {/* Theme Selection */}
-          <div className="settings-group">
-            <label htmlFor="theme-select">Table theme</label>
-            <select
-              id="theme-select"
-              value={settings.tableTheme}
-              onChange={(e) => setSettings({ ...settings, tableTheme: e.target.value as PazaakTableTheme })}
-            >
-              <option value="ebon-hawk">Ebon Hawk</option>
-              <option value="coruscant">Coruscant</option>
-              <option value="tatooine">Tatooine</option>
-              <option value="manaan">Manaan</option>
-              <option value="dantooine">Dantooine</option>
-              <option value="malachor">Malachor</option>
-            </select>
-          </div>
+        {/* Body: nav sidebar + content pane */}
+        <div className="settings-modal-body">
+          <nav className="settings-nav" aria-label="Settings sections">
+            {SETTINGS_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                className={`settings-nav-item${activeTab === tab.id ? " active" : ""}`}
+                onClick={() => setActiveTab(tab.id)}
+                aria-current={activeTab === tab.id ? "page" : undefined}
+              >
+                <span className="settings-nav-icon" aria-hidden="true">{tab.icon}</span>
+                <span className="settings-nav-label">{tab.label}</span>
+              </button>
+            ))}
+          </nav>
 
-          <div className="settings-group">
-            <label htmlFor="card-back-select">Card back</label>
-            <select
-              id="card-back-select"
-              value={settings.cardBackStyle}
-              onChange={(e) =>
-                setSettings({ ...settings, cardBackStyle: e.target.value as PazaakCardBackStyle })
-              }
-            >
-              <option value="classic">Classic</option>
-              <option value="holographic">Holographic</option>
-              <option value="mandalorian">Mandalorian</option>
-              <option value="republic">Republic</option>
-              <option value="sith">Sith</option>
-            </select>
-          </div>
-
-          <div className="settings-group">
-            <label htmlFor="ambience-select">Table ambience</label>
-            <select
-              id="ambience-select"
-              value={settings.tableAmbience}
-              onChange={(e) =>
-                setSettings({ ...settings, tableAmbience: e.target.value as PazaakTableAmbience })
-              }
-            >
-              <option value="cantina">Cantina</option>
-              <option value="ebon-hawk">Ebon Hawk</option>
-              <option value="jedi-archives">Jedi Archives</option>
-              <option value="outer-rim">Outer Rim</option>
-              <option value="sith-sanctum">Sith Sanctum</option>
-            </select>
-          </div>
-
-          {/* Sound Settings */}
-          <div className="settings-group">
-            <label htmlFor="sound-theme-select">Sound theme</label>
-            <select
-              id="sound-theme-select"
-              value={settings.soundTheme}
-              onChange={(e) =>
-                setSettings({ ...settings, soundTheme: e.target.value as PazaakSoundTheme })
-              }
-            >
-              <option value="default">Default</option>
-              <option value="cantina">Cantina</option>
-              <option value="droid">Droid</option>
-              <option value="force">Force</option>
-            </select>
-          </div>
-
-          <div className="settings-group">
-            <label>
-              <input
-                type="checkbox"
-                checked={settings.soundEnabled}
-                onChange={(e) => {
-                  setSettings({ ...settings, soundEnabled: e.target.checked });
-                  soundManager.setEnabled(e.target.checked);
-                }}
-              />
-              Enable Sound Effects
-            </label>
-          </div>
-
-          {/* Reduced Motion */}
-          <div className="settings-group">
-            <label>
-              <input
-                type="checkbox"
-                checked={settings.reducedMotionEnabled}
-                onChange={(e) => setSettings({ ...settings, reducedMotionEnabled: e.target.checked })}
-              />
-              Reduced Motion (accessibility)
-            </label>
-          </div>
-
-          {/* Turn Timer */}
-          <div className="settings-group">
-            <label htmlFor="timer-select">Turn Timer (seconds)</label>
-            <select
-              id="timer-select"
-              value={settings.turnTimerSeconds}
-              onChange={(e) => setSettings({ ...settings, turnTimerSeconds: parseInt(e.target.value) })}
-            >
-              <option value="30">30 seconds</option>
-              <option value="45">45 seconds</option>
-              <option value="60">60 seconds</option>
-              <option value="90">90 seconds</option>
-              <option value="120">120 seconds</option>
-            </select>
-          </div>
-
-          <div className="settings-group">
-            <label>
-              <input
-                type="checkbox"
-                checked={settings.confirmForfeit}
-                onChange={(e) => setSettings({ ...settings, confirmForfeit: e.target.checked })}
-              />
-              Confirm before forfeit
-            </label>
-          </div>
-
-          <div className="settings-group">
-            <label>
-              <input
-                type="checkbox"
-                checked={settings.highlightValidPlays}
-                onChange={(e) => setSettings({ ...settings, highlightValidPlays: e.target.checked })}
-              />
-              Highlight valid plays
-            </label>
-          </div>
-
-          <div className="settings-group">
-            <label>
-              <input
-                type="checkbox"
-                checked={settings.focusMode}
-                onChange={(e) => setSettings({ ...settings, focusMode: e.target.checked })}
-              />
-              Focus mode (minimal HUD)
-            </label>
-          </div>
-
-          <div className="settings-group">
-            <label>
-              <input
-                type="checkbox"
-                checked={settings.showRatingsInGame}
-                onChange={(e) => setSettings({ ...settings, showRatingsInGame: e.target.checked })}
-              />
-              Show ratings in game
-            </label>
-            <p className="settings-field-hint" style={{ margin: "6px 0 0", fontSize: 13, opacity: 0.78 }}>
-              Chess.com publishes the <strong>Glicko</strong> family (not pure Elo): a displayed rating plus <strong>rating deviation (RD)</strong> so upsets and provisional accounts can move more while the system is uncertain. PazaakWorld uses the same ideas—expected score from the MMR gap plus per-player RD—with a compact single-game update. See{" "}
-              <a href="https://support.chess.com/en/articles/8566476-how-do-ratings-work-on-chess-com" target="_blank" rel="noreferrer">
-                How do ratings work on Chess.com?
-              </a>
-              {" "}and <code>wiki/apps/pazaak-world/ratings.md</code>.
-            </p>
-          </div>
-
-          <div className="settings-group">
-            <label>
-              <input
-                type="checkbox"
-                checked={settings.showGuildEmblems}
-                onChange={(e) => setSettings({ ...settings, showGuildEmblems: e.target.checked })}
-              />
-              Show guild emblems
-            </label>
-          </div>
-
-          <div className="settings-group">
-            <label>
-              <input
-                type="checkbox"
-                checked={settings.showHolocronStreaks}
-                onChange={(e) => setSettings({ ...settings, showHolocronStreaks: e.target.checked })}
-              />
-              Show Holocron streaks
-            </label>
-          </div>
-
-          <div className="settings-group">
-            <label>
-              <input
-                type="checkbox"
-                checked={settings.showPostMatchDebrief}
-                onChange={(e) => setSettings({ ...settings, showPostMatchDebrief: e.target.checked })}
-              />
-              Show post-match debrief
-            </label>
-          </div>
-
-          <div className="settings-group">
-            <label htmlFor="chat-audience-select">Chat audience</label>
-            <select
-              id="chat-audience-select"
-              value={settings.chatAudience}
-              onChange={(e) =>
-                setSettings({ ...settings, chatAudience: e.target.value as PazaakChatAudience })
-              }
-            >
-              <option value="everyone">Everyone</option>
-              <option value="guild">Guild only</option>
-              <option value="silent">Silent</option>
-            </select>
-          </div>
-
-          {/* AI Difficulty */}
-          <div className="settings-group">
-            <label htmlFor="ai-difficulty-select">Default AI Difficulty</label>
-            <select
-              id="ai-difficulty-select"
-              value={settings.preferredAiDifficulty}
-              onChange={(e) => setSettings({ ...settings, preferredAiDifficulty: e.target.value as PazaakUserSettings["preferredAiDifficulty"] })}
-            >
-              <option value="easy">Easy</option>
-              <option value="hard">Hard</option>
-              <option value="professional">Professional</option>
-            </select>
-          </div>
-
-          {/* Info Section */}
-          <div className="settings-info">
-            <h3>About</h3>
-            <p>Pazaak World v0.1</p>
-            <p>The legendary card game from Knights of the Old Republic</p>
+          <div className="settings-tab-content" role="tabpanel">
+            {activeTab === "table"         && renderTableCards()}
+            {activeTab === "combat"        && renderCombatRules()}
+            {activeTab === "interface"     && renderInterface()}
+            {activeTab === "comms"         && renderComms()}
+            {activeTab === "accessibility" && renderAccessibility()}
           </div>
         </div>
 
-        {saveError ? (
+        {/* Footer */}
+        {saveError && (
           <p className="settings-modal-error" role="status" aria-live="polite">{saveError}</p>
-        ) : null}
-
-        <p className="settings-modal-hint" aria-live="off">Tip: press Ctrl+Enter to save quickly.</p>
-
+        )}
+        <p className="settings-modal-hint" aria-live="off">Tip: Ctrl+Enter to save.</p>
         <div className="settings-modal-footer">
           <button
             className="settings-modal-reset"
@@ -464,7 +590,7 @@ export function SettingsModal({ isOpen, currentSettings, onClose, onSave }: Sett
             onClick={handleSave}
             disabled={isSaving || !hasChanges}
           >
-            {isSaving ? "Saving..." : "Save Settings"}
+            {isSaving ? "Saving…" : "Save Preferences"}
           </button>
         </div>
       </div>

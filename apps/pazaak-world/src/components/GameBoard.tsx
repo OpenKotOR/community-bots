@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type {
   AdvisorAction,
   AdvisorAlternative,
@@ -6,6 +6,7 @@ import type {
   AdvisorConfidence,
   AdvisorDifficulty,
   PazaakCardBackStyle,
+  PazaakChatAudience,
   PazaakTableAmbience,
   PazaakTableTheme,
   SerializedMatch,
@@ -37,6 +38,14 @@ export type GameBoardVisualSettings = {
   showRatingsInGame?: boolean;
 };
 
+/** In-match behaviour from saved user settings (chat privacy, forfeit confirmation). */
+export type GameBoardMatchPreferences = {
+  chatAudience: PazaakChatAudience;
+  /** Discord server id in Activity context; used when `chatAudience` is `guild`. */
+  discordGuildId?: string;
+  confirmForfeit: boolean;
+};
+
 interface GameBoardProps {
   match: SerializedMatch;
   userId: string;
@@ -51,6 +60,8 @@ interface GameBoardProps {
   onExit: () => void;
   /** Table / card-back / ambience from saved user settings (drives board styling). */
   visualSettings?: GameBoardVisualSettings;
+  /** Saved preferences that affect match UI (chat audience, forfeit confirmation). */
+  matchPreferences?: GameBoardMatchPreferences;
 }
 
 export function GameBoard({
@@ -66,6 +77,7 @@ export function GameBoard({
   onSignIn,
   onExit,
   visualSettings,
+  matchPreferences,
 }: GameBoardProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -122,7 +134,13 @@ export function GameBoard({
   const handleStand = () => act(() => stand(match.id, accessToken));
   const handleEndTurn = () => act(() => endTurn(match.id, accessToken));
   const handlePlayCard = (option: SideCardOption) => { if (soundEnabled) playUiTone("card"); act(() => playSideCard(match.id, accessToken, option)); };
-  const handleForfeit = () => setForfeitPending(true);
+  const handleForfeit = () => {
+    if (confirmForfeitEnabled) {
+      setForfeitPending(true);
+      return;
+    }
+    void act(() => forfeit(match.id, accessToken));
+  };
   const confirmForfeit = () => { setForfeitPending(false); act(() => forfeit(match.id, accessToken)); };
   const cancelForfeit = () => setForfeitPending(false);
   const dismissRoundSummary = () => setRoundSummary(null);
@@ -137,6 +155,24 @@ export function GameBoard({
   const aiSeats = match.aiSeats ?? {};
   const targetSetsToWin = match.setsToWin ?? SETS_TO_WIN;
   const showRatingsInGame = visualSettings?.showRatingsInGame ?? true;
+  const chatAudience = matchPreferences?.chatAudience ?? "everyone";
+  const confirmForfeitEnabled = matchPreferences?.confirmForfeit ?? true;
+  const discordGuildId = matchPreferences?.discordGuildId;
+
+  const visibleChatMessages = useMemo(() => {
+    if (chatAudience === "silent") {
+      return [];
+    }
+    if (chatAudience === "everyone") {
+      return chatMessages;
+    }
+    // Guild-only: in Discord Activity we assume the match is scoped to the same server, so show full thread.
+    // Outside Activity we cannot verify opponent guild membership; hide others' lines until richer metadata exists.
+    if (discordGuildId) {
+      return chatMessages;
+    }
+    return chatMessages.filter((m) => m.userId === userId);
+  }, [chatAudience, chatMessages, discordGuildId, userId]);
 
   const isCompleted = match.phase === "completed";
   const accountDisplayName = myPlayer?.displayName ?? "Spectator";
@@ -378,28 +414,41 @@ export function GameBoard({
     return () => window.clearInterval(id);
   }, []);
 
-  // Auto-scroll chat to bottom on new messages.
+  // Auto-scroll chat to bottom on new visible messages.
   useEffect(() => {
     if (chatOpen) {
       chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  }, [chatMessages, chatOpen]);
+  }, [visibleChatMessages, chatOpen]);
 
-  // Increment unread count when chat is closed and new messages arrive.
-  const prevChatLengthRef = useRef(chatMessages.length);
+  // Increment unread count when chat is closed and new visible messages arrive.
+  const prevChatLengthRef = useRef(visibleChatMessages.length);
   useEffect(() => {
-    if (!chatOpen && chatMessages.length > prevChatLengthRef.current) {
-      setChatUnread((n) => n + (chatMessages.length - prevChatLengthRef.current));
+    if (!chatOpen && visibleChatMessages.length > prevChatLengthRef.current) {
+      setChatUnread((n) => n + (visibleChatMessages.length - prevChatLengthRef.current));
     }
-    prevChatLengthRef.current = chatMessages.length;
-  }, [chatMessages.length, chatOpen]);
+    prevChatLengthRef.current = visibleChatMessages.length;
+  }, [visibleChatMessages.length, chatOpen]);
+
+  useEffect(() => {
+    if (chatAudience === "silent") {
+      setChatOpen(false);
+      setChatUnread(0);
+    }
+  }, [chatAudience]);
 
   const handleChatToggle = () => {
+    if (chatAudience === "silent") {
+      return;
+    }
     setChatOpen((open) => !open);
     setChatUnread(0);
   };
 
   const handleChatSend = () => {
+    if (chatAudience === "silent") {
+      return;
+    }
     const text = chatInput.trim();
     if (!text) return;
     onSendChat(text);
@@ -439,6 +488,10 @@ export function GameBoard({
         return;
       }
 
+      if (chatAudience === "silent") {
+        return;
+      }
+
       const target = event.target as HTMLElement | null;
       const isTextInput = target !== null
         && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
@@ -462,7 +515,7 @@ export function GameBoard({
 
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [chatOpen, forfeitPending, roundSummary]);
+  }, [chatAudience, chatOpen, forfeitPending, roundSummary]);
 
   useEffect(() => {
     if (!error) {
@@ -546,16 +599,18 @@ export function GameBoard({
               Sideboard Workshop
             </button>
           )}
-          <button
-            className={`btn btn--ghost btn--sm game-header__chat-toggle${chatUnread > 0 ? " game-header__chat-toggle--unread" : ""}`}
-            onClick={handleChatToggle}
-            title="Toggle chat"
-            aria-pressed={chatOpen}
-            aria-controls={chatRegionId}
-            aria-label={chatOpen ? "Hide match chat" : "Show match chat"}
-          >
-            Chat{chatUnread > 0 ? ` (${chatUnread})` : ""}
-          </button>
+          {chatAudience !== "silent" && (
+            <button
+              className={`btn btn--ghost btn--sm game-header__chat-toggle${chatUnread > 0 ? " game-header__chat-toggle--unread" : ""}`}
+              onClick={handleChatToggle}
+              title="Toggle chat"
+              aria-pressed={chatOpen}
+              aria-controls={chatRegionId}
+              aria-label={chatOpen ? "Hide match chat" : "Show match chat"}
+            >
+              Chat{chatUnread > 0 ? ` (${chatUnread})` : ""}
+            </button>
+          )}
           <button
             className="btn btn--ghost btn--sm"
             onClick={() => setSoundEnabled((s) => !s)}
@@ -712,10 +767,14 @@ export function GameBoard({
             <button className="btn btn--ghost btn--sm" onClick={() => setChatOpen(false)} aria-label="Close chat panel">✕</button>
           </header>
           <div className="chat-panel__messages">
-            {chatMessages.length === 0 ? (
+            {chatAudience === "guild" && !discordGuildId ? (
+              <p className="chat-panel__empty">
+                Guild-only chat is available when you launch PazaakWorld inside a Discord Activity (same-server matches). In the web client, switch to Everyone in Preferences or use Silent for no chat.
+              </p>
+            ) : visibleChatMessages.length === 0 ? (
               <p className="chat-panel__empty">No messages yet. Say something!</p>
             ) : (
-              chatMessages.map((msg) => (
+              visibleChatMessages.map((msg) => (
                 <div key={msg.id} className={`chat-panel__msg${msg.userId === userId ? " chat-panel__msg--mine" : ""}`}>
                   <span className="chat-panel__msg-author">{msg.userId === userId ? "You" : msg.displayName}</span>
                   <span className="chat-panel__msg-text">{msg.text}</span>
@@ -737,6 +796,7 @@ export function GameBoard({
               maxLength={300}
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
+              disabled={chatAudience === "guild" && !discordGuildId}
               onKeyDown={(event) => {
                 if (event.key === "Escape") {
                   event.preventDefault();
@@ -744,7 +804,7 @@ export function GameBoard({
                 }
               }}
             />
-            <button className="btn btn--primary btn--sm" type="submit" disabled={!chatInput.trim()}>
+            <button className="btn btn--primary btn--sm" type="submit" disabled={!chatInput.trim() || (chatAudience === "guild" && !discordGuildId)}>
               Send
             </button>
           </form>

@@ -165,32 +165,57 @@ export interface SavedSideboardCollectionRecord {
   updatedAt: string;
 }
 
-export type PazaakTableTheme = "ebon-hawk" | "coruscant" | "tatooine" | "manaan" | "dantooine" | "malachor";
+/** Visual colour preset applied to the card table surface. */
+export type PazaakTableTheme =
+  | "ebon-hawk"
+  | "coruscant"
+  | "tatooine"
+  | "manaan"
+  | "dantooine"
+  | "malachor";
 
-export type PazaakCardBackStyle = "classic" | "holographic" | "mandalorian" | "republic" | "sith";
+/** Card-back artwork style. */
+export type PazaakCardBackStyle =
+  | "classic"
+  | "holographic"
+  | "mandalorian"
+  | "republic"
+  | "sith";
 
-export type PazaakTableAmbience = "cantina" | "ebon-hawk" | "jedi-archives" | "outer-rim" | "sith-sanctum";
+/** Ambient background atmosphere applied behind the board. */
+export type PazaakTableAmbience =
+  | "cantina"
+  | "ebon-hawk"
+  | "jedi-archives"
+  | "outer-rim"
+  | "sith-sanctum";
 
+/** Audio theme for card/game sound effects. */
 export type PazaakSoundTheme = "default" | "cantina" | "droid" | "force";
 
 export type PazaakChatAudience = "everyone" | "guild" | "silent";
 
 export interface PazaakUserSettings {
+  // --- Table & Cards ---
   tableTheme: PazaakTableTheme;
   cardBackStyle: PazaakCardBackStyle;
   tableAmbience: PazaakTableAmbience;
+  // --- Accessibility ---
   soundEnabled: boolean;
   soundTheme: PazaakSoundTheme;
   reducedMotionEnabled: boolean;
+  // --- Combat Rules ---
   turnTimerSeconds: number;
   preferredAiDifficulty: AdvisorDifficulty;
   confirmForfeit: boolean;
   highlightValidPlays: boolean;
   focusMode: boolean;
+  // --- Interface ---
   showRatingsInGame: boolean;
   showGuildEmblems: boolean;
   showHolocronStreaks: boolean;
   showPostMatchDebrief: boolean;
+  // --- Comms ---
   chatAudience: PazaakChatAudience;
 }
 

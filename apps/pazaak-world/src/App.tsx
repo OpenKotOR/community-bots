@@ -61,7 +61,7 @@ import {
   bootstrapNakamaActivitySession,
   isNakamaBackend,
 } from "./api.ts";
-import { GameBoard } from "./components/GameBoard.tsx";
+import { GameBoard, type GameBoardMatchPreferences } from "./components/GameBoard.tsx";
 import { LocalBlackjackGame } from "./components/LocalBlackjackGame.tsx";
 import { LocalPracticeGame } from "./components/LocalPracticeGame.tsx";
 import { QuickSideboardSwitcher } from "./components/QuickSideboardSwitcher.tsx";
@@ -480,6 +480,11 @@ function PazaakWorldApp() {
   const [cornerBusy, setCornerBusy] = useState(false);
   const activeSession = getSessionFromAppState(state);
   const [userSettings, setUserSettings] = useState<PazaakUserSettings>(loadUserSettings);
+  const gameBoardMatchPreferences = useMemo((): GameBoardMatchPreferences => ({
+    chatAudience: userSettings.chatAudience,
+    discordGuildId: activeSession?.guildId,
+    confirmForfeit: userSettings.confirmForfeit,
+  }), [activeSession?.guildId, userSettings.chatAudience, userSettings.confirmForfeit]);
   const [onboardingState, setOnboardingState] = useState<OnboardingState>(loadOnboardingState);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [authDialogMessage, setAuthDialogMessage] = useState<string | undefined>();
@@ -1082,6 +1087,7 @@ function PazaakWorldApp() {
         tableAmbience: userSettings.tableAmbience,
         showRatingsInGame: userSettings.showRatingsInGame,
       }}
+      matchPreferences={gameBoardMatchPreferences}
     />
   );
 }
