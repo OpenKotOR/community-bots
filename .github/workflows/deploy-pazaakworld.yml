@@ -76,6 +76,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build workspace libraries (dist for workspace:* deps)
+        run: |
+          pnpm --filter @openkotor/platform build
+          pnpm --filter @openkotor/blackjack-engine build
+          pnpm --filter @openkotor/pazaak-engine build
+
       - name: Build PazaakWorld
         env:
           BASE: ${{ steps.base.outputs.base_path }}
