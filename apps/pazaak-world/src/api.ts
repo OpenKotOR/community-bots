@@ -1051,7 +1051,8 @@ export async function fetchTournament(accessToken: string, tournamentId: string)
 
 export async function createTournament(accessToken: string, input: CreateTournamentInput): Promise<TournamentStateRecord> {
   if (isNakamaBackend()) {
-    throw new Error("Tournament creation is not implemented on Nakama yet.");
+    const data = await nakamaRpc<{ tournament: TournamentStateRecord }>(accessToken, "pazaak.tournament_create", input as object);
+    return data.tournament;
   }
   const data = await apiFetch<{ tournament: TournamentStateRecord }>("/api/tournaments", accessToken, {
     method: "POST",
@@ -1062,7 +1063,8 @@ export async function createTournament(accessToken: string, input: CreateTournam
 
 export async function joinTournament(accessToken: string, tournamentId: string): Promise<TournamentStateRecord> {
   if (isNakamaBackend()) {
-    throw new Error("Tournament join is not implemented on Nakama yet.");
+    const data = await nakamaRpc<{ tournament: TournamentStateRecord }>(accessToken, "pazaak.tournament_join", { tournamentId });
+    return data.tournament;
   }
   const data = await apiFetch<{ tournament: TournamentStateRecord }>(`/api/tournaments/${encodeURIComponent(tournamentId)}/join`, accessToken, { method: "POST" });
   return data.tournament;
@@ -1070,7 +1072,8 @@ export async function joinTournament(accessToken: string, tournamentId: string):
 
 export async function leaveTournament(accessToken: string, tournamentId: string): Promise<TournamentStateRecord> {
   if (isNakamaBackend()) {
-    throw new Error("Tournament leave is not implemented on Nakama yet.");
+    const data = await nakamaRpc<{ tournament: TournamentStateRecord }>(accessToken, "pazaak.tournament_leave", { tournamentId });
+    return data.tournament;
   }
   const data = await apiFetch<{ tournament: TournamentStateRecord }>(`/api/tournaments/${encodeURIComponent(tournamentId)}/leave`, accessToken, { method: "POST" });
   return data.tournament;
@@ -1078,7 +1081,8 @@ export async function leaveTournament(accessToken: string, tournamentId: string)
 
 export async function startTournament(accessToken: string, tournamentId: string): Promise<TournamentStateRecord> {
   if (isNakamaBackend()) {
-    throw new Error("Tournament start is not implemented on Nakama yet.");
+    const data = await nakamaRpc<{ tournament: TournamentStateRecord }>(accessToken, "pazaak.tournament_start", { tournamentId });
+    return data.tournament;
   }
   const data = await apiFetch<{ tournament: TournamentStateRecord }>(`/api/tournaments/${encodeURIComponent(tournamentId)}/start`, accessToken, { method: "POST" });
   return data.tournament;
@@ -1090,6 +1094,13 @@ export async function reportTournamentMatch(
   matchId: string,
   winnerUserId: string | null,
 ): Promise<{ tournament: TournamentStateRecord; tournamentCompleted: boolean }> {
+  if (isNakamaBackend()) {
+    return nakamaRpc<{ tournament: TournamentStateRecord; tournamentCompleted: boolean }>(accessToken, "pazaak.tournament_report", {
+      tournamentId,
+      matchId,
+      winnerUserId,
+    });
+  }
   return apiFetch<{ tournament: TournamentStateRecord; tournamentCompleted: boolean }>(
     `/api/tournaments/${encodeURIComponent(tournamentId)}/report`,
     accessToken,
@@ -1102,7 +1113,8 @@ export async function reportTournamentMatch(
 
 export async function cancelTournament(accessToken: string, tournamentId: string): Promise<TournamentStateRecord> {
   if (isNakamaBackend()) {
-    throw new Error("Tournament cancel is not implemented on Nakama yet.");
+    const data = await nakamaRpc<{ tournament: TournamentStateRecord }>(accessToken, "pazaak.tournament_cancel", { tournamentId });
+    return data.tournament;
   }
   const data = await apiFetch<{ tournament: TournamentStateRecord }>(`/api/tournaments/${encodeURIComponent(tournamentId)}/cancel`, accessToken, { method: "POST" });
   return data.tournament;

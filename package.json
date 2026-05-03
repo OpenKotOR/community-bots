@@ -22,9 +22,12 @@
     "dev:ingest": "pnpm --filter @openkotor/ingest-worker dev",
     "discord:install-links": "tsx scripts/discord-install-links.ts",
     "smoke:trask-gptr-dry": "python scripts/smoke_trask_headless_gptr.py --dry-run",
-    "smoke:trask-gptr": "python scripts/smoke_trask_headless_gptr.py"
+    "smoke:trask-gptr": "python scripts/smoke_trask_headless_gptr.py",
+    "holocron:e2e": "pnpm --filter spark-template build && pnpm exec playwright test -c vendor/qa-webui/playwright.config.ts",
+    "discord:smoke-trask-commands": "node scripts/discord_trask_commands_smoke.mjs"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.0",
     "@types/node": "^24.0.7",
     "tsx": "^4.20.6",
     "typescript": "~6.0.2"

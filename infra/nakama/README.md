@@ -32,7 +32,7 @@ The bundled runtime registers:
 
 - `pazaak_authoritative` match handler for server-owned Pazaak games.
 - `pazaak.*` RPCs for profiles, settings, sideboards, lobby lifecycle,
-  matchmaking queue, leaderboard/history, tournament placeholders, and chat.
+  matchmaking queue, leaderboard/history, **tournaments** (create/join/leave/start/report/cancel), and chat.
 - Authoritative MMR settlement on match completion with Nakama leaderboards.
 
 ## Cutover note

@@ -76,24 +76,24 @@ jobs:
         run: pnpm --filter pazaak-world build
 
       - name: Build QA Trask WebUI
-        working-directory: vendor/qa-webui
         env:
           BASE: /bots/qa-webui/
           ENABLE_SPARK: "0"
-        run: |
-          npm ci
-          npm run build
+        run: pnpm --filter spark-template build
 
       - name: Publish QA Trask WebUI under /bots/qa-webui/
         run: |
           mkdir -p apps/pazaak-world/dist/qa-webui
           cp -R vendor/qa-webui/dist/. apps/pazaak-world/dist/qa-webui/
 
-      - name: Build HK-86 operator WebUI
+      - name: Build Discord bots hub WebUI (hk86)
         env:
           BASE: /bots/hk86/
-          VITE_DISCORD_APPLICATION_ID: ${{ vars.HK86_DISCORD_APP_ID }}
           VITE_REPO_BASE_URL: https://github.com/${{ github.repository }}
+          VITE_TRASK_DISCORD_APPLICATION_ID: ${{ vars.TRASK_DISCORD_APP_ID }}
+          VITE_HK_DISCORD_APPLICATION_ID: ${{ vars.HK86_DISCORD_APP_ID }}
+          VITE_DISCORD_APPLICATION_ID: ${{ vars.HK86_DISCORD_APP_ID }}
+          VITE_PAZAAK_DISCORD_APPLICATION_ID: ${{ vars.PAZAAK_DISCORD_APP_ID }}
         run: pnpm --filter hk86-web build
 
       - name: Publish HK-86 WebUI under /bots/hk86/

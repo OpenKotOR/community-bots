@@ -6545,10 +6545,679 @@ var pazaakWorldRuntime = (() => {
     return { mmr, rd, deltaMmr };
   }
 
+  // scripts/node-crypto-stub.ts
+  function randomUUID() {
+    const c = globalThis.crypto;
+    if (c?.randomUUID) return c.randomUUID();
+    const part = () => Math.floor((1 + Math.random()) * 65536).toString(16).slice(1);
+    return `${part()}${part()}-${part()}-${part()}-${part()}-${part()}${part()}${part()}`;
+  }
+
+  // ../../packages/pazaak-tournament/src/seeding.ts
+  var seedParticipantsByMmr = (participants) => {
+    const seeded = [...participants].sort((left, right) => {
+      if (right.mmr !== left.mmr) {
+        return right.mmr - left.mmr;
+      }
+      return left.registeredAt - right.registeredAt;
+    });
+    return seeded.map((entry, index) => ({
+      ...entry,
+      seed: index + 1
+    }));
+  };
+  var generateBracketPairings = (seedCount) => {
+    if (seedCount < 1) {
+      return [];
+    }
+    const bracketSize = nextPowerOfTwo(seedCount);
+    const pairings = [];
+    const order = buildSeedOrder(bracketSize);
+    for (let i = 0; i < order.length; i += 2) {
+      const a = order[i];
+      const b = order[i + 1];
+      const pairingA = a > seedCount ? null : a;
+      const pairingB = b > seedCount ? null : b;
+      pairings.push([pairingA, pairingB]);
+    }
+    return pairings;
+  };
+  var buildSeedOrder = (size) => {
+    if (size <= 1) {
+      return [1];
+    }
+    const previous = buildSeedOrder(size / 2);
+    const result = [];
+    for (const seed of previous) {
+      result.push(seed, size + 1 - seed);
+    }
+    return result;
+  };
+  var nextPowerOfTwo = (value) => {
+    if (value <= 1) return 1;
+    return 2 ** Math.ceil(Math.log2(value));
+  };
+
+  // ../../packages/pazaak-tournament/src/single-elim.ts
+  var generateSingleElimBracket = (state) => {
+    const seeded = Object.values(state.participants).filter((entry) => entry.seed !== null).sort((left, right) => (left.seed ?? 0) - (right.seed ?? 0));
+    if (seeded.length < 2) {
+      return [];
+    }
+    const bySeed = new Map(seeded.map((entry) => [entry.seed, entry]));
+    const pairings = generateBracketPairings(seeded.length);
+    const bracketSize = nextPowerOfTwo(seeded.length);
+    const totalRounds = Math.max(1, Math.log2(bracketSize));
+    const matchesByRound = [];
+    for (let round = 1; round <= totalRounds; round += 1) {
+      const slotsInRound = bracketSize / 2 ** round;
+      const roundMatches = [];
+      for (let index = 0; index < slotsInRound; index += 1) {
+        roundMatches.push({
+          id: randomUUID(),
+          round,
+          index,
+          bracket: "winners",
+          state: "pending",
+          participantAId: null,
+          participantBId: null,
+          winnerUserId: null,
+          loserUserId: null,
+          engineMatchId: null,
+          scheduledAt: null,
+          completedAt: null,
+          winnerAdvancesToMatchId: null,
+          loserAdvancesToMatchId: null
+        });
+      }
+      matchesByRound.push(roundMatches);
+    }
+    const round1 = matchesByRound[0] ?? [];
+    for (let i = 0; i < pairings.length; i += 1) {
+      const [seedA, seedB] = pairings[i] ?? [null, null];
+      const match = round1[i];
+      if (!match) continue;
+      const participantA = seedA !== null ? bySeed.get(seedA) ?? null : null;
+      const participantB = seedB !== null ? bySeed.get(seedB) ?? null : null;
+      match.participantAId = participantA?.userId ?? null;
+      match.participantBId = participantB?.userId ?? null;
+      if (participantA && !participantB) {
+        match.state = "bye";
+        match.winnerUserId = participantA.userId;
+        match.completedAt = Date.now();
+      } else if (!participantA && participantB) {
+        match.state = "bye";
+        match.winnerUserId = participantB.userId;
+        match.completedAt = Date.now();
+      } else if (participantA && participantB) {
+        match.state = "active";
+      }
+    }
+    for (let round = 1; round < totalRounds; round += 1) {
+      const roundMatches = matchesByRound[round - 1] ?? [];
+      const nextRoundMatches = matchesByRound[round] ?? [];
+      for (let i = 0; i < roundMatches.length; i += 1) {
+        const parent = nextRoundMatches[Math.floor(i / 2)];
+        const match = roundMatches[i];
+        if (match && parent) {
+          match.winnerAdvancesToMatchId = parent.id;
+        }
+      }
+    }
+    const flat = [];
+    for (const round of matchesByRound) {
+      flat.push(...round);
+    }
+    const byId = new Map(flat.map((match) => [match.id, match]));
+    for (const match of flat) {
+      if (match.state === "bye" && match.winnerUserId && match.winnerAdvancesToMatchId) {
+        const parent = byId.get(match.winnerAdvancesToMatchId);
+        if (parent) {
+          if (parent.participantAId === null) {
+            parent.participantAId = match.winnerUserId;
+          } else if (parent.participantBId === null) {
+            parent.participantBId = match.winnerUserId;
+          }
+          if (parent.participantAId && parent.participantBId && parent.state === "pending") {
+            parent.state = "active";
+          }
+        }
+      }
+    }
+    return flat;
+  };
+
+  // ../../packages/pazaak-tournament/src/double-elim.ts
+  var generateDoubleElimBracket = (state) => {
+    const winners = generateSingleElimBracket(state).map((match) => ({ ...match, bracket: "winners" }));
+    if (winners.length === 0) return [];
+    const rounds = Math.max(...winners.map((match) => match.round));
+    const losersRounds = Math.max(0, rounds * 2 - 1);
+    const losers = [];
+    for (let round = 1; round <= losersRounds; round += 1) {
+      const dropRoundIndex = Math.ceil(round / 2);
+      const dropRound = Math.min(rounds - 1, dropRoundIndex);
+      const winnersDropRoundSlots = winners.filter((match) => match.round === dropRound).length;
+      const slotsInRound = round % 2 === 1 ? Math.max(1, winnersDropRoundSlots) : Math.max(1, Math.ceil(winnersDropRoundSlots / 2));
+      for (let i = 0; i < slotsInRound; i += 1) {
+        losers.push({
+          id: randomUUID(),
+          round,
+          index: i,
+          bracket: "losers",
+          state: "pending",
+          participantAId: null,
+          participantBId: null,
+          winnerUserId: null,
+          loserUserId: null,
+          engineMatchId: null,
+          scheduledAt: null,
+          completedAt: null,
+          winnerAdvancesToMatchId: null,
+          loserAdvancesToMatchId: null
+        });
+      }
+    }
+    const grandFinal = {
+      id: randomUUID(),
+      round: rounds + 1,
+      index: 0,
+      bracket: "grand_final",
+      state: "pending",
+      participantAId: null,
+      participantBId: null,
+      winnerUserId: null,
+      loserUserId: null,
+      engineMatchId: null,
+      scheduledAt: null,
+      completedAt: null,
+      winnerAdvancesToMatchId: null,
+      loserAdvancesToMatchId: null
+    };
+    const grandFinalReset = {
+      id: randomUUID(),
+      round: rounds + 2,
+      index: 0,
+      bracket: "grand_final_reset",
+      state: "pending",
+      participantAId: null,
+      participantBId: null,
+      winnerUserId: null,
+      loserUserId: null,
+      engineMatchId: null,
+      scheduledAt: null,
+      completedAt: null,
+      winnerAdvancesToMatchId: null,
+      loserAdvancesToMatchId: null
+    };
+    const winnersFinal = winners.find((match) => match.round === rounds);
+    if (winnersFinal) {
+      winnersFinal.winnerAdvancesToMatchId = grandFinal.id;
+      winnersFinal.loserAdvancesToMatchId = losers.at(-1)?.id ?? null;
+    }
+    grandFinal.winnerAdvancesToMatchId = null;
+    grandFinal.loserAdvancesToMatchId = grandFinalReset.id;
+    const losersFinal = losers.at(-1);
+    if (losersFinal) {
+      losersFinal.winnerAdvancesToMatchId = grandFinal.id;
+    }
+    for (let i = 0; i < losers.length - 1; i += 1) {
+      const current = losers[i];
+      const next = losers[i + 1];
+      current.winnerAdvancesToMatchId = next.id;
+    }
+    const losersByRound = /* @__PURE__ */ new Map();
+    for (const match of losers) {
+      const bucket = losersByRound.get(match.round) ?? [];
+      bucket.push(match);
+      losersByRound.set(match.round, bucket);
+    }
+    for (const winnersMatch of winners) {
+      if (winnersMatch.round === rounds) continue;
+      const dropRound = winnersMatch.round * 2 - 1;
+      const slots = losersByRound.get(dropRound) ?? [];
+      const target = slots[winnersMatch.index % Math.max(1, slots.length)];
+      if (target) {
+        winnersMatch.loserAdvancesToMatchId = target.id;
+      }
+    }
+    return [...winners, ...losers, grandFinal, grandFinalReset];
+  };
+
+  // ../../packages/pazaak-tournament/src/swiss.ts
+  var computeSwissStandings = (state) => {
+    const rows = /* @__PURE__ */ new Map();
+    for (const participant of Object.values(state.participants)) {
+      rows.set(participant.userId, {
+        userId: participant.userId,
+        displayName: participant.displayName,
+        seed: participant.seed,
+        wins: 0,
+        losses: 0,
+        draws: 0,
+        buchholz: 0,
+        sonnebornBerger: 0,
+        opponentIds: [],
+        matchPoints: 0
+      });
+    }
+    for (const match of state.matches) {
+      if (match.state !== "reported" && match.state !== "bye") continue;
+      const aRow = match.participantAId ? rows.get(match.participantAId) : void 0;
+      const bRow = match.participantBId ? rows.get(match.participantBId) : void 0;
+      if (match.state === "bye") {
+        const lonerRow = aRow ?? bRow;
+        if (lonerRow) {
+          lonerRow.wins += 1;
+          lonerRow.matchPoints += 3;
+        }
+        continue;
+      }
+      if (!aRow || !bRow) continue;
+      if (match.winnerUserId === null) {
+        aRow.draws += 1;
+        bRow.draws += 1;
+        aRow.matchPoints += 1;
+        bRow.matchPoints += 1;
+      } else if (match.winnerUserId === aRow.userId) {
+        aRow.wins += 1;
+        aRow.matchPoints += 3;
+        bRow.losses += 1;
+      } else {
+        bRow.wins += 1;
+        bRow.matchPoints += 3;
+        aRow.losses += 1;
+      }
+      aRow.opponentIds.push(bRow.userId);
+      bRow.opponentIds.push(aRow.userId);
+    }
+    for (const row of rows.values()) {
+      let buchholz = 0;
+      let sonnebornBerger = 0;
+      for (const opponentId of row.opponentIds) {
+        const opponent = rows.get(opponentId);
+        if (!opponent) continue;
+        buchholz += opponent.matchPoints;
+      }
+      for (const match of state.matches) {
+        if (match.state !== "reported") continue;
+        if (match.winnerUserId === null && (match.participantAId === row.userId || match.participantBId === row.userId)) {
+          const otherId = match.participantAId === row.userId ? match.participantBId : match.participantAId;
+          const opponent = otherId ? rows.get(otherId) : void 0;
+          if (opponent) {
+            sonnebornBerger += opponent.matchPoints / 2;
+          }
+        } else if (match.winnerUserId === row.userId) {
+          const otherId = match.participantAId === row.userId ? match.participantBId : match.participantAId;
+          const opponent = otherId ? rows.get(otherId) : void 0;
+          if (opponent) {
+            sonnebornBerger += opponent.matchPoints;
+          }
+        }
+      }
+      row.buchholz = buchholz;
+      row.sonnebornBerger = sonnebornBerger;
+    }
+    return [...rows.values()].sort((a, b) => {
+      if (b.matchPoints !== a.matchPoints) return b.matchPoints - a.matchPoints;
+      if (b.buchholz !== a.buchholz) return b.buchholz - a.buchholz;
+      if (b.sonnebornBerger !== a.sonnebornBerger) return b.sonnebornBerger - a.sonnebornBerger;
+      return (a.seed ?? Number.POSITIVE_INFINITY) - (b.seed ?? Number.POSITIVE_INFINITY);
+    });
+  };
+  var generateSwissPairings = (state, round) => {
+    const standings = computeSwissStandings(state);
+    const unpaired = new Set(standings.map((row) => row.userId));
+    const pairings = [];
+    let slotIndex = 0;
+    for (const candidate of standings) {
+      if (!unpaired.has(candidate.userId)) continue;
+      const opponent = standings.find(
+        (entry) => entry.userId !== candidate.userId && unpaired.has(entry.userId) && !candidate.opponentIds.includes(entry.userId)
+      );
+      if (opponent) {
+        unpaired.delete(candidate.userId);
+        unpaired.delete(opponent.userId);
+        pairings.push({
+          id: randomUUID(),
+          round,
+          index: slotIndex,
+          state: "active",
+          participantAId: candidate.userId,
+          participantBId: opponent.userId,
+          winnerUserId: null,
+          loserUserId: null,
+          engineMatchId: null,
+          scheduledAt: null,
+          completedAt: null,
+          winnerAdvancesToMatchId: null,
+          loserAdvancesToMatchId: null
+        });
+        slotIndex += 1;
+      }
+    }
+    for (const loneUserId of unpaired) {
+      pairings.push({
+        id: randomUUID(),
+        round,
+        index: slotIndex,
+        state: "bye",
+        participantAId: loneUserId,
+        participantBId: null,
+        winnerUserId: loneUserId,
+        loserUserId: null,
+        engineMatchId: null,
+        scheduledAt: null,
+        completedAt: Date.now(),
+        winnerAdvancesToMatchId: null,
+        loserAdvancesToMatchId: null
+      });
+      slotIndex += 1;
+    }
+    return pairings;
+  };
+
+  // ../../packages/pazaak-tournament/src/engine.ts
+  var DEFAULT_SETS_PER_MATCH = 3;
+  var DEFAULT_SWISS_ROUNDS = 5;
+  var createTournament = (input) => {
+    const now = input.createdAt ?? Date.now();
+    return {
+      id: randomUUID(),
+      name: input.name,
+      guildId: input.guildId ?? null,
+      channelId: input.channelId ?? null,
+      organizerId: input.organizerId,
+      organizerName: input.organizerName,
+      format: input.format,
+      setsPerMatch: input.setsPerMatch ?? DEFAULT_SETS_PER_MATCH,
+      gameMode: input.gameMode ?? "canonical",
+      rounds: input.rounds ?? DEFAULT_SWISS_ROUNDS,
+      maxParticipants: input.maxParticipants ?? null,
+      status: "registration",
+      currentRound: 0,
+      participants: {},
+      matches: [],
+      championUserId: null,
+      createdAt: now,
+      updatedAt: now
+    };
+  };
+  var registerParticipant = (state, input) => {
+    if (state.status !== "registration") {
+      throw new Error("This tournament is no longer accepting new participants.");
+    }
+    if (state.maxParticipants !== null && Object.keys(state.participants).length >= state.maxParticipants) {
+      throw new Error("This tournament is full.");
+    }
+    if (state.participants[input.userId]) {
+      throw new Error("You are already registered for this tournament.");
+    }
+    const entry = {
+      userId: input.userId,
+      displayName: input.displayName,
+      mmr: input.mmr,
+      seed: null,
+      status: "registered",
+      registeredAt: input.registeredAt ?? Date.now()
+    };
+    return {
+      ...state,
+      participants: { ...state.participants, [input.userId]: entry },
+      updatedAt: Date.now()
+    };
+  };
+  var withdrawParticipant = (state, userId) => {
+    if (!state.participants[userId]) {
+      return state;
+    }
+    if (state.status === "registration") {
+      const nextParticipants = { ...state.participants };
+      delete nextParticipants[userId];
+      return { ...state, participants: nextParticipants, updatedAt: Date.now() };
+    }
+    const existing = state.participants[userId];
+    return {
+      ...state,
+      participants: {
+        ...state.participants,
+        [userId]: { ...existing, status: "withdrawn" }
+      },
+      updatedAt: Date.now()
+    };
+  };
+  var startTournament = (state) => {
+    if (state.status !== "registration") {
+      throw new Error("This tournament has already started.");
+    }
+    const allParticipants = Object.values(state.participants);
+    if (allParticipants.length < 2) {
+      throw new Error("At least 2 participants are required to start a tournament.");
+    }
+    const seeded = seedParticipantsByMmr(allParticipants);
+    const seededRecord = {};
+    for (const entry of seeded) {
+      seededRecord[entry.userId] = { ...entry, status: "active" };
+    }
+    const prepared = {
+      ...state,
+      participants: seededRecord,
+      status: "active",
+      currentRound: 1,
+      updatedAt: Date.now()
+    };
+    if (state.format === "single_elim") {
+      const bracket = generateSingleElimBracket(prepared);
+      return { ...prepared, matches: bracket };
+    }
+    if (state.format === "double_elim") {
+      const bracket = generateDoubleElimBracket(prepared);
+      return { ...prepared, matches: bracket };
+    }
+    const pairings = generateSwissPairings(prepared, 1);
+    return { ...prepared, matches: pairings };
+  };
+  var advanceTournament = (state, report) => {
+    if (state.status !== "active") {
+      throw new Error("This tournament is not active.");
+    }
+    const matchIndex = state.matches.findIndex((entry) => entry.id === report.matchId);
+    if (matchIndex === -1) {
+      throw new Error("Unknown match id.");
+    }
+    const match = state.matches[matchIndex];
+    const winnerId = report.winnerUserId;
+    const loserId = report.loserUserId ?? (winnerId === match.participantAId ? match.participantBId : match.participantAId);
+    const now = report.completedAt ?? Date.now();
+    if (winnerId !== null && winnerId !== match.participantAId && winnerId !== match.participantBId) {
+      throw new Error("Winner must be one of the two match participants (or null for a Swiss draw).");
+    }
+    const reported = {
+      ...match,
+      state: "reported",
+      winnerUserId: winnerId,
+      loserUserId: loserId ?? null,
+      completedAt: now
+    };
+    const nextMatches = [...state.matches];
+    nextMatches[matchIndex] = reported;
+    const nextParticipants = { ...state.participants };
+    if (state.format !== "swiss" && loserId) {
+      const existing = nextParticipants[loserId];
+      if (existing) {
+        nextParticipants[loserId] = { ...existing, status: "eliminated" };
+      }
+    }
+    if (state.format === "single_elim" || state.format === "double_elim") {
+      if (winnerId && reported.winnerAdvancesToMatchId) {
+        const parentIdx = nextMatches.findIndex((entry) => entry.id === reported.winnerAdvancesToMatchId);
+        if (parentIdx !== -1) {
+          nextMatches[parentIdx] = fillEmptySlot(nextMatches[parentIdx], winnerId);
+        }
+      }
+      if (loserId && reported.loserAdvancesToMatchId) {
+        const parentIdx = nextMatches.findIndex((entry) => entry.id === reported.loserAdvancesToMatchId);
+        if (parentIdx !== -1) {
+          nextMatches[parentIdx] = fillEmptySlot(nextMatches[parentIdx], loserId);
+        }
+      }
+    }
+    autoAdvanceByes(nextMatches);
+    const matchesToSchedule = nextMatches.filter(
+      (entry) => entry.state === "active" && entry.participantAId && entry.participantBId && entry.engineMatchId === null
+    );
+    let championUserId = state.championUserId;
+    let status = state.status;
+    let currentRound = state.currentRound;
+    let newSwissRound = null;
+    if (state.format === "single_elim") {
+      const final = nextMatches.find((entry) => entry.round === Math.max(...nextMatches.map((m) => m.round)));
+      if (final?.state === "reported") {
+        championUserId = final.winnerUserId;
+        status = "completed";
+      }
+    } else if (state.format === "double_elim") {
+      const resetMatch = nextMatches.find((entry) => entry.bracket === "grand_final_reset");
+      const grandFinal = nextMatches.find((entry) => entry.bracket === "grand_final");
+      if (grandFinal?.state === "reported") {
+        const winnersBracketChampion = getWinnersBracketChampion(nextMatches);
+        if (grandFinal.winnerUserId === winnersBracketChampion) {
+          championUserId = grandFinal.winnerUserId;
+          status = "completed";
+        } else if (resetMatch?.state === "reported") {
+          championUserId = resetMatch.winnerUserId;
+          status = "completed";
+        } else if (resetMatch && grandFinal.loserAdvancesToMatchId === resetMatch.id) {
+          const idx = nextMatches.findIndex((entry) => entry.id === resetMatch.id);
+          if (idx !== -1) {
+            nextMatches[idx] = {
+              ...nextMatches[idx],
+              participantAId: grandFinal.winnerUserId,
+              participantBId: grandFinal.loserUserId,
+              state: "active"
+            };
+          }
+        }
+      }
+    } else {
+      const roundMatches = nextMatches.filter((entry) => entry.round === currentRound);
+      const allReported = roundMatches.every((entry) => entry.state === "reported" || entry.state === "bye");
+      if (allReported) {
+        if (currentRound >= state.rounds) {
+          status = "completed";
+          const standings = computeSwissStandings({ ...state, matches: nextMatches });
+          championUserId = standings[0]?.userId ?? null;
+        } else {
+          currentRound += 1;
+          newSwissRound = currentRound;
+          const pairings = generateSwissPairings({ ...state, matches: nextMatches }, currentRound);
+          nextMatches.push(...pairings);
+        }
+      }
+    }
+    const nextState = {
+      ...state,
+      matches: nextMatches,
+      participants: nextParticipants,
+      status,
+      currentRound,
+      championUserId,
+      updatedAt: Date.now()
+    };
+    if (status === "completed" && championUserId) {
+      const champion = nextState.participants[championUserId];
+      if (champion) {
+        nextState.participants[championUserId] = { ...champion, status: "champion" };
+      }
+    }
+    return {
+      state: nextState,
+      matchesToSchedule: nextMatches.filter(
+        (entry) => entry.state === "active" && entry.participantAId && entry.participantBId && entry.engineMatchId === null
+      ),
+      newSwissRound,
+      tournamentCompleted: status === "completed"
+    };
+  };
+  var buildBracketView = (state) => {
+    const columns = [];
+    const byRoundBracket = /* @__PURE__ */ new Map();
+    for (const match of state.matches) {
+      const bracketKey = state.format === "swiss" ? "swiss" : match.bracket ?? "winners";
+      const key = `${bracketKey}:${match.round}`;
+      const bucket = byRoundBracket.get(key) ?? [];
+      bucket.push(match);
+      byRoundBracket.set(key, bucket);
+    }
+    for (const [key, matches] of byRoundBracket.entries()) {
+      const [bracketKey, roundString] = key.split(":");
+      columns.push({
+        round: Number(roundString),
+        bracket: bracketKey ?? "winners",
+        matches: matches.sort((a, b) => a.index - b.index)
+      });
+    }
+    columns.sort((a, b) => {
+      if (a.round !== b.round) return a.round - b.round;
+      const order = {
+        winners: 0,
+        losers: 1,
+        grand_final: 2,
+        grand_final_reset: 3,
+        swiss: 0
+      };
+      return order[a.bracket] - order[b.bracket];
+    });
+    return { columns };
+  };
+  var fillEmptySlot = (match, userId) => {
+    if (match.participantAId === null) {
+      const next = { ...match, participantAId: userId };
+      if (next.participantAId && next.participantBId) {
+        return { ...next, state: "active" };
+      }
+      return next;
+    }
+    if (match.participantBId === null) {
+      const next = { ...match, participantBId: userId };
+      if (next.participantAId && next.participantBId) {
+        return { ...next, state: "active" };
+      }
+      return next;
+    }
+    return match;
+  };
+  var autoAdvanceByes = (matches) => {
+    const byId = new Map(matches.map((entry) => [entry.id, entry]));
+    for (const match of matches) {
+      if (match.state === "bye" && match.winnerUserId && match.winnerAdvancesToMatchId) {
+        const parent = byId.get(match.winnerAdvancesToMatchId);
+        if (!parent) continue;
+        if (parent.participantAId === null) {
+          parent.participantAId = match.winnerUserId;
+        } else if (parent.participantBId === null) {
+          parent.participantBId = match.winnerUserId;
+        }
+        if (parent.participantAId && parent.participantBId && parent.state === "pending") {
+          parent.state = "active";
+        }
+      }
+    }
+  };
+  var getWinnersBracketChampion = (matches) => {
+    const winnersRounds = matches.filter((entry) => entry.bracket === "winners").map((entry) => entry.round);
+    if (winnersRounds.length === 0) return null;
+    const finalRound = Math.max(...winnersRounds);
+    const final = matches.find((entry) => entry.bracket === "winners" && entry.round === finalRound);
+    return final?.winnerUserId ?? null;
+  };
+
   // src/index.ts
   var SYSTEM_USER_ID = "00000000-0000-0000-0000-000000000000";
   var MATCH_HANDLER = "pazaak_authoritative";
   var LEADERBOARD_ID = "pazaak_ranked_mmr";
+  var TOURNAMENT_COLLECTION = "pazaak_tournaments";
+  var TOURNAMENT_IDS_KEY = "tournament_ids";
   function ensureCrypto() {
     const g = globalThis;
     if (g.crypto?.randomUUID) return;
@@ -6713,6 +7382,55 @@ var pazaakWorldRuntime = (() => {
   function saveGlobalList(nk, ctx, key, items) {
     writeStorage(nk, ctx, "pazaak_global", key, SYSTEM_USER_ID, { items });
   }
+  function readTournamentIdList(nk, ctx) {
+    const cur = readStorage(nk, ctx, "pazaak_global", TOURNAMENT_IDS_KEY, SYSTEM_USER_ID);
+    return Array.isArray(cur?.ids) ? cur.ids.filter((x) => typeof x === "string") : [];
+  }
+  function writeTournamentIdList(nk, ctx, ids) {
+    writeStorage(nk, ctx, "pazaak_global", TOURNAMENT_IDS_KEY, SYSTEM_USER_ID, { ids });
+  }
+  function appendTournamentId(nk, ctx, id) {
+    const ids = readTournamentIdList(nk, ctx);
+    if (!ids.includes(id)) {
+      ids.unshift(id);
+      writeTournamentIdList(nk, ctx, ids);
+    }
+  }
+  function loadTournament(nk, ctx, id) {
+    const v = readStorage(nk, ctx, TOURNAMENT_COLLECTION, id, SYSTEM_USER_ID);
+    if (!v || typeof v.id !== "string") return null;
+    return v;
+  }
+  function saveTournamentState(nk, ctx, state) {
+    writeStorage(nk, ctx, TOURNAMENT_COLLECTION, state.id, SYSTEM_USER_ID, state);
+  }
+  function summarizeTournamentState(state) {
+    return {
+      id: state.id,
+      name: state.name,
+      guildId: state.guildId,
+      channelId: state.channelId,
+      format: state.format,
+      gameMode: state.gameMode,
+      status: state.status,
+      currentRound: state.currentRound,
+      participants: Object.values(state.participants).map((entry) => ({
+        userId: entry.userId,
+        displayName: entry.displayName,
+        seed: entry.seed,
+        status: entry.status,
+        mmr: entry.mmr
+      })),
+      championUserId: state.championUserId,
+      setsPerMatch: state.setsPerMatch,
+      rounds: state.rounds,
+      maxParticipants: state.maxParticipants,
+      organizerId: state.organizerId,
+      organizerName: state.organizerName,
+      createdAt: state.createdAt,
+      updatedAt: state.updatedAt
+    };
+  }
   function getMatchIndex(nk, ctx, matchId) {
     return readStorage(nk, ctx, "pazaak_matches", `index:${matchId}`, SYSTEM_USER_ID);
   }
@@ -6796,6 +7514,39 @@ var pazaakWorldRuntime = (() => {
       updatedAt: nowIso()
     });
     return { match: snapshot, nakamaMatchId };
+  }
+  function matchmakerMatched(ctx, logger, nk, matches) {
+    if (matches.length < 2) {
+      logger.warn("matchmakerMatched: expected at least 2 players, got %d", matches.length);
+      throw new Error("Invalid matchmaker group size.");
+    }
+    const sorted = [...matches].sort((a, b) => String(a.presence.userId).localeCompare(String(b.presence.userId)));
+    const first = sorted[0];
+    const second = sorted[1];
+    const p1Id = String(first.presence.userId);
+    const p2Id = String(second.presence.userId);
+    const logicalMatchId = randomId();
+    const params = {
+      matchId: logicalMatchId,
+      playerOneId: p1Id,
+      playerOneName: displayNameFor(nk, ctx, p1Id),
+      playerTwoId: p2Id,
+      playerTwoName: displayNameFor(nk, ctx, p2Id),
+      gameMode: "canonical",
+      setsToWin: "3",
+      wager: "0"
+    };
+    const nakamaMatchId = nk.matchCreate(ctx, MATCH_HANDLER, params);
+    saveMatchIndex(nk, ctx, {
+      matchId: logicalMatchId,
+      nakamaMatchId,
+      playerIds: [p1Id, p2Id],
+      completed: false,
+      createdAt: nowIso(),
+      updatedAt: nowIso()
+    });
+    logger.info("matchmakerMatched created match %s nakama=%s", logicalMatchId, nakamaMatchId);
+    return nakamaMatchId;
   }
   function settleIfNeeded(nk, ctx, state) {
     if (state.settled || state.snapshot.phase !== "completed" || !state.snapshot.winnerId || !state.snapshot.loserId) return;
@@ -7050,53 +7801,28 @@ var pazaakWorldRuntime = (() => {
     const current = readStorage(nk, ctx, "pazaak_history", "history", userId);
     return json({ history: (current?.history ?? []).slice(0, Math.max(1, Math.min(100, limit))) });
   }
-  function rpcQueueEnqueue(ctx, _logger, nk, payload) {
-    const userId = requireUser(ctx);
-    const body = parsePayload(payload);
-    const wallet = getWallet(nk, ctx, userId);
-    const queue = getGlobalList(nk, ctx, "queue").filter((item) => item.userId !== userId);
-    const preferredRegions = Array.isArray(body.preferredRegions) ? body.preferredRegions.map(String) : [];
-    const entry = {
-      userId,
-      displayName: wallet.displayName,
-      mmr: wallet.mmr,
-      preferredMaxPlayers: Number(body.preferredMaxPlayers ?? 2),
-      enqueuedAt: nowIso(),
-      ...preferredRegions.length > 0 ? { preferredRegions } : {}
-    };
-    const opponentIndex = queue.findIndex((item) => item.userId !== userId);
-    if (opponentIndex !== -1) {
-      const opponent = queue.splice(opponentIndex, 1)[0];
-      saveGlobalList(nk, ctx, "queue", queue);
-      const hosted = createHostedMatch(nk, ctx, {
-        playerOneId: opponent.userId,
-        playerOneName: opponent.displayName,
-        playerTwoId: userId,
-        playerTwoName: wallet.displayName,
-        gameMode: "canonical"
-      });
-      return json({ queue: null, match: { ...hosted.match, nakamaMatchId: hosted.nakamaMatchId } });
-    }
-    queue.push(entry);
-    saveGlobalList(nk, ctx, "queue", queue);
-    return json({ queue: entry });
+  function rpcQueueEnqueue(ctx, _logger, _nk, payload) {
+    requireUser(ctx);
+    void parsePayload(payload);
+    return json({
+      queue: null,
+      match: null,
+      nakamaMatchmaker: true,
+      message: "Ranked queue uses the Nakama realtime matchmaker (socket.addMatchmaker); this RPC is unused."
+    });
   }
-  function rpcQueueLeave(ctx, _logger, nk) {
-    const userId = requireUser(ctx);
-    const before = getGlobalList(nk, ctx, "queue");
-    const after = before.filter((item) => item.userId !== userId);
-    saveGlobalList(nk, ctx, "queue", after);
-    return json({ removed: before.length !== after.length });
+  function rpcQueueLeave(ctx, _logger, _nk) {
+    requireUser(ctx);
+    return json({ removed: false, nakamaMatchmaker: true });
   }
-  function rpcQueueStatus(ctx, _logger, nk) {
-    const userId = requireUser(ctx);
-    return json({ queue: getGlobalList(nk, ctx, "queue").find((item) => item.userId === userId) ?? null });
+  function rpcQueueStatus(ctx, _logger, _nk) {
+    requireUser(ctx);
+    return json({ queue: null });
   }
   function rpcQueueStats(ctx, _logger, nk) {
-    const queue = getGlobalList(nk, ctx, "queue");
     const lobbies = getGlobalList(nk, ctx, "lobbies").filter((lobby) => lobby.status !== "closed");
     return json({
-      playersInQueue: queue.length,
+      playersInQueue: 0,
       openLobbies: lobbies.length,
       activeGames: 0,
       averageWaitSeconds: 0,
@@ -7260,11 +7986,136 @@ var pazaakWorldRuntime = (() => {
     const index = matchId ? getMatchIndex(nk, ctx, matchId) : null;
     return json({ match: snapshot ? { ...snapshot, nakamaMatchId: index?.nakamaMatchId } : null });
   }
-  function rpcTournamentsList() {
-    return json({ tournaments: [] });
+  function rpcTournamentsList(ctx, _logger, nk, _payload) {
+    const ids = readTournamentIdList(nk, ctx);
+    const tournaments = [];
+    for (const id of ids) {
+      const t = loadTournament(nk, ctx, id);
+      if (t) tournaments.push(summarizeTournamentState(t));
+    }
+    tournaments.sort((a, b) => Number(b.createdAt) - Number(a.createdAt));
+    return json({ tournaments });
   }
-  function rpcTournamentDetail() {
-    return json({ tournament: null, bracket: { rounds: [] }, standings: null });
+  function rpcTournamentDetail(ctx, _logger, nk, payload) {
+    const id = String(parsePayload(payload).tournamentId ?? "");
+    const tournament = id ? loadTournament(nk, ctx, id) : null;
+    if (!tournament) {
+      return json({ tournament: null, bracket: { columns: [] }, standings: null });
+    }
+    return json({
+      tournament,
+      bracket: buildBracketView(tournament),
+      standings: tournament.format === "swiss" ? computeSwissStandings(tournament) : null
+    });
+  }
+  function rpcTournamentCreate(ctx, _logger, nk, payload) {
+    const userId = requireUser(ctx);
+    const body = parsePayload(payload);
+    const formatRaw = String(body.format ?? "single_elim");
+    const format = formatRaw === "double_elim" || formatRaw === "swiss" ? formatRaw : "single_elim";
+    const modeRaw = String(body.gameMode ?? body.mode ?? "canonical");
+    const gameMode = modeRaw === "wacky" ? "wacky" : "canonical";
+    const organizerName = displayNameFor(nk, ctx, userId);
+    const tournament = createTournament({
+      name: String(body.name ?? "Unnamed Tournament").slice(0, 64),
+      organizerId: userId,
+      organizerName,
+      format,
+      gameMode,
+      setsPerMatch: Math.max(1, Math.min(9, Number(body.setsPerMatch ?? 3) || 3)),
+      rounds: Math.max(2, Math.min(12, Number(body.rounds ?? 5) || 5)),
+      maxParticipants: typeof body.maxParticipants === "number" ? body.maxParticipants : null,
+      guildId: null,
+      channelId: null
+    });
+    appendTournamentId(nk, ctx, tournament.id);
+    saveTournamentState(nk, ctx, tournament);
+    return json({ tournament });
+  }
+  function rpcTournamentJoin(ctx, _logger, nk, payload) {
+    const userId = requireUser(ctx);
+    const id = String(parsePayload(payload).tournamentId ?? "");
+    const tournament = id ? loadTournament(nk, ctx, id) : null;
+    if (!tournament) throw new Error("Tournament not found.");
+    const wallet = getWallet(nk, ctx, userId);
+    let next;
+    try {
+      next = registerParticipant(tournament, {
+        userId,
+        displayName: wallet.displayName,
+        mmr: wallet.mmr
+      });
+    } catch (err) {
+      throw new Error(err instanceof Error ? err.message : "Registration failed.");
+    }
+    saveTournamentState(nk, ctx, next);
+    return json({ tournament: next });
+  }
+  function rpcTournamentLeave(ctx, _logger, nk, payload) {
+    const userId = requireUser(ctx);
+    const id = String(parsePayload(payload).tournamentId ?? "");
+    const tournament = id ? loadTournament(nk, ctx, id) : null;
+    if (!tournament) throw new Error("Tournament not found.");
+    const next = withdrawParticipant(tournament, userId);
+    saveTournamentState(nk, ctx, next);
+    return json({ tournament: next });
+  }
+  function rpcTournamentStart(ctx, _logger, nk, payload) {
+    const userId = requireUser(ctx);
+    const id = String(parsePayload(payload).tournamentId ?? "");
+    const tournament = id ? loadTournament(nk, ctx, id) : null;
+    if (!tournament) throw new Error("Tournament not found.");
+    if (tournament.organizerId !== userId) {
+      throw new Error("Only the organizer can start this tournament.");
+    }
+    let started;
+    try {
+      started = startTournament(tournament);
+    } catch (err) {
+      throw new Error(err instanceof Error ? err.message : "Unable to start.");
+    }
+    saveTournamentState(nk, ctx, started);
+    return json({ tournament: started });
+  }
+  function rpcTournamentReport(ctx, _logger, nk, payload) {
+    const userId = requireUser(ctx);
+    const body = parsePayload(payload);
+    const id = String(body.tournamentId ?? "");
+    const tournament = id ? loadTournament(nk, ctx, id) : null;
+    if (!tournament) throw new Error("Tournament not found.");
+    const matchId = String(body.matchId ?? "");
+    const winnerRaw = body.winnerUserId;
+    const winnerUserId = winnerRaw === null || winnerRaw === void 0 ? null : String(winnerRaw);
+    const match = tournament.matches.find((entry) => entry.id === matchId);
+    if (!match) throw new Error("Match not found.");
+    const isParticipant = userId === match.participantAId || userId === match.participantBId;
+    const isOrganizer = userId === tournament.organizerId;
+    if (!isParticipant && !isOrganizer) {
+      throw new Error("Only the match participants or the organizer can report this match.");
+    }
+    let result;
+    try {
+      result = advanceTournament(tournament, { matchId, winnerUserId });
+    } catch (err) {
+      throw new Error(err instanceof Error ? err.message : "Advance failed.");
+    }
+    saveTournamentState(nk, ctx, result.state);
+    return json({
+      tournament: result.state,
+      tournamentCompleted: result.tournamentCompleted
+    });
+  }
+  function rpcTournamentCancel(ctx, _logger, nk, payload) {
+    const userId = requireUser(ctx);
+    const id = String(parsePayload(payload).tournamentId ?? "");
+    const tournament = id ? loadTournament(nk, ctx, id) : null;
+    if (!tournament) throw new Error("Tournament not found.");
+    if (tournament.organizerId !== userId) {
+      throw new Error("Only the organizer can cancel this tournament.");
+    }
+    const cancelled = { ...tournament, status: "cancelled", updatedAt: Date.now() };
+    saveTournamentState(nk, ctx, cancelled);
+    return json({ tournament: cancelled });
   }
   function rpcChatSend(ctx, logger, nk, payload) {
     const userId = requireUser(ctx);
@@ -7296,11 +8147,9 @@ var pazaakWorldRuntime = (() => {
     const current = readStorage(nk, ctx, "pazaak_chat", matchId, SYSTEM_USER_ID);
     return json({ messages: Array.isArray(current?.messages) ? current.messages : [] });
   }
-  function notImplemented(name) {
-    return () => json({ error: `${name} is not implemented in the Nakama cutover yet.` });
-  }
   function InitModule(ctx, logger, nk, initializer) {
     initializer.registerMatch(MATCH_HANDLER, matchHandler);
+    initializer.registerMatchmakerMatched(matchmakerMatched);
     initializer.registerRpc("pazaak.config_public", rpcConfigPublic);
     initializer.registerRpc("pazaak.me", rpcMe);
     initializer.registerRpc("pazaak.settings_get", rpcSettingsGet);
@@ -7328,12 +8177,12 @@ var pazaakWorldRuntime = (() => {
     initializer.registerRpc("pazaak.match_resolve", rpcMatchResolve);
     initializer.registerRpc("pazaak.tournaments_list", rpcTournamentsList);
     initializer.registerRpc("pazaak.tournament_detail", rpcTournamentDetail);
-    initializer.registerRpc("pazaak.tournament_create", notImplemented("tournament_create"));
-    initializer.registerRpc("pazaak.tournament_join", notImplemented("tournament_join"));
-    initializer.registerRpc("pazaak.tournament_leave", notImplemented("tournament_leave"));
-    initializer.registerRpc("pazaak.tournament_start", notImplemented("tournament_start"));
-    initializer.registerRpc("pazaak.tournament_report", notImplemented("tournament_report"));
-    initializer.registerRpc("pazaak.tournament_cancel", notImplemented("tournament_cancel"));
+    initializer.registerRpc("pazaak.tournament_create", rpcTournamentCreate);
+    initializer.registerRpc("pazaak.tournament_join", rpcTournamentJoin);
+    initializer.registerRpc("pazaak.tournament_leave", rpcTournamentLeave);
+    initializer.registerRpc("pazaak.tournament_start", rpcTournamentStart);
+    initializer.registerRpc("pazaak.tournament_report", rpcTournamentReport);
+    initializer.registerRpc("pazaak.tournament_cancel", rpcTournamentCancel);
     initializer.registerRpc("pazaak.chat_send", rpcChatSend);
     initializer.registerRpc("pazaak.chat_history", rpcChatHistory);
     try {
