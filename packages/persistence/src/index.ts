@@ -13,6 +13,27 @@ const scrypt = promisify(scryptCallback);
 const PASSWORD_HASH_PREFIX = "scrypt-v1";
 const PASSWORD_KEY_LENGTH = 64;
 
+function isRetriableRenameError(error: unknown): boolean {
+  const code = typeof error === "object" && error !== null && "code" in error
+    ? (error as { code?: string }).code
+    : undefined;
+  return code === "EBUSY" || code === "EPERM" || code === "EACCES" || code === "EAGAIN";
+}
+
+async function renameWithRetry(from: string, to: string, attempts = 8): Promise<void> {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      await rename(from, to);
+      return;
+    } catch (error) {
+      if (i === attempts - 1 || !isRetriableRenameError(error)) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 5 * 2 ** i));
+    }
+  }
+}
+
 export interface RivalryRecord {
   opponentId: string;
   opponentName: string;
@@ -698,7 +719,7 @@ export class JsonPazaakAccountRepository implements PazaakAccountRepositoryContr
     await mkdir(path.dirname(this.filePath), { recursive: true });
     const tempPath = `${this.filePath}.${process.pid}.${Date.now()}.tmp`;
     await writeFile(tempPath, JSON.stringify(state, null, 2), "utf8");
-    await rename(tempPath, this.filePath);
+    await renameWithRetry(tempPath, this.filePath);
   }
 }
 
@@ -1035,7 +1056,7 @@ export class JsonWalletRepository {
     await mkdir(path.dirname(this.filePath), { recursive: true });
     const tempPath = `${this.filePath}.${process.pid}.${Date.now()}.tmp`;
     await writeFile(tempPath, JSON.stringify(state, null, 2), "utf8");
-    await rename(tempPath, this.filePath);
+    await renameWithRetry(tempPath, this.filePath);
   }
 }
 
@@ -1351,7 +1372,7 @@ export class JsonPazaakSideboardRepository {
     await mkdir(path.dirname(this.filePath), { recursive: true });
     const tempPath = `${this.filePath}.${process.pid}.${Date.now()}.tmp`;
     await writeFile(tempPath, JSON.stringify(state, null, 2), "utf8");
-    await rename(tempPath, this.filePath);
+    await renameWithRetry(tempPath, this.filePath);
   }
 }
 
@@ -1446,7 +1467,7 @@ export class JsonDesignationPresetRepository {
     await mkdir(path.dirname(this.filePath), { recursive: true });
     const tempPath = `${this.filePath}.${process.pid}.${Date.now()}.tmp`;
     await writeFile(tempPath, JSON.stringify(state, null, 2), "utf8");
-    await rename(tempPath, this.filePath);
+    await renameWithRetry(tempPath, this.filePath);
   }
 }
 
@@ -1560,7 +1581,7 @@ export class JsonPazaakMatchmakingQueueRepository {
     await mkdir(path.dirname(this.filePath), { recursive: true });
     const tempPath = `${this.filePath}.${process.pid}.${Date.now()}.tmp`;
     await writeFile(tempPath, JSON.stringify(state, null, 2), "utf8");
-    await rename(tempPath, this.filePath);
+    await renameWithRetry(tempPath, this.filePath);
   }
 }
 
@@ -1955,7 +1976,7 @@ export class JsonPazaakLobbyRepository {
     await mkdir(path.dirname(this.filePath), { recursive: true });
     const tempPath = `${this.filePath}.${process.pid}.${Date.now()}.tmp`;
     await writeFile(tempPath, JSON.stringify(state, null, 2), "utf8");
-    await rename(tempPath, this.filePath);
+    await renameWithRetry(tempPath, this.filePath);
   }
 }
 
@@ -2139,7 +2160,7 @@ export class JsonTraskQueryRepository {
   private async persist(state: TraskQueryFileShape): Promise<void> {
     const tempPath = `${this.filePath}.${process.pid}.${Date.now()}.tmp`;
     await writeFile(tempPath, JSON.stringify(state, null, 2), "utf8");
-    await rename(tempPath, this.filePath);
+    await renameWithRetry(tempPath, this.filePath);
   }
 }
 
