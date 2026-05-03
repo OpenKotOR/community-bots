@@ -2089,6 +2089,18 @@ export class JsonPazaakMatchHistoryRepository {
 export class JsonTraskQueryRepository {
   private state: TraskQueryFileShape | undefined;
 
+  /** Serialize disk writes so concurrent `upsert` (e.g. live trace + completion) never clobber each other. */
+  private ioChain: Promise<void> = Promise.resolve();
+
+  private runSerialized<T>(fn: () => Promise<T>): Promise<T> {
+    const run = this.ioChain.then(fn);
+    this.ioChain = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
+
   public constructor(private readonly filePath: string) {}
 
   public async append(record: TraskQueryRecord): Promise<TraskQueryRecord> {
@@ -2097,40 +2109,37 @@ export class JsonTraskQueryRepository {
 
   /** Insert or replace by `queryId` (used for pending → live updates → final). */
   public async upsert(record: TraskQueryRecord): Promise<TraskQueryRecord> {
-    this.state = undefined;
-    const state = await this.ensureState();
-    const cloned = cloneTraskQueryRecord(record);
-    state.queries[record.queryId] = cloned;
-    await this.persist(state);
-    this.state = undefined;
-    return cloneTraskQueryRecord(cloned);
+    return this.runSerialized(async () => {
+      this.state = undefined;
+      const state = await this.ensureState();
+      const cloned = cloneTraskQueryRecord(record);
+      state.queries[record.queryId] = cloned;
+      await this.persist(state);
+      this.state = undefined;
+      return cloneTraskQueryRecord(cloned);
+    });
   }
 
   public async listForUser(userId: string, limit = 25, threadId?: string): Promise<readonly TraskQueryRecord[]> {
-    this.state = undefined;
-    const state = await this.ensureState();
-    return Object.values(state.queries)
-      .filter((record) => record.userId === userId)
-      .filter((record) => !threadId || record.threadId === threadId)
-      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
-      .slice(0, Math.max(1, Math.min(100, limit)))
-      .map(cloneTraskQueryRecord);
-  }
-
-  public async listForThread(threadId: string): Promise<readonly TraskQueryRecord[]> {
-    this.state = undefined;
-    const state = await this.ensureState();
-    return Object.values(state.queries)
-      .filter((record) => record.threadId === threadId)
-      .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
-      .map(cloneTraskQueryRecord);
+    return this.runSerialized(async () => {
+      this.state = undefined;
+      const state = await this.ensureState();
+      return Object.values(state.queries)
+        .filter((record) => record.userId === userId)
+        .filter((record) => !threadId || record.threadId === threadId)
+        .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+        .slice(0, Math.max(1, Math.min(100, limit)))
+        .map(cloneTraskQueryRecord);
+    });
   }
 
   public async getByQueryId(queryId: string): Promise<TraskQueryRecord | undefined> {
-    this.state = undefined;
-    const state = await this.ensureState();
-    const row = state.queries[queryId];
-    return row ? cloneTraskQueryRecord(row) : undefined;
+    return this.runSerialized(async () => {
+      this.state = undefined;
+      const state = await this.ensureState();
+      const row = state.queries[queryId];
+      return row ? cloneTraskQueryRecord(row) : undefined;
+    });
   }
 
   private async ensureState(): Promise<TraskQueryFileShape> {

@@ -327,7 +327,7 @@ function App() {
     let cancelled = false
     const tick = async () => {
       try {
-        const remote = await traskGetThread(holocronThreadId)
+        const remote = await traskGetThread(holocronThreadId, traskApiKey || undefined)
         if (cancelled) return
         syncThreadFromRemote(remote, { animateTrace: true })
       } catch {
@@ -340,7 +340,7 @@ function App() {
       cancelled = true
       window.clearInterval(id)
     }
-  }, [holocronThreadId, legacySparkMode, syncThreadFromRemote])
+  }, [holocronThreadId, legacySparkMode, syncThreadFromRemote, traskApiKey])
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -521,7 +521,7 @@ function App() {
       if (!session) {
         setHolocronSession({ status: 'anonymous', oauthAvailable: false })
         try {
-          const remote = await traskGetThread(holocronThreadId)
+          const remote = await traskGetThread(holocronThreadId, traskApiKey || undefined)
           if (cancelled) return
           syncThreadFromRemote(remote, { animateTrace: false, prependLocals: loadEphemeralPrepend() })
         } catch {
@@ -538,7 +538,7 @@ function App() {
           oauthAvailable: Boolean(session.oauthAvailable),
         })
         try {
-          const remote = await traskGetThread(holocronThreadId)
+          const remote = await traskGetThread(holocronThreadId, traskApiKey || undefined)
           if (cancelled) return
           syncThreadFromRemote(remote, { animateTrace: false, prependLocals: loadEphemeralPrepend() })
         } catch {
@@ -550,7 +550,7 @@ function App() {
       }
 
       try {
-        const history = await traskListHistory(100, undefined, holocronThreadId)
+        const history = await traskListHistory(100, traskApiKey || undefined, holocronThreadId)
         if (cancelled) return
         syncThreadFromRemote(history, { animateTrace: false })
       } catch {
@@ -573,7 +573,7 @@ function App() {
     return () => {
       cancelled = true
     }
-  }, [holocronThreadId, legacySparkMode, syncThreadFromRemote])
+  }, [holocronThreadId, legacySparkMode, syncThreadFromRemote, traskApiKey])
 
   useEffect(() => {
     if (legacySparkMode || !traskUsesSameOriginApi() || !holocronThreadId) {
@@ -830,7 +830,7 @@ function App() {
             for (let attempt = 0; attempt < 900; attempt++) {
               let hist: TraskHistoryRecordDto[]
               try {
-                hist = await traskGetThread(holocronThreadId)
+                hist = await traskGetThread(holocronThreadId, traskApiKey || undefined)
               } catch {
                 await new Promise((r) => window.setTimeout(r, 500))
                 continue
