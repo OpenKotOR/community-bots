@@ -71,7 +71,7 @@ pnpm --filter pazaak-world build
 ```
 
 Deploy `dist/` to any static host. The canonical production URL is
-`https://openkotor.github.io/bots/pazaakworld`; register that URL in the Discord Developer Portal
+`https://openkotor.github.io/community-bots/pazaakworld`; register that URL in the Discord Developer Portal
 (Activities -> URL Mappings) and use it for `PAZAAK_ACTIVITY_URL` plus `PAZAAK_PUBLIC_WEB_ORIGIN`.
 
 ## React Compiler

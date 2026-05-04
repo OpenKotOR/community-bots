@@ -165,8 +165,8 @@ Add to your `.env`:
 ```env
 PAZAAK_DISCORD_CLIENT_SECRET=<client secret from Developer Portal>
 PAZAAK_API_PORT=4001              # port the embedded HTTP/WS server listens on (default 4001)
-PAZAAK_ACTIVITY_URL=https://openkotor.github.io/bots/pazaakworld
-PAZAAK_PUBLIC_WEB_ORIGIN=https://openkotor.github.io/bots/pazaakworld
+PAZAAK_ACTIVITY_URL=https://openkotor.github.io/community-bots/pazaakworld
+PAZAAK_PUBLIC_WEB_ORIGIN=https://openkotor.github.io/community-bots/pazaakworld
 ```
 
 The Activity frontend also needs `.env` in `apps/pazaak-world/`:
@@ -184,17 +184,17 @@ The standalone auth modal can now sign in using OAuth providers. Configure one o
 # Google OAuth (Google Cloud Console)
 PAZAAK_OAUTH_GOOGLE_CLIENT_ID=
 PAZAAK_OAUTH_GOOGLE_CLIENT_SECRET=
-PAZAAK_OAUTH_GOOGLE_CALLBACK_URL=https://openkotor.github.io/bots/pazaakworld/api/auth/oauth/google/callback
+PAZAAK_OAUTH_GOOGLE_CALLBACK_URL=https://openkotor.github.io/community-bots/pazaakworld/api/auth/oauth/google/callback
 
 # Discord OAuth (Discord Developer Portal)
 PAZAAK_OAUTH_DISCORD_CLIENT_ID=
 PAZAAK_OAUTH_DISCORD_CLIENT_SECRET=
-PAZAAK_OAUTH_DISCORD_CALLBACK_URL=https://openkotor.github.io/bots/pazaakworld/api/auth/oauth/discord/callback
+PAZAAK_OAUTH_DISCORD_CALLBACK_URL=https://openkotor.github.io/community-bots/pazaakworld/api/auth/oauth/discord/callback
 
 # GitHub OAuth (GitHub OAuth Apps)
 PAZAAK_OAUTH_GITHUB_CLIENT_ID=
 PAZAAK_OAUTH_GITHUB_CLIENT_SECRET=
-PAZAAK_OAUTH_GITHUB_CALLBACK_URL=https://openkotor.github.io/bots/pazaakworld/api/auth/oauth/github/callback
+PAZAAK_OAUTH_GITHUB_CALLBACK_URL=https://openkotor.github.io/community-bots/pazaakworld/api/auth/oauth/github/callback
 ```
 
 Provider setup checklist:
@@ -225,7 +225,7 @@ Notes:
 5. Go to **APIs & Services -> Credentials**.
 6. Create (or open) an **OAuth 2.0 Client ID** of type **Web application**.
 7. Add Authorized redirect URI:
-   - `https://openkotor.github.io/bots/pazaakworld/api/auth/oauth/google/callback`
+   - `https://openkotor.github.io/community-bots/pazaakworld/api/auth/oauth/google/callback`
 8. Copy the Client ID and Client Secret into:
    - `PAZAAK_OAUTH_GOOGLE_CLIENT_ID`
    - `PAZAAK_OAUTH_GOOGLE_CLIENT_SECRET`
@@ -235,7 +235,7 @@ Notes:
 1. Open [Discord Developer Portal](https://discord.com/developers/applications) and select your Pazaak app.
 2. Go to **OAuth2 -> General**.
 3. Under Redirects, add:
-   - `https://openkotor.github.io/bots/pazaakworld/api/auth/oauth/discord/callback`
+   - `https://openkotor.github.io/community-bots/pazaakworld/api/auth/oauth/discord/callback`
 4. Save changes.
 5. Copy values:
    - **Client ID** -> `PAZAAK_OAUTH_DISCORD_CLIENT_ID`
@@ -253,8 +253,8 @@ Notes:
 2. Create a **New OAuth App** (or open an existing one).
 3. Set fields:
    - **Application name**: your choice
-   - **Homepage URL**: `https://openkotor.github.io/bots/pazaakworld`
-   - **Authorization callback URL**: `https://openkotor.github.io/bots/pazaakworld/api/auth/oauth/github/callback`
+   - **Homepage URL**: `https://openkotor.github.io/community-bots/pazaakworld`
+   - **Authorization callback URL**: `https://openkotor.github.io/community-bots/pazaakworld/api/auth/oauth/github/callback`
 4. Register the app.
 5. Copy values:
    - **Client ID** -> `PAZAAK_OAUTH_GITHUB_CLIENT_ID`

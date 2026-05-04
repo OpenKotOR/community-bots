@@ -9,6 +9,8 @@ This repository contains the first implementation pass for a KOTOR-themed Discor
 
 ## Current State
 
+**GitHub Pages hub:** the live static operator console and nested SPAs (PazaakWorld, Trask Holocron UI, HK hub) are served at `https://openkotor.github.io/community-bots/` (project site). The older path `https://openkotor.github.io/bots/…` is not published and returns 404; use `…/community-bots/…` in env vars, OAuth callbacks, and docs.
+
 This is the foundation phase. The monorepo includes:
 
 - shared configuration, logging, UI, persona, retrieval, and persistence packages
