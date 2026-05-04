@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MatchmakingStatsResponse, MeResponse, SocialAuthProviderConfig } from "../api.ts";
+import {
+  discordHubRoute,
+  operatorConsoleRoute,
+  pazaakWorldPublicUrl,
+  pazaakWorldRoute,
+  qaWebUiPublicUrl,
+  qaWebUiRoute,
+} from "../deployRoutes.ts";
 import type { LeaderboardEntry, PazaakLobbyRecord, PazaakMatchHistoryRecord, PazaakOpponentProfileRecord } from "../types.ts";
 
 type DashboardBotId = "pazaak" | "trask" | "hk" | "ingest";
@@ -185,14 +193,13 @@ const DASHBOARD_CHECKLIST_KEY = "openkotor-bots-dashboard-checklist-v1";
 const STANDALONE_AUTH_TOKEN_KEY = "pazaak-world-standalone-auth-token-v1";
 const TRASK_VOTER_HANDLE_KEY = "openkotor-trask-voter-handle-v1";
 const TRASK_VOTES_KEY = "openkotor-trask-votes-v1";
-/** Operator console (API probes, runbooks). Public Discord invite hub lives at `/bots`. */
-const OPERATOR_CONSOLE_ROUTE = "/community-bots";
-const PAZAAK_WORLD_PUBLIC_ROUTE = "/bots/pazaakworld";
-/** Same-origin path to the static Discord bots landing (`App` switches on `/bots`). */
-const discordBotsHubPath = import.meta.env.BASE.replace(/\/$/, "") || "/bots";
-const PAZAAK_WORLD_PUBLIC_URL = "https://openkotor.github.io/bots/pazaakworld";
-const QA_TRASK_WEBUI_PUBLIC_ROUTE = "/bots/qa-webui/";
-const QA_TRASK_WEBUI_PUBLIC_URL = "https://openkotor.github.io/bots/qa-webui/";
+/** Operator console (API probes, runbooks). Public Discord invite hub: `discordHubRoute()`. */
+const OPERATOR_CONSOLE_ROUTE = operatorConsoleRoute();
+const PAZAAK_WORLD_PUBLIC_ROUTE = pazaakWorldRoute();
+const discordBotsHubPath = discordHubRoute();
+const PAZAAK_WORLD_PUBLIC_URL = pazaakWorldPublicUrl();
+const QA_TRASK_WEBUI_PUBLIC_ROUTE = qaWebUiRoute();
+const QA_TRASK_WEBUI_PUBLIC_URL = qaWebUiPublicUrl();
 const TRASK_DISCORD_APP_ID = String(import.meta.env.VITE_TRASK_DISCORD_APP_ID ?? "1305793207036022784").trim();
 const TRASK_INSTALL_PERMISSIONS = "84992";
 
@@ -278,7 +285,7 @@ const DASHBOARD_ENDPOINT_GROUPS: DashboardEndpointGroup[] = [
       { method: "POST", path: "/api/auth/register", scope: "Account", auth: "None", availability: "Embedded API, Worker", description: "Create a standalone PazaakWorld account.", request: "{ username, displayName?, email?, password }", response: "Bearer app token, safe account, session, linked identities.", operations: "Passwords stay server-side; this page never persists bearer tokens." },
       { method: "POST", path: "/api/auth/login", scope: "Account", auth: "None", availability: "Embedded API, Worker", description: "Exchange username/email plus password for an app bearer token.", request: "{ identifier, password }", response: "Bearer app token and session summary.", operations: "Use the returned token only in local operator probes or the app session." },
       { method: "GET", path: "/api/auth/oauth/providers", scope: "OAuth", auth: "None", availability: "Embedded API, Worker", description: "Lists Google, Discord, and GitHub OAuth provider enablement.", request: "No body.", response: "Provider names with enabled flags.", operations: "After .env edits, restart the API process before checking this." },
-      { method: "POST", path: "/api/auth/oauth/:provider/start", scope: "OAuth", auth: "Optional", availability: "Embedded API", description: "Starts Google, Discord, or GitHub OAuth using the public Pages callback URL.", request: "Provider in the path. Optional existing bearer token links identity.", response: "Provider redirect URL.", operations: "Provider callbacks default to /bots/pazaakworld unless explicitly configured otherwise." },
+      { method: "POST", path: "/api/auth/oauth/:provider/start", scope: "OAuth", auth: "Optional", availability: "Embedded API", description: "Starts Google, Discord, or GitHub OAuth using the public Pages callback URL.", request: "Provider in the path. Optional existing bearer token links identity.", response: "Provider redirect URL.", operations: "Provider callbacks default to /community-bots/pazaakworld unless explicitly configured otherwise." },
       { method: "GET", path: "/api/auth/oauth/:provider/callback", scope: "OAuth", auth: "Provider", availability: "Embedded API", description: "Provider callback that lands back on PazaakWorld with an app token.", request: "Provider query parameters.", response: "Redirect to the frontend OAuth landing flow.", operations: "Register this URL in each provider console exactly as deployed." },
       { method: "GET", path: "/api/auth/session", scope: "Account", auth: "Bearer", availability: "Embedded API, Worker", description: "Inspect the current app session and linked identities.", request: "Authorization bearer token.", response: "Safe account and linked identity summary.", operations: "Useful to confirm cross-platform identity mapping." },
       { method: "POST", path: "/api/auth/logout", scope: "Account", auth: "Bearer", availability: "Embedded API, Worker", description: "Revokes the current app session.", request: "Authorization bearer token.", response: "{ ok: true }.", operations: "The browser should also clear its stored app token." },
@@ -371,9 +378,9 @@ const DASHBOARD_ENDPOINT_GROUPS: DashboardEndpointGroup[] = [
 ];
 
 const DASHBOARD_METRICS = [
-  { label: "Repository", value: "OpenKotOR/bots", detail: "Renamed GitHub project" },
-  { label: "Pages base", value: "/bots/", detail: "GitHub Pages mount (hub + nested routes)" },
-  { label: "Pazaak route", value: "/bots/pazaakworld", detail: "Dedicated game route" },
+  { label: "Repository", value: "OpenKotOR/community-bots", detail: "Renamed GitHub project" },
+  { label: "Pages base", value: "/community-bots/", detail: "GitHub project Pages mount (SPA + nested static bundles)" },
+  { label: "Pazaak route", value: "/community-bots/pazaakworld", detail: "Dedicated game route" },
   { label: "API port", value: "4001", detail: "Embedded matchmaking server" },
   { label: "Worker mode", value: "Fallback", detail: "Auth, queues, lobbies" },
   { label: "Export sample", value: "12,828", detail: "Public guild messages" },
@@ -398,9 +405,9 @@ const DASHBOARD_RUNBOOKS: DashboardRunbook[] = [
     steps: [
       "Install workspace dependencies with pnpm through Corepack.",
       "Copy .env.example to .env and fill Discord app id, bot token, guild id, and client secret.",
-      "Keep PAZAAK_ACTIVITY_URL and PAZAAK_PUBLIC_WEB_ORIGIN pointed at https://openkotor.github.io/bots/pazaakworld for production-style callbacks.",
+      "Keep PAZAAK_ACTIVITY_URL and PAZAAK_PUBLIC_WEB_ORIGIN pointed at https://openkotor.github.io/community-bots/pazaakworld for production-style callbacks.",
       "Start the Pazaak bot process first; it owns the embedded HTTP and WebSocket server on port 4001.",
-      "Start the Vite frontend and open /community-bots for this operator console, /bots for the Discord invite hub, or /bots/pazaakworld for the game.",
+      "Start the Vite frontend: operator console at `/`, Discord invite hub at `/bots` (dev) or `/community-bots/discord` (production BASE), PazaakWorld at `/pazaakworld` (dev) or `/community-bots/pazaakworld` (production).",
     ],
     commands: [
       { label: "Install", command: "corepack pnpm install --frozen-lockfile", detail: "Use after clone or lockfile changes." },
@@ -418,21 +425,21 @@ const DASHBOARD_RUNBOOKS: DashboardRunbook[] = [
   {
     id: "pages-oauth",
     title: "Pages, Routes & OAuth",
-    summary: "Deploy the static app at /bots while keeping PazaakWorld at /bots/pazaakworld and callbacks aligned.",
+    summary: "Deploy the static app at /community-bots with nested routes for PazaakWorld, Holocron, and HK WebUI.",
     steps: [
-      "Use the Deploy PazaakWorld workflow; it pins Vite BASE to /bots/ and creates a 404.html SPA fallback.",
-      "Register https://openkotor.github.io/bots/pazaakworld as the public Activity/browser route.",
-      "Register provider callbacks at https://openkotor.github.io/bots/pazaakworld/api/auth/oauth/<provider>/callback unless a deployed API origin requires a provider-specific callback.",
-      "Set the repository homepage to https://openkotor.github.io/bots/pazaakworld; /bots is the public Discord hub and /community-bots keeps this operator console.",
+      "Use the Deploy PazaakWorld workflow; it pins Vite BASE to /community-bots/ and creates a 404.html SPA fallback.",
+      "Register https://openkotor.github.io/community-bots/pazaakworld as the public Activity/browser route.",
+      "Register provider callbacks at https://openkotor.github.io/community-bots/pazaakworld/api/auth/oauth/<provider>/callback unless a deployed API origin requires a provider-specific callback.",
+      "Set the repository homepage to https://openkotor.github.io/community-bots/pazaakworld; invite hub lives at /community-bots/discord and operator tooling defaults to /community-bots.",
     ],
     commands: [
       { label: "Frontend build", command: "corepack pnpm --filter pazaak-world build", detail: "Builds the Pages artifact." },
-      { label: "Repo homepage", command: "gh repo edit OpenKotOR/bots --homepage https://openkotor.github.io/bots/pazaakworld", detail: "Keeps GitHub metadata aligned." },
-      { label: "Repo verify", command: "gh repo view OpenKotOR/bots --json nameWithOwner,url,homepageUrl", detail: "Confirms rename and homepage." },
+      { label: "Repo homepage", command: "gh repo edit OpenKotOR/community-bots --homepage https://openkotor.github.io/community-bots/pazaakworld", detail: "Keeps GitHub metadata aligned." },
+      { label: "Repo verify", command: "gh repo view OpenKotOR/community-bots --json nameWithOwner,url,homepageUrl", detail: "Confirms rename and homepage." },
     ],
     checks: [
-      "/community-bots shows this operator console; /bots is the public Discord bots landing.",
-      "/bots/pazaakworld shows PazaakWorld, including direct reloads through 404.html.",
+      "/community-bots loads this operator console; /community-bots/discord is the public Discord bots landing.",
+      "/community-bots/pazaakworld shows PazaakWorld, including direct reloads through 404.html.",
       "OAuth callback URLs do not point at localhost in production env files.",
       "Repository variable PAZAAK_API_BASES contains deployed API origins when using remote APIs.",
     ],
@@ -450,7 +457,7 @@ const DASHBOARD_RUNBOOKS: DashboardRunbook[] = [
     commands: [
       { label: "Local Worker", command: "corepack pnpm dlx wrangler dev --config infra/pazaak-matchmaking-worker/wrangler.toml", detail: "Runs the fallback API locally." },
       { label: "Deploy Worker", command: "corepack pnpm dlx wrangler deploy --config infra/pazaak-matchmaking-worker/wrangler.toml", detail: "Publishes the fallback API." },
-      { label: "Pages API bases", command: "gh variable set PAZAAK_API_BASES --body \"https://your-worker.workers.dev\" --repo OpenKotOR/bots", detail: "Feeds VITE_API_BASES during Pages build." },
+      { label: "Pages API bases", command: "gh variable set PAZAAK_API_BASES --body \"https://your-worker.workers.dev\" --repo OpenKotOR/community-bots", detail: "Feeds VITE_API_BASES during Pages build." },
     ],
     checks: [
       "Worker GET /api/ping responds before adding it to PAZAAK_API_BASES.",
@@ -493,7 +500,7 @@ const DASHBOARD_SOLUTIONS: DashboardSolution[] = [
 ];
 
 const DASHBOARD_CHECKLIST: DashboardChecklistItem[] = [
-  { id: "routes", label: "Routes verified", detail: "/bots is the Discord hub; /community-bots is this console; /bots/pazaakworld shows the game." },
+  { id: "routes", label: "Routes verified", detail: "/community-bots/discord is the Discord hub; /community-bots is this console; /community-bots/pazaakworld shows the game." },
   { id: "api", label: "API probe passes", detail: "The selected target responds to /api/ping or /api/health." },
   { id: "oauth", label: "OAuth callbacks aligned", detail: "Provider callbacks target the public Pages PazaakWorld URL or the intended API origin." },
   { id: "worker", label: "Fallback decided", detail: "Worker fallback is either deployed and in PAZAAK_API_BASES, or intentionally unused." },
@@ -504,7 +511,7 @@ const DASHBOARD_CHECKLIST: DashboardChecklistItem[] = [
 const COMMON_PROBLEMS = [
   { symptom: "Dashboard shows API offline", cause: "Selected API target is wrong, the bot API is not running, or CORS blocks the browser origin.", fix: "Run corepack pnpm dev:pazaak, set the API target to http://localhost:4001 for local checks, then run Ping and Health probes." },
   { symptom: "OAuth buttons are unavailable", cause: "Provider client id/secret is missing, or the API process was not restarted after .env edits.", fix: "Run corepack pnpm check:pazaak-oauth, fill provider vars, restart the API, then probe /api/auth/oauth/providers." },
-  { symptom: "Direct /bots/pazaakworld reload 404s", cause: "Static host is missing SPA fallback.", fix: "Ensure the Pages workflow copies dist/index.html to dist/404.html and deploys with BASE=/bots/." },
+  { symptom: "Direct /community-bots/pazaakworld reload 404s", cause: "Static host is missing SPA fallback.", fix: "Ensure the Pages workflow copies dist/index.html to dist/404.html and deploys with BASE=/community-bots/." },
   { symptom: "Worker queues work but matches fail", cause: "Expected fallback limitation: the Worker does not run authoritative match actions.", fix: "Put the embedded API first in VITE_API_BASES for live multiplayer, and keep Worker as fallback for account/queue/lobby continuity." },
   { symptom: "Trask answers stale content", cause: "Queued source refresh jobs were not drained or source credentials are missing.", fix: "Run corepack pnpm dev:ingest -- drain-queue, then show-indexed to confirm refreshed source counts." },
 ];
@@ -521,7 +528,7 @@ const DASHBOARD_ONBOARDING_GUIDES: DashboardOnboardingGuide[] = [
       "Use the hub cards below to jump into the game, inspect queue/lobby activity, or copy working Discord and CLI entry points for other bots.",
     ],
     commands: [
-      { label: "PazaakWorld", command: "https://openkotor.github.io/bots/pazaakworld", detail: "Game route and sign-in surface." },
+      { label: "PazaakWorld", command: "https://openkotor.github.io/community-bots/pazaakworld", detail: "Game route and sign-in surface." },
       { label: "Public probes", command: "Run Public Probes", detail: "Checks ping, health, providers, and opponents from this page." },
       { label: "Trask", command: "/ask query:<topic>", detail: "Working Discord slash command for research answers." },
     ],
@@ -550,16 +557,16 @@ const DASHBOARD_ONBOARDING_GUIDES: DashboardOnboardingGuide[] = [
     title: "Publish public Pages and optional public APIs",
     summary: "Keep static Pages, then layer in a remote API only for the capabilities you actually need.",
     steps: [
-      "Deploy Pages to /bots with the workflow in this repo; it already pins the correct base path and SPA fallback.",
+      "Deploy Pages under /community-bots with the workflow in this repo; it pins BASE=/community-bots/ and SPA fallback via 404.html.",
       "If you need public auth, queue, lobby, and profile continuity, deploy the Cloudflare Worker fallback and set PAZAAK_API_BASES.",
       "If you need live authoritative multiplayer, put a public embedded API in front of the Worker fallback and keep the Worker second in VITE_API_BASES.",
       "Verify the final public URLs and provider callback URLs after each change.",
     ],
     commands: [
-      { label: "Pages deploy", command: "gh workflow run deploy-pazaakworld.yml --repo OpenKotOR/bots --ref main", detail: "Manual Pages deploy trigger." },
+      { label: "Pages deploy", command: "gh workflow run deploy-pazaakworld.yml --repo OpenKotOR/community-bots --ref main", detail: "Manual Pages deploy trigger." },
       { label: "Worker deploy", command: "corepack pnpm dlx wrangler deploy --config infra/pazaak-matchmaking-worker/wrangler.toml", detail: "Fallback API deploy." },
-      { label: "Set API bases", command: "gh variable set PAZAAK_API_BASES --body \"https://your-worker.workers.dev\" --repo OpenKotOR/bots", detail: "Feeds VITE_API_BASES during Pages build." },
-      { label: "Repo verify", command: "gh repo view OpenKotOR/bots --json nameWithOwner,url,homepageUrl", detail: "Confirm public metadata." },
+      { label: "Set API bases", command: "gh variable set PAZAAK_API_BASES --body \"https://your-worker.workers.dev\" --repo OpenKotOR/community-bots", detail: "Feeds VITE_API_BASES during Pages build." },
+      { label: "Repo verify", command: "gh repo view OpenKotOR/community-bots --json nameWithOwner,url,homepageUrl", detail: "Confirm public metadata." },
     ],
   },
 ];
@@ -1539,7 +1546,7 @@ export function CommunityBotsDashboard() {
           <a href={OPERATOR_CONSOLE_ROUTE}>Operator console</a>
           <a href={PAZAAK_WORLD_PUBLIC_ROUTE}>PazaakWorld</a>
           <a href={QA_TRASK_WEBUI_PUBLIC_ROUTE}>Trask WebUI</a>
-          <a href="https://github.com/OpenKotOR/bots">GitHub</a>
+          <a href="https://github.com/OpenKotOR/community-bots">GitHub</a>
         </nav>
       </header>
 
@@ -1575,7 +1582,10 @@ export function CommunityBotsDashboard() {
           <article>
             <span>Frontend route</span>
             <strong>{window.location.pathname}</strong>
-            <small>The deployed operator console stays at /community-bots; /bots is the invite hub; /bots/pazaakworld opens the game surface.</small>
+            <small>
+              Deployed operator console: <code>/community-bots</code>; invite hub: <code>/community-bots/discord</code>; game:{" "}
+              <code>/community-bots/pazaakworld</code>.
+            </small>
           </article>
           <article>
             <span>Selected API</span>
@@ -1924,7 +1934,7 @@ export function CommunityBotsDashboard() {
                   <div className="bots-dashboard-live-panel__header">
                     <div>
                       <p className="bots-dashboard-kicker">Embedded QA Surface</p>
-                      <h3>Trask web UI inside the /bots deployment</h3>
+                      <h3>Trask web UI inside the /community-bots deployment</h3>
                     </div>
                     <div className="bots-dashboard-card-actions">
                       <a href={QA_TRASK_WEBUI_PUBLIC_ROUTE}>Open route</a>

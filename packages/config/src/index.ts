@@ -34,7 +34,7 @@ if (dotEnvPath) {
 
 const defaultChatModel = "gpt-5.4-mini";
 const defaultEmbeddingModel = "text-embedding-3-large";
-const defaultPazaakWorldUrl = "https://openkotor.github.io/bots/pazaakworld";
+const defaultPazaakWorldUrl = "https://openkotor.github.io/community-bots/pazaakworld";
 
 const integerish = z.coerce.number().int().nonnegative();
 

@@ -55,7 +55,7 @@ jobs:
         id: base
         shell: bash
         run: |
-          echo "base_path=/bots/" >> "$GITHUB_OUTPUT"
+          echo "base_path=/community-bots/" >> "$GITHUB_OUTPUT"
 
       - name: Resolve optional API base list
         id: api
@@ -97,11 +97,11 @@ jobs:
       - name: Build Holocron web (Trask Q&A SPA)
         if: hashFiles('apps/holocron-web/package.json') != ''
         env:
-          BASE: /bots/qa-webui/
+          BASE: /community-bots/qa-webui/
           ENABLE_SPARK: "0"
         run: pnpm --filter @openkotor/holocron-web build
 
-      - name: Publish Holocron web under /bots/qa-webui/
+      - name: Publish Holocron web under /community-bots/qa-webui/
         if: hashFiles('apps/holocron-web/package.json') != ''
         run: |
           mkdir -p apps/pazaak-world/dist/qa-webui
@@ -109,7 +109,7 @@ jobs:
 
       - name: Build Discord bots hub WebUI (hk86)
         env:
-          BASE: /bots/hk86/
+          BASE: /community-bots/hk86/
           VITE_REPO_BASE_URL: https://github.com/${{ github.repository }}
           VITE_WIKI_BASE_URL: ${{ vars.WIKI_BASE_URL }}
           VITE_TRASK_DISCORD_APPLICATION_ID: ${{ vars.TRASK_DISCORD_APP_ID }}
@@ -118,7 +118,7 @@ jobs:
           VITE_PAZAAK_DISCORD_APPLICATION_ID: ${{ vars.PAZAAK_DISCORD_APP_ID }}
         run: pnpm --filter hk86-web build
 
-      - name: Publish HK-86 WebUI under /bots/hk86/
+      - name: Publish HK-86 WebUI under /community-bots/hk86/
         run: |
           mkdir -p apps/pazaak-world/dist/hk86
           cp -R apps/hk86-web/dist/. apps/pazaak-world/dist/hk86/

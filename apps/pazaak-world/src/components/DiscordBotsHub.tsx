@@ -6,7 +6,7 @@ const INSTALL_TRASK_PERMS = "84992";
 const INSTALL_HK_PERMS = "268454912";
 const INSTALL_PAZAAK_PERMS = "19456";
 
-const DEFAULT_REPO_BASE = "https://github.com/OpenKotOR/bots";
+const DEFAULT_REPO_BASE = "https://github.com/OpenKotOR/community-bots";
 const DEFAULT_WIKI_BASE = "https://github.com/OpenKotOR/community-bots/wiki";
 const HK_GUIDE_WIKI_SLUG = "docs/guides/hk-86";
 
@@ -29,7 +29,7 @@ function pagesDeployRoot(): string {
     const pathOnly = base === "/" ? "" : base.replace(/\/$/, "");
     return `${window.location.origin}${pathOnly}/`;
   }
-  return "https://openkotor.github.io/bots/";
+  return "https://openkotor.github.io/community-bots/";
 }
 
 export function DiscordBotsHub() {
@@ -54,7 +54,7 @@ export function DiscordBotsHub() {
   const traskWebUiHref = `${webRoot}qa-webui/`;
   const pazaakWebUiHref = `${webRoot}pazaakworld`;
 
-  const operatorConsoleHref = `${webRoot.replace(/\/$/, "")}/community-bots`;
+  const operatorConsoleHref = webRoot;
 
   return (
     <div className="discord-bots-hub">
@@ -238,10 +238,14 @@ export function DiscordBotsHub() {
 
         <footer className="discord-bots-hub__foot">
           <span>
-            Static hub served from GitHub Pages under <code>/bots/</code>. HK operator WebUI remains under <code>/bots/hk86/</code>. Ingest worker is not a Discord bot — it has no invite here.
+            Static hub served from GitHub Pages under <code>{import.meta.env.BASE}</code>. HK operator WebUI remains under{" "}
+            <code>
+              {import.meta.env.BASE}hk86/
+            </code>
+            . Ingest worker is not a Discord bot — it has no invite here.
           </span>
           <p className="discord-bots-hub__console-link">
-            <a href={operatorConsoleHref}>Operator console</a> (API probes, deploy notes) lives at <code>/community-bots</code>.
+            <a href={operatorConsoleHref}>Operator console</a> (API probes, deploy notes) lives at the same deploy root as this hub.
           </p>
         </footer>
       </div>

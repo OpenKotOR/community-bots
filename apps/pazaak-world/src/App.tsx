@@ -78,6 +78,7 @@ import { soundManager } from "./utils/soundManager.ts";
 import { ConnectionStatus } from "./components/ConnectionStatus.tsx";
 import { subscribeToActivityRelay, type ActivityRelayConnectionState, type ActivityRelayMember } from "./activityRelay.ts";
 import type { CardWorldConfig } from "@openkotor/platform";
+import { discordHubRoute, pazaakWorldRoute } from "./deployRoutes.ts";
 
 const STANDALONE_AUTH_TOKEN_KEY = "pazaak-world-standalone-auth-token-v1";
 const USER_SETTINGS_STORAGE_KEY = "pazaak-user-settings-v1";
@@ -400,9 +401,6 @@ const maybeBootstrapNakama = async (session: ActivitySession): Promise<ActivityS
   return bootstrapNakamaActivitySession(session);
 };
 
-const PAZAAK_WORLD_PUBLIC_ROUTE = "/bots/pazaakworld";
-const DISCORD_BOTS_HUB_ROUTE = "/bots";
-
 const normalizePathname = (): string => window.location.pathname.replace(/\/+$/u, "") || "/";
 
 const isPazaakWorldRoute = (): boolean => {
@@ -411,15 +409,21 @@ const isPazaakWorldRoute = (): boolean => {
   }
 
   const pathname = normalizePathname();
-  return pathname === PAZAAK_WORLD_PUBLIC_ROUTE
-    || pathname.startsWith(`${PAZAAK_WORLD_PUBLIC_ROUTE}/`)
+  const primary = pazaakWorldRoute();
+  return pathname === primary
+    || pathname.startsWith(`${primary}/`)
     || pathname === "/pazaakworld"
-    || pathname.startsWith("/pazaakworld/");
+    || pathname.startsWith("/pazaakworld/")
+    || pathname === "/bots/pazaakworld"
+    || pathname.startsWith("/bots/pazaakworld/");
 };
 
 const isDiscordBotsHubRoute = (): boolean => {
   const pathname = normalizePathname();
-  return pathname === DISCORD_BOTS_HUB_ROUTE || pathname === `${DISCORD_BOTS_HUB_ROUTE}/`;
+  const hub = discordHubRoute();
+  return pathname === hub || pathname === `${hub}/`
+    || pathname === "/bots"
+    || pathname === "/bots/";
 };
 
 export default function App() {

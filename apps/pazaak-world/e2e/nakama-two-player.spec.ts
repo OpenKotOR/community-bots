@@ -42,8 +42,8 @@ test.describe("Nakama quick match (two browsers)", () => {
     await seedStandaloneMatchHub(pageA);
     await seedStandaloneMatchHub(pageB);
 
-    await pageA.goto("/bots/pazaakworld");
-    await pageB.goto("/bots/pazaakworld");
+    await pageA.goto("/pazaakworld");
+    await pageB.goto("/pazaakworld");
 
     await expect(pageA.getByRole("button", { name: "Find Match" })).toBeVisible({ timeout: 60_000 });
     await expect(pageB.getByRole("button", { name: "Find Match" })).toBeVisible({ timeout: 60_000 });
