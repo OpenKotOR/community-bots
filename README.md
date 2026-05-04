@@ -86,6 +86,12 @@ docs/
 infra/
 ```
 
+## Bot Web UIs (GitHub Pages)
+
+- **Canonical hub URL:** [https://openkotor.github.io/bots/](https://openkotor.github.io/bots/) — stable bookmark that redirects into this repo’s Pages deploy (same content as [Discord hub](https://openkotor.github.io/community-bots/discord)).
+- **Deploy root:** [https://openkotor.github.io/community-bots/](https://openkotor.github.io/community-bots/) — operator console at `/`, Discord hub at `/discord`, [PazaakWorld](https://openkotor.github.io/community-bots/pazaakworld), [Holocron / qa-webui](https://openkotor.github.io/community-bots/qa-webui/), [HK-86 hub](https://openkotor.github.io/community-bots/hk86/).
+- The `/bots/` entrypoint is served from the org Pages repo [`OpenKotOR/OpenKotOR.github.io`](https://github.com/OpenKotOR/OpenKotOR.github.io) (`bots/index.html`), because `OpenKotOR/bots` is a redirect alias to this repository and cannot host a separate project site at that path.
+
 ## Getting Started
 
 1. Copy `.env.example` to `.env` and fill the relevant Discord app credentials.
