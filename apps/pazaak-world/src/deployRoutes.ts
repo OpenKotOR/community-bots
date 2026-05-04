@@ -1,6 +1,6 @@
-/** Strip trailing slash from Vite BASE (e.g. `/community-bots/` → `/community-bots`). */
+/** Strip trailing slash from Vite base URL (e.g. `/community-bots/` → `/community-bots`). */
 export function viteBasePath(): string {
-  return (import.meta.env.BASE ?? "/").replace(/\/$/, "");
+  return (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 }
 
 /** Canonical GitHub Pages root for this repository (project site). */

@@ -25,7 +25,7 @@ function trimEnv(value: string | undefined): string {
 
 function pagesDeployRoot(): string {
   if (import.meta.env.PROD) {
-    const base = import.meta.env.BASE;
+    const base = import.meta.env.BASE_URL;
     const pathOnly = base === "/" ? "" : base.replace(/\/$/, "");
     return `${window.location.origin}${pathOnly}/`;
   }
@@ -238,9 +238,9 @@ export function DiscordBotsHub() {
 
         <footer className="discord-bots-hub__foot">
           <span>
-            Static hub served from GitHub Pages under <code>{import.meta.env.BASE}</code>. HK operator WebUI remains under{" "}
+            Static hub served from GitHub Pages under <code>{import.meta.env.BASE_URL}</code>. HK operator WebUI remains under{" "}
             <code>
-              {import.meta.env.BASE}hk86/
+              {import.meta.env.BASE_URL}hk86/
             </code>
             . Ingest worker is not a Discord bot — it has no invite here.
           </span>
