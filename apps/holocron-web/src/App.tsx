@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { Message as MessageType, AgentResult, SourceWeight, DEFAULT_SOURCE_WEIGHTS, Conversation, isMessageArray } from '@/lib/types'
 import { Message } from '@/components/Message'
@@ -45,6 +45,7 @@ import {
   type TraskHistoryRecordDto,
   type TraskSessionDto,
 } from '@/lib/trask-api'
+import { priorUserQuestionsFromOtherThreads } from '@/lib/starter-suggestions'
 
 const legacySparkMode = import.meta.env.VITE_TRASK_LEGACY_SPARK === '1'
 
@@ -231,6 +232,11 @@ function App() {
 
   const activeConversation = (conversations || []).find(c => c.id === activeConversationId)
   const messages = activeConversation?.messages || []
+
+  const starterSuggestions = useMemo(
+    () => priorUserQuestionsFromOtherThreads(conversations || [], activeConversationId ?? null),
+    [conversations, activeConversationId],
+  )
 
   const syncThreadFromRemote = useCallback(
     (
@@ -690,15 +696,14 @@ function App() {
     updateConversation(activeConversationId, updatedMessages)
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!input.trim() || isProcessing || !activeConversationId) return
+  const submitQuestion = async (rawQuestion: string) => {
+    const trimmed = rawQuestion.trim()
+    if (!trimmed || isProcessing || !activeConversationId) return
 
     const userMessage: MessageType = {
       id: `msg-${Date.now()}-user`,
       role: 'user',
-      content: input.trim(),
+      content: trimmed,
       timestamp: Date.now(),
     }
 
@@ -913,6 +918,11 @@ function App() {
     }
   }
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    void submitQuestion(input)
+  }
+
   const handleHolocronLogout = async () => {
     await traskLogout()
     const next = await traskFetchSession()
@@ -1035,23 +1045,30 @@ function App() {
                       <code className="text-xs rounded bg-muted px-1 py-0.5">trask-http-server</code> on port{' '}
                       <code className="text-xs rounded bg-muted px-1 py-0.5">4010</code> or open Holocron from the Discord bot link).
                     </p>
-                    <div className="flex flex-wrap gap-2 justify-center max-w-lg">
-                      {[
-                        "How do I mod KotOR?",
-                        "What is TSL:RCM?",
-                        "Installing mods on mobile",
-                      ].map((suggestion) => (
-                        <Button
-                          key={suggestion}
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setInput(suggestion)}
-                          className="text-xs border-primary/40 text-primary hover:bg-primary/20 hover:text-accent hover:border-accent/60 transition-all"
-                        >
-                          {suggestion}
-                        </Button>
-                      ))}
-                    </div>
+                    {starterSuggestions.length > 0 ? (
+                      <div className="flex flex-col gap-2 items-center max-w-lg">
+                        <p className="text-xs text-muted-foreground">Continue from your recent questions</p>
+                        <div className="flex flex-wrap gap-2 justify-center">
+                          {starterSuggestions.map((suggestion) => (
+                            <Button
+                              key={suggestion}
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={isProcessing || !activeConversationId}
+                              onClick={() => void submitQuestion(suggestion)}
+                              className="text-xs border-primary/40 text-primary hover:bg-primary/20 hover:text-accent hover:border-accent/60 transition-all max-w-[min(100%,320px)] text-left whitespace-normal h-auto py-2 leading-snug"
+                            >
+                              {suggestion}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground max-w-md">
+                        Type a question below to start. Later visits will show shortcuts here based on questions you asked in other threads.
+                      </p>
+                    )}
                   </div>
                 )}
 

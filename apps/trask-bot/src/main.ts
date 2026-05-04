@@ -65,7 +65,8 @@ const askCommand = new SlashCommandBuilder()
       .setName("query")
       .setDescription("What should Trask look up?")
       .setRequired(true)
-      .setMaxLength(200);
+      .setMaxLength(200)
+      .setAutocomplete(true);
   })
   .addStringOption((option) => {
     return option
@@ -104,6 +105,32 @@ const reindexCommand = new SlashCommandBuilder()
   });
 
 const commands = [askCommand, sourcesCommand, reindexCommand] as const;
+
+const AUTOCOMPLETE_VALUE_CAP = 100;
+
+const buildAskAutocompleteChoices = async (
+  userId: string,
+  needle: string,
+): Promise<{ name: string; value: string }[]> => {
+  const recent = await queryRepository.listForUser(userId, 60);
+  const uniq: string[] = [];
+  const seen = new Set<string>();
+  const n = needle.trim().toLowerCase();
+  for (const row of recent) {
+    const text = row.query.trim().replace(/\s+/g, " ");
+    if (text.length < 3) continue;
+    const key = text.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (n && !key.includes(n)) continue;
+    uniq.push(text);
+    if (uniq.length >= 25) break;
+  }
+  return uniq.map((text) => {
+    const clipped = text.length > AUTOCOMPLETE_VALUE_CAP ? `${text.slice(0, AUTOCOMPLETE_VALUE_CAP - 1)}…` : text;
+    return { name: clipped, value: clipped };
+  });
+};
 
 const truncateForDiscord = (value: string, limit: number): string => {
   if (value.length <= limit) return value;
@@ -367,6 +394,24 @@ const isAllowedChannel = (channelId: string): boolean => {
 };
 
 client.on("interactionCreate", async (interaction) => {
+  if (interaction.isAutocomplete()) {
+    if (interaction.commandName !== "ask") {
+      return;
+    }
+    const focused = interaction.options.getFocused(true);
+    if (focused.name !== "query") {
+      return;
+    }
+    try {
+      const choices = await buildAskAutocompleteChoices(interaction.user.id, focused.value);
+      await interaction.respond(choices);
+    } catch (error) {
+      logger.warn("Trask /ask autocomplete failed.", error instanceof Error ? error : { error: String(error) });
+      await interaction.respond([]);
+    }
+    return;
+  }
+
   if (!interaction.isChatInputCommand()) {
     return;
   }
