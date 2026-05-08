@@ -9,6 +9,7 @@
 
   Optional:
     GITHUB_REPOSITORY — default OpenKotOR/community-bots
+    PAZAAK_WORKER_PUBLIC_URL in .env.cf.local — if set, syncs GitHub variables PAZAAK_API_BASES (Pages/Vite) and PAZAAK_WORKER_URL (matchmaking-inducer / Fly)
 #>
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -26,7 +27,7 @@ if (Test-Path $envFile) {
     if ($line -match '^\s*#' -or $line.Length -eq 0) {
       return
     }
-    if ($line -match '^(CLOUDFLARE_API_TOKEN|CLOUDFLARE_ACCOUNT_ID)=(.*)$') {
+    if ($line -match '^(CLOUDFLARE_API_TOKEN|CLOUDFLARE_ACCOUNT_ID|PAZAAK_WORKER_PUBLIC_URL)=(.*)$') {
       $key = $Matches[1]
       $val = $Matches[2].Trim().Trim('"').Trim("'")
       if ($key -eq "CLOUDFLARE_API_TOKEN" -and [string]::IsNullOrWhiteSpace($env:CLOUDFLARE_API_TOKEN)) {
@@ -34,6 +35,9 @@ if (Test-Path $envFile) {
       }
       if ($key -eq "CLOUDFLARE_ACCOUNT_ID" -and [string]::IsNullOrWhiteSpace($env:CLOUDFLARE_ACCOUNT_ID)) {
         $env:CLOUDFLARE_ACCOUNT_ID = $val
+      }
+      if ($key -eq "PAZAAK_WORKER_PUBLIC_URL" -and [string]::IsNullOrWhiteSpace($env:PAZAAK_WORKER_PUBLIC_URL)) {
+        $env:PAZAAK_WORKER_PUBLIC_URL = $val
       }
     }
   }
@@ -53,6 +57,11 @@ if ($LASTEXITCODE -ne 0) {
 
 $env:CLOUDFLARE_API_TOKEN | gh secret set CLOUDFLARE_API_TOKEN --repo $repo
 $env:CLOUDFLARE_ACCOUNT_ID | gh secret set CLOUDFLARE_ACCOUNT_ID --repo $repo
+
+if (-not [string]::IsNullOrWhiteSpace($env:PAZAAK_WORKER_PUBLIC_URL)) {
+  gh variable set PAZAAK_API_BASES --repo $repo --body $env:PAZAAK_WORKER_PUBLIC_URL
+  gh variable set PAZAAK_WORKER_URL --repo $repo --body $env:PAZAAK_WORKER_PUBLIC_URL
+}
 
 gh workflow run "Deploy Pazaak Matchmaking Worker" --repo $repo
 Start-Sleep -Seconds 4
