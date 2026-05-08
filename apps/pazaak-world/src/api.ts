@@ -125,6 +125,20 @@ const apiClient = createBrowserApiClient({
         }),
 });
 
+/** First non-empty configured API origin (Worker/bot), for dashboards and probes — not static Pages host. */
+export function getPrimaryBrowserApiOrigin(): string {
+  const found = apiClient.apiBases.find((base) => base.trim().length > 0);
+  return found?.trim() ?? "";
+}
+
+/** Ping using the same failover chain as JSON API calls (avoids root-relative `/api/*` on GitHub Pages). */
+export function fetchApiPingProbe(): Promise<Response> {
+  return apiClient.fetchWithFailover(`/api/ping?ts=${Date.now()}`, {
+    method: "GET",
+    cache: "no-store",
+  });
+}
+
 const apiFetch = apiClient.requestJsonWithBearer;
 const apiPublicFetch = apiClient.requestJson;
 const apiPublicOptionalFetch = apiClient.requestOptionalJson;

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { MatchmakingStatsResponse, MeResponse, SocialAuthProviderConfig } from "../api.ts";
+import { getPrimaryBrowserApiOrigin, type MatchmakingStatsResponse, type MeResponse, type SocialAuthProviderConfig } from "../api.ts";
 import {
   discordHubRoute,
   operatorConsoleRoute,
@@ -826,6 +826,11 @@ function getDefaultApiBase(): string {
   const { protocol, hostname, port } = window.location;
   if ((hostname === "localhost" || hostname === "127.0.0.1") && port !== "4001") {
     return `${protocol}//${hostname}:4001`;
+  }
+
+  const fromBundle = getPrimaryBrowserApiOrigin();
+  if (fromBundle) {
+    return fromBundle;
   }
 
   return "";

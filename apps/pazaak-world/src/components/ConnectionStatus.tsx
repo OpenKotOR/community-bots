@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { fetchApiPingProbe } from "../api.ts";
 
 interface ConnectionStatusProps {
   isOnline: boolean;
@@ -33,10 +34,7 @@ export function ConnectionStatus({ isOnline, socketState = "connecting" }: Conne
       const startTime = performance.now();
 
       try {
-        const response = await fetch(`/api/ping?ts=${Date.now()}`, {
-          method: "GET",
-          cache: "no-store",
-        });
+        const response = await fetchApiPingProbe();
 
         if (!cancelled && response.ok) {
           const endTime = performance.now();
