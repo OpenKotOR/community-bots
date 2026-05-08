@@ -153,6 +153,9 @@ export function Message({ message, onToggleExpand }: MessageProps) {
     if (message.researchStatus === 'pending' && hasResearchTimeline) {
       setIsResearchPanelOpen(true)
     }
+    if (message.researchStatus && message.researchStatus !== 'pending') {
+      setIsResearchPanelOpen(false)
+    }
   }, [hasResearchTimeline, message.researchStatus])
 
   if (isSystem) {
@@ -189,12 +192,12 @@ export function Message({ message, onToggleExpand }: MessageProps) {
         }`}
       >
         {hasResearchTimeline && (
-          <div className="mb-3 pb-3 border-b border-border/50">
+          <div className="mb-3 pb-2 border-b border-border/50">
             <Collapsible
               open={isResearchPanelOpen}
               onOpenChange={setIsResearchPanelOpen}
             >
-              <CollapsibleTrigger className="flex items-center justify-between w-full group/trigger hover:bg-muted/50 -mx-2 px-2 py-1.5 rounded transition-colors">
+              <CollapsibleTrigger className="flex min-h-8 items-center justify-between w-full group/trigger hover:bg-muted/50 -mx-2 px-2 py-1 rounded transition-colors">
                 <div className="flex items-center gap-2 min-w-0">
                   {message.researchStatus === 'pending' ? (
                     <motion.div
@@ -221,12 +224,12 @@ export function Message({ message, onToggleExpand }: MessageProps) {
                 )}
               </CollapsibleTrigger>
 
-              <CollapsibleContent>
+              <CollapsibleContent className="overflow-hidden">
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="mt-2 space-y-2"
+                  className="mt-2 max-h-72 space-y-2 overflow-y-auto overscroll-contain pr-1.5"
                 >
                   {sortedResearchSteps.map((step, idx) => {
                     const isLast = idx === sortedResearchSteps.length - 1

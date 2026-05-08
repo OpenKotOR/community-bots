@@ -13,7 +13,7 @@ import { normalizeAuthHandlerError, type AuthHandlerThrown } from "@openkotor/pl
 
 import type { SearchProvider } from "@openkotor/retrieval";
 
-import type { ResearchWizardProgressEvent, ResearchWizardQueryHandler } from "@openkotor/trask";
+import type { ResearchWizardModelOption, ResearchWizardProgressEvent, ResearchWizardQueryHandler } from "@openkotor/trask";
 
 import { Router, type Request, type Response, type RequestHandler } from "express";
 
@@ -206,6 +206,18 @@ const appendLiveTrace = async (
 
 const CANCELED_QUERY_ERROR = "Canceled by newer request.";
 
+const DEFAULT_TRASK_MODEL_OPTIONS: readonly ResearchWizardModelOption[] = [
+  { id: "auto", label: "Auto", provider: "ResearchWizard fallback", recommended: true },
+  { id: "openrouter:openrouter/auto", label: "OpenRouter Auto", provider: "OpenRouter", recommended: true },
+];
+
+const mapModelOption = (option: ResearchWizardModelOption): ResearchWizardModelOption => ({
+  id: option.id,
+  label: option.label,
+  provider: option.provider,
+  ...(option.recommended ? { recommended: true } : {}),
+});
+
 
 
 const shouldPersistForUser = (user: TraskHttpUser): boolean => {
@@ -246,6 +258,21 @@ const normalizeThreadIdFromBody = (raw: ScalarOrObject | undefined): string => {
 
   return trimmed;
 
+};
+
+const MODEL_ID_RE = /^[a-z0-9][a-z0-9._:/@+-]{0,159}$/iu;
+
+const normalizeTraskModelFromBody = (raw: ScalarOrObject | undefined): string | undefined => {
+  if (raw === undefined || raw === null) return undefined;
+  if (typeof raw !== "string") {
+    throw Object.assign(new Error("model must be a string when provided."), { status: 422 });
+  }
+  const model = raw.trim();
+  if (!model) return undefined;
+  if (!MODEL_ID_RE.test(model)) {
+    throw Object.assign(new Error("model contains unsupported characters."), { status: 422 });
+  }
+  return model;
 };
 
 
@@ -303,6 +330,21 @@ export const createTraskHttpRouter = <TUser extends TraskHttpUser = TraskHttpUse
     }
 
   });
+
+  router.get(
+    "/models",
+    options.auth.requireAuth(async (_req, res, _user) => {
+      try {
+        const trask = requireRuntime();
+        const models = trask.researchWizard.listModels
+          ? await trask.researchWizard.listModels()
+          : DEFAULT_TRASK_MODEL_OPTIONS;
+        res.json({ models: models.map(mapModelOption) });
+      } catch (err) {
+        handleTraskError(res, err as AuthHandlerThrown);
+      }
+    }),
+  );
 
 
 
@@ -506,17 +548,21 @@ export const createTraskHttpRouter = <TUser extends TraskHttpUser = TraskHttpUse
 
       let threadId: string;
 
+      let model: string | undefined;
+
       const persist = shouldPersistForUser(user);
 
 
 
       try {
 
-        const body = req.body as { query?: ScalarOrObject; threadId?: ScalarOrObject };
+        const body = req.body as { query?: ScalarOrObject; threadId?: ScalarOrObject; model?: ScalarOrObject };
 
         query = normalizeTraskQuery(body.query);
 
         threadId = normalizeThreadIdFromBody(body.threadId);
+
+        model = normalizeTraskModelFromBody(body.model);
 
       } catch (err) {
 
@@ -540,7 +586,7 @@ export const createTraskHttpRouter = <TUser extends TraskHttpUser = TraskHttpUse
 
       if (!persist) {
         try {
-          const result = await trask.researchWizard.answerQuestion(query);
+          const result = await trask.researchWizard.answerQuestion(query, undefined, model ? { model } : undefined);
 
           const record: TraskQueryRecord = {
             queryId,
@@ -601,7 +647,7 @@ export const createTraskHttpRouter = <TUser extends TraskHttpUser = TraskHttpUse
           {
             at: createdAt,
             phase: "queued",
-            detail: "Holocron retrieval queued…",
+              detail: model ? `Holocron retrieval queued with ${model}…` : "Holocron retrieval queued…",
           },
         ],
       };
@@ -618,7 +664,7 @@ export const createTraskHttpRouter = <TUser extends TraskHttpUser = TraskHttpUse
               ...(ev.detail !== undefined ? { detail: ev.detail } : {}),
               ...(ev.sources?.length ? { sources: mapDescriptorsToSourceRecords(ev.sources) } : {}),
             });
-          });
+          }, model ? { model } : undefined);
 
           const prev = await trask.queryRepository.getByQueryId(queryId);
 

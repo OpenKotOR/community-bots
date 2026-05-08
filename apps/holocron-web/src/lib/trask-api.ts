@@ -40,6 +40,13 @@ export interface TraskSessionDto {
   discord?: { id: string; username: string; displayName: string }
 }
 
+export interface TraskModelOptionDto {
+  id: string
+  label: string
+  provider: string
+  recommended?: boolean
+}
+
 function apiBase(): string {
   return import.meta.env.VITE_TRASK_API_BASE?.replace(/\/+$/, '') ?? ''
 }
@@ -180,6 +187,15 @@ export async function traskListSources(apiKey?: string): Promise<TraskSourceDto[
   return data.sources ?? []
 }
 
+export async function traskListModels(apiKey?: string): Promise<TraskModelOptionDto[]> {
+  const res = await fetch(`${apiBase()}/api/trask/models`, traskRequestInit(apiKey))
+  const data = (await res.json()) as { models?: TraskModelOptionDto[]; error?: string }
+  if (!res.ok) {
+    throw new Error(data.error ?? `models failed: ${res.status}`)
+  }
+  return data.models ?? []
+}
+
 export async function traskListHistory(
   limit: number,
   apiKey?: string,
@@ -206,10 +222,14 @@ export async function traskAsk(
   query: string,
   apiKey?: string,
   threadId?: string,
+  model?: string,
 ): Promise<TraskHistoryRecordDto> {
-  const body: { query: string; threadId?: string } = { query }
+  const body: { query: string; threadId?: string; model?: string } = { query }
   if (threadId?.trim()) {
     body.threadId = threadId.trim()
+  }
+  if (model?.trim()) {
+    body.model = model.trim()
   }
   const res = await fetch(`${apiBase()}/api/trask/ask`, traskRequestInit(apiKey, {
     method: 'POST',

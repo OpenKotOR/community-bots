@@ -3,7 +3,11 @@ import OpenAI from "openai";
 import { loadSharedAiConfig, type ResearchWizardRuntimeConfig, type SharedAiConfig } from "@openkotor/config";
 import { traskApprovedResearchSources, type SourceDescriptor } from "@openkotor/retrieval";
 
-import { runHeadlessGptResearcher } from "./gpt-researcher-subprocess.js";
+import {
+  listHeadlessGptResearcherModels,
+  runHeadlessGptResearcher,
+  type HeadlessAiResearchWizardModelOption,
+} from "./gpt-researcher-subprocess.js";
 
 export interface ResearchWizardAnswer {
   answer: string;
@@ -22,13 +26,27 @@ export interface ResearchWizardProgressEvent {
   sources?: readonly SourceDescriptor[];
 }
 
+export interface ResearchWizardQueryOptions {
+  /** Preferred ai-researchwizard model id, e.g. `openrouter:openrouter/auto` or `litellm:moonshotai/kimi-k2`. */
+  model?: string;
+}
+
+export interface ResearchWizardModelOption extends HeadlessAiResearchWizardModelOption {}
+
 /** Structural type for adapters that only need full Q&A (e.g. Trask HTTP `/ask`). */
 export interface ResearchWizardQueryHandler {
   answerQuestion(
     query: string,
     onProgress?: (event: ResearchWizardProgressEvent) => void,
+    options?: ResearchWizardQueryOptions,
   ): Promise<ResearchWizardAnswer>;
+  listModels?(): Promise<readonly ResearchWizardModelOption[]>;
 }
+
+const DEFAULT_RESEARCH_WIZARD_MODELS: readonly ResearchWizardModelOption[] = [
+  { id: "auto", label: "Auto", provider: "ResearchWizard fallback", recommended: true },
+  { id: "openrouter:openrouter/auto", label: "OpenRouter Auto", provider: "OpenRouter", recommended: true },
+];
 
 interface ResearchWizardResponsePayload {
   report?: string | null;
@@ -212,6 +230,14 @@ const formatSourcesSection = (sources: readonly SourceDescriptor[]): string => {
 
 const DEFAULT_REWRITE_TIMEOUT_MS = 25_000;
 
+const normalizePreferredRewriteModel = (model: string | undefined): string | undefined => {
+  const trimmed = model?.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.startsWith("litellm:")) return trimmed.slice("litellm:".length).trim() || undefined;
+  if (trimmed.startsWith("openrouter:")) return trimmed.slice("openrouter:".length).trim() || undefined;
+  return trimmed;
+};
+
 const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
   return await new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -367,10 +393,28 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
       : null;
   }
 
+  public async listModels(): Promise<readonly ResearchWizardModelOption[]> {
+    try {
+      const dynamicModels = await listHeadlessGptResearcherModels(this.config);
+      const seen = new Set(DEFAULT_RESEARCH_WIZARD_MODELS.map((model) => model.id));
+      return [
+        ...DEFAULT_RESEARCH_WIZARD_MODELS,
+        ...dynamicModels.filter((model) => {
+          if (seen.has(model.id)) return false;
+          seen.add(model.id);
+          return true;
+        }),
+      ];
+    } catch {
+      return DEFAULT_RESEARCH_WIZARD_MODELS;
+    }
+  }
+
   private async rewriteForDiscord(
     query: string,
     report: string,
     approvedSources: readonly SourceDescriptor[],
+    preferredModel?: string,
   ): Promise<string> {
     if (!this.openAiClient) {
       return fallbackDiscordRewrite(report, approvedSources);
@@ -380,7 +424,10 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
       .map((source, index) => `${index + 1}. ${source.name} - ${source.homeUrl}`)
       .join("\n");
 
-    const modelsToTry = [...new Set([this.aiConfig.chatModel, ...this.aiConfig.chatModelFallbacks])];
+    const preferredRewriteModel = normalizePreferredRewriteModel(preferredModel);
+    const modelsToTry = [
+      ...new Set([...(preferredRewriteModel ? [preferredRewriteModel] : []), this.aiConfig.chatModel, ...this.aiConfig.chatModelFallbacks]),
+    ];
 
     for (const model of modelsToTry) {
       try {
@@ -498,6 +545,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
   private async fetchResearchReport(
     query: string,
     customPrompt: string,
+    options?: ResearchWizardQueryOptions,
   ): Promise<{ report: string; payload: ResearchWizardResponsePayload }> {
     const strictSourceUrlMode = process.env.TRASK_RESEARCH_STRICT_SOURCE_URLS === "1";
     const strictQueryDomainMode = process.env.TRASK_RESEARCH_STRICT_QUERY_DOMAINS === "1";
@@ -509,6 +557,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
       ...(strictQueryDomainMode
         ? { query_domains: this.approvedSources.map((source) => new URL(source.homeUrl).hostname) }
         : {}),
+      ...(options?.model?.trim() ? { model: options.model.trim() } : {}),
       report_type: "research_report",
       report_source: "web",
     });
@@ -532,6 +581,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
   public async answerQuestion(
     query: string,
     onProgress?: (event: ResearchWizardProgressEvent) => void,
+    options?: ResearchWizardQueryOptions,
   ): Promise<ResearchWizardAnswer> {
     try {
       onProgress?.({
@@ -545,7 +595,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
           return `Scanning approved archives and open-web context… (${seconds}s)`;
         },
         onProgress,
-        async () => await this.fetchResearchReport(query, buildCustomPrompt()),
+        async () => await this.fetchResearchReport(query, buildCustomPrompt(), options),
       );
       emitArchiveProbeEvents(payload, this.approvedSources, onProgress);
       onProgress?.({
@@ -562,7 +612,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
         phase: "compose",
         detail: "Rendering Holocron answer…",
       });
-      const answer = await this.rewriteForDiscord(query, report, relevantSources);
+      const answer = await this.rewriteForDiscord(query, report, relevantSources, options?.model);
 
       return {
         answer,

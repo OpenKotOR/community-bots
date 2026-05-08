@@ -12,12 +12,20 @@ export interface HeadlessAiResearchWizardResult {
   };
 }
 
+export interface HeadlessAiResearchWizardModelOption {
+  readonly id: string;
+  readonly label: string;
+  readonly provider: string;
+  readonly recommended?: boolean;
+}
+
 /** stdin payload for `vendor/ai-researchwizard/trask_headless_research.py`. */
 export interface HeadlessAiResearchWizardRequestPayload {
   readonly query: string;
   readonly custom_prompt?: string;
   readonly source_urls?: readonly string[];
   readonly query_domains?: readonly string[];
+  readonly model?: string;
   readonly report_type?: string;
   readonly report_source?: string;
 }
@@ -141,4 +149,115 @@ export const runHeadlessGptResearcher = async (
 
     throw error;
   }
+};
+
+const labelFromModelId = (modelId: string): string => {
+  const tail = modelId.split("/").pop() ?? modelId;
+  return tail
+    .replace(/[-_]+/gu, " ")
+    .replace(/\b\w/gu, (char) => char.toUpperCase())
+    .replace(/\bGpt\b/gu, "GPT")
+    .replace(/\bAi\b/gu, "AI");
+};
+
+const providerFromModelId = (modelId: string): string => {
+  const withoutPrefix = modelId.includes(":") ? modelId.split(":", 2)[1] ?? modelId : modelId;
+  const provider = withoutPrefix.includes("/") ? withoutPrefix.split("/", 1)[0] ?? withoutPrefix : "ResearchWizard";
+  return provider
+    .replace(/[-_]+/gu, " ")
+    .replace(/\b\w/gu, (char) => char.toUpperCase())
+    .replace(/\bAi\b/gu, "AI")
+    .replace(/^Openrouter$/u, "OpenRouter");
+};
+
+const normalizeResearchWizardModelId = (modelId: string): string => {
+  const trimmed = modelId.trim();
+  if (!trimmed) return "";
+  if (trimmed.includes(":")) return trimmed;
+  return trimmed.startsWith("openrouter/") ? `openrouter:${trimmed}` : `litellm:${trimmed}`;
+};
+
+const parseModelList = (stdout: string): HeadlessAiResearchWizardModelOption[] => {
+  const parsed = JSON.parse(stdout) as unknown;
+  if (!Array.isArray(parsed)) return [];
+
+  const seen = new Set<string>();
+  const models: HeadlessAiResearchWizardModelOption[] = [];
+  for (const raw of parsed) {
+    if (typeof raw !== "string") continue;
+    const id = normalizeResearchWizardModelId(raw);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    models.push({
+      id,
+      label: labelFromModelId(id),
+      provider: providerFromModelId(id),
+    });
+  }
+  return models;
+};
+
+export const listHeadlessGptResearcherModels = async (
+  config: ResearchWizardRuntimeConfig,
+): Promise<HeadlessAiResearchWizardModelOption[]> => {
+  const root = config.gptResearcherRoot?.trim();
+  if (!root) return [];
+
+  const python = config.pythonExecutable?.trim() || "python";
+  const script = [
+    "import json, sys",
+    "from pathlib import Path",
+    "root = Path(sys.argv[1]).resolve()",
+    "fallbacks = root.parent / 'llm_fallbacks' / 'src'",
+    "sys.path.insert(0, str(fallbacks))",
+    "from llm_fallbacks import get_fallback_list",
+    "print(json.dumps(list(get_fallback_list('chat'))[:60]))",
+  ].join("; ");
+
+  const { stdout, stderr, code } = await new Promise<{ stdout: string; stderr: string; code: number | null }>(
+    (resolvePromise, rejectPromise) => {
+      const child = spawn(python, ["-c", script, root], {
+        cwd: process.cwd(),
+        stdio: ["ignore", "pipe", "pipe"],
+        env: {
+          ...process.env,
+          PYTHONIOENCODING: "utf-8",
+          PYTHONUTF8: "1",
+        },
+      });
+      const chunksOut: Buffer[] = [];
+      const chunksErr: Buffer[] = [];
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        child.kill("SIGTERM");
+        rejectPromise(new Error("ai-researchwizard model list timed out"));
+      }, Math.min(config.timeoutMs, 15_000));
+      child.stdout?.on("data", (chunk: Buffer | string) => chunksOut.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+      child.stderr?.on("data", (chunk: Buffer | string) => chunksErr.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+      child.on("error", (error) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        rejectPromise(error);
+      });
+      child.on("close", (exitCode) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolvePromise({
+          stdout: Buffer.concat(chunksOut).toString("utf8").trim(),
+          stderr: Buffer.concat(chunksErr).toString("utf8").trim(),
+          code: exitCode,
+        });
+      });
+    },
+  );
+
+  if (code !== 0) {
+    throw new Error(`ai-researchwizard model list exited ${code ?? "unknown"}: ${stderr || stdout || "no output"}`);
+  }
+
+  return parseModelList(stdout);
 };

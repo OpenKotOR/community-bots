@@ -3,6 +3,7 @@ import { Message as MessageType, AgentResult, SourceWeight, DEFAULT_SOURCE_WEIGH
 import { Message } from '@/components/Message'
 import { AgentPanel } from '@/components/AgentPanel'
 import { ConversationSidebar } from '@/components/ConversationSidebar'
+import { HolocronModelPicker } from '@/components/HolocronModelPicker'
 import { SourceWeightsDialog } from '@/components/SourceWeightsDialog'
 import { KeyboardShortcutsDialog } from '@/components/KeyboardShortcutsDialog'
 import { PromptsDialog } from '@/components/PromptsDialog'
@@ -35,11 +36,21 @@ import {
 import { conversationDisplayTitle } from '@/lib/conversation-utils'
 import { usePersistentLocalState } from '@/lib/persistent-local-state'
 import {
+  TRASK_MODEL_AUTO,
+  TRASK_MODEL_OPTIONS,
+  mergeTraskModelOptions,
+  modelPayloadValue,
+  normalizeTraskModelSelection,
+  traskModelLabel,
+  type TraskModelOption,
+} from '@/lib/trask-models'
+import {
   traskAsk,
   traskCancelQuery,
   traskFetchSession,
   traskGetThread,
   traskListHistory,
+  traskListModels,
   traskLogout,
   traskPollIterationSignal,
   traskUsesSameOriginApi,
@@ -72,6 +83,7 @@ type HolocronResearchJob = {
   assistantMessageId: string
   queryType: QueryType
   serverQueryId?: string
+  modelId?: string
   state: HolocronResearchJobState
   attemptCount: number
   pollFailures: number
@@ -89,6 +101,7 @@ function isHolocronResearchJob(value: unknown): value is HolocronResearchJob {
     && typeof o.threadId === 'string'
     && typeof o.question === 'string'
     && typeof o.assistantMessageId === 'string'
+    && (o.modelId === undefined || typeof o.modelId === 'string')
     && (o.state === 'queued' || o.state === 'submitted')
     && typeof o.attemptCount === 'number'
     && typeof o.pollFailures === 'number'
@@ -448,6 +461,8 @@ function App() {
   const [sourceWeights, setSourceWeights] = usePersistentLocalState<SourceWeight[]>('source-weights', DEFAULT_SOURCE_WEIGHTS)
   const [traskApiKey, setTraskApiKey] = usePersistentLocalState<string>('qa-trask-web-api-key', '')
   const [researchJobs, setResearchJobs] = usePersistentLocalState<HolocronResearchJob[]>(HOLOCRON_RESEARCH_JOBS_KEY, [])
+  const [selectedTraskModel, setSelectedTraskModel] = usePersistentLocalState<string>('holocron-trask-model', TRASK_MODEL_AUTO)
+  const [traskModelOptions, setTraskModelOptions] = useState<readonly TraskModelOption[]>(() => mergeTraskModelOptions([]))
   const [sidebarWidth, setSidebarWidth] = usePersistentLocalState<number>('holocron-sidebar-width', 320)
   const [sidebarCollapsed, setSidebarCollapsed] = usePersistentLocalState<boolean>('holocron-sidebar-collapsed', false)
   const [input, setInput] = useState('')
@@ -493,10 +508,30 @@ function App() {
   )
   const hasRunningResearch = !legacySparkMode && activeConversationResearchJobs.length > 0
   const queryInputLocked = isProcessing
+  const effectiveTraskModelOptions = traskModelOptions.length ? traskModelOptions : TRASK_MODEL_OPTIONS
 
   useEffect(() => {
     researchJobsRef.current = normalizeResearchJobs(researchJobs)
   }, [researchJobs])
+
+  useEffect(() => {
+    if (legacySparkMode || !traskUsesSameOriginApi()) return
+    let cancelled = false
+    void traskListModels(traskApiKey || undefined)
+      .then((models) => {
+        if (!cancelled) {
+          setTraskModelOptions(mergeTraskModelOptions(models))
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setTraskModelOptions(mergeTraskModelOptions([]))
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [traskApiKey])
 
   const starterSuggestions = useMemo(
     () => priorUserQuestionsFromOtherThreads(conversations || [], activeConversationId ?? null),
@@ -922,9 +957,12 @@ function App() {
   }, [conversations, holocronSession.status, holocronThreadId, legacySparkMode])
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    if (!scrollRef.current) {
+      return
     }
+    const scrollViewport = scrollRef.current.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]')
+    const scrollTarget = scrollViewport ?? scrollRef.current
+    scrollTarget.scrollTop = scrollTarget.scrollHeight
   }, [messages, activeAgents])
 
   useEffect(() => {
@@ -1191,7 +1229,7 @@ function App() {
           return
         }
 
-        const record = await traskAsk(job.question, traskApiKey || undefined, job.threadId)
+        const record = await traskAsk(job.question, traskApiKey || undefined, job.threadId, modelPayloadValue(job.modelId))
         if (cancelled || !isJobCurrent()) return
         if (record.status === 'complete') {
           completeResearchJob(job, record)
@@ -1342,6 +1380,7 @@ function App() {
           ? candidateThreadId
           : createHolocronThreadId()
         const assistantMessageId = `pending-${clientId}-a`
+        const selectedModelId = normalizeTraskModelSelection(selectedTraskModel, effectiveTraskModelOptions)
         const pendingMessage = createResearchLoadingMessage(
           assistantMessageId,
           userMessage.content,
@@ -1349,7 +1388,7 @@ function App() {
           queryType,
           [
             localResearchStep('queued', 'Queued in local background worker.'),
-            localResearchStep('dispatch', 'Preparing research request.'),
+            localResearchStep('dispatch', `Preparing research request with ${traskModelLabel(selectedModelId, effectiveTraskModelOptions)}.`),
           ],
         )
         const researchJob: HolocronResearchJob = {
@@ -1358,6 +1397,7 @@ function App() {
           threadId,
           question: userMessage.content,
           assistantMessageId,
+          modelId: selectedModelId,
           queryType,
           state: 'queued',
           attemptCount: 0,
@@ -1554,8 +1594,8 @@ function App() {
           </header>
 
           <div className="flex-1 flex flex-col min-h-0">
-            <ScrollArea className="flex-1" ref={scrollRef}>
-              <div className="py-6">
+            <ScrollArea className="flex-1 min-h-0" ref={scrollRef}>
+              <div className="pt-6 pb-32 md:pb-40">
                 {messages.length === 0 && (
                   <div className="flex flex-col items-center justify-center min-h-[min(52vh,420px)] px-6 py-10 text-center relative z-[1]">
                     <h2 className="text-xl font-semibold text-accent mb-3 font-totj-serif">
@@ -1607,7 +1647,7 @@ function App() {
               </div>
             </ScrollArea>
 
-            <div className="border-t border-primary/30 bg-card/70 backdrop-blur-md p-3 md:p-4 shadow-[0_-4px_24px_0_rgba(0,0,0,0.35)]">
+            <div className="flex-shrink-0 border-t border-primary/30 bg-card/70 backdrop-blur-md p-3 md:p-4 shadow-[0_-4px_24px_0_rgba(0,0,0,0.35)]">
               <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
                 <div className="flex gap-2">
                   <Input
@@ -1634,6 +1674,14 @@ function App() {
                       <ArrowRight size={20} weight="bold" />
                     )}
                   </Button>
+                </div>
+                <div className="mt-2 flex justify-center">
+                  <HolocronModelPicker
+                    value={normalizeTraskModelSelection(selectedTraskModel, effectiveTraskModelOptions)}
+                    options={effectiveTraskModelOptions}
+                    onValueChange={(value) => setSelectedTraskModel(normalizeTraskModelSelection(value, effectiveTraskModelOptions))}
+                    disabled={queryInputLocked || !activeConversationId}
+                  />
                 </div>
               </form>
             </div>
