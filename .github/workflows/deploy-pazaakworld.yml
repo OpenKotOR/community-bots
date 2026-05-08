@@ -126,6 +126,19 @@ jobs:
       - name: Add SPA fallback
         run: cp apps/pazaak-world/dist/index.html apps/pazaak-world/dist/404.html
 
+      # GitHub Pages returns 404 for unknown paths even when 404.html is the SPA shell.
+      # Duplicate the SPA shell so /community-bots/discord and /community-bots/pazaakworld
+      # resolve to real files (HTTP 200) for crawlers, curl, and strict clients.
+      - name: Materialize SPA routes for static hosting
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="apps/pazaak-world/dist"
+          for sub in discord pazaakworld; do
+            mkdir -p "$root/$sub"
+            cp "$root/index.html" "$root/$sub/index.html"
+          done
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
