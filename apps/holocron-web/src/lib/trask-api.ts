@@ -231,3 +231,16 @@ export async function traskAsk(
   }
   return record
 }
+
+export async function traskCancelQuery(queryId: string, apiKey?: string): Promise<TraskHistoryRecordDto | null> {
+  const res = await fetch(
+    `${apiBase()}/api/trask/query/${encodeURIComponent(queryId)}/cancel`,
+    traskRequestInit(apiKey, { method: 'POST' }),
+  )
+  const data = (await res.json()) as { query?: TraskHistoryRecordDto; error?: string }
+  if (res.status === 404) return null
+  if (!res.ok) {
+    throw new Error(data.error ?? `cancel failed: ${res.status}`)
+  }
+  return data.query ?? null
+}

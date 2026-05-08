@@ -191,7 +191,7 @@ const appendLiveTrace = async (
   event: Omit<TraskQueryLiveEvent, "at"> & { at?: string },
 ): Promise<void> => {
   const prev = await repository.getByQueryId(queryId);
-  if (!prev) return;
+  if (!prev || prev.status !== "pending") return;
   const row: TraskQueryLiveEvent = {
     at: event.at ?? new Date().toISOString(),
     phase: event.phase,
@@ -203,6 +203,8 @@ const appendLiveTrace = async (
     liveTrace: [...(prev.liveTrace ?? []), row],
   });
 };
+
+const CANCELED_QUERY_ERROR = "Canceled by newer request.";
 
 
 
@@ -344,6 +346,54 @@ export const createTraskHttpRouter = <TUser extends TraskHttpUser = TraskHttpUse
         const history = await trask.queryRepository.listForUser(user.id, 100, threadId);
 
         res.json({ history: history.map(mapTraskQueryRecord) });
+      } catch (err) {
+        handleTraskError(res, err as AuthHandlerThrown);
+      }
+    }),
+  );
+
+  router.post(
+    "/query/:queryId/cancel",
+    options.auth.requireAuth(async (req, res, user) => {
+      try {
+        const queryId = typeof req.params.queryId === "string" ? req.params.queryId.trim() : "";
+        if (!isTraskThreadId(queryId)) {
+          res.status(400).json({ error: "Invalid query id." });
+          return;
+        }
+
+        const trask = requireRuntime();
+        const prev = await trask.queryRepository.getByQueryId(queryId);
+        if (!prev || prev.userId !== user.id) {
+          res.status(404).json({ error: "Query not found." });
+          return;
+        }
+
+        if (prev.status !== "pending") {
+          res.json({ query: mapTraskQueryRecord(prev) });
+          return;
+        }
+
+        const now = new Date().toISOString();
+        const canceledRecord: TraskQueryRecord = {
+          ...prev,
+          status: "failed",
+          answer: null,
+          sources: [],
+          error: CANCELED_QUERY_ERROR,
+          completedAt: now,
+          liveTrace: [
+            ...(prev.liveTrace ?? []),
+            {
+              at: now,
+              phase: "canceled",
+              detail: CANCELED_QUERY_ERROR,
+            },
+          ],
+        };
+
+        await trask.queryRepository.upsert(canceledRecord);
+        res.json({ query: mapTraskQueryRecord(canceledRecord) });
       } catch (err) {
         handleTraskError(res, err as AuthHandlerThrown);
       }
@@ -572,7 +622,7 @@ export const createTraskHttpRouter = <TUser extends TraskHttpUser = TraskHttpUse
 
           const prev = await trask.queryRepository.getByQueryId(queryId);
 
-          if (!prev) return;
+          if (!prev || prev.status !== "pending") return;
 
           const completeRecord: TraskQueryRecord = {
             ...prev,
@@ -597,7 +647,7 @@ export const createTraskHttpRouter = <TUser extends TraskHttpUser = TraskHttpUse
 
           const prev = await trask.queryRepository.getByQueryId(queryId);
 
-          if (!prev) return;
+          if (!prev || prev.status !== "pending") return;
 
           const failedRecord: TraskQueryRecord = {
             ...prev,

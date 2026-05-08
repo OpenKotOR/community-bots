@@ -155,9 +155,15 @@ export function sortConversations(
   return [...conversations].sort((a, b) => {
     switch (sortBy) {
       case 'recent':
-        return b.updatedAt - a.updatedAt
+        return (b.updatedAt - a.updatedAt)
+          || (b.createdAt - a.createdAt)
+          || conversationDisplayTitle(a.title).localeCompare(conversationDisplayTitle(b.title))
+          || a.id.localeCompare(b.id)
       case 'oldest':
-        return a.updatedAt - b.updatedAt
+        return (a.updatedAt - b.updatedAt)
+          || (a.createdAt - b.createdAt)
+          || conversationDisplayTitle(a.title).localeCompare(conversationDisplayTitle(b.title))
+          || a.id.localeCompare(b.id)
       case 'title':
         return conversationDisplayTitle(a.title).localeCompare(conversationDisplayTitle(b.title))
       default:

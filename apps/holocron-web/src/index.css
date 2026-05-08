@@ -87,15 +87,16 @@
 /* Soft TotJ plate — dialed back so the futuristic holocron reads clearly */
 .holocron-atmosphere__panel {
   position: absolute;
-  inset: -18%;
-  background: url("/holocron/holocron-artifact.png") center / contain no-repeat;
-  opacity: 0.07;
-  mix-blend-mode: multiply;
+  inset: 0;
+  background: url("/holocron/holocron-artifact.png") center / cover no-repeat;
+  opacity: 0.22;
+  mix-blend-mode: normal;
+  filter: none;
 }
 
 .dark .holocron-atmosphere__panel {
-  opacity: 0.14;
-  mix-blend-mode: soft-light;
+  opacity: 0.3;
+  mix-blend-mode: normal;
 }
 
 .holocron-atmosphere__halftone {

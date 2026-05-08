@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { ConversationFilterDialog } from '@/components/ConversationFilterDialog'
 import { ExportImportDialog } from '@/components/ExportImportDialog'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
-import { Plus, Trash, ChatCircle, MagnifyingGlass, Funnel, X, HardDrives, PencilSimple, Check } from '@phosphor-icons/react'
+import { Plus, Trash, ChatCircle, MagnifyingGlass, Funnel, X, HardDrives, PencilSimple, Check, CaretLeft, CaretRight } from '@phosphor-icons/react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   applyFilters,
@@ -23,6 +23,10 @@ interface ConversationSidebarProps {
   activeConversationId: string | null
   onSelectConversation: (id: string) => void
   onCreateConversation: () => void
+  disableCreateConversation?: boolean
+  width?: number
+  collapsed?: boolean
+  onToggleCollapsed?: () => void
   onDeleteConversation: (id: string) => void
   onRenameConversation: (id: string, newTitle: string) => void
   sourceWeights: SourceWeight[]
@@ -35,6 +39,10 @@ export function ConversationSidebar({
   activeConversationId,
   onSelectConversation,
   onCreateConversation,
+  disableCreateConversation = false,
+  width = 320,
+  collapsed = false,
+  onToggleCollapsed,
   onDeleteConversation,
   onRenameConversation,
   sourceWeights,
@@ -127,8 +135,33 @@ export function ConversationSidebar({
     }
   }
 
+  if (collapsed) {
+    return (
+      <div
+        className="border-r border-primary/30 flex flex-col h-full relative z-10 isolate bg-background/55 dark:bg-background/40 backdrop-blur-[4px]"
+        style={{ width: 56 }}
+      >
+        <div className="p-2 border-b border-primary/30">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onToggleCollapsed}
+            className="h-9 w-9 text-primary hover:text-accent hover:bg-primary/10"
+            aria-label="Expand history sidebar"
+            title="Expand history"
+          >
+            <CaretRight size={16} weight="bold" />
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="w-80 border-r border-primary/30 flex flex-col h-full relative z-10 isolate bg-background/55 dark:bg-background/40 backdrop-blur-[4px]">
+    <div
+      className="border-r border-primary/30 flex flex-col h-full relative z-10 isolate bg-background/55 dark:bg-background/40 backdrop-blur-[4px]"
+      style={{ width }}
+    >
       <ConfirmDialog
         open={deleteConfirmId !== null}
         onOpenChange={(open) => !open && setDeleteConfirmId(null)}
@@ -161,14 +194,27 @@ export function ConversationSidebar({
       />
 
       <div className="p-4 border-b border-primary/30 space-y-3">
-        <Button
-          onClick={onCreateConversation}
-          className="w-full bg-primary hover:bg-accent shadow-lg shadow-primary/20 hover:shadow-accent/20 transition-all"
-          size="sm"
-        >
-          <Plus size={16} weight="bold" className="mr-2" />
-          New Query
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={onCreateConversation}
+            disabled={disableCreateConversation}
+            className="flex-1 bg-primary hover:bg-accent shadow-lg shadow-primary/20 hover:shadow-accent/20 transition-all"
+            size="sm"
+          >
+            <Plus size={16} weight="bold" className="mr-2" />
+            New Query
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={onToggleCollapsed}
+            className="h-9 w-9 border-primary/40 hover:bg-primary/10 hover:border-accent/60 transition-all"
+            aria-label="Collapse history sidebar"
+            title="Collapse history"
+          >
+            <CaretLeft size={16} weight="bold" />
+          </Button>
+        </div>
 
         <div className="relative">
           <MagnifyingGlass 
@@ -297,7 +343,7 @@ export function ConversationSidebar({
                           />
                         ) : (
                           <h3
-                            className={`text-sm font-medium truncate ${
+                            className={`text-sm font-medium whitespace-normal break-words leading-snug ${
                               isActive ? 'text-accent' : 'text-foreground'
                             }`}
                           >

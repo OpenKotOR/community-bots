@@ -49,9 +49,17 @@ import {
 import { priorUserQuestionsFromOtherThreads } from '@/lib/starter-suggestions'
 
 const legacySparkMode = import.meta.env.VITE_TRASK_LEGACY_SPARK === '1'
+const CONVERSATIONS_KEY = 'qa-conversations-v2'
+const LEGACY_CONVERSATIONS_KEY = 'qa-conversations'
 const HOLOCRON_RESEARCH_JOBS_KEY = 'holocron-research-jobs'
 const RESEARCH_RETRY_BASE_MS = 5_000
 const RESEARCH_RETRY_MAX_MS = 90_000
+const SIDEBAR_WIDTH_MIN = 260
+const SIDEBAR_WIDTH_MAX = 520
+
+function clampSidebarWidth(value: number): number {
+  return Math.max(SIDEBAR_WIDTH_MIN, Math.min(SIDEBAR_WIDTH_MAX, Math.round(value)))
+}
 
 type HolocronResearchJobState = 'queued' | 'submitted'
 
@@ -262,12 +270,47 @@ function mergeHolocronThreadMessages(local: MessageType[], records: TraskHistory
     return local
   }
   const serverMsgs = mapTraskHistoryToMessages(records)
-  const extraLocals = local.filter((m) => {
-    if (m.role !== 'user') return false
-    const key = m.content.trim().toLowerCase()
-    return !records.some((r) => r.query.trim().toLowerCase() === key)
-  })
-  return [...serverMsgs, ...extraLocals].sort((a, b) => a.timestamp - b.timestamp)
+  return serverMsgs.sort((a, b) => a.timestamp - b.timestamp)
+}
+
+function conversationUpdatedAtFromMessages(messages: MessageType[], fallback: number): number {
+  const timestamps = messages
+    .map((message) => message.timestamp)
+    .filter((timestamp) => Number.isFinite(timestamp))
+  return timestamps.length ? Math.max(...timestamps) : fallback
+}
+
+function normalizeConversationForStorage(conversation: Conversation): Conversation {
+  const messages = isMessageArray(conversation.messages) ? conversation.messages : []
+  const createdAt = Number.isFinite(conversation.createdAt) ? conversation.createdAt : Date.now()
+  return {
+    ...conversation,
+    messages,
+    createdAt,
+    updatedAt: conversationUpdatedAtFromMessages(messages, Number.isFinite(conversation.updatedAt) ? conversation.updatedAt : createdAt),
+  }
+}
+
+function loadInitialConversations(): Conversation[] {
+  if (typeof window === 'undefined') return []
+  for (const key of [CONVERSATIONS_KEY, LEGACY_CONVERSATIONS_KEY]) {
+    try {
+      const raw = window.localStorage.getItem(key)
+      if (!raw) continue
+      const parsed: unknown = JSON.parse(raw)
+      if (!Array.isArray(parsed)) continue
+      return parsed
+        .filter((conversation): conversation is Conversation => {
+          if (!conversation || typeof conversation !== 'object') return false
+          const candidate = conversation as Partial<Conversation>
+          return typeof candidate.id === 'string' && typeof candidate.title === 'string'
+        })
+        .map(normalizeConversationForStorage)
+    } catch {
+      /* try the next key */
+    }
+  }
+  return []
 }
 
 function mapTraskHistoryToMessages(records: TraskHistoryRecordDto[]): MessageType[] {
@@ -343,11 +386,13 @@ function scheduleAnswerFluxShards(
 }
 
 function App() {
-  const [conversations, setConversations] = usePersistentLocalState<Conversation[]>('qa-conversations', [])
+  const [conversations, setConversations] = usePersistentLocalState<Conversation[]>(CONVERSATIONS_KEY, loadInitialConversations())
   const [activeConversationId, setActiveConversationId] = usePersistentLocalState<string | null>('active-conversation-id', null)
   const [sourceWeights, setSourceWeights] = usePersistentLocalState<SourceWeight[]>('source-weights', DEFAULT_SOURCE_WEIGHTS)
   const [traskApiKey, setTraskApiKey] = usePersistentLocalState<string>('qa-trask-web-api-key', '')
   const [researchJobs, setResearchJobs] = usePersistentLocalState<HolocronResearchJob[]>(HOLOCRON_RESEARCH_JOBS_KEY, [])
+  const [sidebarWidth, setSidebarWidth] = usePersistentLocalState<number>('holocron-sidebar-width', 320)
+  const [sidebarCollapsed, setSidebarCollapsed] = usePersistentLocalState<boolean>('holocron-sidebar-collapsed', false)
   const [input, setInput] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [activeAgents, setActiveAgents] = useState<AgentResult[]>([])
@@ -381,6 +426,11 @@ function App() {
 
   const activeConversation = (conversations || []).find(c => c.id === activeConversationId)
   const messages = activeConversation?.messages || []
+  const hasRunningResearch = useMemo(
+    () => !legacySparkMode && normalizeResearchJobs(researchJobs).length > 0,
+    [researchJobs],
+  )
+  const queryInputLocked = isProcessing || hasRunningResearch
 
   const starterSuggestions = useMemo(
     () => priorUserQuestionsFromOtherThreads(conversations || [], activeConversationId ?? null),
@@ -390,16 +440,18 @@ function App() {
   const syncThreadFromRemote = useCallback(
     (
       records: TraskHistoryRecordDto[],
-      opts?: { animateTrace?: boolean; prependLocals?: MessageType[] },
+      opts?: { animateTrace?: boolean; prependLocals?: MessageType[]; threadId?: string },
     ) => {
-      if (!holocronThreadId) return
-      const animateTrace = opts?.animateTrace ?? true
+      const targetThreadId = opts?.threadId ?? holocronThreadId
+      if (!targetThreadId) return
+      const targetRecords = records.filter((rec) => rec.threadId === targetThreadId)
+      const animateTrace = (opts?.animateTrace ?? true) && targetThreadId === holocronThreadId
       const prependLocals = opts?.prependLocals ?? []
       if (!legacySparkMode && traskUsesSameOriginApi() && animateTrace) {
         const seen = traceSeenRef.current
         const pulses: HolocronRetrievalPulse[] = []
         const zonesRank = new Map<HolocronSourceZone, number>()
-        for (const rec of records) {
+        for (const rec of targetRecords) {
           const trace = rec.liveTrace ?? []
           for (let i = 0; i < trace.length; i++) {
             const ev = trace[i]!
@@ -445,31 +497,34 @@ function App() {
           }
           setHolocronInteractionCount((n) => n + pulses.length)
         }
-        saveSeenTraceKeys(holocronThreadId, seen)
+        saveSeenTraceKeys(targetThreadId, seen)
       }
 
-      const convId = holocronConversationId(holocronThreadId)
+      const convId = holocronConversationId(targetThreadId)
       setConversations((current) => {
         const list = current || []
-        const others = list.filter((c) => c.id !== convId)
         const prev = list.find((c) => c.id === convId)
         const localBase = [...prependLocals, ...(prev?.messages ?? [])]
-        const merged = mergeHolocronThreadMessages(localBase, records)
+        const merged = mergeHolocronThreadMessages(localBase, targetRecords)
         const firstUser = merged.find((m) => m.role === 'user')
         const raw = firstUser?.content?.trim() ?? ''
         const title = raw
           ? raw.substring(0, 50) + (raw.length > 50 ? '...' : '')
           : 'Trask · Holocron'
+        const updatedAt = conversationUpdatedAtFromMessages(merged, prev?.updatedAt ?? Date.now())
         const conv: Conversation = {
           id: convId,
           title,
           messages: merged,
           createdAt: prev?.createdAt ?? Date.now(),
-          updatedAt: Date.now(),
+          updatedAt,
         }
-        return [conv, ...others]
+        if (prev) {
+          return list.map((candidate) => candidate.id === convId ? conv : candidate)
+        }
+        return [conv, ...list]
       })
-      setActiveConversationId(convId)
+      setActiveConversationId((current) => current ?? convId)
     },
     [holocronThreadId, legacySparkMode],
   )
@@ -485,7 +540,7 @@ function App() {
       try {
         const remote = await traskGetThread(holocronThreadId, traskApiKey || undefined)
         if (cancelled) return
-        syncThreadFromRemote(remote, { animateTrace: true })
+        syncThreadFromRemote(remote, { animateTrace: true, threadId: holocronThreadId })
       } catch {
         /* ignore transient errors */
       }
@@ -507,6 +562,11 @@ function App() {
   }, [])
 
   const handleCreateConversation = () => {
+    if (hasRunningResearch) {
+      toast.info('Please wait for the current research query to finish before starting a new one.')
+      return
+    }
+
     if (!legacySparkMode && traskUsesSameOriginApi()) {
       const tid = crypto.randomUUID()
       const params = new URLSearchParams(window.location.search)
@@ -526,7 +586,7 @@ function App() {
       }
       setConversations((current) => {
         const list = current || []
-        const others = list.filter((c) => !c.id.startsWith('holocron-'))
+        const others = list.filter((c) => c.id !== convId)
         return [...others, newConversation]
       })
       setActiveConversationId(convId)
@@ -549,6 +609,26 @@ function App() {
     setConversations((current) => [...(current || []), newConversation])
     setActiveConversationId(newConversation.id)
   }
+
+  const handleSidebarResizeStart = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (sidebarCollapsed) return
+    e.preventDefault()
+    const startX = e.clientX
+    const startWidth = clampSidebarWidth(sidebarWidth)
+
+    const onMouseMove = (ev: MouseEvent) => {
+      const delta = ev.clientX - startX
+      setSidebarWidth(clampSidebarWidth(startWidth + delta))
+    }
+
+    const onMouseUp = () => {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+    }
+
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+  }, [setSidebarWidth, sidebarCollapsed, sidebarWidth])
 
   useKeyboardShortcuts([
     {
@@ -711,10 +791,10 @@ function App() {
         try {
           const remote = await traskGetThread(holocronThreadId, traskApiKey || undefined)
           if (cancelled) return
-          syncThreadFromRemote(remote, { animateTrace: false, prependLocals: loadEphemeralPrepend() })
+          syncThreadFromRemote(remote, { animateTrace: false, prependLocals: loadEphemeralPrepend(), threadId: holocronThreadId })
         } catch {
           if (!cancelled) {
-            syncThreadFromRemote([], { animateTrace: false, prependLocals: loadEphemeralPrepend() })
+            syncThreadFromRemote([], { animateTrace: false, prependLocals: loadEphemeralPrepend(), threadId: holocronThreadId })
           }
         }
         return
@@ -728,10 +808,10 @@ function App() {
         try {
           const remote = await traskGetThread(holocronThreadId, traskApiKey || undefined)
           if (cancelled) return
-          syncThreadFromRemote(remote, { animateTrace: false, prependLocals: loadEphemeralPrepend() })
+          syncThreadFromRemote(remote, { animateTrace: false, prependLocals: loadEphemeralPrepend(), threadId: holocronThreadId })
         } catch {
           if (!cancelled) {
-            syncThreadFromRemote([], { animateTrace: false, prependLocals: loadEphemeralPrepend() })
+            syncThreadFromRemote([], { animateTrace: false, prependLocals: loadEphemeralPrepend(), threadId: holocronThreadId })
           }
         }
         return
@@ -740,7 +820,7 @@ function App() {
       try {
         const history = await traskListHistory(100, traskApiKey || undefined, holocronThreadId)
         if (cancelled) return
-        syncThreadFromRemote(history, { animateTrace: false })
+        syncThreadFromRemote(history, { animateTrace: false, threadId: holocronThreadId })
       } catch {
         // Background research jobs keep local state alive and retry when the server returns.
       }
@@ -844,7 +924,7 @@ function App() {
             ...conv,
             messages: updatedMessages,
             title,
-            updatedAt: Date.now(),
+            updatedAt: conversationUpdatedAtFromMessages(updatedMessages, conv.updatedAt),
           }
         }
         return conv
@@ -901,7 +981,7 @@ function App() {
           return {
             ...conv,
             messages: nextMessages,
-            updatedAt: Date.now(),
+            updatedAt: conversationUpdatedAtFromMessages(nextMessages, conv.updatedAt),
           }
         })
       )
@@ -1012,7 +1092,7 @@ function App() {
         if (job.serverQueryId) {
           const history = await traskGetThread(job.threadId, traskApiKey || undefined, traskPollIterationSignal())
           if (cancelled) return
-          syncThreadFromRemote(history, { animateTrace: true })
+          syncThreadFromRemote(history, { animateTrace: true, threadId: job.threadId })
           const normalizedQuestion = job.question.trim().toLowerCase()
           const record = history.find((rec) => rec.queryId === job.serverQueryId)
             ?? history.find((rec) => rec.query.trim().toLowerCase() === normalizedQuestion)
@@ -1022,8 +1102,9 @@ function App() {
           }
           if (record?.status === 'failed') {
             retryLater(job, {
-              // Keep the same server query id; avoid repeatedly starting fresh runs.
-              state: 'submitted',
+              // Explicitly failed on server: re-dispatch with backoff and keep UI pending.
+              serverQueryId: undefined,
+              state: 'queued',
               pollFailures: 0,
             })
             return
@@ -1097,7 +1178,7 @@ function App() {
 
   const submitQuestion = async (rawQuestion: string) => {
     const trimmed = rawQuestion.trim()
-    if (!trimmed || isProcessing || !activeConversationId) return
+    if (!trimmed || queryInputLocked || !activeConversationId) return
 
     const userMessage: MessageType = {
       id: `msg-${Date.now()}-user`,
@@ -1289,20 +1370,35 @@ function App() {
           onOpenChange={setIsPromptsOpen}
         />
 
-        <ConversationSidebar
-          conversations={conversations || []}
-          activeConversationId={activeConversationId || null}
-          onSelectConversation={handleSelectConversation}
-          onCreateConversation={handleCreateConversation}
-          onDeleteConversation={handleDeleteConversation}
-          onRenameConversation={handleRenameConversation}
-          sourceWeights={sourceWeights || DEFAULT_SOURCE_WEIGHTS}
-          onImport={handleImportConversations}
-          searchInputRef={searchInputRef}
-        />
+        <div className="relative flex-shrink-0 min-h-0">
+          <ConversationSidebar
+            conversations={conversations || []}
+            activeConversationId={activeConversationId || null}
+            onSelectConversation={handleSelectConversation}
+            onCreateConversation={handleCreateConversation}
+            disableCreateConversation={hasRunningResearch}
+            onDeleteConversation={handleDeleteConversation}
+            onRenameConversation={handleRenameConversation}
+            sourceWeights={sourceWeights || DEFAULT_SOURCE_WEIGHTS}
+            onImport={handleImportConversations}
+            searchInputRef={searchInputRef}
+            width={clampSidebarWidth(sidebarWidth)}
+            collapsed={sidebarCollapsed}
+            onToggleCollapsed={() => setSidebarCollapsed((current) => !current)}
+          />
+          {!sidebarCollapsed && (
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize history sidebar"
+              onMouseDown={handleSidebarResizeStart}
+              className="absolute top-0 -right-1 h-full w-2 cursor-col-resize z-20"
+            />
+          )}
+        </div>
 
-        <div className="flex-1 flex flex-col min-h-0 relative z-10 isolate bg-background/42 dark:bg-background/32 backdrop-blur-[6px] shadow-[inset_0_0_80px_oklch(0.98_0.02_95_/_0.06)] dark:shadow-[inset_0_0_100px_oklch(0.12_0.04_285_/_0.35)] border-l border-primary/15">
-          <header className="border-b border-primary/30 bg-card/40 backdrop-blur-sm px-4 md:px-6 py-4 flex items-center justify-between gap-3 shadow-lg shadow-primary/10">
+        <div className="flex-1 flex flex-col min-h-0 relative z-10 isolate bg-background/42 dark:bg-background/32 shadow-[inset_0_0_80px_oklch(0.98_0.02_95_/_0.06)] dark:shadow-[inset_0_0_100px_oklch(0.12_0.04_285_/_0.35)] border-l border-primary/15">
+          <header className="border-b border-primary/30 bg-card/40 px-4 md:px-6 py-4 flex items-center justify-between gap-3 shadow-lg shadow-primary/10">
             <div className="flex items-center gap-3">
               <HolocronGlyph variant="header" />
               <h1 className="font-bold text-[22px] md:text-[28px] tracking-wide text-accent glow-text">
@@ -1366,7 +1462,7 @@ function App() {
                               type="button"
                               variant="outline"
                               size="sm"
-                              disabled={isProcessing || !activeConversationId}
+                              disabled={queryInputLocked || !activeConversationId}
                               onClick={() => void submitQuestion(suggestion)}
                               className="text-xs border-primary/40 text-primary hover:bg-primary/20 hover:text-accent hover:border-accent/60 transition-all max-w-[min(100%,320px)] text-left whitespace-normal h-auto py-2 leading-snug"
                             >
@@ -1406,13 +1502,13 @@ function App() {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     placeholder={activeConversationId ? 'Ask the Holocron anything…' : 'Preparing thread…'}
-                    disabled={isProcessing || !activeConversationId}
+                    disabled={queryInputLocked || !activeConversationId}
                     className="flex-1 text-[15px] h-11 md:h-12 px-4 bg-background/85 border-primary/50 text-foreground placeholder:text-muted-foreground focus-visible:border-accent focus-visible:ring-accent/40"
                     aria-label="Question input"
                   />
                   <Button
                     type="submit"
-                    disabled={!input.trim() || isProcessing || !activeConversationId}
+                    disabled={!input.trim() || queryInputLocked || !activeConversationId}
                     size="lg"
                     className="h-11 md:h-12 px-4 md:px-6 bg-primary hover:bg-accent shadow-lg shadow-primary/30 hover:shadow-accent/30 transition-all"
                     aria-label="Submit question"

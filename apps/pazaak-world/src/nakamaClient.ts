@@ -40,6 +40,12 @@ export function encodeNakamaCredential(session: Session): string {
   return CRED_PREFIX + btoa(payload);
 }
 
+/** Standalone / dev placeholder sessions — not a real HTTP API bearer from login or Discord. */
+export function isGuestLikeAccessToken(token: string | null | undefined): boolean {
+  if (!token) return false;
+  return token.startsWith("local-guest-token:") || token.startsWith("dev-user-");
+}
+
 export function tryDecodeNakamaCredential(accessToken: string): Session | null {
   if (!accessToken.startsWith(CRED_PREFIX)) return null;
   try {
@@ -66,7 +72,7 @@ export async function ensureNakamaSession(
   }
 
   const client = getNakamaClient();
-  const guestLike = accessToken.startsWith("local-guest-token:") || accessToken.startsWith("dev-user-");
+  const guestLike = isGuestLikeAccessToken(accessToken);
   if (guestLike) {
     return client.authenticateDevice(stableAccountId, true, username);
   }

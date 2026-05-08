@@ -319,6 +319,37 @@ const degradedAnswerFallback = (query: string, approvedSources: readonly SourceD
   return `${lead}\n\n${formatSourcesSection(curated)}`;
 };
 
+const HEARTBEAT_MS = 3500;
+
+const withProgressHeartbeat = async <T>(
+  phase: ResearchWizardProgressEvent["phase"],
+  makeDetail: (elapsedMs: number) => string,
+  onProgress: ((event: ResearchWizardProgressEvent) => void) | undefined,
+  work: () => Promise<T>,
+): Promise<T> => {
+  if (!onProgress) {
+    return await work();
+  }
+
+  const startedAt = Date.now();
+  let lastBucket = -1;
+  const emit = () => {
+    const elapsed = Date.now() - startedAt;
+    const bucket = Math.floor(elapsed / HEARTBEAT_MS);
+    if (bucket === lastBucket) return;
+    lastBucket = bucket;
+    onProgress({ phase, detail: makeDetail(elapsed) });
+  };
+
+  emit();
+  const timer = setInterval(emit, HEARTBEAT_MS);
+  try {
+    return await work();
+  } finally {
+    clearInterval(timer);
+  }
+};
+
 export class ResearchWizardClient implements ResearchWizardQueryHandler {
   private readonly openAiClient: OpenAI | null;
 
@@ -507,7 +538,15 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
         phase: "gather",
         detail: "Scanning approved archives and open-web context…",
       });
-      const { report, payload } = await this.fetchResearchReport(query, buildCustomPrompt());
+      const { report, payload } = await withProgressHeartbeat(
+        "gather",
+        (elapsedMs) => {
+          const seconds = Math.max(1, Math.floor(elapsedMs / 1000));
+          return `Scanning approved archives and open-web context… (${seconds}s)`;
+        },
+        onProgress,
+        async () => await this.fetchResearchReport(query, buildCustomPrompt()),
+      );
       emitArchiveProbeEvents(payload, this.approvedSources, onProgress);
       onProgress?.({
         phase: "report",

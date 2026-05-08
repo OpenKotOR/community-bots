@@ -1,4 +1,4 @@
-import { useCallback, useState, type Dispatch, type SetStateAction } from 'react'
+import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react'
 
 export function usePersistentLocalState<T>(key: string, initialValue: T): [T, Dispatch<SetStateAction<T>>] {
   const [value, setValue] = useState<T>(() => {
@@ -14,15 +14,17 @@ export function usePersistentLocalState<T>(key: string, initialValue: T): [T, Di
 
   const setPersistentValue = useCallback<Dispatch<SetStateAction<T>>>((next) => {
     setValue((current) => {
-      const resolved = typeof next === 'function' ? (next as (value: T) => T)(current) : next
-      try {
-        window.localStorage.setItem(key, JSON.stringify(resolved))
-      } catch {
-        /* keep in-memory state even if storage quota/private mode blocks persistence */
-      }
-      return resolved
+      return typeof next === 'function' ? (next as (value: T) => T)(current) : next
     })
-  }, [key])
+  }, [])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(key, JSON.stringify(value))
+    } catch {
+      /* keep in-memory state even if storage quota/private mode blocks persistence */
+    }
+  }, [key, value])
 
   return [value, setPersistentValue]
 }
