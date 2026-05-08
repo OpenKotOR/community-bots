@@ -57,6 +57,54 @@ function authHeaders(apiKey?: string): Record<string, string> {
   return headers
 }
 
+/** Wall-clock cap for each Trask HTTP call so a dead proxy/backend cannot hang the UI. */
+const DEFAULT_TRASK_FETCH_TIMEOUT_MS = 20_000
+
+export function traskFetchTimeoutMs(): number {
+  const raw = import.meta.env.VITE_TRASK_FETCH_TIMEOUT_MS
+  const n = typeof raw === 'string' ? Number(raw.trim()) : NaN
+  return Number.isFinite(n) && n >= 3_000 ? n : DEFAULT_TRASK_FETCH_TIMEOUT_MS
+}
+
+function abortAfterTimeout(ms: number): AbortSignal {
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+    return AbortSignal.timeout(ms)
+  }
+  const c = new AbortController()
+  globalThis.setTimeout(() => c.abort(), ms)
+  return c.signal
+}
+
+function mergeAbortSignals(a: AbortSignal, b: AbortSignal): AbortSignal {
+  const anyFn = (AbortSignal as unknown as { any?: (s: AbortSignal[]) => AbortSignal }).any
+  if (typeof anyFn === 'function') {
+    return anyFn([a, b])
+  }
+  const c = new AbortController()
+  const forward = () => c.abort()
+  a.addEventListener('abort', forward)
+  b.addEventListener('abort', forward)
+  return c.signal
+}
+
+/** User-facing message for failed Trask HTTP calls (handles DOMException / TypeError). */
+export function traskErrorMessageFromUnknown(error: unknown): string {
+  const abortish = (name: string | undefined) => name === 'AbortError' || name === 'TimeoutError'
+  if (error instanceof Error && abortish(error.name)) {
+    return 'Trask request timed out. Run trask-http-server on port 4010, or set VITE_TRASK_API_BASE to a reachable host.'
+  }
+  if (typeof error === 'object' && error !== null && 'name' in error) {
+    const name = String((error as { name: unknown }).name)
+    if (abortish(name)) {
+      return 'Trask request timed out. Run trask-http-server on port 4010, or set VITE_TRASK_API_BASE to a reachable host.'
+    }
+  }
+  if (error instanceof Error && typeof error.message === 'string' && error.message) {
+    return error.message
+  }
+  return 'Trask request failed.'
+}
+
 function traskRequestInit(apiKey?: string, init?: RequestInit): RequestInit {
   const sameOrigin = !apiBase()
   const baseHeaders = authHeaders(apiKey)
@@ -64,10 +112,15 @@ function traskRequestInit(apiKey?: string, init?: RequestInit): RequestInit {
     init?.headers && typeof init.headers === 'object' && !Array.isArray(init.headers)
       ? (init.headers as Record<string, string>)
       : {}
+  const ms = traskFetchTimeoutMs()
+  const timeoutSignal = abortAfterTimeout(ms)
+  const userSignal = init?.signal ?? undefined
+  const signal = userSignal ? mergeAbortSignals(userSignal, timeoutSignal) : timeoutSignal
   return {
     ...init,
     credentials: sameOrigin ? 'include' : 'omit',
     headers: { ...baseHeaders, ...extra },
+    signal,
   }
 }
 
@@ -91,11 +144,25 @@ export async function traskLogout(): Promise<void> {
   await fetch(`${apiBase()}/api/trask/auth/logout`, traskRequestInit(undefined, { method: 'POST' }))
 }
 
+/** Tighter per-iteration budget while polling `/thread` so one dead hop cannot waste the full Trask HTTP timeout. */
+const POLL_ITERATION_MS = 12_000
+
+export function traskPollIterationSignal(): AbortSignal {
+  return abortAfterTimeout(POLL_ITERATION_MS)
+}
+
 /** Thread history for the authenticated session (same auth as `/history` / `/ask`). */
-export async function traskGetThread(threadId: string, apiKey?: string): Promise<TraskHistoryRecordDto[]> {
+export async function traskGetThread(
+  threadId: string,
+  apiKey?: string,
+  outerSignal?: AbortSignal,
+): Promise<TraskHistoryRecordDto[]> {
+  const init: RequestInit = outerSignal
+    ? { method: 'GET', signal: outerSignal }
+    : { method: 'GET' }
   const res = await fetch(
     `${apiBase()}/api/trask/thread/${encodeURIComponent(threadId)}`,
-    traskRequestInit(apiKey, { method: 'GET' }),
+    traskRequestInit(apiKey, init),
   )
   const data = (await res.json()) as { history?: TraskHistoryRecordDto[]; error?: string }
   if (!res.ok) {

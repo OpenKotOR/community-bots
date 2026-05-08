@@ -36,10 +36,12 @@ import {
 } from '@/lib/qa-engine'
 import {
   traskAsk,
+  traskErrorMessageFromUnknown,
   traskFetchSession,
   traskGetThread,
   traskListHistory,
   traskLogout,
+  traskPollIterationSignal,
   traskUsesSameOriginApi,
   type TraskHistoryLiveEventDto,
   type TraskHistoryRecordDto,
@@ -655,9 +657,10 @@ function App() {
       (current || []).map((conv) => {
         if (conv.id === conversationId) {
           const firstUserMessage = updatedMessages.find(m => m.role === 'user')
-          const title = firstUserMessage 
-            ? firstUserMessage.content.substring(0, 50) + (firstUserMessage.content.length > 50 ? '...' : '')
-            : 'New Conversation'
+          const q = firstUserMessage?.content?.trim()
+          const title = q
+            ? q.substring(0, 50) + (q.length > 50 ? '...' : '')
+            : conv.title?.trim() || 'Holocron thread'
           
           return {
             ...conv,
@@ -832,10 +835,11 @@ function App() {
           } else if (record.status === 'pending' && holocronThreadId) {
             let terminal: TraskHistoryRecordDto | undefined
             let completionHandled = false
-            for (let attempt = 0; attempt < 900; attempt++) {
+            const pollDeadline = Date.now() + 4 * 60 * 1000
+            while (Date.now() < pollDeadline) {
               let hist: TraskHistoryRecordDto[]
               try {
-                hist = await traskGetThread(holocronThreadId, traskApiKey || undefined)
+                hist = await traskGetThread(holocronThreadId, traskApiKey || undefined, traskPollIterationSignal())
               } catch {
                 await new Promise((r) => window.setTimeout(r, 500))
                 continue
@@ -851,13 +855,25 @@ function App() {
               }
               await new Promise((r) => window.setTimeout(r, 420))
             }
+            if (!terminal || (terminal.status !== 'complete' && terminal.status !== 'failed')) {
+              const msg =
+                'Timed out waiting for Trask research. Is trask-http-server running on port 4010?'
+              toast.error(msg)
+              const stallMessage: MessageType = {
+                id: `msg-${Date.now()}-trask-stall`,
+                role: 'system',
+                content: msg,
+                timestamp: Date.now(),
+              }
+              updateConversation(activeConversationId, [...newMessages, stallMessage])
+            }
             if (terminal?.status === 'failed') {
               toast.error(terminal.error ?? 'Trask research failed.')
             }
           }
         } catch (error) {
           console.error('Trask API error:', error)
-          const msg = error instanceof Error ? error.message : 'Trask request failed.'
+          const msg = traskErrorMessageFromUnknown(error)
           toast.error(msg)
           const errMessage: MessageType = {
             id: `msg-${Date.now()}-trask-err`,

@@ -1,4 +1,4 @@
-import { ComponentProps } from "react"
+import { ComponentProps, ComponentPropsWithoutRef } from "react"
 import ChevronLeft from "lucide-react/dist/esm/icons/chevron-left"
 import ChevronRight from "lucide-react/dist/esm/icons/chevron-right"
 import { DayPicker } from "react-day-picker"
@@ -59,11 +59,21 @@ function Calendar({
         ...classNames,
       }}
       components={{
-        PreviousMonthButton: ({ className, ...props }) => (
-          <ChevronLeft className={cn("size-4", className)} {...props} />
+        PreviousMonthButton: ({
+          className,
+          ...props
+        }: ComponentPropsWithoutRef<"button">) => (
+          <button type="button" className={cn(className)} {...props}>
+            <ChevronLeft className="size-4" />
+          </button>
         ),
-        NextMonthButton: ({ className, ...props }) => (
-          <ChevronRight className={cn("size-4", className)} {...props} />
+        NextMonthButton: ({
+          className,
+          ...props
+        }: ComponentPropsWithoutRef<"button">) => (
+          <button type="button" className={cn(className)} {...props}>
+            <ChevronRight className="size-4" />
+          </button>
         ),
       }}
       {...props}

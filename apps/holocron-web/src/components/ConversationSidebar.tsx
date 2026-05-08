@@ -299,7 +299,7 @@ export function ConversationSidebar({
                               isActive ? 'text-accent' : 'text-foreground'
                             }`}
                           >
-                            {conversation.title}
+                            {conversation.title?.trim() || 'Holocron thread'}
                           </h3>
                         )}
                         <div className="flex items-center justify-between mt-1">

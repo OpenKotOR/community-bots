@@ -13,3 +13,20 @@ interface ImportMeta {
 
 declare const GITHUB_RUNTIME_PERMANENT_NAME: string
 declare const BASE_KV_SERVICE_URL: string
+
+/** Opaque prompt handle produced by `llmPrompt` and consumed by `llm`. */
+type SparkLlmPrompt = object
+
+interface Window {
+  spark: {
+    llmPrompt(
+      strings: TemplateStringsArray,
+      ...values: unknown[]
+    ): SparkLlmPrompt
+    llm(
+      prompt: SparkLlmPrompt,
+      model: string,
+      jsonMode?: boolean
+    ): Promise<string>
+  }
+}
