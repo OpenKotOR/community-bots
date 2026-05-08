@@ -15,7 +15,7 @@ $ErrorActionPreference = "Stop"
 
 $repo = $env:GITHUB_REPOSITORY
 if ([string]::IsNullOrWhiteSpace($repo)) {
-  $repo = "OpenKotOR/bots"
+  $repo = "OpenKotOR/community-bots"
 }
 
 if ([string]::IsNullOrWhiteSpace($env:CLOUDFLARE_API_TOKEN)) {

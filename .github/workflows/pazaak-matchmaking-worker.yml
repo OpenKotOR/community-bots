@@ -41,6 +41,13 @@ jobs:
       - name: Install workspace (worker bundle resolves workspace packages)
         run: pnpm install --frozen-lockfile
 
+      - name: Build workspace packages (wrangler resolves compiled dist/* entrypoints)
+        run: |
+          pnpm --filter @openkotor/platform build
+          pnpm --filter @openkotor/pazaak-engine build
+          pnpm --filter @openkotor/pazaak-policy build
+          pnpm --filter @openkotor/pazaak-tournament build
+
       - name: Wrangler dry-run (no Cloudflare secrets required)
         run: pnpm dlx wrangler@4.87.0 deploy --config infra/pazaak-matchmaking-worker/wrangler.toml --dry-run
 
@@ -80,6 +87,14 @@ jobs:
       - name: Install workspace (worker bundle resolves workspace packages)
         if: steps.cf_check.outputs.configured == 'true'
         run: pnpm install --frozen-lockfile
+
+      - name: Build workspace packages (wrangler resolves compiled dist/* entrypoints)
+        if: steps.cf_check.outputs.configured == 'true'
+        run: |
+          pnpm --filter @openkotor/platform build
+          pnpm --filter @openkotor/pazaak-engine build
+          pnpm --filter @openkotor/pazaak-policy build
+          pnpm --filter @openkotor/pazaak-tournament build
 
       - name: Deploy worker
         if: steps.cf_check.outputs.configured == 'true'
