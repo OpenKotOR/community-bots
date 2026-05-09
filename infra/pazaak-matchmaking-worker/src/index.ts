@@ -192,11 +192,29 @@ type WorkerSocialProvider = (typeof SOCIAL_PROVIDERS)[number];
  */
 function createWorkerSocialAuthLookup(env: Env): EnvLookup {
   const base = createObjectEnvLookup(env);
-  const t = (key: string) => (base(key) ?? "").trim();
+  const sanitizeOauthEnvValue = (value: string | undefined): string => {
+    if (!value) {
+      return "";
+    }
+    // Drop control characters so malformed secret values cannot produce bogus OAuth client IDs.
+    return value.replace(/[\u0000-\u001f\u007f]/g, "").trim();
+  };
+  const t = (key: string) => sanitizeOauthEnvValue(base(key));
+  const discordPairComplete = t("DISCORD_CLIENT_ID") !== "" && t("DISCORD_CLIENT_SECRET") !== "";
   const googlePairComplete = t("GOOGLE_CLIENT_ID") !== "" && t("GOOGLE_CLIENT_SECRET") !== "";
   const githubPairComplete = t("GITHUB_CLIENT_ID") !== "" && t("GITHUB_CLIENT_SECRET") !== "";
 
   return (key: string) => {
+    if (discordPairComplete) {
+      if (
+        key === "PAZAAK_OAUTH_DISCORD_CLIENT_ID" ||
+        key === "PAZAAK_OAUTH_DISCORD_CLIENT_SECRET" ||
+        key === "PAZAAK_OAUTH_DISCORD_CALLBACK_URL" ||
+        key === "PAZAAK_OAUTH_DISCORD_URL"
+      ) {
+        return undefined;
+      }
+    }
     if (googlePairComplete) {
       if (
         key === "PAZAAK_OAUTH_GOOGLE_CLIENT_ID" ||
@@ -217,8 +235,21 @@ function createWorkerSocialAuthLookup(env: Env): EnvLookup {
         return undefined;
       }
     }
-    return base(key);
+    return t(key) || undefined;
   };
+}
+
+function buildOauthLandingRedirect(env: Env, callbackBase: string): URL {
+  const landingBase = env.PUBLIC_WEB_ORIGIN?.trim() || callbackBase;
+  try {
+    const target = new URL(landingBase);
+    // OAuth callback parameters are encoded on the landing URL itself.
+    target.search = "";
+    target.hash = "";
+    return target;
+  } catch {
+    return new URL(callbackBase);
+  }
 }
 
 function resolveOauthProviderConfig(env: Env, provider: WorkerSocialProvider) {
@@ -472,8 +503,7 @@ async function handleOauthCallback(request: Request, env: Env, provider: WorkerS
   const code = url.searchParams.get("code") ?? "";
   const state = url.searchParams.get("state") ?? "";
   const oauthError = url.searchParams.get("error") ?? "";
-  const landingBase = env.PUBLIC_WEB_ORIGIN?.trim() || callbackBase;
-  const redirect = new URL("/", landingBase);
+  const redirect = buildOauthLandingRedirect(env, callbackBase);
 
   if (oauthError) {
     redirect.searchParams.set("oauth_error", oauthError);
