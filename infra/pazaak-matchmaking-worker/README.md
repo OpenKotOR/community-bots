@@ -101,7 +101,22 @@ verify participants with Discord before accepting a room join.
 PazaakWorld reads `GET /api/auth/oauth/providers` and only enables buttons when
 the Worker has the matching client credentials.
 
-1. **Secrets** (repeat with `wrangler secret put … --config infra/pazaak-matchmaking-worker/wrangler.toml`):
+### GitHub Actions (recommended)
+
+Add **repository secrets** on `OpenKotOR/community-bots` (values come from each provider console):
+
+| Repository secret | Written to Worker secret |
+|---|---|
+| `WORKER_DISCORD_CLIENT_ID` | `DISCORD_CLIENT_ID` |
+| `WORKER_DISCORD_CLIENT_SECRET` | `DISCORD_CLIENT_SECRET` |
+| `WORKER_GOOGLE_CLIENT_ID` | `GOOGLE_CLIENT_ID` |
+| `WORKER_GOOGLE_CLIENT_SECRET` | `GOOGLE_CLIENT_SECRET` |
+| `WORKER_GITHUB_CLIENT_ID` | `GITHUB_CLIENT_ID` |
+| `WORKER_GITHUB_CLIENT_SECRET` | `GITHUB_CLIENT_SECRET` |
+
+The deploy workflow runs `wrangler secret put` after each deploy (empty secrets are skipped).
+
+1. **Secrets** (manual alternative: repeat with `wrangler secret put … --config infra/pazaak-matchmaking-worker/wrangler.toml`):
 
    - `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` (optional `DISCORD_REDIRECT_URI`)
    - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (optional `GOOGLE_REDIRECT_URI`)

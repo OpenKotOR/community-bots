@@ -102,3 +102,35 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: pnpm dlx wrangler@4.87.0 deploy --config infra/pazaak-matchmaking-worker/wrangler.toml
+
+      # Optional: set repository secrets WORKER_* (see infra/pazaak-matchmaking-worker/README.md) so
+      # GET /api/auth/oauth/providers returns enabled: true. Provider consoles must allow callbacks on
+      # https://<worker-host>/api/auth/oauth/<provider>/callback (not the static Pages URL).
+      - name: Sync OAuth secrets to Cloudflare Worker
+        if: steps.cf_check.outputs.configured == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DISCORD_CLIENT_ID: ${{ secrets.WORKER_DISCORD_CLIENT_ID }}
+          DISCORD_CLIENT_SECRET: ${{ secrets.WORKER_DISCORD_CLIENT_SECRET }}
+          GOOGLE_CLIENT_ID: ${{ secrets.WORKER_GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.WORKER_GOOGLE_CLIENT_SECRET }}
+          GITHUB_CLIENT_ID: ${{ secrets.WORKER_GITHUB_CLIENT_ID }}
+          GITHUB_CLIENT_SECRET: ${{ secrets.WORKER_GITHUB_CLIENT_SECRET }}
+        run: |
+          set -eo pipefail
+          wr () { pnpm dlx wrangler@4.87.0 "$@"; }
+          put () {
+            name="$1"
+            val="${2-}"
+            if [ -z "${val}" ]; then
+              return 0
+            fi
+            printf '%s' "$val" | wr secret put "$name" --config infra/pazaak-matchmaking-worker/wrangler.toml
+          }
+          put DISCORD_CLIENT_ID "${DISCORD_CLIENT_ID-}"
+          put DISCORD_CLIENT_SECRET "${DISCORD_CLIENT_SECRET-}"
+          put GOOGLE_CLIENT_ID "${GOOGLE_CLIENT_ID-}"
+          put GOOGLE_CLIENT_SECRET "${GOOGLE_CLIENT_SECRET-}"
+          put GITHUB_CLIENT_ID "${GITHUB_CLIENT_ID-}"
+          put GITHUB_CLIENT_SECRET "${GITHUB_CLIENT_SECRET-}"
