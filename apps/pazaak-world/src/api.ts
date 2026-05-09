@@ -126,10 +126,25 @@ const apiClient = createBrowserApiClient({
         }),
 });
 
+const primaryApiBase = apiClient.apiBases.find((base) => base.trim().length > 0)?.trim() ?? "";
+
+const isStaticPagesApiBase = (rawBase: string): boolean => {
+  if (!rawBase) {
+    return false;
+  }
+  try {
+    const url = new URL(rawBase);
+    return url.hostname === "openkotor.github.io" && url.pathname.startsWith("/community-bots/pazaakworld");
+  } catch {
+    return false;
+  }
+};
+
+const shouldUseRealtimeWebSocket = !isStaticPagesApiBase(primaryApiBase);
+
 /** First non-empty configured API origin (Worker/bot), for dashboards and probes — not static Pages host. */
 export function getPrimaryBrowserApiOrigin(): string {
-  const found = apiClient.apiBases.find((base) => base.trim().length > 0);
-  return found?.trim() ?? "";
+  return primaryApiBase;
 }
 
 /** Ping using the same failover chain as JSON API calls (avoids root-relative `/api/*` on GitHub Pages). */
@@ -1160,6 +1175,7 @@ export function subscribeToMatch(
 
   return subscribeToReconnectingWebSocket<WsMessage>({
     createUrl: () => `${apiClient.resolveWebSocketBase()}/ws?matchId=${encodeURIComponent(matchId)}`,
+    enabled: shouldUseRealtimeWebSocket,
     reconnect: options.reconnect,
     maxDelayMs: options.maxDelayMs,
     onConnectionChange: options.onConnectionChange,
@@ -1184,6 +1200,7 @@ export function subscribeToLobbies(onUpdate: LobbyUpdateHandler, options: MatchS
   }
   return subscribeToReconnectingWebSocket<LobbyWsMessage>({
     createUrl: () => `${apiClient.resolveWebSocketBase()}/ws?stream=lobbies`,
+    enabled: shouldUseRealtimeWebSocket,
     reconnect: options.reconnect,
     maxDelayMs: options.maxDelayMs,
     onConnectionChange: options.onConnectionChange,
