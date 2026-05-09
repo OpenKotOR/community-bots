@@ -40,6 +40,7 @@ interface Env {
   SERVICE_NAME?: string;
   DISCORD_CLIENT_ID?: string;
   DISCORD_CLIENT_SECRET?: string;
+  DISCORD_PUBLIC_CLIENT?: string;
   DISCORD_REDIRECT_URI?: string;
   PAZAAK_DISCORD_APP_ID?: string;
   PAZAAK_DISCORD_CLIENT_SECRET?: string;
@@ -155,7 +156,7 @@ type StorageShape = {
   queue: QueueEntry[];
   lobbies: LobbyRecord[];
   tournaments: Record<string, TournamentState>;
-  oauthStates: Record<string, { provider: string; expiresAt: number; pendingMatchId?: string }>;
+  oauthStates: Record<string, { provider: string; expiresAt: number; pendingMatchId?: string; codeVerifier?: string }>;
   policyRuntime?: PolicyRuntimeState;
   auditLog?: AuditEntry[];
 };
@@ -183,6 +184,11 @@ const DEFAULT_SETTINGS = {
 
 const SOCIAL_PROVIDERS = ["discord", "github", "google"] as const;
 type WorkerSocialProvider = (typeof SOCIAL_PROVIDERS)[number];
+
+function isDiscordPublicClientEnabled(env: Env): boolean {
+  const value = env.DISCORD_PUBLIC_CLIENT?.trim().toLowerCase() ?? "";
+  return value === "1" || value === "true" || value === "yes" || value === "on";
+}
 
 /**
  * `resolveSocialAuthProviderConfig` prefers `PAZAAK_OAUTH_*` keys over `GOOGLE_*` / `GITHUB_*`.
@@ -455,12 +461,13 @@ const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
 async function createWorkerOauthState(
   provider: WorkerSocialProvider,
   pendingMatchId: string | undefined,
+  codeVerifier: string | undefined,
   coordinatorStub: { fetch(req: Request): Promise<Response> },
 ): Promise<string> {
   const response = await coordinatorStub.fetch(new Request("http://internal/api/auth/oauth/state/create", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ provider, pendingMatchId }),
+    body: JSON.stringify({ provider, pendingMatchId, codeVerifier }),
   }));
   if (!response.ok) {
     throw new Error(`Failed to create OAuth state for ${provider}.`);
@@ -476,7 +483,7 @@ async function consumeWorkerOauthState(
   state: string,
   provider: WorkerSocialProvider,
   coordinatorStub: { fetch(req: Request): Promise<Response> },
-): Promise<{ pendingMatchId?: string } | null> {
+): Promise<{ pendingMatchId?: string; codeVerifier?: string } | null> {
   const response = await coordinatorStub.fetch(new Request("http://internal/api/auth/oauth/state/consume", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -488,23 +495,58 @@ async function consumeWorkerOauthState(
   if (!response.ok) {
     throw new Error(`Failed to consume OAuth state for ${provider}.`);
   }
-  const payload = await response.json() as { pendingMatchId?: string | null };
-  return payload.pendingMatchId ? { pendingMatchId: payload.pendingMatchId } : {};
+  const payload = await response.json() as { pendingMatchId?: string | null; codeVerifier?: string | null };
+  return {
+    ...(payload.pendingMatchId ? { pendingMatchId: payload.pendingMatchId } : {}),
+    ...(payload.codeVerifier ? { codeVerifier: payload.codeVerifier } : {}),
+  };
 }
 
-function buildProviderAuthorizeUrl(provider: WorkerSocialProvider, state: string, env: Env, callbackBase: string): string {
+function randomPkceVerifier(length = 64): string {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
+  let result = "";
+  for (let index = 0; index < length; index += 1) {
+    result += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return result;
+}
+
+async function toPkceS256Challenge(codeVerifier: string): Promise<string> {
+  const bytes = new TextEncoder().encode(codeVerifier);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const hash = String.fromCharCode(...new Uint8Array(digest));
+  return btoa(hash).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function buildProviderAuthorizeUrl(
+  provider: WorkerSocialProvider,
+  state: string,
+  env: Env,
+  callbackBase: string,
+  discordPkce?: { codeChallenge: string; method: "S256" | "plain" },
+): string {
   if (provider !== "discord" && provider !== "github" && provider !== "google") {
     throw new Error(`Unsupported provider: ${provider}`);
   }
   const config = resolveOauthProviderConfig(env, provider);
 
-  return buildSocialAuthAuthorizeUrl(provider, {
+  const authorizeUrl = buildSocialAuthAuthorizeUrl(provider, {
     clientId: config.clientId,
     redirectUri: oauthRedirectUriForProvider(provider, callbackBase, config.callbackUrl),
     state,
   }, {
     discordApiBase: DISCORD_API,
+    discordPrompt: provider === "discord" ? "none" : undefined,
   });
+
+  if (provider === "discord" && discordPkce) {
+    const url = new URL(authorizeUrl);
+    url.searchParams.set("code_challenge", discordPkce.codeChallenge);
+    url.searchParams.set("code_challenge_method", discordPkce.method);
+    return url.toString();
+  }
+
+  return authorizeUrl;
 }
 
 async function handleOauthStart(
@@ -516,12 +558,21 @@ async function handleOauthStart(
 ): Promise<Response> {
   if (request.method !== "POST") return error("Method not allowed", 405);
   let pendingMatchId: string | undefined;
+  const discordPkceEnabled = provider === "discord" && isDiscordPublicClientEnabled(env);
+  const codeVerifier = discordPkceEnabled ? randomPkceVerifier() : undefined;
+  const codeChallenge = codeVerifier ? await toPkceS256Challenge(codeVerifier) : undefined;
   try {
     const body = await request.json<Json>();
     if (typeof body.matchId === "string" && body.matchId.trim()) pendingMatchId = body.matchId.trim();
   } catch { /* body may be empty */ }
-  const state = await createWorkerOauthState(provider, pendingMatchId, coordinatorStub);
-  const redirectUrl = buildProviderAuthorizeUrl(provider, state, env, callbackBase);
+  const state = await createWorkerOauthState(provider, pendingMatchId, codeVerifier, coordinatorStub);
+  const redirectUrl = buildProviderAuthorizeUrl(
+    provider,
+    state,
+    env,
+    callbackBase,
+    codeChallenge ? { codeChallenge, method: "S256" } : undefined,
+  );
   return json({ provider, redirectUrl });
 }
 
@@ -550,7 +601,8 @@ async function handleOauthCallback(request: Request, env: Env, provider: WorkerS
 
   try {
     const oauthConfig = resolveOauthProviderConfig(env, provider);
-    if (!oauthConfig.clientId || !oauthConfig.clientSecret) {
+    const discordPkceEnabled = provider === "discord" && isDiscordPublicClientEnabled(env);
+    if (!oauthConfig.clientId || (!discordPkceEnabled && !oauthConfig.clientSecret)) {
       throw new Error(`OAuth provider ${provider} is not configured on this server.`);
     }
     const redirectUri = oauthRedirectUriForProvider(provider, callbackBase, oauthConfig.callbackUrl);
@@ -558,10 +610,11 @@ async function handleOauthCallback(request: Request, env: Env, provider: WorkerS
     if (provider === "discord") {
       profile = await fetchDiscordSocialAuthProfile(code, {
         clientId: oauthConfig.clientId,
-        clientSecret: oauthConfig.clientSecret,
+        clientSecret: discordPkceEnabled ? "" : oauthConfig.clientSecret,
         redirectUri,
       }, {
         discordApiBase: DISCORD_API,
+        codeVerifier: discordPkceEnabled ? pending.codeVerifier : undefined,
       });
     } else if (provider === "github") {
       profile = await fetchGithubSocialAuthProfile(code, {
@@ -1044,6 +1097,9 @@ export class MatchCoordinator {
       const pendingMatchId = typeof body.pendingMatchId === "string" && body.pendingMatchId.trim()
         ? body.pendingMatchId.trim()
         : undefined;
+      const codeVerifier = typeof body.codeVerifier === "string" && body.codeVerifier.trim()
+        ? body.codeVerifier.trim()
+        : undefined;
       const now = Date.now();
       for (const [token, entry] of Object.entries(state.oauthStates)) {
         if (entry.expiresAt <= now) {
@@ -1055,6 +1111,7 @@ export class MatchCoordinator {
         provider,
         expiresAt: now + OAUTH_STATE_TTL_MS,
         pendingMatchId,
+        codeVerifier,
       };
       await this.persist(state);
       return json({ state: oauthStateToken });
@@ -1076,7 +1133,7 @@ export class MatchCoordinator {
       if (!entry || entry.expiresAt <= Date.now() || entry.provider !== provider) {
         return error("OAuth state is invalid or expired.", 404);
       }
-      return json({ pendingMatchId: entry.pendingMatchId ?? null });
+      return json({ pendingMatchId: entry.pendingMatchId ?? null, codeVerifier: entry.codeVerifier ?? null });
     }
 
     // Internal: called by the main Worker after a successful OAuth code exchange
