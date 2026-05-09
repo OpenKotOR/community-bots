@@ -46,7 +46,7 @@ jobs:
         env:
           TRASK_WEB_ALLOW_ANONYMOUS: "1"
           TRASK_RESEARCHWIZARD_BASE_URL: https://example.com
-        run: pnpm dlx wrangler@4.87.0 deploy --config infra/trask-worker/wrangler.toml --dry-run
+        run: pnpm dlx wrangler@4.87.0 deploy --config infra/trask-worker/wrangler.toml --dry-run --var "TRASK_WEB_ALLOW_ANONYMOUS:${TRASK_WEB_ALLOW_ANONYMOUS}" --var "TRASK_RESEARCHWIZARD_BASE_URL:${TRASK_RESEARCHWIZARD_BASE_URL}"
 
   deploy:
     needs: verify-bundle
@@ -135,4 +135,4 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           TRASK_RESEARCHWIZARD_BASE_URL: ${{ vars.TRASK_RESEARCHWIZARD_BASE_URL }}
           TRASK_WEB_ALLOW_ANONYMOUS: ${{ vars.TRASK_WEB_ALLOW_ANONYMOUS != '' && vars.TRASK_WEB_ALLOW_ANONYMOUS || '1' }}
-        run: pnpm dlx wrangler@4.87.0 deploy --config infra/trask-worker/wrangler.toml
+        run: pnpm dlx wrangler@4.87.0 deploy --config infra/trask-worker/wrangler.toml --var "TRASK_WEB_ALLOW_ANONYMOUS:${TRASK_WEB_ALLOW_ANONYMOUS}" --var "TRASK_RESEARCHWIZARD_BASE_URL:${TRASK_RESEARCHWIZARD_BASE_URL}"
