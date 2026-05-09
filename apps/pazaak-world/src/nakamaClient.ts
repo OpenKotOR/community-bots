@@ -81,6 +81,18 @@ export async function nakamaAsError(err: unknown, label: string): Promise<Error>
         : `${label}: HTTP ${err.status} ${err.statusText || ""}`.trim(),
     );
   }
+  if (err && typeof err === "object") {
+    const anyErr = err as { message?: unknown; code?: unknown };
+    if (typeof anyErr.message === "string") {
+      const codePart = typeof anyErr.code === "number" || typeof anyErr.code === "string" ? ` (code ${String(anyErr.code)})` : "";
+      return new Error(`${label}: ${anyErr.message}${codePart}`);
+    }
+    try {
+      return new Error(`${label}: ${JSON.stringify(err).slice(0, 400)}`);
+    } catch {
+      // fall through to generic string conversion
+    }
+  }
   return new Error(`${label}: ${String(err)}`);
 }
 
@@ -106,7 +118,11 @@ export async function ensureNakamaSession(
   const deviceId = guestLike ? nakamaGuestDeviceId(stableAccountId) : stableAccountId;
   try {
     if (guestLike) {
-      return await client.authenticateDevice(deviceId, true, username);
+      /**
+       * Do not force a username for device auth. Reusing a prior device id with a stale/truncated username
+       * can trigger HTTP 409 "Username is already in use" and prevent bootstrapping in fresh browser contexts.
+       */
+      return await client.authenticateDevice(deviceId, true);
     }
     return await client.authenticateCustom(`openkotor:${stableAccountId}`, true, username);
   } catch (err) {

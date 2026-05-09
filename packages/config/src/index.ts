@@ -202,7 +202,7 @@ export const loadResearchWizardRuntimeConfig = (env: NodeJS.ProcessEnv = process
     gptResearcherRoot,
     pythonExecutable: resolveTraskHeadlessPythonExecutable(gptResearcherRoot, env),
     headlessScriptPath: scriptRaw ? resolve(scriptRaw.trim()) : undefined,
-    timeoutMs: integerish.parse(readOptionalEnv("TRASK_RESEARCHWIZARD_TIMEOUT_MS", env) ?? "120000"),
+    timeoutMs: integerish.parse(readOptionalEnv("TRASK_RESEARCHWIZARD_TIMEOUT_MS", env) ?? "90000"),
   };
 };
 

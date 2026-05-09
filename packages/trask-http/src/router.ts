@@ -222,6 +222,11 @@ const mapModelOption = (option: ResearchWizardModelOption): ResearchWizardModelO
   ...(option.recommended ? { recommended: true } : {}),
 });
 
+const isFreeModelId = (id: string): boolean => {
+  const lower = id.toLowerCase();
+  return lower === "auto" || lower === "openrouter:openrouter/free" || lower.includes(":free") || lower.includes("/free");
+};
+
 const resolveTraskModelOptions = async (
   researchWizard: ResearchWizardQueryHandler,
 ): Promise<readonly ResearchWizardModelOption[]> => {
@@ -230,7 +235,7 @@ const resolveTraskModelOptions = async (
   const models: ResearchWizardModelOption[] = [];
   for (const option of [...DEFAULT_TRASK_MODEL_OPTIONS, ...dynamicModels]) {
     const id = option.id.trim();
-    if (!id || seen.has(id)) continue;
+    if (!id || seen.has(id) || !isFreeModelId(id)) continue;
     seen.add(id);
     models.push(mapModelOption({
       id,

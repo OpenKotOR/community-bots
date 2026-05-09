@@ -237,6 +237,56 @@ test("GET /models defaults to Auto only when the wizard has no live model list",
   ]);
 });
 
+test("GET /models filters out non-free model ids", async () => {
+  const queryRepository = new JsonTraskQueryRepository(path.join(tmpDir, `qmf-${Math.random()}.json`));
+  const searchProvider = {
+    async listSources() {
+      return [];
+    },
+    async search() {
+      return [];
+    },
+    async queueReindex() {
+      return { queuedSourceIds: [] as string[], mode: "file-queue" as const };
+    },
+  };
+
+  const researchWizard = {
+    ...mockWizard,
+    async listModels() {
+      return [
+        { id: "openrouter:openrouter/free", label: "Free", provider: "OpenRouter" },
+        { id: "litellm:foo/bar", label: "Paid-ish", provider: "ResearchWizard" },
+        { id: "vendor/model:free", label: "Free tag", provider: "Vendor" },
+      ];
+    },
+  };
+
+  const app = express();
+  app.use(express.json());
+  app.use(
+    "/api/trask",
+    createTraskHttpRouter({
+      runtime: {
+        searchProvider,
+        researchWizard,
+        queryRepository,
+      },
+      auth: {
+        requireAuth: (handler) => async (req, res) => handler(req, res, { id: "user-1" }),
+      },
+    }),
+  );
+
+  const res = await request(app).get("/api/trask/models");
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.models, [
+    { id: "auto", label: "Auto", provider: "ResearchWizard fallback", recommended: true },
+    { id: "openrouter:openrouter/free", label: "Free", provider: "OpenRouter" },
+    { id: "vendor/model:free", label: "Free tag", provider: "Vendor" },
+  ]);
+});
+
 test("POST /ask rejects model ids outside the current ResearchWizard list", async () => {
   const queryRepository = new JsonTraskQueryRepository(path.join(tmpDir, `qmr-${Math.random()}.json`));
   const searchProvider = {

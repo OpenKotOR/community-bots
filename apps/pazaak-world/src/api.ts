@@ -245,10 +245,13 @@ function nakamaUseSsl(): boolean {
 /** Nakama ranked queue uses the built-in matchmaker; ticket is tied to this socket until matched or cancelled. */
 let nakamaMatchmakingSession: {
   accessToken: string;
+  userId: string;
   socket: DefaultSocket;
   ticket: string;
   queue: MatchmakingQueueRecord;
 } | null = null;
+const nakamaEnqueueInFlight = new Map<string, Promise<EnqueueMatchmakingResult>>();
+const nakamaCommandSessions = new Map<string, { accessToken: string; matchId: string; socket: DefaultSocket }>();
 
 async function nakamaDisconnectMatchmaking(accessToken: string): Promise<boolean> {
   const cur = nakamaMatchmakingSession;
@@ -267,6 +270,21 @@ const NAKAMA_OP_SNAPSHOT = 1;
 const NAKAMA_OP_COMMAND = 2;
 const NAKAMA_OP_CHAT = 3;
 const NAKAMA_OP_ERROR = 4;
+const NAKAMA_COMMAND_TIMEOUT_MS = 12_000;
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId !== null) clearTimeout(timeoutId);
+  }
+}
 
 function normalizeNakamaLobby(raw: Record<string, unknown>): PazaakLobbyRecord {
   const players = Array.isArray(raw.players) ? raw.players : [];
@@ -305,21 +323,50 @@ async function nakamaMatchSnapshot(accessToken: string, logicalMatchId: string):
 
 async function nakamaSendMatchCommand(accessToken: string, nakamaMatchId: string, body: Record<string, unknown>): Promise<void> {
   const session = await sessionFromPazaakAccessToken(accessToken);
-  const socket = getNakamaClient().createSocket(nakamaUseSsl()) as DefaultSocket;
   const clientMoveId =
     typeof globalThis.crypto?.randomUUID === "function"
       ? globalThis.crypto.randomUUID()
       : `mv-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  await socket.connect(session, false);
+  const socketKey = `${accessToken}::${nakamaMatchId}`;
   try {
-    await socket.joinMatch(nakamaMatchId);
-    await socket.sendMatchState(
+    let commandSession = nakamaCommandSessions.get(socketKey);
+    if (!commandSession) {
+      // Drop stale sockets for prior matches using the same account token.
+      for (const [key, value] of nakamaCommandSessions.entries()) {
+        if (value.accessToken !== accessToken) continue;
+        if (key === socketKey) continue;
+        try {
+          value.socket.disconnect(false);
+        } catch {
+          /* ignore stale socket cleanup */
+        }
+        nakamaCommandSessions.delete(key);
+      }
+
+      const socket = getNakamaClient().createSocket(nakamaUseSsl()) as DefaultSocket;
+      await socket.connect(session, false);
+      await socket.joinMatch(nakamaMatchId);
+      commandSession = { accessToken, matchId: nakamaMatchId, socket };
+      nakamaCommandSessions.set(socketKey, commandSession);
+    }
+
+    const payloadJson = JSON.stringify({ ...body, clientMoveId });
+    const payloadBytes = typeof TextEncoder !== "undefined"
+      ? new TextEncoder().encode(payloadJson)
+      : payloadJson;
+    await commandSession.socket.sendMatchState(
       nakamaMatchId,
       NAKAMA_OP_COMMAND,
-      JSON.stringify({ ...body, clientMoveId }),
+      payloadBytes,
     );
-  } finally {
-    socket.disconnect(false);
+  } catch (err) {
+    try {
+      nakamaCommandSessions.get(socketKey)?.socket.disconnect(false);
+    } catch {
+      /* ignore socket cleanup failure */
+    }
+    nakamaCommandSessions.delete(socketKey);
+    throw await nakamaAsError(err, "Nakama sendMatchState");
   }
 }
 
@@ -327,7 +374,12 @@ async function nakamaMove(accessToken: string, logicalMatchId: string, cmd: Reco
   const snap = await nakamaMatchSnapshot(accessToken, logicalMatchId);
   const nid = snap.nakamaMatchId;
   if (!nid) throw new Error("Active match is missing a realtime id; try re-entering the match.");
-  await nakamaSendMatchCommand(accessToken, nid, cmd);
+  console.debug("[nakamaMove] cmd=%s logical=%s realtime=%s", String(cmd.type ?? "unknown"), logicalMatchId, nid);
+  await withTimeout(
+    nakamaSendMatchCommand(accessToken, nid, cmd),
+    NAKAMA_COMMAND_TIMEOUT_MS,
+    "Nakama sendMatchState",
+  );
   return nakamaMatchSnapshot(accessToken, logicalMatchId);
 }
 
@@ -577,9 +629,19 @@ export async function enqueueMatchmaking(
   preferredRegions?: string[],
 ): Promise<EnqueueMatchmakingResult> {
   if (isNakamaBackend()) {
+    const me = await nakamaRpc<MeResponse>(accessToken, "pazaak.me", {});
+    const queueKey = me.user.id;
+    const existing = nakamaMatchmakingSession;
+    if (existing?.userId === queueKey) {
+      return { queue: existing.queue, match: null };
+    }
+
+    const pending = nakamaEnqueueInFlight.get(queueKey);
+    if (pending) return pending;
+
+    const run = (async (): Promise<EnqueueMatchmakingResult> => {
     await nakamaDisconnectMatchmaking(accessToken);
 
-    const me = await nakamaRpc<MeResponse>(accessToken, "pazaak.me", {});
     const session = await sessionFromPazaakAccessToken(accessToken);
     const socket = getNakamaClient().createSocket(nakamaUseSsl()) as DefaultSocket;
 
@@ -612,7 +674,7 @@ export async function enqueueMatchmaking(
       enqueuedAt: new Date().toISOString(),
     };
 
-    nakamaMatchmakingSession = { accessToken, socket, ticket, queue };
+    nakamaMatchmakingSession = { accessToken, userId: queue.userId, socket, ticket, queue };
 
     socket.onmatchmakermatched = async (mm) => {
       const held = nakamaMatchmakingSession;
@@ -628,6 +690,14 @@ export async function enqueueMatchmaking(
     };
 
     return { queue, match: null };
+    })();
+    nakamaEnqueueInFlight.set(queueKey, run);
+    try {
+      return await run;
+    } finally {
+      const cur = nakamaEnqueueInFlight.get(queueKey);
+      if (cur === run) nakamaEnqueueInFlight.delete(queueKey);
+    }
   }
   const data = await apiFetch<QueueResponse & { match?: SerializedMatch | null }>("/api/matchmaking/enqueue", accessToken, {
     method: "POST",

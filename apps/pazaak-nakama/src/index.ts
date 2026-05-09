@@ -31,6 +31,7 @@ const MATCH_HANDLER = "pazaak_authoritative";
 const LEADERBOARD_ID = "pazaak_ranked_mmr";
 const TOURNAMENT_COLLECTION = "pazaak_tournaments";
 const TOURNAMENT_IDS_KEY = "tournament_ids";
+const RUNTIME_COORDINATORS = new Map<string, PazaakCoordinator>();
 
 const enum Opcode {
   Snapshot = 1,
@@ -149,7 +150,6 @@ interface RuntimeHistoryRecord {
 
 interface MatchState {
   matchId: string;
-  coordinator: PazaakCoordinator;
   snapshot: SerializedMatch;
   presences: Record<string, nkruntime.Presence>;
   idempotency: Record<string, SerializedMatch>;
@@ -198,7 +198,22 @@ function json(data: unknown): string {
 }
 
 function textData(data: string | Uint8Array): string {
-  return typeof data === "string" ? data : String.fromCharCode(...data);
+  if (typeof data === "string") return data;
+  if (typeof ArrayBuffer !== "undefined" && data instanceof ArrayBuffer) {
+    return String.fromCharCode(...new Uint8Array(data));
+  }
+  if (typeof ArrayBuffer !== "undefined" && ArrayBuffer.isView(data as unknown as ArrayBufferView)) {
+    const view = data as unknown as ArrayBufferView;
+    return String.fromCharCode(...new Uint8Array(view.buffer, view.byteOffset, view.byteLength));
+  }
+  if (data instanceof Uint8Array) return String.fromCharCode(...data);
+  try {
+    const maybeArray = Array.from(data as unknown as ArrayLike<number>);
+    if (maybeArray.length > 0) return String.fromCharCode(...maybeArray);
+  } catch {
+    /* fall through */
+  }
+  return String(data as unknown);
 }
 
 function requireUser(ctx: nkruntime.Context): string {
@@ -465,6 +480,14 @@ function createCoordinator(nk: nkruntime.Nakama, ctx: nkruntime.Context, matchId
   });
 }
 
+function getRuntimeCoordinator(nk: nkruntime.Nakama, ctx: nkruntime.Context, matchId: string): PazaakCoordinator {
+  const existing = RUNTIME_COORDINATORS.get(matchId);
+  if (existing) return existing;
+  const created = createCoordinator(nk, ctx, matchId);
+  RUNTIME_COORDINATORS.set(matchId, created);
+  return created;
+}
+
 function createInitialMatch(
   nk: nkruntime.Nakama,
   ctx: nkruntime.Context,
@@ -639,11 +662,11 @@ function broadcastSnapshot(dispatcher: nkruntime.MatchDispatcher, snapshot: Seri
 // Nakama's JS loader resolves match hooks by top-level function names (no inlined object methods).
 function matchInit(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, params: Record<string, string>) {
   const { coordinator, snapshot } = createInitialMatch(nk, ctx, params);
+  RUNTIME_COORDINATORS.set(snapshot.id, coordinator);
   logger.info("Pazaak match %s initialized", snapshot.id);
   return {
     state: {
       matchId: snapshot.id,
-      coordinator,
       snapshot,
       presences: {},
       idempotency: {},
@@ -684,17 +707,18 @@ function matchJoin(
 }
 
 function matchLeave(
-  _ctx: nkruntime.Context,
+  ctx: nkruntime.Context,
   _logger: nkruntime.Logger,
-  _nk: nkruntime.Nakama,
+  nk: nkruntime.Nakama,
   _dispatcher: nkruntime.MatchDispatcher,
   _tick: number,
   state: MatchState,
   presences: nkruntime.Presence[],
 ): { state: MatchState } {
+  const coordinator = getRuntimeCoordinator(nk, ctx, state.matchId);
   for (const presence of presences) {
     delete state.presences[presence.userId];
-    const updated = state.coordinator.markDisconnected(presence.userId);
+    const updated = coordinator.markDisconnected(presence.userId);
     if (updated) state.snapshot = serializeMatch(updated);
   }
   return { state };
@@ -709,8 +733,9 @@ function matchLoop(
   state: MatchState,
   messages: nkruntime.MatchMessage[],
 ): { state: MatchState } {
+  const coordinator = getRuntimeCoordinator(nk, ctx, state.matchId);
   let changed = false;
-  const timerUpdates = [...state.coordinator.tickTurnTimers(), ...state.coordinator.tickDisconnectForfeits()];
+  const timerUpdates = [...coordinator.tickTurnTimers(), ...coordinator.tickDisconnectForfeits()];
   if (timerUpdates.length > 0) {
     state.snapshot = serializeMatch(timerUpdates.at(-1)!);
     changed = true;
@@ -735,19 +760,19 @@ function matchLoop(
       let updated: PazaakMatch;
       switch (kind) {
         case "draw":
-          updated = state.coordinator.draw(state.matchId, message.sender.userId);
+          updated = coordinator.draw(state.matchId, message.sender.userId);
           break;
         case "stand":
-          updated = state.coordinator.stand(state.matchId, message.sender.userId);
+          updated = coordinator.stand(state.matchId, message.sender.userId);
           break;
         case "end_turn":
-          updated = state.coordinator.endTurn(state.matchId, message.sender.userId);
+          updated = coordinator.endTurn(state.matchId, message.sender.userId);
           break;
         case "forfeit":
-          updated = state.coordinator.forfeit(state.matchId, message.sender.userId);
+          updated = coordinator.forfeit(state.matchId, message.sender.userId);
           break;
         case "play_side":
-          updated = state.coordinator.playSideCard(
+          updated = coordinator.playSideCard(
             state.matchId,
             message.sender.userId,
             String(payload.cardId ?? ""),
@@ -784,6 +809,7 @@ function matchTerminate(
   _tick: number,
   state: MatchState,
 ): { state: MatchState } {
+  RUNTIME_COORDINATORS.delete(state.matchId);
   saveSnapshot(nk, ctx, state.snapshot);
   settleIfNeeded(nk, ctx, state);
   return { state };

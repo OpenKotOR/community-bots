@@ -210,7 +210,14 @@ function normalizeTraskAnswerText(answer: string | null | undefined): string {
   return answer?.replace(/\r\n/g, '\n').trim() ?? ''
 }
 
+function isTraskSynthesisFailureText(answer: string): boolean {
+  return /could not complete live archive synthesis/i.test(answer)
+}
+
 function mapSourcesFromTraskRecord(rec: TraskHistoryRecordDto) {
+  const answer = normalizeTraskAnswerText(rec.answer)
+  if (rec.status !== 'complete' || isTraskSynthesisFailureText(answer)) return []
+
   return (rec.sources ?? []).map((s) => ({
     name: s.name,
     url: s.url,
@@ -223,6 +230,7 @@ function createAssistantMessageFromTraskRecord(rec: TraskHistoryRecordDto, query
   if (rec.status !== 'complete' || !answer) return null
   const researchSteps = mapResearchStepsFromRecord(rec)
   const mappedSources = mapSourcesFromTraskRecord(rec)
+  const failedSynthesis = isTraskSynthesisFailureText(answer)
   return {
     id: `srv-${rec.queryId}-a`,
     role: 'assistant',
@@ -236,26 +244,23 @@ function createAssistantMessageFromTraskRecord(rec: TraskHistoryRecordDto, query
         source: 'holocron',
         snippet: answer.slice(0, 280),
         confidence: 1,
-        status: 'complete',
+        status: failedSynthesis ? 'failed' : 'complete',
         retrievedContent: answer,
       },
     ],
     queryType,
-    researchStatus: 'complete',
+    researchStatus: failedSynthesis ? 'failed' : 'complete',
     researchSteps,
   }
 }
 
 function createDegradedMessageFromTraskRecord(rec: TraskHistoryRecordDto, queryType: QueryType): MessageType {
-  const mappedSources = mapSourcesFromTraskRecord(rec)
-  const content = mappedSources.length > 0
-    ? 'Trask completed, but the backend returned no visible answer text. The source cards below are the only usable result from this run.'
-    : 'Trask completed, but the backend returned no visible answer text. Try asking again or narrow the question.'
+  const content = 'Trask completed without visible answer text.'
   return {
     id: `srv-${rec.queryId}-degraded`,
     role: 'assistant',
     content,
-    sources: mappedSources,
+    sources: [],
     timestamp: Date.parse(rec.completedAt ?? rec.createdAt) || Date.now(),
     isExpanded: false,
     agentResults: [
@@ -263,7 +268,7 @@ function createDegradedMessageFromTraskRecord(rec: TraskHistoryRecordDto, queryT
         agentName: 'Trask',
         source: 'holocron',
         snippet: content,
-        confidence: mappedSources.length > 0 ? 0.35 : 0,
+        confidence: 0,
         status: 'failed',
       },
     ],
@@ -357,8 +362,39 @@ function conversationUpdatedAtFromMessages(messages: MessageType[], fallback: nu
   return timestamps.length ? Math.max(...timestamps) : fallback
 }
 
+function messageSignature(message: MessageType): string {
+  return `${message.id}\u0000${message.role}\u0000${message.timestamp}\u0000${message.content}`
+}
+
+function ensureUniqueMessageIds(messages: MessageType[]): MessageType[] {
+  const seenIds = new Set<string>()
+  const seenExactMessages = new Set<string>()
+  const nextMessages: MessageType[] = []
+  for (const message of messages) {
+    const exact = messageSignature(message)
+    if (seenExactMessages.has(exact)) continue
+    seenExactMessages.add(exact)
+
+    if (!seenIds.has(message.id)) {
+      seenIds.add(message.id)
+      nextMessages.push(message)
+      continue
+    }
+
+    let suffix = 2
+    let nextId = `${message.id}-dup-${suffix}`
+    while (seenIds.has(nextId)) {
+      suffix += 1
+      nextId = `${message.id}-dup-${suffix}`
+    }
+    seenIds.add(nextId)
+    nextMessages.push({ ...message, id: nextId })
+  }
+  return nextMessages
+}
+
 function normalizeConversationForStorage(conversation: Conversation): Conversation {
-  const messages = isMessageArray(conversation.messages) ? conversation.messages : []
+  const messages = ensureUniqueMessageIds(isMessageArray(conversation.messages) ? conversation.messages : [])
   const createdAt = Number.isFinite(conversation.createdAt) ? conversation.createdAt : Date.now()
   return {
     ...conversation,
@@ -390,8 +426,56 @@ function loadInitialConversations(): Conversation[] {
   return []
 }
 
+function recordRankForSync(record: TraskHistoryRecordDto): number {
+  switch (record.status) {
+    case 'complete':
+      return 3
+    case 'failed':
+      return 2
+    case 'pending':
+    default:
+      return 1
+  }
+}
+
+function recordSyncTimestamp(record: TraskHistoryRecordDto): number {
+  const completed = Date.parse(record.completedAt ?? '')
+  if (Number.isFinite(completed)) return completed
+  const created = Date.parse(record.createdAt)
+  return Number.isFinite(created) ? created : 0
+}
+
+function pickPreferredRecord(current: TraskHistoryRecordDto, next: TraskHistoryRecordDto): TraskHistoryRecordDto {
+  const currentRank = recordRankForSync(current)
+  const nextRank = recordRankForSync(next)
+  if (nextRank !== currentRank) {
+    return nextRank > currentRank ? next : current
+  }
+  const currentTs = recordSyncTimestamp(current)
+  const nextTs = recordSyncTimestamp(next)
+  if (nextTs !== currentTs) {
+    return nextTs > currentTs ? next : current
+  }
+  const currentTraceLen = current.liveTrace?.length ?? 0
+  const nextTraceLen = next.liveTrace?.length ?? 0
+  return nextTraceLen >= currentTraceLen ? next : current
+}
+
+function dedupeRecordsByQueryId(records: TraskHistoryRecordDto[]): TraskHistoryRecordDto[] {
+  const byId = new Map<string, TraskHistoryRecordDto>()
+  for (const record of records) {
+    const existing = byId.get(record.queryId)
+    if (!existing) {
+      byId.set(record.queryId, record)
+      continue
+    }
+    byId.set(record.queryId, pickPreferredRecord(existing, record))
+  }
+  return [...byId.values()]
+}
+
 function mapTraskHistoryToMessages(records: TraskHistoryRecordDto[]): MessageType[] {
-  const sorted = [...records].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+  const sorted = dedupeRecordsByQueryId(records).sort((a, b) => a.createdAt.localeCompare(b.createdAt))
   const syncedMessages: MessageType[] = []
   for (const rec of sorted) {
     if (isCanceledTraskRecord(rec)) continue
@@ -418,7 +502,7 @@ function mapTraskHistoryToMessages(records: TraskHistoryRecordDto[]): MessageTyp
       ))
     }
   }
-  return syncedMessages
+  return ensureUniqueMessageIds(syncedMessages)
 }
 
 function shortFluxWords(text: string, cap = 3): string {
@@ -568,7 +652,10 @@ function App() {
   }, [])
 
   const activeConversation = (conversations || []).find(c => c.id === activeConversationId)
-  const messages = activeConversation?.messages || []
+  const messages = useMemo(
+    () => ensureUniqueMessageIds(activeConversation?.messages || []),
+    [activeConversation?.messages],
+  )
   const activeConversationResearchJobs = useMemo(
     () => activeConversationId
       ? normalizeResearchJobs(researchJobs).filter((job) => job.conversationId === activeConversationId)

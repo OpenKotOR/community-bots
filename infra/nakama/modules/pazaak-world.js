@@ -7241,6 +7241,7 @@ var MATCH_HANDLER = "pazaak_authoritative";
 var LEADERBOARD_ID = "pazaak_ranked_mmr";
 var TOURNAMENT_COLLECTION = "pazaak_tournaments";
 var TOURNAMENT_IDS_KEY = "tournament_ids";
+var RUNTIME_COORDINATORS = /* @__PURE__ */ new Map();
 function ensureCrypto() {
   const g = globalThis;
   if (g.crypto?.randomUUID) return;
@@ -7276,7 +7277,21 @@ function json(data) {
   return JSON.stringify(data);
 }
 function textData(data) {
-  return typeof data === "string" ? data : String.fromCharCode(...data);
+  if (typeof data === "string") return data;
+  if (typeof ArrayBuffer !== "undefined" && data instanceof ArrayBuffer) {
+    return String.fromCharCode(...new Uint8Array(data));
+  }
+  if (typeof ArrayBuffer !== "undefined" && ArrayBuffer.isView(data)) {
+    const view = data;
+    return String.fromCharCode(...new Uint8Array(view.buffer, view.byteOffset, view.byteLength));
+  }
+  if (data instanceof Uint8Array) return String.fromCharCode(...data);
+  try {
+    const maybeArray = Array.from(data);
+    if (maybeArray.length > 0) return String.fromCharCode(...maybeArray);
+  } catch {
+  }
+  return String(data);
 }
 function requireUser(ctx) {
   if (!ctx.userId) throw new Error("Nakama session required.");
@@ -7492,6 +7507,13 @@ function createCoordinator(nk, ctx, matchId) {
     disconnectForfeitMs: PAZAAK_POLICY_DEFAULTS.timers.disconnectForfeitMs
   });
 }
+function getRuntimeCoordinator(nk, ctx, matchId) {
+  const existing = RUNTIME_COORDINATORS.get(matchId);
+  if (existing) return existing;
+  const created = createCoordinator(nk, ctx, matchId);
+  RUNTIME_COORDINATORS.set(matchId, created);
+  return created;
+}
 function createInitialMatch(nk, ctx, params) {
   const matchId = params.matchId || randomId();
   const coordinator = createCoordinator(nk, ctx, matchId);
@@ -7628,11 +7650,11 @@ function broadcastSnapshot(dispatcher, snapshot, presences) {
 }
 function matchInit(ctx, logger, nk, params) {
   const { coordinator, snapshot } = createInitialMatch(nk, ctx, params);
+  RUNTIME_COORDINATORS.set(snapshot.id, coordinator);
   logger.info("Pazaak match %s initialized", snapshot.id);
   return {
     state: {
       matchId: snapshot.id,
-      coordinator,
       snapshot,
       presences: {},
       idempotency: {},
@@ -7651,17 +7673,19 @@ function matchJoin(_ctx, _logger, _nk, dispatcher, _tick, state, presences) {
   broadcastSnapshot(dispatcher, state.snapshot, presences);
   return { state };
 }
-function matchLeave(_ctx, _logger, _nk, _dispatcher, _tick, state, presences) {
+function matchLeave(ctx, _logger, nk, _dispatcher, _tick, state, presences) {
+  const coordinator = getRuntimeCoordinator(nk, ctx, state.matchId);
   for (const presence of presences) {
     delete state.presences[presence.userId];
-    const updated = state.coordinator.markDisconnected(presence.userId);
+    const updated = coordinator.markDisconnected(presence.userId);
     if (updated) state.snapshot = serializeMatch(updated);
   }
   return { state };
 }
 function matchLoop(ctx, logger, nk, dispatcher, _tick, state, messages) {
+  const coordinator = getRuntimeCoordinator(nk, ctx, state.matchId);
   let changed = false;
-  const timerUpdates = [...state.coordinator.tickTurnTimers(), ...state.coordinator.tickDisconnectForfeits()];
+  const timerUpdates = [...coordinator.tickTurnTimers(), ...coordinator.tickDisconnectForfeits()];
   if (timerUpdates.length > 0) {
     state.snapshot = serializeMatch(timerUpdates.at(-1));
     changed = true;
@@ -7683,19 +7707,19 @@ function matchLoop(ctx, logger, nk, dispatcher, _tick, state, messages) {
       let updated;
       switch (kind) {
         case "draw":
-          updated = state.coordinator.draw(state.matchId, message.sender.userId);
+          updated = coordinator.draw(state.matchId, message.sender.userId);
           break;
         case "stand":
-          updated = state.coordinator.stand(state.matchId, message.sender.userId);
+          updated = coordinator.stand(state.matchId, message.sender.userId);
           break;
         case "end_turn":
-          updated = state.coordinator.endTurn(state.matchId, message.sender.userId);
+          updated = coordinator.endTurn(state.matchId, message.sender.userId);
           break;
         case "forfeit":
-          updated = state.coordinator.forfeit(state.matchId, message.sender.userId);
+          updated = coordinator.forfeit(state.matchId, message.sender.userId);
           break;
         case "play_side":
-          updated = state.coordinator.playSideCard(
+          updated = coordinator.playSideCard(
             state.matchId,
             message.sender.userId,
             String(payload.cardId ?? ""),
@@ -7721,6 +7745,7 @@ function matchLoop(ctx, logger, nk, dispatcher, _tick, state, messages) {
   return { state };
 }
 function matchTerminate(ctx, _logger, nk, _dispatcher, _tick, state) {
+  RUNTIME_COORDINATORS.delete(state.matchId);
   saveSnapshot(nk, ctx, state.snapshot);
   settleIfNeeded(nk, ctx, state);
   return { state };

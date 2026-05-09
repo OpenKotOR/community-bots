@@ -194,20 +194,47 @@ const matchApprovedSource = (
   });
 };
 
-const sourceMentionedInReport = (report: string, source: SourceDescriptor): boolean => {
-  const normalizedReport = report.toLowerCase();
-  const normalizedSourceName = source.name.toLowerCase().trim();
-
-  if (normalizedSourceName.length >= 4 && normalizedReport.includes(normalizedSourceName)) {
-    return true;
-  }
-
+const sourceUrlLabel = (source: SourceDescriptor, url: string): string => {
   try {
-    const hostname = new URL(source.homeUrl).hostname.replace(/^www\./, "").toLowerCase();
-    return hostname.length > 0 && normalizedReport.includes(hostname);
+    const exact = new URL(url);
+    const base = new URL(source.homeUrl);
+    const exactPath = decodeURIComponent(exact.pathname.replace(/\/+$/u, ""));
+    const basePath = decodeURIComponent(base.pathname.replace(/\/+$/u, ""));
+    const relativePath = exactPath.startsWith(`${basePath}/`) ? exactPath.slice(basePath.length + 1) : exactPath;
+    const cleaned = relativePath
+      .replace(/^blob\/[^/]+\//u, "")
+      .replace(/^tree\/[^/]+\//u, "")
+      .replace(/^wiki\//u, "")
+      .split("/")
+      .filter(Boolean)
+      .slice(-2)
+      .join("/")
+      .replace(/[-_]+/gu, " ")
+      .trim();
+    if (!cleaned) return source.name;
+    const lineAnchor = exact.hash && /^#L\d+(?:-L\d+)?$/iu.test(exact.hash) ? exact.hash : "";
+    return `${source.name}: ${cleaned}${lineAnchor}`;
   } catch {
-    return false;
+    return source.name;
   }
+};
+
+const exactSourceFromUrl = (url: string, approvedSources: readonly SourceDescriptor[]): SourceDescriptor | undefined => {
+  const source = matchApprovedSource(url, approvedSources);
+  if (!source) return undefined;
+  const exactUrl = normalizeUrl(url);
+  const sourceUrl = normalizeUrl(source.homeUrl);
+  return {
+    ...source,
+    id: exactUrl === sourceUrl ? source.id : `${source.id}:${exactUrl}`,
+    name: sourceUrlLabel(source, exactUrl),
+    homeUrl: exactUrl,
+  };
+};
+
+const isCatalogRootUrl = (url: string, approvedSources: readonly SourceDescriptor[]): boolean => {
+  const normalized = normalizeUrl(url);
+  return approvedSources.some((source) => normalizeUrl(source.homeUrl) === normalized);
 };
 
 const collectRelevantSources = (
@@ -215,31 +242,27 @@ const collectRelevantSources = (
   approvedSources: readonly SourceDescriptor[],
   payload: ResearchWizardResponsePayload,
 ): readonly SourceDescriptor[] => {
-  const candidateUrls = [
+  const candidateUrls = uniqueUrlsPreserveOrder([
     ...extractUrls(report),
     ...((Array.isArray(payload.research_information?.source_urls) ? payload.research_information.source_urls : [])
       .filter((value): value is string => typeof value === "string")),
     ...((Array.isArray(payload.research_information?.visited_urls) ? payload.research_information.visited_urls : [])
       .filter((value): value is string => typeof value === "string")),
-  ].filter((url) => isTraskApprovedResearchUrl(url, approvedSources));
+  ].filter((url) => isTraskApprovedResearchUrl(url, approvedSources)));
 
   const matched: SourceDescriptor[] = [];
+  const hasPreciseUrl = candidateUrls.some((url) => !isCatalogRootUrl(url, approvedSources));
 
   for (const url of candidateUrls) {
-    const source = matchApprovedSource(url, approvedSources);
+    if (hasPreciseUrl && isCatalogRootUrl(url, approvedSources)) continue;
+    const source = exactSourceFromUrl(url, approvedSources);
 
-    if (source && !matched.some((entry) => entry.id === source.id)) {
+    if (source && !matched.some((entry) => normalizeUrl(entry.homeUrl) === normalizeUrl(source.homeUrl))) {
       matched.push(source);
     }
   }
 
-  for (const source of approvedSources) {
-    if (sourceMentionedInReport(report, source) && !matched.some((entry) => entry.id === source.id)) {
-      matched.push(source);
-    }
-  }
-
-  return matched;
+  return matched.slice(0, 6);
 };
 
 const normalizeReport = (value: string): string => {
@@ -257,7 +280,51 @@ const formatSourcesSection = (sources: readonly SourceDescriptor[]): string => {
   ].join("\n");
 };
 
-const DEFAULT_REWRITE_TIMEOUT_MS = 25_000;
+const isSynthesisFailureText = (report: string): boolean =>
+  /^i could not complete live archive synthesis for this question right now\.?$/iu.test(report.trim());
+
+const titleCase = (value: string): string =>
+  value
+    .split(/\s+/u)
+    .filter(Boolean)
+    .map((part) => part.slice(0, 1).toUpperCase() + part.slice(1))
+    .join(" ");
+
+const sourceToolHint = (source: SourceDescriptor): string => {
+  try {
+    const parsed = new URL(source.homeUrl);
+    const parts = parsed.pathname
+      .split("/")
+      .map((part) => decodeURIComponent(part).trim())
+      .filter(Boolean);
+    const candidate = parts[parts.length - 1] ?? "";
+    const cleaned = candidate
+      .replace(/^\d+-?/u, "")
+      .replace(/^file-/u, "")
+      .replace(/[-_]+/gu, " ")
+      .trim();
+    if (!cleaned || cleaned.length < 3) return source.name;
+    return titleCase(cleaned);
+  } catch {
+    return source.name;
+  }
+};
+
+const sourceOnlyFallbackAnswer = (sources: readonly SourceDescriptor[]): string => {
+  if (sources.length === 0) return "I could not complete live archive synthesis for this question right now.";
+
+  const hints = [...new Set(sources.map(sourceToolHint).filter((hint) => hint.length > 0))].slice(0, 5);
+  const bullets = hints.map((hint, index) => `- ${hint} [${Math.min(index + 1, sources.length)}]`);
+  const summary = [
+    "Commonly referenced KotOR model-modding tools in the approved archive sources include:",
+    ...bullets,
+  ].join("\n");
+
+  return `${summary}\n\n${formatSourcesSection(sources)}`;
+};
+
+const DEFAULT_REWRITE_TIMEOUT_MS = 3_000;
+const MAX_REWRITE_ATTEMPTS = 1;
 
 const normalizePreferredRewriteModel = (model: string | undefined): string | undefined => {
   const trimmed = model?.trim();
@@ -290,11 +357,16 @@ const fallbackDiscordRewrite = (
   report: string,
   sources: readonly SourceDescriptor[],
 ): string => {
+  const normalized = normalizeReport(report);
+  if (isSynthesisFailureText(normalized)) {
+    return sourceOnlyFallbackAnswer(sources);
+  }
+
   const sourceIndexByUrl = new Map<string, number>(
     sources.map((source, index) => [normalizeUrl(source.homeUrl), index + 1]),
   );
 
-  const [bodyOnlyCandidate = ""] = normalizeReport(report).split(/\n(?:#{1,6}\s*)?(?:Sources|References)\s*\n/i, 1);
+  const [bodyOnlyCandidate = ""] = normalized.split(/\n(?:#{1,6}\s*)?(?:Sources|References)\s*\n/i, 1);
   const bodyOnly = bodyOnlyCandidate
     .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, (_match, text: string, url: string) => {
       const matchedSource = matchApprovedSource(url, sources);
@@ -332,15 +404,20 @@ const fallbackDiscordRewrite = (
     summary = `${summary} [1]`.trim();
   }
 
-  return `${summary}\n\n${formatSourcesSection(sources)}`;
+  return sources.length > 0 ? `${summary}\n\n${formatSourcesSection(sources)}` : summary;
 };
 
 const fallbackDiscordBrief = (report: string, sources: readonly SourceDescriptor[]): string => {
+  const normalized = normalizeReport(report);
+  if (isSynthesisFailureText(normalized)) {
+    return sourceOnlyFallbackAnswer(sources);
+  }
+
   const sourceIndexByUrl = new Map<string, number>(
     sources.map((source, index) => [normalizeUrl(source.homeUrl), index + 1]),
   );
 
-  const [bodyOnlyCandidate = ""] = normalizeReport(report).split(/\n(?:#{1,6}\s*)?(?:Sources|References)\s*\n/i, 1);
+  const [bodyOnlyCandidate = ""] = normalized.split(/\n(?:#{1,6}\s*)?(?:Sources|References)\s*\n/i, 1);
   const bodyOnly = bodyOnlyCandidate
     .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, (_match, text: string, url: string) => {
       const matchedSource = matchApprovedSource(url, sources);
@@ -363,7 +440,7 @@ const fallbackDiscordBrief = (report: string, sources: readonly SourceDescriptor
     summary = `${summary} [1]`.trim();
   }
 
-  return `${summary}\n\n${formatSourcesSection(sources)}`;
+  return sources.length > 0 ? `${summary}\n\n${formatSourcesSection(sources)}` : summary;
 };
 
 const degradedAnswerFallback = (_query: string, _approvedSources: readonly SourceDescriptor[]): string => {
@@ -438,7 +515,7 @@ const researchDomainsForSources = (sources: readonly SourceDescriptor[]): string
   return [...enabledHosts];
 };
 
-const HEARTBEAT_MS = 3500;
+const HEARTBEAT_MS = 8000;
 
 const withProgressHeartbeat = async <T>(
   phase: ResearchWizardProgressEvent["phase"],
@@ -520,7 +597,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
     const preferredRewriteModel = normalizePreferredRewriteModel(preferredModel);
     const modelsToTry = [
       ...new Set([...(preferredRewriteModel ? [preferredRewriteModel] : []), this.aiConfig.chatModel, ...this.aiConfig.chatModelFallbacks]),
-    ];
+    ].slice(0, MAX_REWRITE_ATTEMPTS);
 
     for (const model of modelsToTry) {
       try {
@@ -586,7 +663,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
       .map((source, index) => `${index + 1}. ${source.name} - ${source.homeUrl}`)
       .join("\n");
 
-    const modelsToTry = [...new Set([this.aiConfig.chatModel, ...this.aiConfig.chatModelFallbacks])];
+    const modelsToTry = [...new Set([this.aiConfig.chatModel, ...this.aiConfig.chatModelFallbacks])].slice(0, MAX_REWRITE_ATTEMPTS);
 
     for (const model of modelsToTry) {
       try {
@@ -688,7 +765,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
         "gather",
         (elapsedMs) => {
           const seconds = Math.max(1, Math.floor(elapsedMs / 1000));
-          return `Scanning approved source allowlist… (${seconds}s)`;
+          return `Researching approved archive sources… (${seconds}s)`;
         },
         onProgress,
         async () => await this.fetchResearchReport(query, buildCustomPrompt(), approvedSources, options),
@@ -715,26 +792,20 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
         phase: "compose",
         detail: "Rendering Holocron answer…",
       });
-      const answer = await this.rewriteForDiscord(query, report, relevantSources, options?.model);
+      const answer = fallbackDiscordRewrite(report, relevantSources);
 
       return {
         answer,
         approvedSources: relevantSources,
       };
     } catch {
-      const curatedSources = approvedSources.slice(0, 3);
-      onProgress?.({
-        phase: "sources",
-        detail: "Live synthesis unavailable; returning vetted quick-path sources…",
-        sources: curatedSources,
-      });
       onProgress?.({
         phase: "compose",
         detail: "Rendering fallback Holocron answer…",
       });
       return {
         answer: degradedAnswerFallback(query, approvedSources),
-        approvedSources: curatedSources,
+        approvedSources: [],
       };
     }
   }

@@ -30,12 +30,11 @@ import { startEmbeddedTraskWebUi } from "./web-server.js";
 const logger = createLogger("trask-bot");
 const config = loadTraskBotConfig();
 const searchProvider = createDefaultSearchProvider({ stateDir: config.chunkDir });
-const DISCORD_ASK_MIN_TIMEOUT_MS = 420_000;
-const DISCORD_ASK_RESPONSE_SLA_MS = 50_000;
+const DISCORD_ASK_RESPONSE_SLA_MS = 90_000;
 const DISCORD_ASK_SYNTHESIS_FAILURE_MESSAGE = "I could not complete live archive synthesis for this question right now.";
-const researchWizardTimeoutMs = Math.max(config.researchWizard.timeoutMs, DISCORD_ASK_MIN_TIMEOUT_MS);
+const researchWizardTimeoutMs = Math.min(config.researchWizard.timeoutMs, DISCORD_ASK_RESPONSE_SLA_MS);
 if (researchWizardTimeoutMs !== config.researchWizard.timeoutMs) {
-  logger.warn("TRASK_RESEARCHWIZARD_TIMEOUT_MS is low for Discord /ask; elevating at runtime.", {
+  logger.warn("TRASK_RESEARCHWIZARD_TIMEOUT_MS exceeds Discord /ask SLA; clamping at runtime.", {
     configuredTimeoutMs: config.researchWizard.timeoutMs,
     effectiveTimeoutMs: researchWizardTimeoutMs,
   });
@@ -196,7 +195,9 @@ const chunkSourceLines = (sourceLines: readonly string[]): APIEmbedField[] => {
   const fields: APIEmbedField[] = [];
   let currentLines: string[] = [];
 
-  for (const line of sourceLines) {
+  for (const rawLine of sourceLines) {
+    // Discord embed field values must be <= 1024 chars.
+    const line = truncateForDiscord(rawLine, 1000);
     const candidate = [...currentLines, line].join("\n");
 
     if (candidate.length > 1024 && currentLines.length > 0) {
@@ -229,17 +230,23 @@ const buildFallbackSources = (sources: readonly SourceDescriptor[]): APIEmbedFie
 
 const buildResearchEmbed = (rawAnswer: string, approvedSources: readonly SourceDescriptor[]) => {
   const { body, sourceLines } = splitResearchAnswer(rawAnswer);
-  const description = truncateForDiscord(body, 4000);
-  const sourceFields = description === DISCORD_ASK_SYNTHESIS_FAILURE_MESSAGE
+  const sourceFields = body === DISCORD_ASK_SYNTHESIS_FAILURE_MESSAGE
     ? []
     : sourceLines.length > 0
       ? chunkSourceLines(sourceLines)
       : buildFallbackSources(approvedSources);
 
+  const title = `${personaProfiles.trask.displayName} Briefing`;
+  const limitedSourceFields = sourceFields.slice(0, 3);
+  const sourceFieldChars = limitedSourceFields.reduce((total, field) => total + field.name.length + field.value.length, 0);
+  // Keep a margin under Discord's 6000-char embed cap (title + description + fields).
+  const descriptionLimit = Math.max(500, Math.min(4000, 5900 - title.length - sourceFieldChars));
+  const description = truncateForDiscord(body, descriptionLimit);
+
   return buildInfoEmbed({
-    title: `${personaProfiles.trask.displayName} Briefing`,
+    title,
     description,
-    fields: sourceFields.slice(0, 3),
+    fields: limitedSourceFields,
   });
 };
 
@@ -348,7 +355,7 @@ const handleAskCommand = async (interaction: ChatInputCommandInteraction): Promi
       void answerPromise.catch(() => undefined);
 
       const completedAt = new Date().toISOString();
-      const timeoutMessage = `Live archive synthesis exceeded ${Math.floor(DISCORD_ASK_RESPONSE_SLA_MS / 1000)}s.`;
+      const timeoutMessage = `I could not complete live archive synthesis within ${Math.floor(DISCORD_ASK_RESPONSE_SLA_MS / 1000)} seconds`;
       await queryRepository.append({
         queryId,
         threadId,
@@ -371,7 +378,7 @@ const handleAskCommand = async (interaction: ChatInputCommandInteraction): Promi
 
       const fallbackEmbed = buildInfoEmbed({
         title: `${personaProfiles.trask.displayName} Briefing`,
-        description: DISCORD_ASK_SYNTHESIS_FAILURE_MESSAGE,
+        description: timeoutMessage,
       });
 
       await interaction.editReply({

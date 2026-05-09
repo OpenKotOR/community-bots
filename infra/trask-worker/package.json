@@ -1,0 +1,12 @@
+{
+  "name": "trask-worker",
+  "version": "0.1.0",
+  "main": "dist/worker.js",
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/worker.ts --bundle --platform=neutral --target=es2022 --outfile=dist/worker.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.19.0"
+  }
+}
