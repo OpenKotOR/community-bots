@@ -447,28 +447,49 @@ function randomCode(length: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// OAuth state store (in-memory, 10-min TTL). Workers are single-threaded so
-// a module-level Map is safe here for a single-instance deployment.
+// OAuth state TTL. State is persisted in the coordinator Durable Object so
+// callback validation survives worker isolate changes between start/callback.
 // ---------------------------------------------------------------------------
 const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
-const workerOauthStates = new Map<string, { provider: string; expiresAt: number; pendingMatchId?: string }>();
 
-function createWorkerOauthState(provider: string, pendingMatchId?: string): string {
-  const now = Date.now();
-  // Prune expired entries first
-  for (const [k, v] of workerOauthStates) {
-    if (v.expiresAt <= now) workerOauthStates.delete(k);
+async function createWorkerOauthState(
+  provider: WorkerSocialProvider,
+  pendingMatchId: string | undefined,
+  coordinatorStub: { fetch(req: Request): Promise<Response> },
+): Promise<string> {
+  const response = await coordinatorStub.fetch(new Request("http://internal/api/auth/oauth/state/create", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ provider, pendingMatchId }),
+  }));
+  if (!response.ok) {
+    throw new Error(`Failed to create OAuth state for ${provider}.`);
   }
-  const state = crypto.randomUUID().replace(/-/g, "");
-  workerOauthStates.set(state, { provider, expiresAt: now + OAUTH_STATE_TTL_MS, pendingMatchId });
-  return state;
+  const payload = await response.json() as { state?: string };
+  if (!payload.state) {
+    throw new Error(`OAuth state response missing state token for ${provider}.`);
+  }
+  return payload.state;
 }
 
-function consumeWorkerOauthState(state: string, provider: string): { pendingMatchId?: string } | null {
-  const entry = workerOauthStates.get(state);
-  workerOauthStates.delete(state);
-  if (!entry || entry.expiresAt <= Date.now() || entry.provider !== provider) return null;
-  return { pendingMatchId: entry.pendingMatchId };
+async function consumeWorkerOauthState(
+  state: string,
+  provider: WorkerSocialProvider,
+  coordinatorStub: { fetch(req: Request): Promise<Response> },
+): Promise<{ pendingMatchId?: string } | null> {
+  const response = await coordinatorStub.fetch(new Request("http://internal/api/auth/oauth/state/consume", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ state, provider }),
+  }));
+  if (response.status === 404) {
+    return null;
+  }
+  if (!response.ok) {
+    throw new Error(`Failed to consume OAuth state for ${provider}.`);
+  }
+  const payload = await response.json() as { pendingMatchId?: string | null };
+  return payload.pendingMatchId ? { pendingMatchId: payload.pendingMatchId } : {};
 }
 
 function buildProviderAuthorizeUrl(provider: WorkerSocialProvider, state: string, env: Env, callbackBase: string): string {
@@ -486,14 +507,20 @@ function buildProviderAuthorizeUrl(provider: WorkerSocialProvider, state: string
   });
 }
 
-async function handleOauthStart(request: Request, env: Env, provider: WorkerSocialProvider, callbackBase: string): Promise<Response> {
+async function handleOauthStart(
+  request: Request,
+  env: Env,
+  provider: WorkerSocialProvider,
+  callbackBase: string,
+  coordinatorStub: { fetch(req: Request): Promise<Response> },
+): Promise<Response> {
   if (request.method !== "POST") return error("Method not allowed", 405);
   let pendingMatchId: string | undefined;
   try {
     const body = await request.json<Json>();
     if (typeof body.matchId === "string" && body.matchId.trim()) pendingMatchId = body.matchId.trim();
   } catch { /* body may be empty */ }
-  const state = createWorkerOauthState(provider, pendingMatchId);
+  const state = await createWorkerOauthState(provider, pendingMatchId, coordinatorStub);
   const redirectUrl = buildProviderAuthorizeUrl(provider, state, env, callbackBase);
   return json({ provider, redirectUrl });
 }
@@ -515,7 +542,7 @@ async function handleOauthCallback(request: Request, env: Env, provider: WorkerS
     return Response.redirect(redirect.toString(), 302);
   }
 
-  const pending = consumeWorkerOauthState(state, provider);
+  const pending = await consumeWorkerOauthState(state, provider, coordinatorStub);
   if (!pending) {
     redirect.searchParams.set("oauth_error", "invalid_or_expired_state");
     return Response.redirect(redirect.toString(), 302);
@@ -633,7 +660,7 @@ export default {
       if (!providers.find((p) => p.provider === provider)?.enabled) {
         return error(`OAuth provider ${provider} is not configured on this server.`, 501);
       }
-      return handleOauthStart(request, env, provider, callbackBase);
+      return handleOauthStart(request, env, provider, callbackBase, stub);
     }
 
     // OAuth callback — handled here so we can redirect to the frontend
@@ -1005,6 +1032,51 @@ export class MatchCoordinator {
     // This route is kept here only as a fallback but should not be reached.
     if (path === "/api/auth/oauth/providers" && request.method === "GET") {
       return json({ providers: [] });
+    }
+
+    // Internal: create OAuth state so callbacks can validate across worker isolates.
+    if (path === "/api/auth/oauth/state/create" && request.method === "POST") {
+      const body = await request.json<Json>().catch(() => ({} as Json));
+      const provider = typeof body.provider === "string" ? body.provider.trim() : "";
+      if (!SOCIAL_PROVIDERS.includes(provider as WorkerSocialProvider)) {
+        return error("Unsupported OAuth provider.", 404);
+      }
+      const pendingMatchId = typeof body.pendingMatchId === "string" && body.pendingMatchId.trim()
+        ? body.pendingMatchId.trim()
+        : undefined;
+      const now = Date.now();
+      for (const [token, entry] of Object.entries(state.oauthStates)) {
+        if (entry.expiresAt <= now) {
+          delete state.oauthStates[token];
+        }
+      }
+      const oauthStateToken = crypto.randomUUID().replace(/-/g, "");
+      state.oauthStates[oauthStateToken] = {
+        provider,
+        expiresAt: now + OAUTH_STATE_TTL_MS,
+        pendingMatchId,
+      };
+      await this.persist(state);
+      return json({ state: oauthStateToken });
+    }
+
+    // Internal: consume OAuth state exactly once on callback.
+    if (path === "/api/auth/oauth/state/consume" && request.method === "POST") {
+      const body = await request.json<Json>().catch(() => ({} as Json));
+      const oauthStateToken = typeof body.state === "string" ? body.state.trim() : "";
+      const provider = typeof body.provider === "string" ? body.provider.trim() : "";
+      if (!oauthStateToken || !provider) {
+        return error("Missing OAuth state or provider.", 400);
+      }
+      const entry = state.oauthStates[oauthStateToken];
+      if (entry) {
+        delete state.oauthStates[oauthStateToken];
+        await this.persist(state);
+      }
+      if (!entry || entry.expiresAt <= Date.now() || entry.provider !== provider) {
+        return error("OAuth state is invalid or expired.", 404);
+      }
+      return json({ pendingMatchId: entry.pendingMatchId ?? null });
     }
 
     // Internal: called by the main Worker after a successful OAuth code exchange
