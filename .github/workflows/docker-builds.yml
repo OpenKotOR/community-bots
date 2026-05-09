@@ -27,24 +27,8 @@ permissions:
   contents: read
 
 jobs:
-  build-web-apps:
+  docker-builds:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        app: [pazaak-world, holocron-web, hk86-web]
-        include:
-          - app: pazaak-world
-            dockerfile: apps/pazaak-world/Dockerfile
-            image: pazaak-world-preview
-            port: 5173
-          - app: holocron-web
-            dockerfile: apps/holocron-web/Dockerfile
-            image: holocron-web-preview
-            port: 5174
-          - app: hk86-web
-            dockerfile: apps/hk86-web/Dockerfile
-            image: hk86-web-preview
-            port: 5175
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -55,123 +39,76 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Docker image - ${{ matrix.app }}
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ${{ matrix.dockerfile }}
-          push: false
-          load: true
-          tags: ${{ matrix.image }}:test
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Test container startup - ${{ matrix.app }}
+      - name: Build and verify service images
         run: |
-          docker run --rm -d --name ${{ matrix.app }}-test -e PORT=${{ matrix.port }} -p ${{ matrix.port }}:${{ matrix.port }} ${{ matrix.image }}:test
-          sleep 3
-          if docker logs ${{ matrix.app }}-test | grep -E "Local:|Network:|listening|started|ready"; then
-            echo "✓ Server started successfully"
-          else
-            echo "Server startup output:"
-            docker logs ${{ matrix.app }}-test
-            docker kill ${{ matrix.app }}-test || true
-            exit 1
-          fi
-          docker kill ${{ matrix.app }}-test || true
+          set -euo pipefail
 
-  build-services:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        service: [pazaak-bot, trask-bot, hk-bot, trask-http-server, ingest-worker]
-        include:
-          - service: pazaak-bot
-            dockerfile: apps/pazaak-bot/Dockerfile
-            image: pazaak-bot-service
-          - service: trask-bot
-            dockerfile: apps/trask-bot/Dockerfile
-            image: trask-bot-service
-          - service: hk-bot
-            dockerfile: apps/hk-bot/Dockerfile
-            image: hk-bot-service
-          - service: trask-http-server
-            dockerfile: apps/trask-http-server/Dockerfile
-            image: trask-http-server-service
-          - service: ingest-worker
-            dockerfile: apps/ingest-worker/Dockerfile
-            image: ingest-worker-service
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          token: ${{ secrets.ACTIONS_SUBMODULES_TOKEN || github.token }}
+          declare -A SERVICE_DOCKERFILES=(
+            [pazaak-bot]="apps/pazaak-bot/Dockerfile"
+            [trask-bot]="apps/trask-bot/Dockerfile"
+            [hk-bot]="apps/hk-bot/Dockerfile"
+            [trask-http-server]="apps/trask-http-server/Dockerfile"
+            [ingest-worker]="apps/ingest-worker/Dockerfile"
+          )
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+          for service in "${!SERVICE_DOCKERFILES[@]}"; do
+            image="${service}-service:test"
+            dockerfile="${SERVICE_DOCKERFILES[$service]}"
+            echo "Building $service with $dockerfile"
+            docker buildx build --load --progress=plain -f "$dockerfile" -t "$image" .
+            docker image inspect "$image" >/dev/null
+            echo "OK: $service image built"
+          done
 
-      - name: Build Docker image - ${{ matrix.service }}
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ${{ matrix.dockerfile }}
-          push: false
-          load: true
-          tags: ${{ matrix.image }}:test
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Verify image built successfully - ${{ matrix.service }}
+      - name: Build and smoke test web images
         run: |
-          docker image inspect ${{ matrix.image }}:test >/dev/null
-          echo "✓ Docker image built successfully"
+          set -euo pipefail
 
-  build-special:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        service: [pazaak-nakama]
-        include:
-          - service: pazaak-nakama
-            dockerfile: apps/pazaak-nakama/Dockerfile
-            image: pazaak-nakama-builder
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          token: ${{ secrets.ACTIONS_SUBMODULES_TOKEN || github.token }}
+          declare -A WEB_DOCKERFILES=(
+            [pazaak-world]="apps/pazaak-world/Dockerfile"
+            [holocron-web]="apps/holocron-web/Dockerfile"
+            [hk86-web]="apps/hk86-web/Dockerfile"
+          )
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+          declare -A WEB_PORTS=(
+            [pazaak-world]=5173
+            [holocron-web]=5174
+            [hk86-web]=5175
+          )
 
-      - name: Build Docker image - ${{ matrix.service }}
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ${{ matrix.dockerfile }}
-          push: false
-          load: true
-          tags: ${{ matrix.image }}:test
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          for app in pazaak-world holocron-web hk86-web; do
+            image="${app}-preview:test"
+            dockerfile="${WEB_DOCKERFILES[$app]}"
+            port="${WEB_PORTS[$app]}"
+            container="${app}-ci-test"
 
-      - name: Verify image and check Nakama modules - ${{ matrix.service }}
+            echo "Building $app with $dockerfile"
+            docker buildx build --load --progress=plain -f "$dockerfile" -t "$image" .
+            docker image inspect "$image" >/dev/null
+
+            echo "Smoke testing $app on port $port"
+            docker run --rm -d --name "$container" -e PORT="$port" -p "$port:$port" "$image"
+            sleep 5
+            if docker logs "$container" | grep -E "Local:|Network:|listening|started|ready" >/dev/null; then
+              echo "OK: $app started successfully"
+            else
+              echo "ERROR: $app did not show expected startup output"
+              docker logs "$container" || true
+              docker kill "$container" || true
+              exit 1
+            fi
+            docker kill "$container" || true
+          done
+
+      - name: Build and verify Nakama module image
         run: |
-          docker image inspect ${{ matrix.image }}:test >/dev/null
-          docker run --rm ${{ matrix.image }}:test ls -lh /app/dist 2>&1 || true
-          echo "✓ Nakama module bundle verified"
+          set -euo pipefail
 
-  summary:
-    runs-on: ubuntu-latest
-    needs: [build-web-apps, build-services, build-special]
-    if: always()
-    steps:
-      - name: Check build results
-        run: |
-          if [ "${{ needs.build-web-apps.result }}" = "failure" ] || [ "${{ needs.build-services.result }}" = "failure" ] || [ "${{ needs.build-special.result }}" = "failure" ]; then
-            echo "❌ One or more Docker builds failed"
-            exit 1
-          fi
-          echo "✅ All Docker builds passed successfully!"
+          image="pazaak-nakama-builder:test"
+          docker buildx build --load --progress=plain -f apps/pazaak-nakama/Dockerfile -t "$image" .
+          docker image inspect "$image" >/dev/null
+          docker run --rm "$image" ls -lh /app/dist
+          echo "OK: Nakama module bundle verified"
+
+      - name: CI summary
+        run: echo "All Docker build and smoke tests passed"
