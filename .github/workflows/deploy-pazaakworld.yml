@@ -92,6 +92,7 @@ jobs:
         env:
           BASE: /community-bots/qa-webui/
           ENABLE_SPARK: "0"
+          VITE_TRASK_API_BASE: ${{ vars.TRASK_API_BASE != '' && vars.TRASK_API_BASE || 'https://trask-worker.workers.dev' }}
         run: pnpm --filter @openkotor/holocron-web build
 
       - name: Publish Holocron web under /community-bots/qa-webui/

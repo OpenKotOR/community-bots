@@ -1,27 +1,59 @@
 # Trask Q&A Cloudflare Worker
 
-This Worker exposes the `/api/trask/ask` endpoint for the Trask Discord Q&A bot and Holocron web UI, running entirely on Cloudflare Workers.
+This Worker serves Trask Q&A remotely on Cloudflare Workers (workers.dev free tier). It is intended to back both:
 
-## Features
-- Stateless /ask endpoint for Discord and web clients
-- Calls out to the ResearchWizard backend (Python) for research
-- Supports API key and anonymous access (configurable)
+- Discord `/ask` flows via a remote Trask HTTP origin
+- Holocron static Pages UI at `https://openkotor.github.io/community-bots/qa-webui/`
 
-## Deployment
-- Configure secrets in Cloudflare dashboard or GitHub Actions
-- Deploy with `wrangler deploy --config infra/trask-worker/wrangler.toml`
-- See wrangler.toml for environment variable bindings
+## Runtime behavior
 
-## Development
-- Worker entrypoint: `src/worker.ts`
-- Build with `pnpm build:trask-worker`
-- Test with `wrangler dev --config infra/trask-worker/wrangler.toml`
+- Handles `POST /api/trask/ask`
+- Handles CORS preflight (`OPTIONS`)
+- Exposes `GET /healthz`
+- Proxies requests to `TRASK_RESEARCHWIZARD_BASE_URL/api/trask/ask`
+- Optional client auth gate via `TRASK_WEB_API_KEY`
+- Anonymous mode via `TRASK_WEB_ALLOW_ANONYMOUS=1`
 
-## CI
-- Add a GitHub Actions workflow to automate deploys on push
+## Files
 
-## TODO
-- Port all /api/trask/* endpoints
-- Remove Node/Express dependencies
-- Harden error handling and logging
-- Add Durable Object or KV for persistent storage if needed
+- Entrypoint: `infra/trask-worker/src/worker.ts`
+- Wrangler config: `infra/trask-worker/wrangler.toml`
+- CI deploy workflow: `.github/workflows/trask-worker.yml`
+
+## Local build check
+
+```powershell
+pnpm --dir infra/trask-worker run build
+pnpm dlx wrangler deploy --config infra/trask-worker/wrangler.toml --dry-run
+```
+
+## GitHub Actions deploy (remote)
+
+Workflow: `.github/workflows/trask-worker.yml`
+
+Required repository secrets:
+
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
+
+Required repository variable:
+
+- `TRASK_RESEARCHWIZARD_BASE_URL` (origin only, no trailing slash required)
+
+Optional repository secrets:
+
+- `TRASK_RESEARCHWIZARD_API_KEY` (set as Worker secret if present)
+- `TRASK_WEB_API_KEY` (set as Worker secret if present)
+
+Optional repository variable:
+
+- `TRASK_WEB_ALLOW_ANONYMOUS` (defaults to `1` in CI deploy)
+
+## Pages integration
+
+The Pages build workflow (`.github/workflows/deploy-pazaakworld.yml`) now sets:
+
+- `VITE_TRASK_API_BASE` from repository variable `TRASK_API_BASE`, or
+- falls back to `https://trask-worker.workers.dev`
+
+This keeps `qa-webui` remote-only and avoids localhost coupling.

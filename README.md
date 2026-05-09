@@ -92,6 +92,16 @@ infra/
 - **Deploy root:** [https://openkotor.github.io/community-bots/](https://openkotor.github.io/community-bots/) — operator console at `/`, Discord hub at [`/discord/`](https://openkotor.github.io/community-bots/discord/), [PazaakWorld](https://openkotor.github.io/community-bots/pazaakworld/), [Holocron / qa-webui](https://openkotor.github.io/community-bots/qa-webui/), [HK-86 hub](https://openkotor.github.io/community-bots/hk86/). The Pages workflow copies `index.html` into `discord/` and `pazaakworld/` so those routes return HTTP 200 (not only a 404-wrapped SPA shell).
 - The `/bots/` entrypoint is served from the org Pages repo [`OpenKotOR/OpenKotOR.github.io`](https://github.com/OpenKotOR/OpenKotOR.github.io) (`bots/index.html`), because `OpenKotOR/bots` is a redirect alias to this repository and cannot host a separate project site at that path.
 
+## Trask Worker Remote Deploy
+
+- Cloudflare Worker source lives in `infra/trask-worker` and deploys from `.github/workflows/trask-worker.yml`.
+- This deployment targets workers.dev (free tier) and is designed to keep Trask `/api/trask/ask` remote-only.
+- Required secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
+- Required repository variable: `TRASK_RESEARCHWIZARD_BASE_URL`.
+- Optional secrets: `TRASK_RESEARCHWIZARD_API_KEY`, `TRASK_WEB_API_KEY`.
+- Optional variable: `TRASK_WEB_ALLOW_ANONYMOUS` (`1` default).
+- Pages build for `qa-webui` reads `TRASK_API_BASE` (repo variable) and otherwise defaults to `https://trask-worker.workers.dev`.
+
 ## Getting Started
 
 1. Copy `.env.example` to `.env` and fill the relevant Discord app credentials.

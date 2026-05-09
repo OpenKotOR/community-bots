@@ -19,6 +19,8 @@
     "test:hk86-web": "pnpm --filter hk86-web test:e2e",
     "dev:pazaak": "pnpm --filter @openkotor/pazaak-bot dev",
     "dev:pazaak-world": "pnpm --filter pazaak-world dev",
+    "build:trask-worker": "pnpm --dir infra/trask-worker run build",
+    "deploy:trask-worker": "pnpm dlx wrangler@4.87.0 deploy --config infra/trask-worker/wrangler.toml",
     "dev:pazaak-nakama": "pnpm --filter @openkotor/pazaak-nakama build && docker compose -f infra/nakama/docker-compose.yml up",
     "build:pazaak-nakama": "pnpm --filter @openkotor/pazaak-nakama build",
     "dev:ingest": "pnpm --filter @openkotor/ingest-worker dev",
