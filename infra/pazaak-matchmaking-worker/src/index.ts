@@ -187,7 +187,14 @@ type WorkerSocialProvider = (typeof SOCIAL_PROVIDERS)[number];
 
 function isDiscordPublicClientEnabled(env: Env): boolean {
   const value = env.DISCORD_PUBLIC_CLIENT?.trim().toLowerCase() ?? "";
-  return value === "1" || value === "true" || value === "yes" || value === "on";
+  // Default to PKCE public-client mode unless explicitly disabled.
+  if (!value) {
+    return true;
+  }
+  if (value === "0" || value === "false" || value === "no" || value === "off") {
+    return false;
+  }
+  return true;
 }
 
 /**
