@@ -189,3 +189,4 @@ apps/hk86-web/test-results/
 # Local-only Cloudflare creds for scripts/gh-cloudflare-push-secrets-and-deploy.ps1 (never commit)
 .env.cf.local
 llm_debug_logs/
+test-results/
