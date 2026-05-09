@@ -2853,92 +2853,130 @@ function LobbyScreen({
 
         <section className="lobby-panel lobby-panel--tables">
           <div className="lobby-section-header">
-            <div>
+            <div className="lobby-section-intro">
               <p className="lobby-kicker">Open Tables</p>
               <h2>Lobby Browser</h2>
+              <p className="lobby-sub">Create a table with clear rules, then share the code or keep it public.</p>
             </div>
             <div className="lobby-create">
-              <input value={newLobbyName} onChange={(event) => setNewLobbyName(event.target.value)} aria-label="Lobby name" />
-              <input
-                type="password"
-                value={newLobbyPassword}
-                onChange={(event) => setNewLobbyPassword(event.target.value)}
-                placeholder="Password (optional)"
-                aria-label="Lobby password"
-                autoComplete="new-password"
-              />
-              <select
-                value={newLobbyVariant}
-                onChange={(event) => {
-                  const nextVariant = event.target.value === "multi_seat" ? "multi_seat" : "canonical";
-                  setNewLobbyVariant(nextVariant);
-                  if (nextVariant === "canonical") {
-                    setNewLobbyMaxPlayers(2);
-                    setNewLobbyRanked(true);
-                  }
-                }}
-                aria-label="Table variant"
-              >
-                <option value="canonical">Canonical (2-player)</option>
-                <option value="multi_seat">Multi-seat (2-5)</option>
-              </select>
-              <select
-                value={String(newLobbyVariant === "canonical" ? 2 : newLobbyMaxPlayers)}
-                onChange={(event) => setNewLobbyMaxPlayers(Number(event.target.value) || 2)}
-                aria-label="Max players"
-                disabled={newLobbyVariant === "canonical"}
-              >
-                {[2, 3, 4, 5].map((value) => <option key={value} value={value}>{value} seats</option>)}
-              </select>
-              <select
-                value={String(newLobbyMaxRounds)}
-                onChange={(event) => setNewLobbyMaxRounds(Number(event.target.value) || 3)}
-                aria-label="Sets to win"
-              >
-                {[1, 3, 5, 7, 9].map((value) => <option key={value} value={value}>{value} sets to win</option>)}
-              </select>
-              <select
-                value={String(newLobbyTurnTimer)}
-                onChange={(event) => setNewLobbyTurnTimer(Number(event.target.value) || 120)}
-                aria-label="Turn timer"
-              >
-                {[0, 30, 45, 60, 90, 120, 180].map((value) => <option key={value} value={value}>{value === 0 ? "No timer" : `${value}s`}</option>)}
-              </select>
-              <label className="lobby-toggle">
-                <input type="checkbox" checked={newLobbyRanked} onChange={(event) => setNewLobbyRanked(event.target.checked)} disabled={newLobbyVariant === "canonical"} />
-                Ranked
-              </label>
-              <label className="lobby-toggle">
-                <input type="checkbox" checked={newLobbyAllowAiFill} onChange={(event) => setNewLobbyAllowAiFill(event.target.checked)} />
-                AI Fill
-              </label>
-              <select
-                value={newLobbySideboardMode}
-                onChange={(event) => {
-                  const nextMode = event.target.value === "player_active_custom"
-                    ? "player_active_custom"
-                    : event.target.value === "host_mirror_custom"
-                      ? "host_mirror_custom"
-                      : "runtime_random";
-                  setNewLobbySideboardMode(nextMode);
-                }}
-                aria-label="Sideboard mode"
-              >
-                <option value="runtime_random">Sideboards: Runtime random</option>
-                <option value="player_active_custom">Sideboards: Each player active custom</option>
-                <option value="host_mirror_custom">Sideboards: Host mirrored custom</option>
-              </select>
-              <select
-                value={newLobbyRanked ? "canonical" : newLobbyGameMode}
-                onChange={(event) => setNewLobbyGameMode(event.target.value === "wacky" ? "wacky" : "canonical")}
-                aria-label="Game mode"
-                disabled={newLobbyRanked}
-                title={newLobbyRanked ? "Ranked lobbies must use canonical rules." : "Choose canonical TSL or the experimental Wacky card set."}
-              >
-                <option value="canonical">Mode: Canonical TSL</option>
-                <option value="wacky">Mode: Wacky (%N, /2, 00)</option>
-              </select>
-              <button className="btn btn--primary btn--sm" onClick={handleCreateLobby} disabled={!canUseLobbyControls}>Create</button>
+              <div className="lobby-create-grid">
+                <label className="lobby-field">
+                  <span>Lobby name</span>
+                  <input
+                    value={newLobbyName}
+                    onChange={(event) => setNewLobbyName(event.target.value)}
+                    aria-label="Lobby name"
+                    placeholder="Guest table"
+                  />
+                </label>
+                <label className="lobby-field">
+                  <span>Password (optional)</span>
+                  <input
+                    type="password"
+                    value={newLobbyPassword}
+                    onChange={(event) => setNewLobbyPassword(event.target.value)}
+                    placeholder="Leave blank for public"
+                    aria-label="Lobby password"
+                    autoComplete="new-password"
+                  />
+                </label>
+                <label className="lobby-field">
+                  <span>Table variant</span>
+                  <select
+                    value={newLobbyVariant}
+                    onChange={(event) => {
+                      const nextVariant = event.target.value === "multi_seat" ? "multi_seat" : "canonical";
+                      setNewLobbyVariant(nextVariant);
+                      if (nextVariant === "canonical") {
+                        setNewLobbyMaxPlayers(2);
+                        setNewLobbyRanked(true);
+                      }
+                    }}
+                    aria-label="Table variant"
+                  >
+                    <option value="canonical">Canonical (2-player)</option>
+                    <option value="multi_seat">Multi-seat (2-5)</option>
+                  </select>
+                </label>
+                <label className="lobby-field">
+                  <span>Max players</span>
+                  <select
+                    value={String(newLobbyVariant === "canonical" ? 2 : newLobbyMaxPlayers)}
+                    onChange={(event) => setNewLobbyMaxPlayers(Number(event.target.value) || 2)}
+                    aria-label="Max players"
+                    disabled={newLobbyVariant === "canonical"}
+                  >
+                    {[2, 3, 4, 5].map((value) => <option key={value} value={value}>{value} seats</option>)}
+                  </select>
+                </label>
+                <label className="lobby-field">
+                  <span>Sets to win</span>
+                  <select
+                    value={String(newLobbyMaxRounds)}
+                    onChange={(event) => setNewLobbyMaxRounds(Number(event.target.value) || 3)}
+                    aria-label="Sets to win"
+                  >
+                    {[1, 3, 5, 7, 9].map((value) => <option key={value} value={value}>{value} sets to win</option>)}
+                  </select>
+                </label>
+                <label className="lobby-field">
+                  <span>Turn timer</span>
+                  <select
+                    value={String(newLobbyTurnTimer)}
+                    onChange={(event) => setNewLobbyTurnTimer(Number(event.target.value) || 120)}
+                    aria-label="Turn timer"
+                  >
+                    {[0, 30, 45, 60, 90, 120, 180].map((value) => <option key={value} value={value}>{value === 0 ? "No timer" : `${value}s`}</option>)}
+                  </select>
+                </label>
+                <label className="lobby-field lobby-field--wide">
+                  <span>Sideboard mode</span>
+                  <select
+                    value={newLobbySideboardMode}
+                    onChange={(event) => {
+                      const nextMode = event.target.value === "player_active_custom"
+                        ? "player_active_custom"
+                        : event.target.value === "host_mirror_custom"
+                          ? "host_mirror_custom"
+                          : "runtime_random";
+                      setNewLobbySideboardMode(nextMode);
+                    }}
+                    aria-label="Sideboard mode"
+                  >
+                    <option value="runtime_random">Runtime random</option>
+                    <option value="player_active_custom">Each player active custom</option>
+                    <option value="host_mirror_custom">Host mirrored custom</option>
+                  </select>
+                </label>
+                <label className="lobby-field lobby-field--wide">
+                  <span>Game mode</span>
+                  <select
+                    value={newLobbyRanked ? "canonical" : newLobbyGameMode}
+                    onChange={(event) => setNewLobbyGameMode(event.target.value === "wacky" ? "wacky" : "canonical")}
+                    aria-label="Game mode"
+                    disabled={newLobbyRanked}
+                    title={newLobbyRanked ? "Ranked lobbies must use canonical rules." : "Choose canonical TSL or the experimental Wacky card set."}
+                  >
+                    <option value="canonical">Canonical TSL</option>
+                    <option value="wacky">Wacky (%N, /2, 00)</option>
+                  </select>
+                </label>
+              </div>
+
+              <div className="lobby-create-toggles">
+                <label className="lobby-toggle">
+                  <input type="checkbox" checked={newLobbyRanked} onChange={(event) => setNewLobbyRanked(event.target.checked)} disabled={newLobbyVariant === "canonical"} />
+                  Ranked rules
+                </label>
+                <label className="lobby-toggle">
+                  <input type="checkbox" checked={newLobbyAllowAiFill} onChange={(event) => setNewLobbyAllowAiFill(event.target.checked)} />
+                  Fill empty seats with AI
+                </label>
+              </div>
+
+              <div className="lobby-create-actions">
+                <button className="btn btn--primary" onClick={handleCreateLobby} disabled={!canUseLobbyControls}>Create Table</button>
+              </div>
             </div>
           </div>
 

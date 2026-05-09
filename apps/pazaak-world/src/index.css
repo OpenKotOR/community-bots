@@ -4849,10 +4849,15 @@ html[data-kotor-shell="light"] .pazaak-world-floating-status {
 
 .lobby-section-header {
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: flex-end;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 14px;
+  align-items: stretch;
+}
+
+.lobby-section-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .lobby-section-header h2 {
@@ -4861,25 +4866,64 @@ html[data-kotor-shell="light"] .pazaak-world-floating-status {
 }
 
 .lobby-create {
+  border: 1px solid color-mix(in srgb, var(--border) 86%, #fff 14%);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(0, 0, 0, 0.12)),
+    var(--bg-surface);
+  padding: 12px;
   display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lobby-create-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.lobby-field {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lobby-field--wide {
+  grid-column: 1 / -1;
+}
+
+.lobby-field span {
+  color: var(--text-muted);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .lobby-create input,
 .lobby-create select {
-  width: 190px;
+  width: 100%;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg-surface);
   color: var(--text);
-  padding: 7px 10px;
+  padding: 8px 10px;
 }
 
-.lobby-create select {
-  width: auto;
-  min-width: 120px;
+.lobby-create-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lobby-create-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.lobby-create-actions .btn {
+  min-width: 150px;
 }
 
 .lobby-toggle {
@@ -4889,9 +4933,13 @@ html[data-kotor-shell="light"] .pazaak-world-floating-status {
   font-size: 12px;
   color: var(--text-muted);
   border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 5px 10px;
+  border-radius: var(--radius);
+  padding: 7px 10px;
   background: var(--bg-surface);
+}
+
+.lobby-toggle input {
+  accent-color: var(--accent);
 }
 
 .lobby-queue-config {
@@ -4966,6 +5014,33 @@ html[data-kotor-shell="light"] .pazaak-world-floating-status {
   background: var(--bg-surface);
   color: var(--text);
   padding: 6px 10px;
+}
+
+@media (max-width: 760px) {
+  .lobby-create-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lobby-create-actions {
+    justify-content: stretch;
+  }
+
+  .lobby-create-actions .btn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .lobby-queue-config,
+  .lobby-join-code {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .lobby-queue-config select,
+  .lobby-join-code input,
+  .lobby-join-code .btn {
+    width: 100%;
+  }
 }
 
 .lobby-local-practice {
