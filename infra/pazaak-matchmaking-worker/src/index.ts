@@ -916,6 +916,25 @@ export default {
       return stub.fetch(request);
     }
 
+    // Generic WebSocket subscriptions for lobbies and match updates.
+    // Supports ?stream=lobbies for lobby list updates and ?matchId=<id> for specific match updates.
+    if (url.pathname === "/ws") {
+      if (!isWebSocketUpgrade(request)) {
+        return error("Expected WebSocket upgrade", 426);
+      }
+      const stream = url.searchParams.get("stream");
+      const matchId = url.searchParams.get("matchId");
+      let roomName = "default";
+      if (stream === "lobbies") {
+        roomName = "lobbies";
+      } else if (matchId) {
+        roomName = `match:${matchId}`;
+      }
+      const id = env.RELAY_ROOM.idFromName(roomName);
+      const stub = env.RELAY_ROOM.get(id);
+      return stub.fetch(request);
+    }
+
     if (!url.pathname.startsWith("/api/")) {
       return error("Not found", 404);
     }
