@@ -1584,6 +1584,8 @@ export class MatchCoordinator {
       const createdAt = nowIso();
       const lobbyId = crypto.randomUUID();
       const maxPlayers = Math.max(2, Math.min(8, Number(payload.maxPlayers ?? 2) || 2));
+      const parsedMaxRounds = Number(payload.maxRounds ?? 3);
+      const parsedTurnTimerSeconds = Number(payload.turnTimerSeconds ?? 45);
       const lobby: LobbyRecord = {
         id: lobbyId,
         lobbyCode: randomCode(6),
@@ -1593,8 +1595,11 @@ export class MatchCoordinator {
         tableSettings: {
           variant: payload.variant === "multi_seat" ? "multi_seat" : "canonical",
           maxPlayers,
-          maxRounds: Math.max(1, Math.min(9, Number(payload.maxRounds ?? 3) || 3)),
-          turnTimerSeconds: Math.max(0, Math.min(180, Number(payload.turnTimerSeconds ?? 45) || 45)),
+          maxRounds: Math.max(1, Math.min(9, Number.isFinite(parsedMaxRounds) ? parsedMaxRounds : 3)),
+          turnTimerSeconds: Math.max(
+            0,
+            Math.min(180, Number.isFinite(parsedTurnTimerSeconds) ? parsedTurnTimerSeconds : 45),
+          ),
           ranked: Boolean(payload.ranked),
           allowAiFill: Boolean(payload.allowAiFill),
           sideboardMode: payload.sideboardMode === "player_active_custom" || payload.sideboardMode === "host_mirror_custom"
