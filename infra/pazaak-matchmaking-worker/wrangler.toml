@@ -11,6 +11,7 @@ ALLOW_UNVERIFIED_INSTANCES = "1"
 DISCORD_PUBLIC_CLIENT = "1"
 PAZAAK_TURN_TIMEOUT_MS = "300000"
 PAZAAK_DISCONNECT_FORFEIT_MS = "30000"
+PAZAAK_POLICY_JSON = "{\"features\":{\"workerMatchAuthority\":true}}"
 # Where OAuth callbacks redirect after issuing app_token (GitHub Pages bundle root)
 PUBLIC_WEB_ORIGIN = "https://openkotor.github.io/community-bots/pazaakworld"
 # Optional: comma-separated worker auth accountIds allowed to call /api/admin/policy
