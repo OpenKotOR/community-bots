@@ -200,6 +200,8 @@ const discordBotsHubPath = discordHubRoute();
 const PAZAAK_WORLD_PUBLIC_URL = pazaakWorldPublicUrl();
 const QA_TRASK_WEBUI_PUBLIC_ROUTE = qaWebUiRoute();
 const QA_TRASK_WEBUI_PUBLIC_URL = qaWebUiPublicUrl();
+const OPERATOR_CONSOLE_ROUTE_TRAILING = OPERATOR_CONSOLE_ROUTE.endsWith("/") ? OPERATOR_CONSOLE_ROUTE : `${OPERATOR_CONSOLE_ROUTE}/`;
+const PAZAAK_WORLD_OAUTH_CALLBACK_BASE = `${PAZAAK_WORLD_PUBLIC_URL}/api/auth/oauth`;
 const TRASK_DISCORD_APP_ID = String(import.meta.env.VITE_TRASK_DISCORD_APP_ID ?? "1305793207036022784").trim();
 const TRASK_INSTALL_PERMISSIONS = "84992";
 
@@ -285,7 +287,7 @@ const DASHBOARD_ENDPOINT_GROUPS: DashboardEndpointGroup[] = [
       { method: "POST", path: "/api/auth/register", scope: "Account", auth: "None", availability: "Embedded API, Worker", description: "Create a standalone PazaakWorld account.", request: "{ username, displayName?, email?, password }", response: "Bearer app token, safe account, session, linked identities.", operations: "Passwords stay server-side; this page never persists bearer tokens." },
       { method: "POST", path: "/api/auth/login", scope: "Account", auth: "None", availability: "Embedded API, Worker", description: "Exchange username/email plus password for an app bearer token.", request: "{ identifier, password }", response: "Bearer app token and session summary.", operations: "Use the returned token only in local operator probes or the app session." },
       { method: "GET", path: "/api/auth/oauth/providers", scope: "OAuth", auth: "None", availability: "Embedded API, Worker", description: "Lists Google, Discord, and GitHub OAuth provider enablement.", request: "No body.", response: "Provider names with enabled flags.", operations: "After .env edits, restart the API process before checking this." },
-      { method: "POST", path: "/api/auth/oauth/:provider/start", scope: "OAuth", auth: "Optional", availability: "Embedded API", description: "Starts Google, Discord, or GitHub OAuth using the public Pages callback URL.", request: "Provider in the path. Optional existing bearer token links identity.", response: "Provider redirect URL.", operations: "Provider callbacks default to /community-bots/pazaakworld unless explicitly configured otherwise." },
+      { method: "POST", path: "/api/auth/oauth/:provider/start", scope: "OAuth", auth: "Optional", availability: "Embedded API", description: "Starts Google, Discord, or GitHub OAuth using the public Pages callback URL.", request: "Provider in the path. Optional existing bearer token links identity.", response: "Provider redirect URL.", operations: `Provider callbacks default to ${PAZAAK_WORLD_PUBLIC_ROUTE} unless explicitly configured otherwise.` },
       { method: "GET", path: "/api/auth/oauth/:provider/callback", scope: "OAuth", auth: "Provider", availability: "Embedded API", description: "Provider callback that lands back on PazaakWorld with an app token.", request: "Provider query parameters.", response: "Redirect to the frontend OAuth landing flow.", operations: "Register this URL in each provider console exactly as deployed." },
       { method: "GET", path: "/api/auth/session", scope: "Account", auth: "Bearer", availability: "Embedded API, Worker", description: "Inspect the current app session and linked identities.", request: "Authorization bearer token.", response: "Safe account and linked identity summary.", operations: "Useful to confirm cross-platform identity mapping." },
       { method: "POST", path: "/api/auth/logout", scope: "Account", auth: "Bearer", availability: "Embedded API, Worker", description: "Revokes the current app session.", request: "Authorization bearer token.", response: "{ ok: true }.", operations: "The browser should also clear its stored app token." },
@@ -379,8 +381,8 @@ const DASHBOARD_ENDPOINT_GROUPS: DashboardEndpointGroup[] = [
 
 const DASHBOARD_METRICS = [
   { label: "Repository", value: "OpenKotOR/community-bots", detail: "Renamed GitHub project" },
-  { label: "Pages base", value: "/community-bots/", detail: "GitHub project Pages mount (SPA + nested static bundles)" },
-  { label: "Pazaak route", value: "/community-bots/pazaakworld", detail: "Dedicated game route" },
+  { label: "Pages base", value: OPERATOR_CONSOLE_ROUTE_TRAILING, detail: "GitHub project Pages mount (SPA + nested static bundles)" },
+  { label: "Pazaak route", value: PAZAAK_WORLD_PUBLIC_ROUTE, detail: "Dedicated game route" },
   { label: "API port", value: "4001", detail: "Embedded matchmaking server" },
   { label: "Worker mode", value: "Fallback", detail: "Auth, queues, lobbies" },
   { label: "Export sample", value: "12,828", detail: "Public guild messages" },
@@ -405,9 +407,9 @@ const DASHBOARD_RUNBOOKS: DashboardRunbook[] = [
     steps: [
       "Install workspace dependencies with pnpm through Corepack.",
       "Copy .env.example to .env and fill Discord app id, bot token, guild id, and client secret.",
-      "Keep PAZAAK_ACTIVITY_URL and PAZAAK_PUBLIC_WEB_ORIGIN pointed at https://openkotor.github.io/community-bots/pazaakworld for production-style callbacks.",
+      `Keep PAZAAK_ACTIVITY_URL and PAZAAK_PUBLIC_WEB_ORIGIN pointed at ${PAZAAK_WORLD_PUBLIC_URL} for production-style callbacks.`,
       "Start the Pazaak bot process first; it owns the embedded HTTP and WebSocket server on port 4001.",
-      "Start the Vite frontend: operator console at `/`, Discord invite hub at `/bots` (dev) or `/community-bots/discord` (production BASE), PazaakWorld at `/pazaakworld` (dev) or `/community-bots/pazaakworld` (production).",
+      `Start the Vite frontend: operator console at \`/\`, Discord invite hub at \`/bots\` (dev) or \`${discordBotsHubPath}\` (production BASE), PazaakWorld at \`/pazaakworld\` (dev) or \`${PAZAAK_WORLD_PUBLIC_ROUTE}\` (production).`,
     ],
     commands: [
       { label: "Install", command: "corepack pnpm install --frozen-lockfile", detail: "Use after clone or lockfile changes." },
@@ -425,21 +427,21 @@ const DASHBOARD_RUNBOOKS: DashboardRunbook[] = [
   {
     id: "pages-oauth",
     title: "Pages, Routes & OAuth",
-    summary: "Deploy the static app at /community-bots with nested routes for PazaakWorld, Holocron, and HK WebUI.",
+    summary: `Deploy the static app at ${OPERATOR_CONSOLE_ROUTE_TRAILING} with nested routes for PazaakWorld, Holocron, and HK WebUI.`,
     steps: [
-      "Use the Deploy PazaakWorld workflow; it pins Vite BASE to /community-bots/, copies dist/index.html to dist/404.html, and materializes dist/discord/index.html plus dist/pazaakworld/index.html so /discord/ and /pazaakworld/ return HTTP 200 (not only a 404-wrapped SPA shell).",
-      "Register https://openkotor.github.io/community-bots/pazaakworld as the public Activity/browser route.",
-      "Register provider callbacks at https://openkotor.github.io/community-bots/pazaakworld/api/auth/oauth/<provider>/callback unless a deployed API origin requires a provider-specific callback.",
-      "Set the repository homepage to https://openkotor.github.io/community-bots/pazaakworld; invite hub lives at /community-bots/discord and operator tooling defaults to /community-bots.",
+      `Use the Deploy PazaakWorld workflow; it pins Vite BASE to ${OPERATOR_CONSOLE_ROUTE_TRAILING}, copies dist/index.html to dist/404.html, and materializes dist/discord/index.html plus dist/pazaakworld/index.html so /discord/ and /pazaakworld/ return HTTP 200 (not only a 404-wrapped SPA shell).`,
+      `Register ${PAZAAK_WORLD_PUBLIC_URL} as the public Activity/browser route.`,
+      `Register provider callbacks at ${PAZAAK_WORLD_OAUTH_CALLBACK_BASE}/<provider>/callback unless a deployed API origin requires a provider-specific callback.`,
+      `Set the repository homepage to ${PAZAAK_WORLD_PUBLIC_URL}; invite hub lives at ${discordBotsHubPath} and operator tooling defaults to ${OPERATOR_CONSOLE_ROUTE}.`,
     ],
     commands: [
       { label: "Frontend build", command: "corepack pnpm --filter pazaak-world build", detail: "Builds the Pages artifact." },
-      { label: "Repo homepage", command: "gh repo edit OpenKotOR/community-bots --homepage https://openkotor.github.io/community-bots/pazaakworld", detail: "Keeps GitHub metadata aligned." },
+      { label: "Repo homepage", command: `gh repo edit OpenKotOR/community-bots --homepage ${PAZAAK_WORLD_PUBLIC_URL}`, detail: "Keeps GitHub metadata aligned." },
       { label: "Repo verify", command: "gh repo view OpenKotOR/community-bots --json nameWithOwner,url,homepageUrl", detail: "Confirms rename and homepage." },
     ],
     checks: [
-      "/community-bots loads this operator console; /community-bots/discord is the public Discord bots landing.",
-      "/community-bots/pazaakworld/ serves PazaakWorld with HTTP 200; other client-only paths still rely on 404.html as the SPA shell.",
+      `${OPERATOR_CONSOLE_ROUTE} loads this operator console; ${discordBotsHubPath} is the public Discord bots landing.`,
+      `${PAZAAK_WORLD_PUBLIC_ROUTE}/ serves PazaakWorld with HTTP 200; other client-only paths still rely on 404.html as the SPA shell.`,
       "OAuth callback URLs do not point at localhost in production env files.",
       "Repository variable PAZAAK_API_BASES contains deployed API origins when using remote APIs.",
     ],
@@ -507,7 +509,7 @@ const DASHBOARD_SOLUTIONS: DashboardSolution[] = [
 ];
 
 const DASHBOARD_CHECKLIST: DashboardChecklistItem[] = [
-  { id: "routes", label: "Routes verified", detail: "/community-bots/discord is the Discord hub; /community-bots is this console; /community-bots/pazaakworld shows the game." },
+  { id: "routes", label: "Routes verified", detail: `${discordBotsHubPath} is the Discord hub; ${OPERATOR_CONSOLE_ROUTE} is this console; ${PAZAAK_WORLD_PUBLIC_ROUTE} shows the game.` },
   { id: "api", label: "API probe passes", detail: "The selected target responds to /api/ping or /api/health." },
   { id: "oauth", label: "OAuth callbacks aligned", detail: "Provider callbacks target the public Pages PazaakWorld URL or the intended API origin." },
   { id: "worker", label: "Fallback decided", detail: "Worker fallback is either deployed and in PAZAAK_API_BASES, or intentionally unused." },
@@ -518,7 +520,7 @@ const DASHBOARD_CHECKLIST: DashboardChecklistItem[] = [
 const COMMON_PROBLEMS = [
   { symptom: "Dashboard shows API offline", cause: "Selected API target is wrong, the bot API is not running, or CORS blocks the browser origin.", fix: "Run corepack pnpm dev:pazaak, set the API target to http://localhost:4001 for local checks, then run Ping and Health probes." },
   { symptom: "OAuth buttons are unavailable", cause: "Provider client id/secret is missing, or the API process was not restarted after .env edits.", fix: "Run corepack pnpm check:pazaak-oauth, fill provider vars, restart the API, then probe /api/auth/oauth/providers." },
-  { symptom: "curl or bots show HTTP 404 for /community-bots/discord or /pazaakworld (no trailing slash)", cause: "GitHub Pages had no physical index.html under those paths.", fix: "Deploy workflow must copy dist/index.html into dist/discord/index.html and dist/pazaakworld/index.html; trailing-slash URLs should return 200, bare paths may 301 to the slash form." },
+  { symptom: `curl or bots show HTTP 404 for ${discordBotsHubPath} or /pazaakworld (no trailing slash)`, cause: "GitHub Pages had no physical index.html under those paths.", fix: "Deploy workflow must copy dist/index.html into dist/discord/index.html and dist/pazaakworld/index.html; trailing-slash URLs should return 200, bare paths may 301 to the slash form." },
   { symptom: "Worker queues work but matches fail", cause: "Expected fallback limitation: the Worker does not run authoritative match actions.", fix: "Put the embedded API first in VITE_API_BASES for live multiplayer, and keep Worker as fallback for account/queue/lobby continuity." },
   { symptom: "Trask answers stale content", cause: "Queued source refresh jobs were not drained or source credentials are missing.", fix: "Run corepack pnpm dev:ingest -- drain-queue, then show-indexed to confirm refreshed source counts." },
 ];
@@ -564,7 +566,7 @@ const DASHBOARD_ONBOARDING_GUIDES: DashboardOnboardingGuide[] = [
     title: "Publish public Pages and optional public APIs",
     summary: "Keep static Pages, then layer in a remote API only for the capabilities you actually need.",
     steps: [
-      "Deploy Pages under /community-bots with the workflow in this repo; it pins BASE=/community-bots/ and SPA fallback via 404.html.",
+      `Deploy Pages under ${OPERATOR_CONSOLE_ROUTE} with the workflow in this repo; it pins BASE=${OPERATOR_CONSOLE_ROUTE_TRAILING} and SPA fallback via 404.html.`,
       "If you need public auth, queue, lobby, and profile continuity, deploy the Cloudflare Worker fallback and set PAZAAK_API_BASES.",
       "If you need live authoritative multiplayer, put a public embedded API in front of the Worker fallback and keep the Worker second in VITE_API_BASES.",
       "Verify the final public URLs and provider callback URLs after each change.",
