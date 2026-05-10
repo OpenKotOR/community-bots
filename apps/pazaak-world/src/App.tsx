@@ -88,7 +88,8 @@ const USER_SETTINGS_STORAGE_KEY = "pazaak-user-settings-v1";
 const AUTH_MODE_STORAGE_KEY = "pazaak-world-auth-mode-v1";
 const ONBOARDING_STORAGE_KEY = "pazaak-world-onboarding-v1";
 const LOCAL_GUEST_ID_KEY = "pazaak-world-local-guest-id-v1";
-const CHITIN_PROOF_STORAGE_KEY = "cardworld-chitin-proof-v1";
+const CHITIN_PROOF_STORAGE_KEY = "pazaak-world-chitin-proof-v1";
+const LEGACY_CHITIN_PROOF_STORAGE_KEY = "cardworld-chitin-proof-v1";
 
 const DEFAULT_CARDWORLD_CONFIG: CardWorldConfig = {
   botGameType: "pazaak",
@@ -103,13 +104,12 @@ interface OwnershipProofRecord {
   uploadedAt: string;
 }
 
-const loadOwnershipProof = (): OwnershipProofRecord | null => {
-  try {
-    const raw = window.localStorage.getItem(CHITIN_PROOF_STORAGE_KEY);
-    if (!raw) {
-      return null;
-    }
+const parseOwnershipProofRecord = (raw: string | null): OwnershipProofRecord | null => {
+  if (!raw) {
+    return null;
+  }
 
+  try {
     const parsed = JSON.parse(raw) as Partial<OwnershipProofRecord>;
     if (!parsed.filename || typeof parsed.size !== "number" || !parsed.uploadedAt) {
       return null;
@@ -120,6 +120,26 @@ const loadOwnershipProof = (): OwnershipProofRecord | null => {
       size: parsed.size,
       uploadedAt: parsed.uploadedAt,
     };
+  } catch {
+    return null;
+  }
+};
+
+const loadOwnershipProof = (): OwnershipProofRecord | null => {
+  try {
+    const primary = parseOwnershipProofRecord(window.localStorage.getItem(CHITIN_PROOF_STORAGE_KEY));
+    if (primary) {
+      return primary;
+    }
+
+    const legacy = parseOwnershipProofRecord(window.localStorage.getItem(LEGACY_CHITIN_PROOF_STORAGE_KEY));
+    if (!legacy) {
+      return null;
+    }
+
+    // Auto-migrate valid legacy data to the canonical key.
+    window.localStorage.setItem(CHITIN_PROOF_STORAGE_KEY, JSON.stringify(legacy));
+    return legacy;
   } catch {
     return null;
   }

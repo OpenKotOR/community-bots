@@ -38,7 +38,7 @@ function seedStandaloneMatchHub(
         /* ignore */
       }
       localStorage.setItem("pazaak-world-onboarding-v1", onb);
-      localStorage.setItem("cardworld-chitin-proof-v1", chi);
+      localStorage.setItem("pazaak-world-chitin-proof-v1", chi);
       localStorage.setItem("pazaak-world-local-guest-id-v1", gid);
       localStorage.removeItem("pazaak-world-standalone-auth-token-v1");
     },
