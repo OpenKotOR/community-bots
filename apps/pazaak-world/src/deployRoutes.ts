@@ -3,8 +3,17 @@ export function viteBasePath(): string {
   return (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 }
 
-/** Canonical GitHub Pages root for this repository (project site). */
-export const GITHUB_PAGES_SITE_ROOT = "https://openkotor.github.io/community-bots";
+export const GITHUB_PAGES_ORIGIN = "https://openkotor.github.io";
+/** Legacy fallback root when build-time BASE is unavailable. */
+export const GITHUB_PAGES_SITE_ROOT = `${GITHUB_PAGES_ORIGIN}/community-bots`;
+
+function resolvePagesSiteRootFromBasePath(): string {
+  const b = viteBasePath();
+  if (b && b !== "/") {
+    return `${GITHUB_PAGES_ORIGIN}${b}`;
+  }
+  return GITHUB_PAGES_SITE_ROOT;
+}
 
 /** Operator dashboard lives at the SPA deploy root. */
 export function operatorConsoleRoute(): string {
@@ -31,9 +40,8 @@ export function qaWebUiRoute(): string {
 }
 
 export function pazaakWorldPublicUrl(): string {
-  const b = viteBasePath();
-  if (import.meta.env.PROD && b) {
-    return `${GITHUB_PAGES_SITE_ROOT}/pazaakworld`;
+  if (import.meta.env.PROD) {
+    return `${resolvePagesSiteRootFromBasePath()}/pazaakworld`;
   }
   if (typeof window !== "undefined") {
     return `${window.location.origin}${pazaakWorldRoute()}`;
@@ -42,9 +50,8 @@ export function pazaakWorldPublicUrl(): string {
 }
 
 export function qaWebUiPublicUrl(): string {
-  const b = viteBasePath();
-  if (import.meta.env.PROD && b) {
-    return `${GITHUB_PAGES_SITE_ROOT}/qa-webui/`;
+  if (import.meta.env.PROD) {
+    return `${resolvePagesSiteRootFromBasePath()}/qa-webui/`;
   }
   if (typeof window !== "undefined") {
     return `${window.location.origin}${qaWebUiRoute()}`;
