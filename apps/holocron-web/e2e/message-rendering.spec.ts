@@ -202,6 +202,30 @@ test('renders answers, sources, and only real expansion controls', async ({ page
   await expect(expandableArticle.getByRole('button', { name: 'Show less' })).toBeVisible()
 })
 
+test('keeps citation chips linked to parsed sources', async ({ page }) => {
+  await openSeededConversation(page)
+
+  const completedArticle = page.getByRole('article', { name: 'Assistant message' }).filter({ hasText: 'Completed answer from Trask' }).first()
+  const citationLink = completedArticle.getByRole('link', { name: '1' }).first()
+
+  await expect(citationLink).toBeVisible()
+  await expect(citationLink).toHaveAttribute('href', 'https://deadlystream.com/topic/answer')
+  await expect(citationLink).toHaveAttribute('target', '_blank')
+  await expect(citationLink).toHaveAttribute('rel', 'noopener noreferrer')
+})
+
+test('renders source-only assistant replies with fallback guidance', async ({ page }) => {
+  await openSeededConversation(page)
+
+  const sourceOnlyArticle = page.getByRole('article', { name: 'Assistant message' }).filter({ hasText: 'PCGamingWiki KOTOR' }).first()
+
+  await expect(sourceOnlyArticle.getByText('Trask returned source references, but no visible answer text')).toBeVisible()
+  await expect(sourceOnlyArticle.getByRole('button', { name: 'Show more' })).toHaveCount(0)
+  const sourceItem = sourceOnlyArticle.getByRole('listitem').filter({ hasText: 'PCGamingWiki KOTOR' }).first()
+  await expect(sourceItem).toBeVisible()
+  await expect(sourceItem).toContainText('pcgamingwiki.com')
+})
+
 test('keeps dark-glass controls readable', async ({ page }) => {
   await openSeededConversation(page)
 
