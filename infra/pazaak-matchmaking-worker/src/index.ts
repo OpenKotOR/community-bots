@@ -1743,6 +1743,7 @@ export class MatchCoordinator {
             playerTwoName: p2!.displayName,
             gameMode: gm,
             setsToWin: lobby.tableSettings.maxRounds,
+            turnTimeoutMs: lobby.tableSettings.turnTimerSeconds * 1000,
           }),
         }),
       );

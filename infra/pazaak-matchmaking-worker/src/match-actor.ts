@@ -40,6 +40,7 @@ export class MatchActor {
   private readonly env: MatchActorEnv;
   private coordinator: PazaakCoordinator | null = null;
   private initPromise: Promise<PazaakCoordinator> | null = null;
+  private turnTimeoutOverrideMs: number | null = null;
 
   constructor(ctx: DurableObjectState, env: MatchActorEnv) {
     this.ctx = ctx;
@@ -49,8 +50,9 @@ export class MatchActor {
   private coordinatorOptions(): ConstructorParameters<typeof PazaakCoordinator>[1] {
     const turnMs = Number(this.env.PAZAAK_TURN_TIMEOUT_MS ?? "300000");
     const discMs = Number(this.env.PAZAAK_DISCONNECT_FORFEIT_MS ?? "30000");
+    const resolvedTurnMs = this.turnTimeoutOverrideMs ?? turnMs;
     return {
-      turnTimeoutMs: Number.isFinite(turnMs) ? turnMs : 300_000,
+      turnTimeoutMs: Number.isFinite(resolvedTurnMs) ? resolvedTurnMs : 300_000,
       disconnectForfeitMs: Number.isFinite(discMs) ? discMs : 30_000,
     };
   }
@@ -146,6 +148,7 @@ export class MatchActor {
       const p2Name = String(body.playerTwoName ?? "Player 2").slice(0, 48);
       const gameMode = body.gameMode === "wacky" ? "wacky" : "canonical";
       const setsToWin = typeof body.setsToWin === "number" ? body.setsToWin : undefined;
+      const turnTimeoutMs = typeof body.turnTimeoutMs === "number" ? body.turnTimeoutMs : undefined;
       if (!matchId || !p1Id || !p2Id) {
         return error("matchId, playerOneId, and playerTwoId are required", 400);
       }
@@ -154,6 +157,10 @@ export class MatchActor {
       if (existing) {
         await this.ensureCoordinator();
         return json({ snapshot: existing, alreadyExists: true });
+      }
+
+      if (turnTimeoutMs !== undefined && Number.isFinite(turnTimeoutMs)) {
+        this.turnTimeoutOverrideMs = Math.max(0, Math.min(180_000, Math.trunc(turnTimeoutMs)));
       }
 
       const coord = await this.ensureCoordinator();
