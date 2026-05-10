@@ -12,6 +12,7 @@ export type MatchActorCreatePayload = {
   gameMode: "canonical" | "wacky";
   setsToWin: number;
   turnTimeoutMs: number;
+  opponentAiDifficulty?: string;
 };
 
 export function selectAccountByUsernameOrEmail<T extends AccountLike>(
@@ -48,6 +49,7 @@ export function buildMatchActorCreatePayload(input: {
   gameMode: string;
   maxRounds: number;
   turnTimerSeconds: number;
+  opponentAiDifficulty?: string;
 }): MatchActorCreatePayload {
   return {
     matchId: input.matchId,
@@ -58,5 +60,6 @@ export function buildMatchActorCreatePayload(input: {
     gameMode: input.gameMode === "wacky" ? "wacky" : "canonical",
     setsToWin: input.maxRounds,
     turnTimeoutMs: input.turnTimerSeconds * 1000,
+    ...(input.opponentAiDifficulty ? { opponentAiDifficulty: input.opponentAiDifficulty } : {}),
   };
 }

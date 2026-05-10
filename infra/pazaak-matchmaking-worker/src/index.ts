@@ -117,6 +117,7 @@ type LobbyPlayer = {
   ready: boolean;
   isHost: boolean;
   isAi: boolean;
+  aiDifficulty?: string;
   joinedAt: string;
 };
 
@@ -1075,7 +1076,7 @@ export class PazaakRelayRoom {
     server.addEventListener("close", () => this.handleClose(server));
     server.addEventListener("error", () => this.handleClose(server));
 
-    return new Response(null, { status: 101, webSocket: client } as ResponseInit & { webSocket: WebSocket });
+    return new Response(null, { status: 101, webSocket: client } as ResponseInit & { webSocket: WebSocket };
   }
 
   private async handleMessage(ws: WebSocket, raw: string): Promise<void> {
@@ -1843,26 +1844,31 @@ export class MatchCoordinator {
         return error("Only the host can start this lobby.", 403);
       }
       const humans = lobby.players.filter((player) => !player.isAi);
-      if (humans.length < 2) {
-        return error("At least two human players are required to start.", 400);
+      const aiPlayers = lobby.players.filter((player) => player.isAi);
+      if (humans.length < 1) {
+        return error("At least one human player is required to start.", 400);
       }
-      const [p1, p2] = humans;
+      if (humans.length < 2 && aiPlayers.length < 1) {
+        return error("At least two players are required to start.", 400);
+      }
+      const p1 = humans[0]!;
+      // Use second human if available; otherwise the first AI player.
+      const p2 = humans.length >= 2 ? humans[1]! : aiPlayers[0]!;
       const matchId = crypto.randomUUID();
-      const ra = [policy.matchmaking.defaultRegionId];
-      const rb = [policy.matchmaking.defaultRegionId];
       const namespace = this.env.MATCH_ACTOR;
       const stub = namespace.get(
         namespace.idFromName(matchId),
       );
       const createPayload = buildMatchActorCreatePayload({
         matchId,
-        playerOneId: p1!.userId,
-        playerOneName: p1!.displayName,
-        playerTwoId: p2!.userId,
-        playerTwoName: p2!.displayName,
+        playerOneId: p1.userId,
+        playerOneName: p1.displayName,
+        playerTwoId: p2.userId,
+        playerTwoName: p2.displayName,
         gameMode: lobby.tableSettings.gameMode,
         maxRounds: lobby.tableSettings.maxRounds,
         turnTimerSeconds: lobby.tableSettings.turnTimerSeconds,
+        ...(p2.isAi && p2.aiDifficulty ? { opponentAiDifficulty: p2.aiDifficulty } : {}),
       });
       const createRes = await stub.fetch(
         new Request("http://internal/create", {
@@ -1875,11 +1881,12 @@ export class MatchCoordinator {
         const errText = await createRes.text();
         return error(errText || "Failed to create match", createRes.status);
       }
+      const createBody = await createRes.json<{ snapshot: unknown }>();
       lobby.matchId = matchId;
       lobby.status = "in_game";
       lobby.updatedAt = nowIso();
       await this.persist(state);
-      return json({ lobby, matchId });
+      return json({ lobby, match: createBody.snapshot });
     }
 
     if (path === "/api/match/me" && request.method === "GET") {

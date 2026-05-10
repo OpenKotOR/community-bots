@@ -149,6 +149,9 @@ export class MatchActor {
       const gameMode = body.gameMode === "wacky" ? "wacky" : "canonical";
       const setsToWin = typeof body.setsToWin === "number" ? body.setsToWin : undefined;
       const turnTimeoutMs = typeof body.turnTimeoutMs === "number" ? body.turnTimeoutMs : undefined;
+      const rawAiDiff = typeof body.opponentAiDifficulty === "string" ? body.opponentAiDifficulty.trim() : "";
+      const opponentAiDifficulty: "easy" | "hard" | "professional" | undefined =
+        rawAiDiff === "easy" || rawAiDiff === "hard" || rawAiDiff === "professional" ? rawAiDiff : undefined;
       if (!matchId || !p1Id || !p2Id) {
         return error("matchId, playerOneId, and playerTwoId are required", 400);
       }
@@ -175,6 +178,7 @@ export class MatchActor {
           setsToWin,
           gameMode,
           matchId,
+          ...(opponentAiDifficulty ? { opponentAiDifficulty } : {}),
         });
       } catch (err) {
         return error(err instanceof Error ? err.message : String(err), 400);
@@ -240,6 +244,21 @@ export class MatchActor {
         }
       } catch (err) {
         return error(err instanceof Error ? err.message : String(err), 400);
+      }
+
+      // Auto-advance AI turns so the client always receives state on the human's turn.
+      const MAX_AI_STEPS = 20;
+      let aiSteps = 0;
+      while (updated.phase !== "completed" && aiSteps < MAX_AI_STEPS) {
+        const activePlayer = updated.players[updated.activePlayerIndex];
+        const aiDiff = activePlayer?.userId ? updated.aiSeats?.[activePlayer.userId] : undefined;
+        if (!aiDiff || !activePlayer) break;
+        try {
+          updated = coord.executeAiMove(matchId, activePlayer.userId, aiDiff);
+        } catch {
+          break;
+        }
+        aiSteps++;
       }
 
       const seq = await this.bumpSeq();
