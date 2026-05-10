@@ -30,6 +30,11 @@ import {
 } from "@openkotor/pazaak-policy";
 
 import { MatchActor } from "./match-actor.js";
+import {
+  buildMatchActorCreatePayload,
+  normalizeLobbyRoundAndTimerSettings,
+  selectAccountByUsernameOrEmail,
+} from "./lobby-auth-helpers.js";
 
 export { MatchActor };
 
@@ -1370,9 +1375,7 @@ export class MatchCoordinator {
       const username = toSlug(String(body.username ?? identifier)).slice(0, 32);
       const email = typeof body.email === "string" && body.email.includes("@") ? body.email : null;
 
-      let account = Object.values(state.accounts).find(
-        (candidate) => candidate.username === username || (email !== null && candidate.email === email),
-      );
+      let account = selectAccountByUsernameOrEmail(state.accounts, username, email);
       if (!account) {
         const createdAt = nowIso();
         account = {
@@ -1584,8 +1587,10 @@ export class MatchCoordinator {
       const createdAt = nowIso();
       const lobbyId = crypto.randomUUID();
       const maxPlayers = Math.max(2, Math.min(8, Number(payload.maxPlayers ?? 2) || 2));
-      const parsedMaxRounds = Number(payload.maxRounds ?? 3);
-      const parsedTurnTimerSeconds = Number(payload.turnTimerSeconds ?? 45);
+      const roundsAndTimer = normalizeLobbyRoundAndTimerSettings({
+        maxRounds: payload.maxRounds,
+        turnTimerSeconds: payload.turnTimerSeconds,
+      });
       const lobby: LobbyRecord = {
         id: lobbyId,
         lobbyCode: randomCode(6),
@@ -1595,11 +1600,8 @@ export class MatchCoordinator {
         tableSettings: {
           variant: payload.variant === "multi_seat" ? "multi_seat" : "canonical",
           maxPlayers,
-          maxRounds: Math.max(1, Math.min(9, Number.isFinite(parsedMaxRounds) ? parsedMaxRounds : 3)),
-          turnTimerSeconds: Math.max(
-            0,
-            Math.min(180, Number.isFinite(parsedTurnTimerSeconds) ? parsedTurnTimerSeconds : 45),
-          ),
+          maxRounds: roundsAndTimer.maxRounds,
+          turnTimerSeconds: roundsAndTimer.turnTimerSeconds,
           ranked: Boolean(payload.ranked),
           allowAiFill: Boolean(payload.allowAiFill),
           sideboardMode: payload.sideboardMode === "player_active_custom" || payload.sideboardMode === "host_mirror_custom"
@@ -1735,21 +1737,21 @@ export class MatchCoordinator {
       const stub = namespace.get(
         namespace.idFromName(matchId),
       );
-      const gm = lobby.tableSettings.gameMode === "wacky" ? "wacky" : "canonical";
+      const createPayload = buildMatchActorCreatePayload({
+        matchId,
+        playerOneId: p1!.userId,
+        playerOneName: p1!.displayName,
+        playerTwoId: p2!.userId,
+        playerTwoName: p2!.displayName,
+        gameMode: lobby.tableSettings.gameMode,
+        maxRounds: lobby.tableSettings.maxRounds,
+        turnTimerSeconds: lobby.tableSettings.turnTimerSeconds,
+      });
       const createRes = await stub.fetch(
         new Request("http://internal/create", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            matchId,
-            playerOneId: p1!.userId,
-            playerOneName: p1!.displayName,
-            playerTwoId: p2!.userId,
-            playerTwoName: p2!.displayName,
-            gameMode: gm,
-            setsToWin: lobby.tableSettings.maxRounds,
-            turnTimeoutMs: lobby.tableSettings.turnTimerSeconds * 1000,
-          }),
+          body: JSON.stringify(createPayload),
         }),
       );
       if (!createRes.ok) {
