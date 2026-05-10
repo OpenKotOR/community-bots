@@ -537,7 +537,7 @@ const DASHBOARD_ONBOARDING_GUIDES: DashboardOnboardingGuide[] = [
       "Use the hub cards below to jump into the game, inspect queue/lobby activity, or copy working Discord and CLI entry points for other bots.",
     ],
     commands: [
-      { label: "PazaakWorld", command: "https://openkotor.github.io/community-bots/pazaakworld", detail: "Game route and sign-in surface." },
+      { label: "PazaakWorld", command: PAZAAK_WORLD_PUBLIC_URL, detail: "Game route and sign-in surface." },
       { label: "Public probes", command: "Run Public Probes", detail: "Checks ping, health, providers, and opponents from this page." },
       { label: "Trask", command: "/ask query:<topic>", detail: "Working Discord slash command for research answers." },
     ],
@@ -1597,8 +1597,8 @@ export function CommunityBotsDashboard() {
             <span>Frontend route</span>
             <strong>{window.location.pathname}</strong>
             <small>
-              Deployed operator console: <code>/community-bots</code>; invite hub: <code>/community-bots/discord</code>; game:{" "}
-              <code>/community-bots/pazaakworld</code>.
+              Deployed operator console: <code>{OPERATOR_CONSOLE_ROUTE}</code>; invite hub: <code>{discordBotsHubPath}</code>; game:{" "}
+              <code>{PAZAAK_WORLD_PUBLIC_ROUTE}</code>.
             </small>
           </article>
           <article>
@@ -1948,7 +1948,7 @@ export function CommunityBotsDashboard() {
                   <div className="bots-dashboard-live-panel__header">
                     <div>
                       <p className="bots-dashboard-kicker">Embedded QA Surface</p>
-                      <h3>Trask web UI inside the /community-bots deployment</h3>
+                      <h3>Trask web UI inside the {OPERATOR_CONSOLE_ROUTE} deployment</h3>
                     </div>
                     <div className="bots-dashboard-card-actions">
                       <a href={QA_TRASK_WEBUI_PUBLIC_ROUTE}>Open route</a>
