@@ -485,6 +485,108 @@ type AppState =
   | { stage: "tournament"; auth: ActivitySession; tournamentId?: string | null }
   | { stage: "trask"; auth: ActivitySession };
 
+type RequestedCardWorldPage = {
+  stage: Exclude<AppState["stage"], "loading" | "auth_error">;
+  matchId?: string;
+  tournamentId?: string | null;
+};
+
+function uniqueRouteBases(bases: string[]): string[] {
+  return [...new Set(bases.map((base) => base.replace(/\/+$/u, "") || "/"))];
+}
+
+function readSubpathFromBases(pathname: string, bases: string[]): string {
+  for (const base of bases) {
+    if (pathname === base || pathname === `${base}/`) {
+      return "";
+    }
+    if (pathname.startsWith(`${base}/`)) {
+      return pathname.slice(base.length).replace(/^\/+/, "");
+    }
+  }
+  return "";
+}
+
+function cardWorldRouteBases(): string[] {
+  return uniqueRouteBases([cardWorldRoute(), "/cardworld", "/pazaakworld", "/bots/pazaakworld"]);
+}
+
+function createDefaultLocalGameState(auth: ActivitySession): Extract<AppState, { stage: "local_game" }> {
+  const opponent = getDefaultLocalOpponentForDifficulty("professional");
+  return {
+    stage: "local_game",
+    auth,
+    difficulty: opponent.difficulty,
+    opponentId: opponent.id,
+  };
+}
+
+function readRequestedCardWorldPage(defaultPublicGameType: CardWorldConfig["defaultPublicGameType"]): RequestedCardWorldPage {
+  const pathname = normalizePathname();
+  const subpath = readSubpathFromBases(pathname, cardWorldRouteBases());
+  if (!subpath) {
+    return { stage: defaultPublicGameType === "blackjack" ? "blackjack_game" : "mode_selection" };
+  }
+
+  const [head, tail] = subpath.split("/");
+  switch (head) {
+    case "":
+    case "play":
+      return { stage: "mode_selection" };
+    case "onboarding":
+      return { stage: "onboarding" };
+    case "matchmaking":
+      return { stage: "matchmaking" };
+    case "lobby":
+      return { stage: "lobby" };
+    case "practice":
+      return { stage: "local_game" };
+    case "blackjack":
+      return { stage: "blackjack_game" };
+    case "workshop":
+      return { stage: "workshop" };
+    case "trask":
+      return { stage: "trask" };
+    case "tournaments":
+      return { stage: "tournament", tournamentId: tail ? decodeURIComponent(tail).trim() || null : null };
+    case "match": {
+      const matchId = tail ? decodeURIComponent(tail).trim() : "";
+      return matchId ? { stage: "game", matchId } : { stage: "mode_selection" };
+    }
+    default:
+      return { stage: "mode_selection" };
+  }
+}
+
+function buildCardWorldPath(state: AppState): string | null {
+  const base = cardWorldRoute();
+  switch (state.stage) {
+    case "loading":
+    case "auth_error":
+      return null;
+    case "mode_selection":
+      return base;
+    case "onboarding":
+      return `${base}/onboarding`;
+    case "matchmaking":
+      return `${base}/matchmaking`;
+    case "lobby":
+      return `${base}/lobby`;
+    case "local_game":
+      return `${base}/practice`;
+    case "blackjack_game":
+      return `${base}/blackjack`;
+    case "workshop":
+      return `${base}/workshop`;
+    case "tournament":
+      return state.tournamentId ? `${base}/tournaments/${encodeURIComponent(state.tournamentId)}` : `${base}/tournaments`;
+    case "trask":
+      return `${base}/trask`;
+    case "game":
+      return `${base}/match/${encodeURIComponent(state.match.id)}`;
+  }
+}
+
 function getSessionFromAppState(state: AppState): ActivitySession | null {
   switch (state.stage) {
     case "loading":
@@ -554,6 +656,7 @@ function CardWorldApp() {
   }, [onboardingState.completed]);
 
   const routePostAuth = useCallback((session: ActivitySession, match: SerializedMatch | null) => {
+    const requestedPage = readRequestedCardWorldPage(cardWorldConfig.defaultPublicGameType);
     if (match) {
       setState({ stage: "game", auth: session, match });
       return;
@@ -565,11 +668,42 @@ function CardWorldApp() {
     }
 
     if (!isDiscordActivity() && cardWorldConfig.defaultPublicGameType === "blackjack") {
-      setState({ stage: "blackjack_game", auth: session });
-      return;
+      if (requestedPage.stage === "mode_selection" || requestedPage.stage === "game") {
+        setState({ stage: "blackjack_game", auth: session });
+        return;
+      }
     }
 
-    setState({ stage: "mode_selection", auth: session });
+    switch (requestedPage.stage) {
+      case "onboarding":
+        setState({ stage: "onboarding", auth: session });
+        return;
+      case "matchmaking":
+        setState({ stage: "matchmaking", auth: session, preferredMaxPlayers: 2 });
+        return;
+      case "lobby":
+        setState({ stage: "lobby", auth: session });
+        return;
+      case "local_game":
+        setState(createDefaultLocalGameState(session));
+        return;
+      case "blackjack_game":
+        setState({ stage: "blackjack_game", auth: session });
+        return;
+      case "workshop":
+        setState({ stage: "workshop", auth: session, returnTo: "lobby" });
+        return;
+      case "tournament":
+        setState({ stage: "tournament", auth: session, tournamentId: requestedPage.tournamentId ?? null });
+        return;
+      case "trask":
+        setState({ stage: "trask", auth: session });
+        return;
+      case "game":
+      case "mode_selection":
+      default:
+        setState({ stage: "mode_selection", auth: session });
+    }
   }, [cardWorldConfig.defaultPublicGameType, shouldRequireOnboarding]);
 
   const handleSettingsSave = useCallback(async (settings: PazaakUserSettings) => {
@@ -870,6 +1004,27 @@ function CardWorldApp() {
     document.title = stageTitles[state.stage] ?? "CardWorld";
   }, [state.stage]);
 
+  useEffect(() => {
+    if (isDiscordActivity()) {
+      return;
+    }
+
+    const nextPath = buildCardWorldPath(state);
+    if (!nextPath) {
+      return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    params.delete("matchId");
+    const nextUrl = `${nextPath}${params.toString() ? `?${params.toString()}` : ""}`;
+    const currentUrl = `${window.location.pathname}${window.location.search}`;
+    if (currentUrl === nextUrl) {
+      return;
+    }
+
+    window.history.replaceState({}, "", nextUrl);
+  }, [state.stage, state.stage === "game" ? state.match.id : null, state.stage === "tournament" ? state.tournamentId ?? null : null]);
+
   // On mount: run Discord SDK auth, then poll for an active match.
   useEffect(() => {
     standaloneAuthBootSeq.current += 1;
@@ -880,6 +1035,7 @@ function CardWorldApp() {
       try {
         if (!isDiscordActivity()) {
           const params = new URLSearchParams(window.location.search);
+          const requestedPage = readRequestedCardWorldPage(cardWorldConfig.defaultPublicGameType);
           const oauthToken = params.get("oauth_app_token")?.trim() || "";
           const oauthError = params.get("oauth_error")?.trim() || "";
           const clearOauthQuery = () => {
@@ -904,7 +1060,7 @@ function CardWorldApp() {
           }
 
           const accessToken = oauthToken || getStoredStandaloneAuthToken();
-          const requestedMatchId = params.get("matchId")?.trim() || "";
+          const requestedMatchId = (requestedPage.matchId ?? params.get("matchId")?.trim()) || "";
 
           if (accessToken) {
             try {

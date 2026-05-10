@@ -98,6 +98,9 @@ verify participants with Discord before accepting a room join.
 
 ## Social OAuth (Google / Discord / GitHub)
 
+**Full documentation** (Google Cloud / Discord / GitHub consoles, callback URLs, Wrangler + GitHub
+Actions secret names, precedence, verification, troubleshooting): **[`docs/pazaak-oauth-providers.md`](../../docs/pazaak-oauth-providers.md)**.
+
 PazaakWorld reads `GET /api/auth/oauth/providers` and only enables buttons when
 the Worker has the matching client credentials.
 

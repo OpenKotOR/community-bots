@@ -8,6 +8,7 @@ workers_dev = true
 [vars]
 SERVICE_NAME = "Pazaak Matchmaking Fallback"
 ALLOW_UNVERIFIED_INSTANCES = "1"
+DISCORD_PUBLIC_CLIENT = "1"
 PAZAAK_TURN_TIMEOUT_MS = "300000"
 PAZAAK_DISCONNECT_FORFEIT_MS = "30000"
 # Where OAuth callbacks redirect after issuing app_token (GitHub Pages bundle root)

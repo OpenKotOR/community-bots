@@ -128,7 +128,19 @@ jobs:
         run: |
           set -euo pipefail
           root="apps/pazaak-world/dist"
-          for sub in discord pazaakworld; do
+          routes=(
+            discord
+            pazaakworld
+            pazaakworld/onboarding
+            pazaakworld/matchmaking
+            pazaakworld/lobby
+            pazaakworld/practice
+            pazaakworld/blackjack
+            pazaakworld/workshop
+            pazaakworld/trask
+            pazaakworld/tournaments
+          )
+          for sub in "${routes[@]}"; do
             mkdir -p "$root/$sub"
             cp "$root/index.html" "$root/$sub/index.html"
           done

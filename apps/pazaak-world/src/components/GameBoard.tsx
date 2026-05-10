@@ -696,8 +696,8 @@ export function GameBoard({
             <div className="game-advisor__alternatives">
               <span className="game-advisor__alternatives-label">Fallbacks</span>
               <div className="game-advisor__alternatives-list">
-                {advisorSnapshot.alternatives.slice(1).map((alternative) => (
-                  <span key={`${alternative.displayLabel}-${alternative.score}`} className="game-advisor__alternative">
+                {advisorSnapshot.alternatives.slice(1).map((alternative, altIndex) => (
+                  <span key={`advisor-alt-${altIndex}-${alternative.displayLabel}-${alternative.score}`} className="game-advisor__alternative">
                     {formatAdvisorAlternative(alternative)}
                   </span>
                 ))}
@@ -904,7 +904,7 @@ export function GameBoard({
           ) : (
             <p className="game-result__draw">It's a draw.</p>
           )}
-          <p className="game-result__status">{match.statusLine}</p>
+          <p className="game-result__status" data-testid="game-result-status">{match.statusLine}</p>
           {showRatingsInGame && postGameMmr !== null && (() => {
             const delta = mmrDeltaDisplay;
             return (
@@ -1199,13 +1199,13 @@ function PlayerPanel({ player, isActive, label, isMe = false, connectionState = 
       {/* Hand (only for current player — shows labels, masks for opponent) */}
       {isMe && player.hand.length > 0 && (
         <div className="player-hand">
-          {player.hand.map((card) => {
+          {player.hand.map((card, handIndex) => {
             const used = player.usedCardIds.includes(card.id);
             const tip = describeCardTooltip(card.label);
-            const tipId = `hand-card-tip-${card.id}`;
+            const tipId = `hand-card-tip-${handIndex}-${card.id}`;
             return (
               <span
-                key={card.id}
+                key={`hand-${handIndex}-${card.id}`}
                 className={`hand-card ${used ? "hand-card--used" : ""}`}
                 title={tip}
                 aria-describedby={tipId}

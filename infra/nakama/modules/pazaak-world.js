@@ -387,7 +387,7 @@ var pazaakOpponents = [
   {
     id: "trump",
     name: "Donald Trump",
-    description: "A loud high-stakes table personality from the HoloPazaak vendor roster.",
+    description: "A loud high-stakes table personality from the community opponent roster.",
     difficulty: "hard",
     advisorDifficulty: "hard",
     standAt: 18,
@@ -7648,6 +7648,12 @@ function appendHistory(nk, ctx, userId, entry) {
 function broadcastSnapshot(dispatcher, snapshot, presences) {
   dispatcher.broadcastMessage(1 /* Snapshot */, json({ type: "match_update", data: snapshot }), presences ?? null);
 }
+function presenceSessionKey(presence) {
+  const raw = presence;
+  const userId = String(raw.userId ?? raw.user_id ?? "");
+  const sessionId = String(raw.sessionId ?? raw.session_id ?? "");
+  return `${userId}#${sessionId}`;
+}
 function matchInit(ctx, logger, nk, params) {
   const { coordinator, snapshot } = createInitialMatch(nk, ctx, params);
   RUNTIME_COORDINATORS.set(snapshot.id, coordinator);
@@ -7657,6 +7663,7 @@ function matchInit(ctx, logger, nk, params) {
       matchId: snapshot.id,
       snapshot,
       presences: {},
+      presenceSessionKeys: {},
       idempotency: {},
       settled: snapshot.settled
     },
@@ -7665,24 +7672,56 @@ function matchInit(ctx, logger, nk, params) {
   };
 }
 function matchJoinAttempt(_ctx, _logger, _nk, _dispatcher, _tick, state, presence) {
-  const allowed = state.snapshot.players.some((player) => player.userId === presence.userId);
+  const raw = presence;
+  const joinerId = String(raw.userId ?? raw.user_id ?? "");
+  const allowed = state.snapshot.players.some((player) => player.userId === joinerId);
   return allowed ? { state, accept: true } : { state, accept: false, rejectMessage: "Only match participants can join this match." };
 }
-function matchJoin(_ctx, _logger, _nk, dispatcher, _tick, state, presences) {
-  for (const presence of presences) state.presences[presence.userId] = presence;
+function matchJoin(ctx, _logger, nk, dispatcher, _tick, state, presences) {
+  const coordinator = getRuntimeCoordinator(nk, ctx, state.matchId);
+  state.presenceSessionKeys ?? (state.presenceSessionKeys = {});
+  for (const presence of presences) {
+    const key = presenceSessionKey(presence);
+    state.presenceSessionKeys[key] = true;
+    const raw = presence;
+    const userId = String(raw.userId ?? raw.user_id ?? "");
+    state.presences[userId] = presence;
+    const reconnected = coordinator.markReconnected(userId);
+    if (reconnected) state.snapshot = serializeMatch(reconnected);
+  }
   broadcastSnapshot(dispatcher, state.snapshot, presences);
   return { state };
 }
+function presenceSessionPrefix(userId) {
+  return `${userId}#`;
+}
+function userStillHasSession(state, userId) {
+  const prefix = presenceSessionPrefix(userId);
+  return Object.keys(state.presenceSessionKeys ?? {}).some((k) => k.startsWith(prefix));
+}
 function matchLeave(ctx, _logger, nk, _dispatcher, _tick, state, presences) {
   const coordinator = getRuntimeCoordinator(nk, ctx, state.matchId);
+  state.presenceSessionKeys ?? (state.presenceSessionKeys = {});
   for (const presence of presences) {
-    delete state.presences[presence.userId];
-    const updated = coordinator.markDisconnected(presence.userId);
-    if (updated) state.snapshot = serializeMatch(updated);
+    const key = presenceSessionKey(presence);
+    delete state.presenceSessionKeys[key];
+    const raw = presence;
+    const uid = String(raw.userId ?? raw.user_id ?? "");
+    if (!userStillHasSession(state, uid)) {
+      delete state.presences[uid];
+      const updated = coordinator.markDisconnected(uid);
+      if (updated) state.snapshot = serializeMatch(updated);
+    }
   }
   return { state };
 }
 function matchLoop(ctx, logger, nk, dispatcher, _tick, state, messages) {
+  if (state.presenceSessionKeys === void 0) {
+    state.presenceSessionKeys = {};
+    for (const [uid, p] of Object.entries(state.presences)) {
+      state.presenceSessionKeys[presenceSessionKey(p)] = true;
+    }
+  }
   const coordinator = getRuntimeCoordinator(nk, ctx, state.matchId);
   let changed = false;
   const timerUpdates = [...coordinator.tickTurnTimers(), ...coordinator.tickDisconnectForfeits()];

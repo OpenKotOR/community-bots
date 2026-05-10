@@ -152,6 +152,8 @@ interface MatchState {
   matchId: string;
   snapshot: SerializedMatch;
   presences: Record<string, nkruntime.Presence>;
+  /** Joined sockets as `userId#sessionId` (realtime + command sockets both join the same match). */
+  presenceSessionKeys?: Record<string, boolean>;
   idempotency: Record<string, SerializedMatch>;
   settled: boolean;
 }
@@ -659,6 +661,14 @@ function broadcastSnapshot(dispatcher: nkruntime.MatchDispatcher, snapshot: Seri
   dispatcher.broadcastMessage(Opcode.Snapshot, json({ type: "match_update", data: snapshot }), presences ?? null);
 }
 
+/** Nakama may expose camelCase or snake_case on presence objects depending on runtime bridge. */
+function presenceSessionKey(presence: nkruntime.Presence): string {
+  const raw = presence as unknown as Record<string, string | undefined>;
+  const userId = String(raw.userId ?? raw.user_id ?? "");
+  const sessionId = String(raw.sessionId ?? raw.session_id ?? "");
+  return `${userId}#${sessionId}`;
+}
+
 // Nakama's JS loader resolves match hooks by top-level function names (no inlined object methods).
 function matchInit(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, params: Record<string, string>) {
   const { coordinator, snapshot } = createInitialMatch(nk, ctx, params);
@@ -669,6 +679,7 @@ function matchInit(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkrunti
       matchId: snapshot.id,
       snapshot,
       presences: {},
+      presenceSessionKeys: {},
       idempotency: {},
       settled: snapshot.settled,
     },
@@ -686,24 +697,45 @@ function matchJoinAttempt(
   state: MatchState,
   presence: nkruntime.Presence,
 ): { state: MatchState; accept: boolean; rejectMessage?: string } {
-  const allowed = state.snapshot.players.some((player) => player.userId === presence.userId);
+  const raw = presence as unknown as Record<string, string | undefined>;
+  const joinerId = String(raw.userId ?? raw.user_id ?? "");
+  const allowed = state.snapshot.players.some((player) => player.userId === joinerId);
   return allowed
     ? { state, accept: true }
     : { state, accept: false, rejectMessage: "Only match participants can join this match." };
 }
 
 function matchJoin(
-  _ctx: nkruntime.Context,
+  ctx: nkruntime.Context,
   _logger: nkruntime.Logger,
-  _nk: nkruntime.Nakama,
+  nk: nkruntime.Nakama,
   dispatcher: nkruntime.MatchDispatcher,
   _tick: number,
   state: MatchState,
   presences: nkruntime.Presence[],
 ): { state: MatchState } {
-  for (const presence of presences) state.presences[presence.userId] = presence;
+  const coordinator = getRuntimeCoordinator(nk, ctx, state.matchId);
+  state.presenceSessionKeys ??= {};
+  for (const presence of presences) {
+    const key = presenceSessionKey(presence);
+    state.presenceSessionKeys[key] = true;
+    const raw = presence as unknown as Record<string, string | undefined>;
+    const userId = String(raw.userId ?? raw.user_id ?? "");
+    state.presences[userId] = presence;
+    const reconnected = coordinator.markReconnected(userId);
+    if (reconnected) state.snapshot = serializeMatch(reconnected);
+  }
   broadcastSnapshot(dispatcher, state.snapshot, presences);
   return { state };
+}
+
+function presenceSessionPrefix(userId: string): string {
+  return `${userId}#`;
+}
+
+function userStillHasSession(state: MatchState, userId: string): boolean {
+  const prefix = presenceSessionPrefix(userId);
+  return Object.keys(state.presenceSessionKeys ?? {}).some((k) => k.startsWith(prefix));
 }
 
 function matchLeave(
@@ -716,10 +748,17 @@ function matchLeave(
   presences: nkruntime.Presence[],
 ): { state: MatchState } {
   const coordinator = getRuntimeCoordinator(nk, ctx, state.matchId);
+  state.presenceSessionKeys ??= {};
   for (const presence of presences) {
-    delete state.presences[presence.userId];
-    const updated = coordinator.markDisconnected(presence.userId);
-    if (updated) state.snapshot = serializeMatch(updated);
+    const key = presenceSessionKey(presence);
+    delete state.presenceSessionKeys[key];
+    const raw = presence as unknown as Record<string, string | undefined>;
+    const uid = String(raw.userId ?? raw.user_id ?? "");
+    if (!userStillHasSession(state, uid)) {
+      delete state.presences[uid];
+      const updated = coordinator.markDisconnected(uid);
+      if (updated) state.snapshot = serializeMatch(updated);
+    }
   }
   return { state };
 }
@@ -733,6 +772,12 @@ function matchLoop(
   state: MatchState,
   messages: nkruntime.MatchMessage[],
 ): { state: MatchState } {
+  if (state.presenceSessionKeys === undefined) {
+    state.presenceSessionKeys = {};
+    for (const [uid, p] of Object.entries(state.presences)) {
+      state.presenceSessionKeys[presenceSessionKey(p as nkruntime.Presence)] = true;
+    }
+  }
   const coordinator = getRuntimeCoordinator(nk, ctx, state.matchId);
   let changed = false;
   const timerUpdates = [...coordinator.tickTurnTimers(), ...coordinator.tickDisconnectForfeits()];

@@ -32,6 +32,13 @@ This repository now supports a no-server baseline deployment pattern:
 - Worker deployment workflow:
   - `.github/workflows/pazaak-matchmaking-worker.yml` — **`verify-bundle`** job runs `wrangler deploy --dry-run` on every trigger (no Cloudflare secrets). **`deploy`** runs only when `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` repository secrets exist.
 
+## OAuth (Google / Discord / GitHub)
+
+End-to-end instructions for provider consoles, **Worker vs bot redirect URIs**, Wrangler secrets,
+repository secrets (`WORKER_*`), precedence rules, verification, and troubleshooting:
+
+**[pazaak-oauth-providers.md](pazaak-oauth-providers.md)**
+
 ## API failover strategy
 
 The frontend API client supports a comma-separated list of API origins in `VITE_API_BASES`, plus an

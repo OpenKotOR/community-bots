@@ -347,9 +347,9 @@ async function nakamaMatchSnapshot(accessToken: string, logicalMatchId: string):
     // Validate match structure
     const match = data.match as Record<string, unknown>;
     if (
-      typeof match.logicalMatchId !== "string" ||
-      !Array.isArray(match.hands) ||
-      !Array.isArray(match.players)
+      typeof match.id !== "string" ||
+      !Array.isArray(match.players) ||
+      match.players.length < 2
     ) {
       throw new Error("Invalid match data structure from server");
     }
@@ -507,15 +507,15 @@ export async function fetchAdminPolicy(accessToken: string): Promise<{ policy: R
   if (typeof accessToken !== "string" || !accessToken.trim()) {
     throw new Error("Invalid access token: must be a non-empty string");
   }
-  
+
   try {
     console.debug("[fetchAdminPolicy] Fetching admin policy");
     const response = await apiFetch<{ policy: Record<string, unknown>; etag: string | null }>("/api/admin/policy", accessToken);
-    
+
     if (!response.policy || typeof response.policy !== "object") {
       throw new Error("Invalid admin policy response: policy must be an object");
     }
-    
+
     console.debug("[fetchAdminPolicy] Successfully fetched admin policy");
     return response;
   } catch (err) {
@@ -528,11 +528,11 @@ export async function putAdminPolicy(accessToken: string, patch: Record<string, 
   if (typeof accessToken !== "string" || !accessToken.trim()) {
     throw new Error("Invalid access token: must be a non-empty string");
   }
-  
+
   if (!patch || typeof patch !== "object") {
     throw new Error("Invalid policy patch: must be an object");
   }
-  
+
   try {
     console.debug("[putAdminPolicy] Updating admin policy");
     const response = await apiFetch<{ ok: true; etag: string }>("/api/admin/policy", accessToken, {
@@ -540,11 +540,11 @@ export async function putAdminPolicy(accessToken: string, patch: Record<string, 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
     });
-    
+
     if (response.ok !== true || typeof response.etag !== "string") {
       throw new Error("Invalid admin policy update response: missing ok flag or etag");
     }
-    
+
     console.debug("[putAdminPolicy] Successfully updated admin policy with etag %s", response.etag);
     return response;
   } catch (err) {
@@ -575,39 +575,39 @@ function validateBlackjackRules(data: unknown): BlackjackRulesConfig {
     throw new Error("Invalid blackjack rules: must be an object");
   }
   const obj = data as Record<string, unknown>;
-  
+
   if (typeof obj.decks !== "number" || obj.decks < 1 || obj.decks > 8) {
     throw new Error("Invalid blackjack rules: decks must be between 1 and 8");
   }
-  
+
   if (typeof obj.hitSoft17 !== "boolean") {
     throw new Error("Invalid blackjack rules: hitSoft17 must be boolean");
   }
-  
+
   if (typeof obj.dealerUpCardVisible !== "boolean") {
     throw new Error("Invalid blackjack rules: dealerUpCardVisible must be boolean");
   }
-  
+
   if (!Array.isArray(obj.doubleDownOn) || !obj.doubleDownOn.every((v: unknown) => ["11", "10", "9", "any"].includes(String(v)))) {
     throw new Error("Invalid blackjack rules: doubleDownOn must be array of valid values");
   }
-  
+
   if (typeof obj.splitPairs !== "boolean") {
     throw new Error("Invalid blackjack rules: splitPairs must be boolean");
   }
-  
+
   if (typeof obj.doubleAfterSplit !== "boolean") {
     throw new Error("Invalid blackjack rules: doubleAfterSplit must be boolean");
   }
-  
+
   if (typeof obj.insuranceEnabled !== "boolean") {
     throw new Error("Invalid blackjack rules: insuranceEnabled must be boolean");
   }
-  
+
   if (obj.blackjackPayoutRatio !== "3:2" && obj.blackjackPayoutRatio !== "6:5") {
     throw new Error("Invalid blackjack rules: blackjackPayoutRatio must be '3:2' or '6:5'");
   }
-  
+
   return obj as unknown as BlackjackRulesConfig;
 }
 
@@ -615,18 +615,18 @@ export async function fetchBlackjackRules(accessToken: string): Promise<Blackjac
   if (typeof accessToken !== "string" || !accessToken.trim()) {
     throw new Error("Invalid access token: must be a non-empty string");
   }
-  
+
   try {
     console.debug("[fetchBlackjackRules] Fetching blackjack rules");
     const response = await apiFetch<BlackjackRulesResponse>("/api/blackjack/rules", accessToken);
-    
+
     if (!response.blackjack) {
       throw new Error("Invalid blackjack rules response: missing blackjack config");
     }
-    
+
     const validated = validateBlackjackRules(response.blackjack);
     console.debug("[fetchBlackjackRules] Successfully fetched blackjack rules");
-    
+
     return { blackjack: validated };
   } catch (err) {
     console.error("[fetchBlackjackRules]", err instanceof Error ? err.message : String(err));
@@ -684,24 +684,24 @@ export async function openRewardCrate(accessToken: string, kind: "standard" | "p
   if (kind !== "standard" && kind !== "premium") {
     throw new Error("Invalid crate kind: must be 'standard' or 'premium'");
   }
-  
+
   if (isNakamaBackend()) {
     try {
       console.debug("[openRewardCrate] Opening %s crate via Nakama", kind);
-      
+
       const response = await nakamaRpc<{}>(
         accessToken,
         "pazaak.crate_open",
         { kind },
       );
-      
+
       const validated = validateCrateOpenResponse(response);
-      console.debug("[openRewardCrate] Successfully opened %s crate, received %d tokens and %d bonus credits", 
-        kind, 
+      console.debug("[openRewardCrate] Successfully opened %s crate, received %d tokens and %d bonus credits",
+        kind,
         validated.opened.tokens.length,
         validated.opened.bonusCredits,
       );
-      
+
       return validated;
     } catch (err) {
       const error = await nakamaAsError(err, `Failed to open ${kind} crate via Nakama`);
@@ -709,29 +709,29 @@ export async function openRewardCrate(accessToken: string, kind: "standard" | "p
       throw error;
     }
   }
-  
+
   // Fallback to HTTP API for non-Nakama backends
   try {
     console.debug("[openRewardCrate] Opening %s crate via HTTP API", kind);
-    
+
     const response = await apiFetch<unknown>("/api/crates/open", accessToken, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ kind }),
     });
-    
+
     const validated = validateCrateOpenResponse(response);
     console.debug("[openRewardCrate] Successfully opened %s crate, received %d tokens and %d bonus credits",
       kind,
       validated.opened.tokens.length,
       validated.opened.bonusCredits,
     );
-    
+
     return validated;
   } catch (err) {
     console.error("[openRewardCrate] HTTP API error:", err instanceof Error ? err.message : String(err));
-    throw err instanceof Error 
-      ? err 
+    throw err instanceof Error
+      ? err
       : new Error(`Failed to open ${kind} crate: ${String(err)}`);
   }
 }

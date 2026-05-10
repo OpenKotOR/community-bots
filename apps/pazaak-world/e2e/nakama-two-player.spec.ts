@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Locator, type Page } from "@playwright/test";
 
 const onboarding = JSON.stringify({
   completed: true,
@@ -46,8 +46,25 @@ function seedStandaloneMatchHub(
   );
 }
 
+async function safePageWait(page: Page, ms: number): Promise<void> {
+  if (page.isClosed()) return;
+  await page.waitForTimeout(ms).catch(() => undefined);
+}
+
 async function matchFinishedVisible(page: Page): Promise<boolean> {
-  return page.locator(".game-result").isVisible();
+  if (page.isClosed()) return false;
+  return page.locator(".game-result").isVisible().catch(() => false);
+}
+
+/** Wait out short `busy` / in-flight UI windows so clicks are not no-ops. */
+async function waitUntilClickable(page: Page, loc: Locator, maxMs: number): Promise<boolean> {
+  const deadline = Date.now() + maxMs;
+  while (Date.now() < deadline) {
+    if (page.isClosed()) return false;
+    if ((await loc.isVisible().catch(() => false)) && (await loc.isEnabled().catch(() => false))) return true;
+    await safePageWait(page, 80);
+  }
+  return (await loc.isVisible().catch(() => false)) && (await loc.isEnabled().catch(() => false));
 }
 
 /** Returns true if an action was taken (draw, side card, end turn, or stand). */
@@ -57,7 +74,7 @@ async function tryTakeTurn(page: Page): Promise<boolean> {
   }
 
   const stand = page.locator('[data-testid="stand-btn"]').or(page.getByRole("button", { name: "Stand" })).first();
-  if (await stand.isVisible().catch(() => false) && await stand.isEnabled().catch(() => false)) {
+  if (await stand.isVisible().catch(() => false) && await waitUntilClickable(page, stand, 4_000)) {
     const raw = await page.locator('[data-testid="score-display"]').last().textContent().catch(() => null);
     const total = Number.parseInt(raw?.trim() ?? "0", 10);
     if (Number.isFinite(total) && total >= 19) {
@@ -66,8 +83,22 @@ async function tryTakeTurn(page: Page): Promise<boolean> {
     }
   }
 
+  // Side cards (after-draw / after-card): playing at least one option unblocks many stuck lines vs only End Turn.
+  const firstSide = page.locator(".side-cards__grid button.btn--card").first();
+  if (await firstSide.isVisible().catch(() => false) && await waitUntilClickable(page, firstSide, 4_000)) {
+    const clicked = await firstSide.click({ timeout: 1_000 }).then(() => true).catch(() => false);
+    if (clicked) {
+      await safePageWait(page, 450);
+      const endAfterSide = page.getByRole("button", { name: "End Turn" }).first();
+      if (await endAfterSide.isVisible().catch(() => false) && await endAfterSide.isEnabled().catch(() => false)) {
+        await endAfterSide.click({ timeout: 1_000 }).catch(() => undefined);
+      }
+      return true;
+    }
+  }
+
   const endTurnBtn = page.locator('[data-testid="end-turn-btn"]').or(page.getByRole("button", { name: "End Turn" })).first();
-  if (await endTurnBtn.isVisible().catch(() => false) && await endTurnBtn.isEnabled().catch(() => false)) {
+  if (await endTurnBtn.isVisible().catch(() => false) && await waitUntilClickable(page, endTurnBtn, 4_000)) {
     const clicked = await endTurnBtn.click({ timeout: 1_000 }).then(() => true).catch(() => false);
     if (clicked) return true;
   }
@@ -76,7 +107,7 @@ async function tryTakeTurn(page: Page): Promise<boolean> {
   if (await draw.isVisible().catch(() => false) && await draw.isEnabled().catch(() => false)) {
     const clicked = await draw.click({ timeout: 1_000 }).then(() => true).catch(() => false);
     if (!clicked) return false;
-    await page.waitForTimeout(450);
+    await safePageWait(page, 450);
     if (await endTurnBtn.isVisible().catch(() => false) && await endTurnBtn.isEnabled().catch(() => false)) {
       await endTurnBtn.click({ timeout: 1_000 }).catch(() => undefined);
     }
@@ -84,8 +115,8 @@ async function tryTakeTurn(page: Page): Promise<boolean> {
   }
 
   if (await stand.isVisible().catch(() => false) && await stand.isEnabled().catch(() => false)) {
-    await stand.click();
-    return true;
+    const clicked = await stand.click({ timeout: 1_000 }).then(() => true).catch(() => false);
+    return clicked;
   }
 
   return false;
@@ -106,11 +137,11 @@ async function gotoMatchHubBoth(pageA: Page, pageB: Page): Promise<void> {
         const retry = page.getByRole("button", { name: "Try Again" });
         if (await retry.isVisible().catch(() => false)) {
           await retry.click();
-          await page.waitForTimeout(800);
+          await safePageWait(page, 800);
           if (await findMatch.isVisible().catch(() => false)) return;
         }
       }
-      await page.waitForTimeout(400);
+      await safePageWait(page, 400);
     }
     await expect(page.getByRole("button", { name: "Find Match" })).toBeVisible({ timeout: 1_000 });
   };
@@ -133,15 +164,23 @@ async function eitherPlayerCanAct(pageA: Page, pageB: Page): Promise<boolean> {
 
     const stand = page.locator('[data-testid="stand-btn"]').or(page.getByRole("button", { name: "Stand" })).first();
     if (await stand.isVisible().catch(() => false) && await stand.isEnabled().catch(() => false)) return true;
+
+    const side = page.locator(".side-cards__grid button.btn--card").first();
+    if (await side.isVisible().catch(() => false) && await side.isEnabled().catch(() => false)) return true;
   }
   return false;
 }
 
+/** Drives both pages until `.game-result` is visible on each — no Forfeit shortcut; stalls throw. */
 async function playUntilBothSeeResult(pageA: Page, pageB: Page, maxMs: number): Promise<void> {
-  const startedAt = Date.now();
   const deadline = Date.now() + maxMs;
   let stagnantCycles = 0;
+  let forfeitUiStall = 0;
   while (Date.now() < deadline) {
+    if (pageA.isClosed() || pageB.isClosed()) {
+      throw new Error("Browser page closed during match play");
+    }
+
     const errAEl = pageA.locator(".error-toast");
     if ((await errAEl.count()) > 0 && await errAEl.first().isVisible()) {
       const msg = (await errAEl.first().textContent())?.trim() ?? "unknown error";
@@ -159,19 +198,26 @@ async function playUntilBothSeeResult(pageA: Page, pageB: Page, maxMs: number): 
       return;
     }
 
-    if (Date.now() - startedAt > 180_000) {
-      const forfeitA = pageA.getByRole("button", { name: "Forfeit" });
-      if (await forfeitA.isVisible().catch(() => false) && await forfeitA.isEnabled().catch(() => false)) {
-        await forfeitA.click().catch(() => undefined);
-        await expect.poll(async () => (await matchFinishedVisible(pageA)) && (await matchFinishedVisible(pageB)), {
-          timeout: 30_000,
-        }).toBe(true);
-        return;
+    const barA = await pageA.locator(".status-bar").textContent().catch(() => "");
+    const barB = await pageB.locator(".status-bar").textContent().catch(() => "");
+    const forfeitsInLiveStatus = /\bforfeits\b/i.test(barA) || /\bforfeits\b/i.test(barB);
+    if (forfeitsInLiveStatus && !(doneA && doneB)) {
+      forfeitUiStall += 1;
+      if (forfeitUiStall >= 80) {
+        throw new Error(
+          "Live status shows a forfeit (`… forfeits … takes the table.`) but both `.game-result` panels never appeared — " +
+            `likely disconnect-forfeit or client desync (not play-through). A=${JSON.stringify(barA)} B=${JSON.stringify(barB)}`,
+        );
       }
+    } else {
+      forfeitUiStall = 0;
     }
 
     let acted = false;
-    for (const p of [pageA, pageB]) {
+    // Alternate who we try first so one tab does not starve when both briefly show stale UI.
+    const primaryFirst = Math.floor(Date.now() / 2_000) % 2 === 0;
+    const order = primaryFirst ? [pageA, pageB] : [pageB, pageA];
+    for (const p of order) {
       if (await tryTakeTurn(p)) {
         acted = true;
         break;
@@ -181,7 +227,7 @@ async function playUntilBothSeeResult(pageA: Page, pageB: Page, maxMs: number): 
     if (!acted) {
       stagnantCycles += 1;
       if (stagnantCycles >= 120) {
-        const [statusA, statusB, drawA, drawB, endA, endB, standA, standB] = await Promise.all([
+        const [statusA, statusB, drawA, drawB, endA, endB, standA, standB, sideA, sideB] = await Promise.all([
           pageA.locator(".status-bar").textContent().catch(() => null),
           pageB.locator(".status-bar").textContent().catch(() => null),
           pageA.locator('[data-testid="draw-btn"]').isVisible().catch(() => false),
@@ -190,31 +236,43 @@ async function playUntilBothSeeResult(pageA: Page, pageB: Page, maxMs: number): 
           pageB.getByRole("button", { name: "End Turn" }).isVisible().catch(() => false),
           pageA.locator('[data-testid="stand-btn"]').isVisible().catch(() => false),
           pageB.locator('[data-testid="stand-btn"]').isVisible().catch(() => false),
+          pageA.locator(".side-cards__grid button.btn--card").first().isVisible().catch(() => false),
+          pageB.locator(".side-cards__grid button.btn--card").first().isVisible().catch(() => false),
         ]);
         throw new Error(
           `Match stalled: ` +
-          `A(status=${JSON.stringify(statusA)},draw=${drawA},end=${endA},stand=${standA}) ` +
-          `B(status=${JSON.stringify(statusB)},draw=${drawB},end=${endB},stand=${standB})`,
+          `A(status=${JSON.stringify(statusA)},draw=${drawA},end=${endA},stand=${standA},side=${sideA}) ` +
+          `B(status=${JSON.stringify(statusB)},draw=${drawB},end=${endB},stand=${standB},side=${sideB})`,
         );
       }
-      await pageA.waitForTimeout(150);
+      await safePageWait(pageA, 150);
+      await safePageWait(pageB, 150);
     } else {
       stagnantCycles = 0;
-      await pageA.waitForTimeout(350);
+      await safePageWait(pageA, 350);
+      await safePageWait(pageB, 350);
     }
   }
 
-  // Safety valve: force a terminal state so the test can still verify end-of-match UI wiring.
-  const forfeitA = pageA.getByRole("button", { name: "Forfeit" });
-  if (await forfeitA.isVisible().catch(() => false) && await forfeitA.isEnabled().catch(() => false)) {
-    await forfeitA.click().catch(() => undefined);
-    await expect.poll(async () => (await matchFinishedVisible(pageA)) && (await matchFinishedVisible(pageB)), {
-      timeout: 30_000,
-    }).toBe(true);
-    return;
-  }
+  throw new Error(`Match did not complete naturally within ${maxMs}ms (no forfeit shortcut)`);
+}
 
-  throw new Error(`Match did not complete within ${maxMs}ms`);
+/**
+ * Both clients should show the same engine `statusLine` on the completed snapshot.
+ * Reject explicit forfeit / disconnect forfeit (`forfeits`) and turn-timer coercion (`timed out`).
+ * Require normal match completion copy from the coordinator (`wins the match` / `takes the match`).
+ */
+function assertMatchEndedByPlaythrough(statusA: string, statusB: string): void {
+  const norm = (s: string) => s.replace(/\s+/g, " ").trim();
+  const a = norm(statusA);
+  const b = norm(statusB);
+  expect(a.length).toBeGreaterThan(0);
+  expect(b.length).toBeGreaterThan(0);
+  expect(b).toBe(a);
+  const lower = a.toLowerCase();
+  expect(lower).not.toMatch(/\bforfeits\b/);
+  expect(lower).not.toMatch(/\btimed out\b/);
+  expect(lower).toMatch(/wins the match|takes the match/);
 }
 
 test.describe("Nakama quick match (two browsers)", () => {
@@ -259,8 +317,8 @@ test.describe("Nakama quick match (two browsers)", () => {
     await contextB.close();
   });
 
-  test("two guests play a full match to completion (two isolated contexts)", async ({ browser }) => {
-    test.setTimeout(600_000);
+  test("two guests play a full match to completion — natural end only, two isolated contexts", async ({ browser }) => {
+    test.setTimeout(900_000);
 
     const contextA = await browser.newContext();
     const contextB = await browser.newContext();
@@ -280,7 +338,7 @@ test.describe("Nakama quick match (two browsers)", () => {
     ]);
     await expect.poll(() => eitherPlayerCanAct(pageA, pageB), { timeout: 90_000 }).toBe(true);
 
-    await playUntilBothSeeResult(pageA, pageB, 540_000);
+    await playUntilBothSeeResult(pageA, pageB, 840_000);
 
     await expect(pageA.locator(".game-result")).toBeVisible();
     await expect(pageB.locator(".game-result")).toBeVisible();
@@ -302,6 +360,10 @@ test.describe("Nakama quick match (two browsers)", () => {
     if (bWon) {
       expect(aLost).toBe(true);
     }
+
+    const statusA = await pageA.getByTestId("game-result-status").innerText();
+    const statusB = await pageB.getByTestId("game-result-status").innerText();
+    assertMatchEndedByPlaythrough(statusA, statusB);
 
     await contextA.close();
     await contextB.close();
