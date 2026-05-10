@@ -1589,8 +1589,8 @@ export class MatchCoordinator {
         tableSettings: {
           variant: payload.variant === "multi_seat" ? "multi_seat" : "canonical",
           maxPlayers,
-          maxRounds: Math.max(1, Math.min(5, Number(payload.maxRounds ?? 3) || 3)),
-          turnTimerSeconds: Math.max(10, Math.min(120, Number(payload.turnTimerSeconds ?? 45) || 45)),
+          maxRounds: Math.max(1, Math.min(9, Number(payload.maxRounds ?? 3) || 3)),
+          turnTimerSeconds: Math.max(0, Math.min(180, Number(payload.turnTimerSeconds ?? 45) || 45)),
           ranked: Boolean(payload.ranked),
           allowAiFill: Boolean(payload.allowAiFill),
           sideboardMode: payload.sideboardMode === "player_active_custom" || payload.sideboardMode === "host_mirror_custom"
@@ -1738,6 +1738,7 @@ export class MatchCoordinator {
             playerTwoId: p2!.userId,
             playerTwoName: p2!.displayName,
             gameMode: gm,
+            setsToWin: lobby.tableSettings.maxRounds,
           }),
         }),
       );
