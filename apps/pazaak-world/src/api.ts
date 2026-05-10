@@ -127,7 +127,12 @@ const apiClient = createBrowserApiClient({
 
 const primaryApiBase = apiClient.apiBases.find((base) => base.trim().length > 0)?.trim() ?? "";
 
-const STATIC_PAZAAK_PAGES_PATH_PREFIXES = ["/community-bots/pazaakworld", "/bots/pazaakworld"] as const;
+const STATIC_PAZAAK_PAGES_PATH_PREFIXES = [
+  "/community-bots",
+  "/community-bots/pazaakworld",
+  "/bots",
+  "/bots/pazaakworld",
+] as const;
 
 const isStaticPagesApiBase = (rawBase: string): boolean => {
   if (!rawBase) {
@@ -138,7 +143,7 @@ const isStaticPagesApiBase = (rawBase: string): boolean => {
     if (url.hostname !== "openkotor.github.io") {
       return false;
     }
-    const pathname = trimTrailingSlashes(url.pathname);
+    const pathname = trimTrailingSlashes(url.pathname) || "/";
     return STATIC_PAZAAK_PAGES_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix));
   } catch {
     return false;
