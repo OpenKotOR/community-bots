@@ -5,7 +5,7 @@
  * coordinator can call it without a circular import.
  */
 
-import { randomUUID as nodeRandomUuid } from "node:crypto";
+import { createHmac, randomUUID as nodeRandomUuid } from "node:crypto";
 import { mkdir, readFile, writeFile, readdir, rename, unlink } from "node:fs/promises";
 import path from "node:path";
 
@@ -22,6 +22,15 @@ export type MatchStoreDualWrite = {
   workerBaseUrl: string;
   syncSecret: string;
 };
+
+function toBase64Url(input: Buffer): string {
+  return input.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function signWorkerSyncPayload(secret: string, timestampSeconds: string, body: string): string {
+  const digest = createHmac("sha256", secret).update(`${timestampSeconds}.${body}`).digest();
+  return toBase64Url(digest);
+}
 
 export class MatchStore implements MatchPersistence {
   private readonly writeQueues = new Map<string, Promise<void>>();
@@ -88,13 +97,17 @@ export class MatchStore implements MatchPersistence {
     if (this.dualWrite && match.phase !== "completed") {
       const base = this.dualWrite.workerBaseUrl.replace(/\/$/, "");
       const snapshot = serializeMatch(match);
+      const body = JSON.stringify({ matchId: match.id, snapshot });
+      const timestampSeconds = Math.floor(Date.now() / 1000).toString();
+      const signature = signWorkerSyncPayload(this.dualWrite.syncSecret, timestampSeconds, body);
       void fetch(`${base}/api/bot-match-sync`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Pazaak-Sync-Secret": this.dualWrite.syncSecret,
+          "X-Pazaak-Sync-Timestamp": timestampSeconds,
+          "X-Pazaak-Sync-Signature": signature,
         },
-        body: JSON.stringify({ matchId: match.id, snapshot }),
+        body,
       }).catch(() => {
         /* dual-write is best-effort */
       });

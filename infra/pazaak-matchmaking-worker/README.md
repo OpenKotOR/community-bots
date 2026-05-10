@@ -48,6 +48,19 @@ authoritative bot API:
   `/api/matches/:id/state` and `/command`; bot may dual-write via
   `POST /api/bot-match-sync` (see `wrangler.toml` secrets)
 
+### Signed bot sync payloads
+
+`POST /api/bot-match-sync` now requires a timestamped HMAC signature so
+snapshots are authenticated and replay-resistant:
+
+- Header `X-Pazaak-Sync-Timestamp`: Unix epoch seconds
+- Header `X-Pazaak-Sync-Signature`: base64url(HMAC-SHA256(`${timestamp}.${rawBody}`))
+
+Requests are rejected when the signature is invalid or the timestamp is outside
+the 5-minute acceptance window.
+
+Set `PAZAAK_BOT_SYNC_SECRET` to a high-entropy value (minimum 32 characters).
+
 ## Ops policy (Wrangler vars + env)
 
 Policy merges in this order: **baked defaults** → optional **`PAZAAK_POLICY_JSON`**

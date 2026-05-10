@@ -102,6 +102,13 @@ const cardWorldBotGameType = normalizeCardGameType(process.env.CARDWORLD_BOT_GAM
 const pazaakRequiresOwnershipProof = (process.env.CARDWORLD_REQUIRE_CHITIN_KEY?.trim() ?? "1") !== "0";
 const workerSyncUrl = process.env.PAZAAK_WORKER_SYNC_URL?.trim();
 const workerSyncSecret = process.env.PAZAAK_BOT_SYNC_SECRET?.trim();
+if (
+  config.opsPolicy.features.dualWriteMatchesToWorker
+  && workerSyncUrl
+  && (!workerSyncSecret || workerSyncSecret.length < 32)
+) {
+  throw new Error("PAZAAK_BOT_SYNC_SECRET must be at least 32 characters when dual-write is enabled.");
+}
 const matchDualWrite =
   config.opsPolicy.features.dualWriteMatchesToWorker && workerSyncUrl && workerSyncSecret
     ? { workerBaseUrl: workerSyncUrl, syncSecret: workerSyncSecret }

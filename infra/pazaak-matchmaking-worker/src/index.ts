@@ -203,6 +203,8 @@ const DEFAULT_SETTINGS = {
 const SESSION_JWT_ISSUER = "openkotor-pazaak";
 const SESSION_JWT_AUDIENCE = "pazaak-world";
 const SESSION_TOKEN_VERSION = 1;
+const MIN_SIGNING_SECRET_LENGTH = 32;
+const BOT_SYNC_SIGNATURE_MAX_AGE_SECONDS = 5 * 60;
 
 const SOCIAL_PROVIDERS = ["discord", "github", "google"] as const;
 type WorkerSocialProvider = (typeof SOCIAL_PROVIDERS)[number];
@@ -400,6 +402,15 @@ function base64UrlToBytes(value: string): Uint8Array {
   return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 }
 
+function timingSafeEqualBytes(a: Uint8Array, b: Uint8Array): boolean {
+  const maxLength = Math.max(a.length, b.length);
+  let diff = a.length ^ b.length;
+  for (let index = 0; index < maxLength; index += 1) {
+    diff |= (a[index] ?? 0) ^ (b[index] ?? 0);
+  }
+  return diff === 0;
+}
+
 function decodeBase64UrlJson<T>(value: string): T | null {
   try {
     const bytes = base64UrlToBytes(value);
@@ -414,31 +425,61 @@ function resolveSessionSigningSecret(env: Env): string {
   const candidates = [
     env.PAZAAK_SESSION_JWT_SECRET,
     env.SESSION_JWT_SECRET,
-    env.PAZAAK_OAUTH_DISCORD_CLIENT_SECRET,
-    env.PAZAAK_DISCORD_CLIENT_SECRET,
-    env.DISCORD_CLIENT_SECRET,
-    env.PAZAAK_OAUTH_GITHUB_CLIENT_SECRET,
-    env.GITHUB_CLIENT_SECRET,
-    env.PAZAAK_OAUTH_GOOGLE_CLIENT_SECRET,
-    env.GOOGLE_CLIENT_SECRET,
   ];
   for (const candidate of candidates) {
     const value = candidate?.trim();
     if (value) {
+      if (value.length < MIN_SIGNING_SECRET_LENGTH) {
+        throw new Error(`Session signing secret must be at least ${MIN_SIGNING_SECRET_LENGTH} characters.`);
+      }
       return value;
     }
   }
-  return env.SERVICE_NAME?.trim() || "openkotor-pazaak-dev-session-secret";
+  if (env.ALLOW_UNVERIFIED_INSTANCES === "1") {
+    return `${env.SERVICE_NAME?.trim() || "openkotor-pazaak"}-dev-session-secret`;
+  }
+  throw new Error("Missing session signing secret. Set PAZAAK_SESSION_JWT_SECRET or SESSION_JWT_SECRET.");
 }
 
-async function importSessionSigningKey(env: Env): Promise<CryptoKey> {
+async function importHmacSigningKey(secret: string): Promise<CryptoKey> {
   return await crypto.subtle.importKey(
     "raw",
-    new TextEncoder().encode(resolveSessionSigningSecret(env)),
+    new TextEncoder().encode(secret),
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign", "verify"],
   );
+}
+
+async function importSessionSigningKey(env: Env): Promise<CryptoKey> {
+  return importHmacSigningKey(resolveSessionSigningSecret(env));
+}
+
+async function verifyBotSyncSignature(secret: string, timestampHeader: string, signatureHeader: string, bodyText: string): Promise<boolean> {
+  if (!/^\d{10}$/.test(timestampHeader)) {
+    return false;
+  }
+  const timestampSeconds = Number(timestampHeader);
+  if (!Number.isSafeInteger(timestampSeconds)) {
+    return false;
+  }
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  if (Math.abs(nowSeconds - timestampSeconds) > BOT_SYNC_SIGNATURE_MAX_AGE_SECONDS) {
+    return false;
+  }
+
+  let providedSignature: Uint8Array;
+  try {
+    providedSignature = base64UrlToBytes(signatureHeader);
+  } catch {
+    return false;
+  }
+
+  const signingInput = `${timestampHeader}.${bodyText}`;
+  const expectedSignature = new Uint8Array(
+    await crypto.subtle.sign("HMAC", await importHmacSigningKey(secret), new TextEncoder().encode(signingInput)),
+  );
+  return timingSafeEqualBytes(providedSignature, expectedSignature);
 }
 
 async function createSignedSessionToken(accountId: string, sessionId: string, expiresAt: string, env: Env): Promise<string> {
@@ -913,8 +954,17 @@ export default {
 
     if (url.pathname === "/api/bot-match-sync" && request.method === "POST") {
       const secret = env.PAZAAK_BOT_SYNC_SECRET?.trim();
-      const header = request.headers.get("x-pazaak-sync-secret")?.trim();
-      if (!secret || header !== secret) {
+      if (!secret || secret.length < MIN_SIGNING_SECRET_LENGTH) {
+        return error(`PAZAAK_BOT_SYNC_SECRET must be configured with at least ${MIN_SIGNING_SECRET_LENGTH} characters.`, 500);
+      }
+      const timestampHeader = request.headers.get("x-pazaak-sync-timestamp")?.trim() ?? "";
+      const signatureHeader = request.headers.get("x-pazaak-sync-signature")?.trim() ?? "";
+      if (!timestampHeader || !signatureHeader) {
+        return error("Missing sync signature headers", 401);
+      }
+      const rawBody = await request.text();
+      const verifiedSignature = await verifyBotSyncSignature(secret, timestampHeader, signatureHeader, rawBody);
+      if (!verifiedSignature) {
         return error("Forbidden", 403);
       }
       if (!env.MATCH_ACTOR) {
@@ -922,7 +972,7 @@ export default {
       }
       let body: { matchId?: string; snapshot?: SerializedMatch };
       try {
-        body = (await request.json()) as { matchId?: string; snapshot?: SerializedMatch };
+        body = JSON.parse(rawBody) as { matchId?: string; snapshot?: SerializedMatch };
       } catch {
         return error("Invalid JSON", 400);
       }
