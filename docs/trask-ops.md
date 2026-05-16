@@ -10,7 +10,7 @@ Operations and verification guide for the three OpenKOTOR Discord bots plus the 
 | Holocron web UI (`apps/holocron-web`) | ✅ | Playwright verifier passes 5 KOTOR Q&A queries |
 | GPTR Python venv auto-discovery | ✅ | No path config needed; walks up from cwd |
 | Garbage content filtering | ✅ | Cloudflare/JS-challenge blocks stripped from scraped pages |
-| Seeded KOTOR lore (9 entries) | ✅ | Carth/Revan/Bastila/HK-47/etc. answer without LLM key |
+| Seeded KOTOR lore (15 entries) | ✅ | Revan/Bastila/HK-47/Exile/Nihilus/Pazaak-rules/etc. answer without LLM key |
 | Local knowledge fallback | ✅ | `localKnowledgeFallbackAnswer` used when synthesis fails |
 | HK-86 bot unit tests | ✅ | 130/130 passing incl. reaction-role logic |
 | Bot cold-start (no tokens) | ✅ | All 3 bots start → only fail at Discord token step |
