@@ -12,7 +12,7 @@ Operations and verification guide for the three OpenKOTOR Discord bots plus the 
 | Garbage content filtering | ✅ | Cloudflare/JS-challenge blocks stripped from scraped pages |
 | Seeded KOTOR lore (15 entries) | ✅ | Revan/Bastila/HK-47/Exile/Nihilus/Pazaak-rules/etc. answer without LLM key |
 | Local knowledge fallback | ✅ | `localKnowledgeFallbackAnswer` used when synthesis fails |
-| Unit test suite | ✅ | 337/337 passing — persistence, retrieval, config, core, platform, policy, pazaak-engine (rules + opponents), bots, Trask, and tournament |
+| Unit test suite | ✅ | 349/349 passing — persistence, retrieval, config, core, platform, policy, pazaak-engine (rules + opponents), discord-ui, bots, Trask, and tournament |
 | Bot cold-start (no tokens) | ✅ | All 3 bots start → only fail at Discord token step |
 | Discord bot code + command registration | ✅ | `pnpm discord:smoke-bots` once tokens provided |
 | Live Discord bot interaction | ⏳ | Run `pnpm discord:setup` to enter credentials — see below |
