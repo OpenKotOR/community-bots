@@ -10,18 +10,22 @@ interface ConnectionStatusProps {
  * Monitors connection status and calculates real-time ping
  */
 export function ConnectionStatus({ isOnline, socketState = "connecting" }: ConnectionStatusProps) {
+  const [prevIsOnline, setPrevIsOnline] = useState(isOnline);
   const [ping, setPing] = useState<number | null>(null);
   const [hadRecentFailure, setHadRecentFailure] = useState(false);
 
-  useEffect(() => {
+  // Derived-state reset in the render phase: when isOnline flips to false,
+  // immediately clear stale ping and failure state so the display is consistent.
+  if (prevIsOnline !== isOnline) {
+    setPrevIsOnline(isOnline);
     if (!isOnline) {
-      // Reset derived display state when we go offline — intentional synchronous setState.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPing(null);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setHadRecentFailure(false);
-      return;
     }
+  }
+
+  useEffect(() => {
+    if (!isOnline) return;
 
     let cancelled = false;
     let pongTimer = 0;
