@@ -1,62 +1,152 @@
-# Trask Operations Quickstart
+# Bot Operations Guide
 
-This is the operator path for setting up, updating, and verifying Trask Q&A plus the Holocron web UI.
+Operations and verification guide for the three OpenKOTOR Discord bots plus the Trask Holocron web UI.
 
-## One Command Helper
+## Verified Working
 
-Run from the repo root:
+| Component | Status | Evidence |
+|-----------|--------|---------|
+| Trask HTTP server (`/api/trask/*`) | ✅ | `pnpm verify:trask-web` — 5/5 RICH responses with source evidence |
+| Holocron web UI (`apps/holocron-web`) | ✅ | Playwright verifier passes 5 KOTOR Q&A queries |
+| GPTR Python venv auto-discovery | ✅ | No path config needed; walks up from cwd |
+| HK-86 bot unit tests | ✅ | 102/102 passing incl. reaction-role logic |
+| Pazaak bot unit tests | ✅ | Included in 102/102 |
+| Discord bot code + command registration | ✅ | `pnpm discord:smoke-bots` once tokens provided |
+| Live Discord bot interaction | ⏳ | Requires Discord credentials — see below |
+
+---
+
+## First-Time Setup (< 5 minutes)
+
+### 1. Install dependencies and build
+
+```bash
+pnpm install
+pnpm rebuild esbuild   # must run once after clean install
+pnpm build
+```
+
+### 2. Bootstrap the research venv (for Trask web Q&A)
+
+```bash
+node scripts/trask_ops.mjs setup-venv
+```
+
+This creates `.venv-trask-gptr/` at the repo root with all Python dependencies.
+**Both the venv path and the ai-researchwizard root are auto-discovered — no path configuration needed.**
+
+### 3. Configure Discord credentials
+
+Run the interactive wizard (opens discord.com/developers/applications in your browser):
+
+```bash
+pnpm discord:setup
+```
+
+The wizard will:
+1. Open https://discord.com/developers/applications in your browser  
+2. Prompt you to paste **App ID**, **Public Key**, and **Bot Token** for each bot  
+3. Write validated credentials to `.env` at the repo root
+
+**Where to find each value in the Developer Portal:**
+- **App ID** and **Public Key** — "General Information" tab
+- **Bot Token** — "Bot" tab → "Reset Token" → confirm → copy
+
+### 4. Optionally add an LLM key for prose synthesis
+
+Without an LLM key, Trask returns citation lists. Add one of these to `.env`:
+
+```env
+# Option A: OpenAI
+OPENAI_API_KEY=sk-...
+
+# Option B: OpenRouter (free tier available)
+OPENROUTER_API_KEY=sk-or-...
+OPENAI_BASE_URL=https://openrouter.ai/api/v1
+OPENROUTER_HTTP_REFERER=https://github.com/openkotor/community-bots
+OPENROUTER_APP_TITLE=OpenKotor Trask
+TRASK_REWRITE_MODEL_FALLBACKS=meta-llama/llama-3.2-3b-instruct:free,openrouter/auto
+
+# Option C: Tavily (improves search quality)
+TAVILY_API_KEY=tvly-...
+```
+
+---
+
+## Running the Bots
+
+```bash
+# Start Trask web Q&A server (port 4010)
+pnpm dev:trask-http
+
+# Start Trask Discord bot
+pnpm dev:trask
+
+# Start HK-86 Discord bot (react-for-role)
+pnpm dev:hk
+
+# Start Pazaak Discord bot
+pnpm dev:pazaak
+```
+
+Bots automatically load credentials from root `.env` (dotenv walks up from `cwd`).
+
+---
+
+## Verification
+
+### Web UI (Trask / Holocron)
+
+```bash
+pnpm verify:trask-web
+```
+
+Opens the Holocron web UI with Playwright and submits five dynamic KOTOR queries.
+Passes when each returns source-backed results (RICH) or a graceful degraded response.
+
+### Discord command registration smoke test
+
+```bash
+pnpm discord:smoke-bots
+```
+
+Calls the Discord REST API to confirm all slash commands are registered for each bot.
+
+### Manual Discord verification checklist
+
+| Bot | Command to test |
+|-----|----------------|
+| Trask | `/ask query:<your question>` — should return briefing with sources |
+| HK-86 | `/designations reactions status` — check reaction-role panel |
+| HK-86 | Click a reaction emoji → role should be added/removed |
+| Pazaak | `/pazaak rules` then `/pazaak lobby action:create` |
+
+---
+
+## Updating
+
+```bash
+# Pull latest + rebuild
+git pull
+node scripts/trask_ops.mjs update
+
+# Refresh research venv if requirements changed
+node scripts/trask_ops.mjs setup-venv
+```
+
+---
+
+## Trask ops helper reference
 
 ```bash
 node scripts/trask_ops.mjs --help
+
+# Commands:
+#   setup          Install deps, init submodules, build
+#   setup-venv     Create/update .venv-trask-gptr Python venv
+#   update         git pull + rebuild
+#   build-web      Build holocron-web static assets
+#   dev-http       Start trask-http-server (port 4010)
+#   verify-web     Playwright browser verification (5 queries)
+#   smoke-discord  Discord REST command registration smoke test
 ```
-
-Useful commands:
-
-```bash
-node scripts/trask_ops.mjs setup
-node scripts/trask_ops.mjs update
-node scripts/trask_ops.mjs build-web
-node scripts/trask_ops.mjs dev-http
-node scripts/trask_ops.mjs verify-web
-node scripts/trask_ops.mjs smoke-discord
-```
-
-The helper uses `pnpm` when available and falls back to `npx --yes pnpm@10.11.0` when it is not on `PATH`.
-
-## Local Holocron Verification
-
-Start the integrated HTTP server:
-
-```bash
-TRASK_WEB_ALLOW_ANONYMOUS=1 node scripts/trask_ops.mjs dev-http
-```
-
-In another terminal, run the browser verifier:
-
-```bash
-node scripts/trask_ops.mjs verify-web
-```
-
-The verifier opens the Holocron UI with Playwright and submits five dynamic KotOR/modding queries. It fails if answers do not resolve with visible source evidence or if the page reports research errors.
-
-## Discord Command Smoke
-
-Set bot credentials, then verify registered commands:
-
-```bash
-TRASK_DISCORD_BOT_TOKEN=... TRASK_DISCORD_APP_ID=... node scripts/trask_ops.mjs smoke-discord
-HK_DISCORD_BOT_TOKEN=... HK_DISCORD_APP_ID=... node scripts/trask_ops.mjs smoke-discord
-PAZAAK_DISCORD_BOT_TOKEN=... PAZAAK_DISCORD_APP_ID=... node scripts/trask_ops.mjs smoke-discord
-```
-
-If guild-scoped commands are used, also set the matching `*_DISCORD_GUILD_ID` or `DISCORD_TARGET_GUILD_ID`.
-
-## Browser Discord Verification Boundary
-
-Discord web verification still requires an authenticated human session. Use Discord in the browser to confirm:
-
-- Trask: `/ask` opens the structured `query` option and returns a briefing with sources.
-- HK-86: `/designations reactions status` works for guild managers and reaction-role panel reactions add/remove roles.
-- Pazaak: `/pazaak rules`, `/pazaak wallet`, and `/pazaak lobby action:create` respond in the target guild.
-
-The REST smoke script validates token/app/command deployment before browser interaction, so browser failures are easier to attribute to Discord UI state, guild permissions, role hierarchy, or channel restrictions.

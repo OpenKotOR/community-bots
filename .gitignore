@@ -190,3 +190,4 @@ apps/hk86-web/test-results/
 .env.cf.local
 llm_debug_logs/
 test-results/
+.playwright-discord-profile/
