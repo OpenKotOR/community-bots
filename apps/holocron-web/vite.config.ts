@@ -97,6 +97,12 @@ export default defineConfig({
         BASE_KV_SERVICE_URL: JSON.stringify("/__spark-kv"),
         GITHUB_RUNTIME_PERMANENT_NAME: JSON.stringify("holocron-local"),
       },
+  build: {
+    // Holocron bundles @github/spark + @phosphor-icons which together exceed 500 kB before
+    // any app code. Raise the warning threshold to avoid noise from dependencies we cannot
+    // easily split without breaking the Spark icon proxy plugin.
+    chunkSizeWarningLimit: 900,
+  },
   server: {
     proxy: {
       "/api/trask": {
