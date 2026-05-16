@@ -141,6 +141,35 @@ You will also be asked for your Discord Server (Guild) ID.
     console.log(`  ✓  ${bot.displayName} credentials saved.`);
   }
 
+  // AI API key — required for Trask research synthesis
+  console.log("\n" + hr());
+  console.log("  AI API Key (for Trask Q&A research synthesis)");
+  console.log(hr());
+  console.log("  Trask needs an LLM to synthesize answers from KOTOR sources.");
+  console.log("  Supported: OpenAI (https://platform.openai.com/api-keys)");
+  console.log("             OpenRouter (https://openrouter.ai/keys) — access to many models");
+  console.log("  Without a key, Trask will still find source links but cannot write full answers.\n");
+
+  let openAiKey = "";
+  let openRouterKey = "";
+  const rawAiKey = (await ask(rl, "  OpenAI API key (sk-..., or Enter to skip): ")).trim();
+  if (rawAiKey.startsWith("sk-")) {
+    openAiKey = rawAiKey;
+    console.log("  ✓  OpenAI API key saved.");
+  } else if (rawAiKey) {
+    console.log("  ⚠  Doesn't look like an OpenAI key (should start with sk-), skipping.");
+  }
+
+  if (!openAiKey) {
+    const rawOrKey = (await ask(rl, "  OpenRouter API key (sk-or-..., or Enter to skip): ")).trim();
+    if (rawOrKey.startsWith("sk-or-") || rawOrKey.startsWith("sk-")) {
+      openRouterKey = rawOrKey;
+      console.log("  ✓  OpenRouter API key saved.");
+    } else if (rawOrKey) {
+      console.log("  ⚠  Doesn't look like an OpenRouter key, skipping.");
+    }
+  }
+
   rl.close();
 
   // Build snippet
@@ -151,6 +180,11 @@ You will also be asked for your Discord Server (Guild) ID.
     if (val.appId)  lines.push(`${prefix}_DISCORD_APP_ID=${val.appId}`);
     if (val.pubKey) lines.push(`${prefix}_DISCORD_PUBLIC_KEY=${val.pubKey}`);
     if (val.token)  lines.push(`${prefix}_DISCORD_BOT_TOKEN=${val.token}`);
+  }
+  if (openAiKey || openRouterKey) {
+    lines.push("\n# ── AI / LLM API Keys ────────────────────────────────");
+    if (openAiKey)     lines.push(`OPENAI_API_KEY=${openAiKey}`);
+    if (openRouterKey) lines.push(`OPENROUTER_API_KEY=${openRouterKey}`);
   }
   const snippet = lines.join("\n") + "\n";
 
@@ -164,7 +198,7 @@ You will also be asked for your Discord Server (Guild) ID.
     // Remove any existing DISCORD entries to avoid duplicates
     const stripped = existing
       .split("\n")
-      .filter(l => !l.match(/^(DISCORD_TARGET_GUILD_ID|(TRASK|HK|PAZAAK)_DISCORD_(APP_ID|PUBLIC_KEY|BOT_TOKEN))=/))
+      .filter(l => !l.match(/^(DISCORD_TARGET_GUILD_ID|(TRASK|HK|PAZAAK)_DISCORD_(APP_ID|PUBLIC_KEY|BOT_TOKEN)|OPENAI_API_KEY|OPENROUTER_API_KEY)=/))
       .join("\n");
     writeFileSync(envPath, stripped.trimEnd() + snippet);
     console.log(`✅  Written to ${envPath}`);
@@ -187,14 +221,19 @@ You will also be asked for your Discord Server (Guild) ID.
 
   console.log(`
 Next steps:
-  pnpm dev:trask       # start Trask Q&A bot
+  pnpm dev:trask       # start Trask Q&A bot (uses OPENAI_API_KEY for answers)
   pnpm dev:hk          # start HK-86 bot (react-for-role)
   pnpm dev:pazaak      # start Pazaak card game bot
+  pnpm dev:trask-http  # Trask HTTP server + Holocron web UI (port 4010)
   node scripts/discord_bots_smoke.mjs   # smoke-test command registration
 
 For HK-86 reaction roles:
   Edit: data/hk-bot/reaction-role-panels.json
   (fill in channelId, messageId, and emoji/role mappings for your server)
+
+For Trask web UI (Holocron):
+  pnpm dev:holocron-web    # dev server at http://localhost:5173
+  pnpm dev:trask-http      # API server at http://localhost:4010
 `);
 }
 

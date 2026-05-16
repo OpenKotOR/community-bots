@@ -318,7 +318,7 @@ const sourceOnlyFallbackAnswer = (sources: readonly SourceDescriptor[]): string 
   const hints = [...new Set(sources.map(sourceToolHint).filter((hint) => hint.length > 0))].slice(0, 5);
   const bullets = hints.map((hint, index) => `- ${hint} [${Math.min(index + 1, sources.length)}]`);
   const summary = [
-    "Commonly referenced KotOR model-modding tools in the approved archive sources include:",
+    "Here are the most relevant pages I found in the approved KOTOR knowledge sources:",
     ...bullets,
   ].join("\n");
 

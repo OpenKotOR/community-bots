@@ -377,6 +377,26 @@ export const defaultSourceCatalog: readonly SourceDescriptor[] = [
     tags: ["textures", "tpc", "assets", "conversion"],
   },
   {
+    id: "wikipedia-kotor",
+    name: "Wikipedia — Star Wars KOTOR",
+    kind: "website",
+    homeUrl: "https://en.wikipedia.org/wiki/Star_Wars:_Knights_of_the_Old_Republic",
+    description: "Wikipedia coverage of the KOTOR game series, characters, storylines, and development history — openly scrapable lore reference.",
+    freshnessPolicy: "on-demand scrape for cited articles; weekly refresh of KOTOR-era pages",
+    approvalScope: "public encyclopedia articles",
+    tags: ["lore", "characters", "story", "wiki", "history"],
+  },
+  {
+    id: "strategywiki-kotor",
+    name: "StrategyWiki KOTOR",
+    kind: "website",
+    homeUrl: "https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic",
+    description: "Community-authored KOTOR walkthrough, gameplay strategy, builds, and secrets guides for KotOR I and II.",
+    freshnessPolicy: "weekly crawl for walkthrough and strategy pages",
+    approvalScope: "public wiki articles",
+    tags: ["walkthrough", "gameplay", "strategy", "guides", "companions", "quests"],
+  },
+  {
     id: "approved-discord-knowledge",
     name: "Approved Discord Knowledge",
     kind: "discord",
@@ -402,6 +422,8 @@ export const traskApprovedResearchBaseHosts: readonly string[] = [
   "github.com",
   "kotor.neocities.org",
   "pcgamingwiki.com",
+  "en.wikipedia.org",
+  "strategywiki.org",
 ];
 
 export const traskApprovedResearchUrlPrefixes: readonly string[] = traskApprovedResearchSources.map(
