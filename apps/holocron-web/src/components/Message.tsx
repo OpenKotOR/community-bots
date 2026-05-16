@@ -126,7 +126,14 @@ function parseSourcesFromText(sourceText: string): DisplaySource[] {
       continue
     }
 
-    entries.at(-1)?.body.push(line)
+    const numberedMatch = line.match(/^(\d{1,3})\.\s+(.*)$/)
+    if (numberedMatch) {
+      entries.push({ index: Number(numberedMatch[1]), body: [numberedMatch[2] ?? ''] })
+      continue
+    }
+
+    const lastEntry = entries.length > 0 ? entries[entries.length - 1] : undefined
+    lastEntry?.body.push(line)
   }
 
   return entries

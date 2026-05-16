@@ -25,7 +25,9 @@ const extractBearerToken = (authorization: string | undefined): string | null =>
   return authorization.slice("Bearer ".length).trim() || null;
 };
 
-const createWebAuth = (config: ReturnType<typeof loadTraskHttpServerConfig>): TraskHttpAuth<{ id: string }> => ({
+const createWebAuth = (
+  config: ReturnType<typeof loadTraskHttpServerConfig>,
+): TraskHttpAuth<{ id: string; persistQueries?: boolean }> => ({
   requireAuth: (handler) => async (req: Request, res: Response) => {
     if (config.webApiKey) {
       const bearer = extractBearerToken(req.headers.authorization);
@@ -36,12 +38,13 @@ const createWebAuth = (config: ReturnType<typeof loadTraskHttpServerConfig>): Tr
         res.status(401).json({ error: "Invalid or missing API key." });
         return;
       }
-      await handler(req, res, { id: config.webDefaultUserId });
+      await handler(req, res, { id: config.webDefaultUserId, persistQueries: true });
       return;
     }
 
     if (config.webAllowAnonymous) {
-      await handler(req, res, { id: config.webDefaultUserId });
+      // Holocron polls GET /thread after 202 /ask; anonymous must persist queries or research never completes in-browser.
+      await handler(req, res, { id: config.webDefaultUserId, persistQueries: true });
       return;
     }
 

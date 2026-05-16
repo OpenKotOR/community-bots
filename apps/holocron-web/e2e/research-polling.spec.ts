@@ -79,10 +79,23 @@ test('polls async Trask research until complete answer renders', async ({ page }
               query,
               status: complete ? 'complete' : 'pending',
               answer: complete
-                ? 'TSLPatcher applies 2DA, TLK, and GFF patches for KotOR mods [1].\n\nSources\n1. Deadly Stream - https://deadlystream.com/topic/tslpatcher'
+                ? [
+                    'Here is a concise, source-backed answer about TSLPatcher in KOTOR modding:',
+                    '',
+                    'TSLPatcher applies numbered patches to 2DA, GFF, and TLK data so mods ship incremental edits instead of replacing whole archives [1].',
+                    '',
+                    'Sources',
+                    '1. Deadly Stream: TSLPatcher guide - https://deadlystream.com/files/file/1039-tsl-patcher-tlked-and-accessories',
+                  ].join('\n')
                 : null,
               sources: complete
-                ? [{ id: 'deadlystream', name: 'Deadly Stream', url: 'https://deadlystream.com/topic/tslpatcher' }]
+                ? [
+                    {
+                      id: 'deadlystream',
+                      name: 'Deadly Stream: TSLPatcher guide',
+                      url: 'https://deadlystream.com/files/file/1039-tsl-patcher-tlked-and-accessories',
+                    },
+                  ]
                 : [],
               error: null,
               createdAt: new Date().toISOString(),
@@ -115,7 +128,17 @@ test('polls async Trask research until complete answer renders', async ({ page }
   await expect(assistantArticle).toBeVisible({ timeout: 15_000 })
   await expect(assistantArticle.getByText(/TSLPatcher applies/i)).toBeVisible({ timeout: 45_000 })
   await expect(assistantArticle.getByText(/^Thinking$/i)).toHaveCount(0)
+  await expect(assistantArticle.getByText(/could not complete live archive synthesis/i)).toHaveCount(0)
+  await expect(assistantArticle.locator('[aria-label="Sources"]')).toBeVisible()
   await expect(page.getByText('Deadly Stream').first()).toBeVisible()
+
+  const citationLink = assistantArticle.getByRole('link', { name: '1' }).first()
+  await expect(citationLink).toBeVisible()
+  await expect(citationLink).toHaveAttribute(
+    'href',
+    'https://deadlystream.com/files/file/1039-tsl-patcher-tlked-and-accessories',
+  )
+  await expect(citationLink).toHaveAttribute('target', '_blank')
 
   expect(askCount).toBe(1)
   expect(threadPolls).toBeGreaterThanOrEqual(3)

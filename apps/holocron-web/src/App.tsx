@@ -218,7 +218,7 @@ function isTraskSynthesisFailureText(answer: string): boolean {
 
 function mapSourcesFromTraskRecord(rec: TraskHistoryRecordDto) {
   const answer = normalizeTraskAnswerText(rec.answer)
-  if (rec.status !== 'complete' || isTraskSynthesisFailureText(answer)) return []
+  if (rec.status !== 'complete' || !answer) return []
 
   return (rec.sources ?? []).map((s) => ({
     name: s.name,
