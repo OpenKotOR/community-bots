@@ -113,7 +113,9 @@ test.beforeEach(async ({ page }) => {
 
 async function openSeededConversation(page: Page) {
   await page.goto(`/?thread=${seededThreadId}`)
+  await expect(page.getByRole('log', { name: 'Holocron conversation messages' })).toBeVisible()
   await expect(page.getByText('Completed answer from Trask').first()).toBeVisible()
+  await expect(page.getByRole('article', { name: 'Assistant message' })).toHaveCount(4, { timeout: 15_000 })
 }
 
 function parseRgb(value: string): { r: number; g: number; b: number; a: number } {
@@ -232,7 +234,13 @@ test('renders source-only assistant replies with fallback guidance', async ({ pa
 test('keeps dark-glass controls readable', async ({ page }) => {
   await openSeededConversation(page)
 
-  const showMore = page.getByRole('button', { name: 'Show more' }).first()
+  const expandableArticle = page
+    .getByRole('article', { name: 'Assistant message' })
+    .filter({ hasText: 'Short archival summary' })
+    .first()
+  const showMore = expandableArticle.getByRole('button', { name: 'Show more' })
+  await showMore.scrollIntoViewIfNeeded()
+  await expect(showMore).toBeVisible()
   await expect(await contrastRatio(showMore)).toBeGreaterThanOrEqual(4.5)
 
   const dataBadge = page.getByText('Data').first()

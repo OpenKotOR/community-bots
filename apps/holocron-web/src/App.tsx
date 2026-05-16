@@ -796,6 +796,10 @@ function App() {
         const prev = list.find((c) => c.id === convId)
         const localBase = [...prependLocals, ...(prev?.messages ?? [])]
         const merged = mergeHolocronThreadMessages(localBase, targetRecords)
+        // Empty remote snapshot before local conversation hydrates must not wipe seeded/UI messages.
+        if (targetRecords.length === 0 && merged.length === 0) {
+          return list
+        }
         const firstUser = merged.find((m) => m.role === 'user')
         const raw = firstUser?.content?.trim() ?? ''
         const title = raw
