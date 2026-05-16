@@ -20,6 +20,19 @@ source "${VENV_DIR}/bin/activate"
 python -m pip install --upgrade pip
 python -m pip install -r "${REQ_FILE}"
 
+# Install the local gpt_researcher package (vendored copy of ai-researchwizard).
+# requirements.txt covers third-party deps; the package itself must be installed
+# from the local source tree so `import gpt_researcher` works.
+# The pyproject.toml uses Poetry which doesn't support editable install via pip,
+# so we use setup.py when available; otherwise fall back to a .pth file.
+SITE_PACKAGES=$(python -c "import site; print(site.getsitepackages()[0])")
+if [[ -f "${REPO_ROOT}/vendor/ai-researchwizard/setup.py" ]]; then
+  python "${REPO_ROOT}/vendor/ai-researchwizard/setup.py" develop 2>/dev/null || \
+    echo "${REPO_ROOT}/vendor/ai-researchwizard" > "${SITE_PACKAGES}/gptr-local.pth"
+else
+  echo "${REPO_ROOT}/vendor/ai-researchwizard" > "${SITE_PACKAGES}/gptr-local.pth"
+fi
+
 echo ""
 echo "Done. Point Trask at:"
 echo "  export TRASK_GPT_RESEARCHER_PYTHON=${VENV_DIR}/bin/python"

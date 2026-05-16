@@ -53,8 +53,12 @@ const createWebAuth = (config: ReturnType<typeof loadTraskHttpServerConfig>): Tr
 
 const config = loadTraskHttpServerConfig();
 
-const queryRepository = new JsonTraskQueryRepository(resolveDataFile(config.dataDir, "trask-queries.json"));
-const searchProvider = createChunkSearchProvider(config.chunkDir);
+// Resolve relative data paths from repo root so they work regardless of which
+// directory pnpm launches the process from (e.g. apps/trask-http-server/ vs repo root).
+const resolveFromRoot = (p: string) => (path.isAbsolute(p) ? p : path.resolve(repoRoot, p));
+
+const queryRepository = new JsonTraskQueryRepository(resolveDataFile(resolveFromRoot(config.dataDir), "trask-queries.json"));
+const searchProvider = createChunkSearchProvider(resolveFromRoot(config.chunkDir));
 const researchWizard = createResearchWizardClient(config.researchWizard, config.ai, searchProvider);
 
 const runtime = {

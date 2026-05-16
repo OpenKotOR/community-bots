@@ -241,8 +241,8 @@ export const defaultSourceCatalog: readonly SourceDescriptor[] = [
     name: "PCGamingWiki",
     kind: "website",
     homeUrl: "https://www.pcgamingwiki.com",
-    description: "Technical compatibility notes, fixes, and platform troubleshooting for KOTOR and TSL.",
-    freshnessPolicy: "daily if referenced often, otherwise weekly",
+    description: "Technical compatibility notes, fixes, and platform troubleshooting for KOTOR and TSL. Note: Cloudflare-protected — serves as reference display only; live scraping will fail.",
+    freshnessPolicy: "manual reference only — site requires JavaScript to scrape",
     approvalScope: "public technical reference",
     tags: ["troubleshooting", "pc", "compatibility", "fixes"],
   },
@@ -421,7 +421,7 @@ export const traskApprovedResearchBaseHosts: readonly string[] = [
   "deadlystream.com",
   "github.com",
   "kotor.neocities.org",
-  "pcgamingwiki.com",
+  // pcgamingwiki.com excluded: Cloudflare-protected, returns JS challenge on automated requests.
   "en.wikipedia.org",
   "strategywiki.org",
 ];
@@ -776,7 +776,7 @@ export class ChunkSearchProvider implements SearchProvider {
           sourceName: chunk.sourceName,
           kind: chunk.kind,
           title: chunk.title,
-          snippet: chunk.chunkText.slice(0, 200).trim() + (chunk.chunkText.length > 200 ? "\u2026" : ""),
+          snippet: chunk.chunkText.slice(0, 800).trim() + (chunk.chunkText.length > 800 ? "\u2026" : ""),
           url: chunk.url,
           score,
           tags: chunk.tags,

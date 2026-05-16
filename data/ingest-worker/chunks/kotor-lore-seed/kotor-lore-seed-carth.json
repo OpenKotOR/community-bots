@@ -1,0 +1,17 @@
+{
+  "id": "kotor-lore-seed-carth",
+  "sourceId": "kotor-lore-seed",
+  "sourceName": "KOTOR Lore Compendium",
+  "kind": "website",
+  "url": "local://kotor-lore/carth",
+  "title": "Carth Onasi — Republic Soldier Companion",
+  "chunkText": "Carth Onasi is a Republic soldier and the first companion you meet in KOTOR 1. He is a skilled pilot who helps you escape Taris. Carth has deep trust issues stemming from his mentor Saul Karath betraying the Republic and bombing Telos, killing Carth's wife and son. He initially distrusts Revan due to his past with Jedi, but gradually opens up. He is a romance option for a female player character. Carth also appears in KOTOR 2 and the Star Wars: The Old Republic MMO.",
+  "fetchedAt": 1778939758725,
+  "chunkIndex": 0,
+  "tags": [
+    "lore",
+    "characters",
+    "story",
+    "kotor"
+  ]
+}

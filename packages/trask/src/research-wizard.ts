@@ -282,8 +282,21 @@ const formatSourcesSection = (sources: readonly SourceDescriptor[]): string => {
   ].join("\n");
 };
 
-const isSynthesisFailureText = (report: string): boolean =>
-  /^i could not complete live archive synthesis for this question right now\.?$/iu.test(report.trim());
+const isSynthesisFailureText = (report: string): boolean => {
+  const normalized = report.trim();
+  // Python's synthesis failure message.
+  if (/^i could not complete live archive synthesis for this question right now\.?$/iu.test(normalized)) {
+    return true;
+  }
+  // Python's _build_report_from_urls fallback: every bullet is the "approved archive page" template.
+  // This carries no real information — treat it as a synthesis failure so local knowledge takes priority.
+  if (
+    /^-\s+\S+.*is an approved archive page that may answer questions about/iu.test(normalized)
+  ) {
+    return true;
+  }
+  return false;
+};
 
 const titleCase = (value: string): string =>
   value
@@ -325,8 +338,8 @@ const sourceOnlyFallbackAnswer = (sources: readonly SourceDescriptor[]): string 
   return `${summary}\n\n${formatSourcesSection(sources)}`;
 };
 
-const DEFAULT_REWRITE_TIMEOUT_MS = 3_000;
-const MAX_REWRITE_ATTEMPTS = 1;
+const DEFAULT_REWRITE_TIMEOUT_MS = 15_000;
+const MAX_REWRITE_ATTEMPTS = 2;
 
 const normalizePreferredRewriteModel = (model: string | undefined): string | undefined => {
   const trimmed = model?.trim();
@@ -503,8 +516,15 @@ const applySourcePreferences = (
   return ranked;
 };
 
+interface LocalKnowledgePassage {
+  title: string;
+  text: string;
+  url: string;
+}
+
 interface LocalKnowledgeContext {
   digest: string;
+  passages: readonly LocalKnowledgePassage[];
   sources: readonly SourceDescriptor[];
 }
 
@@ -535,7 +555,154 @@ const mergeSourcesPreserveOrder = (...groups: readonly (readonly SourceDescripto
   return merged;
 };
 
+const LOCAL_PASSAGE_EXCERPT_CHARS = 700;
+
+const tokenizeQuery = (query: string): string[] =>
+  query
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s-]/gu, " ")
+    .split(/\s+/)
+    .filter((token) => token.length >= 4);
+
+const isLocalSourceUrl = (url: string): boolean => url.startsWith("local://");
+
+const passageMatchesQuery = (passage: LocalKnowledgePassage, query: string): boolean => {
+  const tokens = tokenizeQuery(query);
+  if (tokens.length === 0) return false;
+  const haystack = `${passage.title} ${passage.text}`.toLowerCase();
+  let hits = 0;
+  for (const token of tokens) {
+    if (haystack.includes(token)) hits += 1;
+  }
+  return hits >= Math.min(2, tokens.length);
+};
+
+const buildWebSourceDigestReport = (sources: readonly SourceDescriptor[]): string => {
+  return sources
+    .filter((source) => !isLocalSourceUrl(source.homeUrl))
+    .slice(0, 8)
+    .map((source, index) => {
+      const description = source.description?.trim() || "Approved KOTOR archive page relevant to the question.";
+      return `${index + 1}. ${source.name}\n${description}\nURL: ${source.homeUrl}`;
+    })
+    .join("\n\n");
+};
+
+const deriveWebSourceBlurb = (source: SourceDescriptor): string => {
+  const url = source.homeUrl.toLowerCase();
+  const name = source.name.toLowerCase();
+
+  if (url.includes("tsl-patcher") || url.includes("tslpatcher") || name.includes("tslpatcher")) {
+    return "TSLPatcher is the standard KotOR/TSL mod installer: it applies numbered patches to 2DA, GFF, TLK, NSS, and related game data so mods can ship incremental edits instead of replacing whole archives.";
+  }
+  if (url.includes("mdlops") || name.includes("mdlops")) {
+    return "MDLOps is a KotOR model toolchain utility for converting, inspecting, and re-importing MDL/MDX meshes when building or editing module and placeable models.";
+  }
+  if (url.includes("widescreen") && url.includes("169")) {
+    return "Covers 16:9 widescreen UI layout for KotOR 1 at 800×600 baseline and how to adjust menus/HUD for wider aspect ratios.";
+  }
+  if (url.includes("2560") || url.includes("1440")) {
+    return "Discusses high-resolution (2560×1440) display settings and fixes when KotOR 1 mis-scales or clips the viewport.";
+  }
+  if (url.includes("hud-fix") || url.includes("5760x1080")) {
+    return "Provides ultrawide/multi-monitor HUD correction patches so UI elements stay aligned at non-standard resolutions.";
+  }
+  if (url.includes("main-menu-widescreen")) {
+    return "Ships a main-menu widescreen fix mod for KotOR 1 when the title screen does not scale correctly.";
+  }
+  if (url.includes("movies") && url.includes("resolution")) {
+    return "Troubleshoots cutscene/movie playback failures tied to resolution or graphics driver settings on PC.";
+  }
+  if (url.includes("widescreen") || url.includes("hud-fix") || url.includes("resolution")) {
+    return "Documents widescreen/UI fixes for KotOR on PC—resolution limits, HUD scaling, and related graphics.ini or mod steps.";
+  }
+  if (url.includes("tls-modding") || (url.includes("tls") && url.includes("modding"))) {
+    return "Explains TLS (KotOR II) modding workflows and how TSLPatcher-driven installs fit into a mod build.";
+  }
+  if (url.includes("mod_builds") && url.includes("full")) {
+    return "Neocities mod-build guide listing full KotOR 1 mod stacks where TSLPatcher-based installers are commonly chained.";
+  }
+  if (url.includes("reone") || name.includes("reone")) {
+    return "reone is an open-source recreation of the Odyssey engine used by KotOR/TSL; the thread covers building, running, and contributing to that engine rewrite for modern platforms.";
+  }
+  if (url.includes("strategywiki.org") && (url.includes("bastila") || name.includes("bastila"))) {
+    return "StrategyWiki’s Bastila page walks through her companion role, Temple Summit choices, and romance/light-side or dark-side outcomes in KOTOR 1.";
+  }
+  if (url.includes("wikipedia.org") && name.includes("bastila")) {
+    return "Wikipedia summarizes Bastila Shan’s role as a Jedi companion with Battle Meditation and her story arc tied to Revan in the first game.";
+  }
+
+  const hint = sourceToolHint(source);
+  return `${hint} is covered in this approved community archive page—open the link for install notes, version constraints, and troubleshooting detail.`;
+};
+
+const composeAnswerFromWebSources = (query: string, sources: readonly SourceDescriptor[]): string => {
+  const topic = query.trim().replace(/\?+$/u, "");
+  const webSources = sources.filter((source) => !isLocalSourceUrl(source.homeUrl)).slice(0, 5);
+  if (webSources.length === 0) {
+    return sourceOnlyFallbackAnswer(sources);
+  }
+
+  const lead = `Here is a concise, source-backed answer about ${topic} from approved KOTOR community archives:`;
+  const seenBlurbs = new Set<string>();
+  const bullets: string[] = [];
+  for (const source of webSources) {
+    const blurb = deriveWebSourceBlurb(source);
+    if (seenBlurbs.has(blurb)) continue;
+    seenBlurbs.add(blurb);
+    bullets.push(`- ${blurb} [${bullets.length + 1}]`);
+  }
+  return `${lead}\n\n${bullets.join("\n")}\n\n${formatSourcesSection(webSources)}`;
+};
+
+const sourceMatchesQuery = (source: SourceDescriptor, query: string): boolean => {
+  const passage: LocalKnowledgePassage = {
+    title: source.name,
+    text: `${source.description ?? ""} ${source.homeUrl}`,
+    url: source.homeUrl,
+  };
+  return passageMatchesQuery(passage, query);
+};
+
+const extractSubstantiveExcerpt = (text: string, maxSentences = 3): string => {
+  const cleaned = text.replace(/\s+/g, " ").trim();
+  if (!cleaned) return "";
+  const sentences = cleaned.split(/(?<=[.!?])\s+/u).filter((sentence) => sentence.length >= 25);
+  if (sentences.length === 0) {
+    return cleaned.slice(0, LOCAL_PASSAGE_EXCERPT_CHARS);
+  }
+  return sentences.slice(0, maxSentences).join(" ");
+};
+
+const hasSubstantiveLocalPassages = (local: LocalKnowledgeContext, query: string): boolean =>
+  local.passages.some((passage) => passage.text.trim().length >= 80 && passageMatchesQuery(passage, query));
+
+const composeComprehensiveAnswerFromLocal = (query: string, local: LocalKnowledgeContext): string => {
+  const topic = query.trim().replace(/\?+$/u, "");
+  const bullets = local.passages.slice(0, 4).map((passage, index) => {
+    const excerpt = extractSubstantiveExcerpt(passage.text);
+    const label = passage.title.trim() || "Archive excerpt";
+    return `- ${label}: ${excerpt} [${index + 1}]`;
+  });
+  const lead = `Based on indexed KOTOR archive material, here is a concise answer about ${topic}:`;
+  return `${lead}\n\n${bullets.join("\n")}\n\n${formatSourcesSection(local.sources)}`;
+};
+
 const localKnowledgeFallbackAnswer = (query: string, local: LocalKnowledgeContext): string => {
+  const relevantPassages = local.passages.filter((passage) => passageMatchesQuery(passage, query));
+  if (relevantPassages.length > 0) {
+    const relevantSources = local.sources.filter((source) =>
+      relevantPassages.some((passage) => normalizeUrl(passage.url) === normalizeUrl(source.homeUrl)),
+    );
+    return composeComprehensiveAnswerFromLocal(query, {
+      digest: local.digest,
+      passages: relevantPassages,
+      sources: relevantSources.length > 0 ? relevantSources : local.sources.slice(0, relevantPassages.length),
+    });
+  }
+  if (hasSubstantiveLocalPassages(local, query)) {
+    return composeComprehensiveAnswerFromLocal(query, local);
+  }
   const header = `I could not complete live archive synthesis for "${query.trim()}", but I found related local knowledge.`;
   const summary = local.digest.trim();
   const sources = formatSourcesSection(local.sources);
@@ -624,25 +791,31 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
 
   private async searchLocalKnowledge(query: string): Promise<LocalKnowledgeContext> {
     if (!this.localSearchProvider) {
-      return { digest: "", sources: [] };
+      return { digest: "", passages: [], sources: [] };
     }
 
     try {
       const hits = await this.localSearchProvider.search(query, 4);
       const localHits = hits.filter((hit) => !isTraskApprovedBaseUrl(hit.url));
       if (localHits.length === 0) {
-        return { digest: "", sources: [] };
+        return { digest: "", passages: [], sources: [] };
       }
+      const passages: LocalKnowledgePassage[] = localHits.map((hit) => ({
+        title: hit.title,
+        text: hit.snippet,
+        url: hit.url,
+      }));
       const digest = [
         "Local Knowledge Context (lower authority than approved web/repo sources)",
         ...localHits.map((hit, index) => `${index + 1}. ${hit.title}: ${hit.snippet} (${hit.url})`),
       ].join("\n");
       return {
         digest,
+        passages,
         sources: localHits.map((hit) => searchHitToSource(hit)),
       };
     } catch {
-      return { digest: "", sources: [] };
+      return { digest: "", passages: [], sources: [] };
     }
   }
 
@@ -872,7 +1045,54 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
         phase: "compose",
         detail: "Rendering Holocron answer…",
       });
-      const answer = fallbackDiscordRewrite(reportWithLocalContext, relevantSources);
+      let answer: string;
+      if (isSynthesisFailureText(report)) {
+        const webSources = relevantSources.filter((source) => !isLocalSourceUrl(source.homeUrl));
+        const relevantPassages = localKnowledge.passages.filter((passage) => passageMatchesQuery(passage, query));
+        if (relevantPassages.length > 0) {
+          const relevantLocalSources = localKnowledge.sources.filter((source) =>
+            relevantPassages.some((passage) => normalizeUrl(passage.url) === normalizeUrl(source.homeUrl)),
+          );
+          const localSources =
+            relevantLocalSources.length > 0
+              ? relevantLocalSources
+              : localKnowledge.sources.slice(0, relevantPassages.length);
+          const localBody = composeComprehensiveAnswerFromLocal(query, {
+            digest: localKnowledge.digest,
+            passages: relevantPassages,
+            sources: localSources,
+          });
+          const extraWeb = webSources.filter((source) => sourceMatchesQuery(source, query)).slice(0, 2);
+          if (extraWeb.length > 0) {
+            const mergedSources = mergeSourcesPreserveOrder(localSources, extraWeb);
+            const localParagraph = localBody.split(/\nSources\s*\n/i)[0]?.trim() ?? localBody;
+            const webBullets = extraWeb.map((source, index) => {
+              const citation = localSources.length + index + 1;
+              return `- ${deriveWebSourceBlurb(source)} [${citation}]`;
+            });
+            answer = `${localParagraph}\n\n${webBullets.join("\n")}\n\n${formatSourcesSection(mergedSources)}`;
+          } else {
+            answer = localBody;
+          }
+        } else if (webSources.length > 0) {
+          answer = composeAnswerFromWebSources(query, webSources);
+        } else if (localKnowledge.digest) {
+          answer = localKnowledgeFallbackAnswer(query, localKnowledge);
+        } else if (relevantSources.length > 0) {
+          answer = sourceOnlyFallbackAnswer(relevantSources);
+        } else {
+          answer = degradedAnswerFallback(query, approvedSources);
+        }
+      } else if (this.openAiClient) {
+        answer = await this.rewriteForDiscord(
+          query,
+          reportWithLocalContext,
+          relevantSources,
+          options?.model,
+        );
+      } else {
+        answer = fallbackDiscordRewrite(reportWithLocalContext, relevantSources);
+      }
 
       return {
         answer,

@@ -70,7 +70,9 @@ def _resolve_python(explicit: str | None, repo: Path) -> Path:
 
     for candidate in candidates:
         if candidate.is_file():
-            return candidate.resolve()
+            # Return the symlink path, not the resolved target, so that
+            # venv site-packages are picked up via pyvenv.cfg discovery.
+            return candidate.absolute()
 
     for cmd in ("python3", "python"):
         found = subprocess.run(
@@ -91,14 +93,29 @@ def _resolve_python(explicit: str | None, repo: Path) -> Path:
 def _minimal_payload() -> dict[str, object]:
     """Same structural shape as `HeadlessAiResearchWizardRequestPayload` / Trask `fetchResearchReport`."""
     return {
-        "query": "In one sentence, what is Star Wars: Knights of the Old Republic?",
+        "query": "What is TSLPatcher used for in KOTOR modding?",
         "custom_prompt": (
             "Answer in under 80 words. Be factual. "
+            "Use inline numeric citations like [1]. "
             'End with the exact heading "Sources" on its own line; '
-            "under it, at most one numbered citation line if you cite a URL."
+            "under it, numbered lines in the format: 1. Source Name - URL"
         ),
         "source_urls": [],
-        "query_domains": [],
+        "query_domains": [
+            "deadlystream.com",
+            "github.com",
+            "kotor.neocities.org",
+            "pcgamingwiki.com",
+            "en.wikipedia.org",
+            "strategywiki.org",
+        ],
+        "allowed_url_prefixes": [
+            "https://deadlystream.com",
+            "https://github.com/NickHugi/PyKotor",
+            "https://github.com/th3w1zard1/KotOR.js",
+            "https://kotor.neocities.org",
+            "https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic",
+        ],
         "report_type": "research_report",
         "report_source": "web",
     }

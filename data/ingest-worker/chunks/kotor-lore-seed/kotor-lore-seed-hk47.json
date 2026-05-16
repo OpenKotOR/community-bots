@@ -1,0 +1,17 @@
+{
+  "id": "kotor-lore-seed-hk47",
+  "sourceId": "kotor-lore-seed",
+  "sourceName": "KOTOR Lore Compendium",
+  "kind": "website",
+  "url": "local://kotor-lore/hk-47",
+  "title": "HK-47 — Assassin Droid Companion",
+  "chunkText": "HK-47 is an assassin droid companion in KOTOR 1 and 2. Built by Revan himself, HK-47 is famous for his darkly comic sarcastic personality and his habit of calling organics 'meatbags'. He opens every request with 'Query:' and refers to killing as 'cleansing'. He is enthusiastic about violence and assassination. HK-47 is beloved as one of the most memorable video game companions ever created. In KOTOR 2, he is found disassembled and must be repaired by the Exile.",
+  "fetchedAt": 1778939758725,
+  "chunkIndex": 0,
+  "tags": [
+    "lore",
+    "characters",
+    "story",
+    "kotor"
+  ]
+}

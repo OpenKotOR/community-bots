@@ -1,0 +1,17 @@
+{
+  "id": "kotor-lore-seed-kreia",
+  "sourceId": "kotor-lore-seed",
+  "sourceName": "KOTOR Lore Compendium",
+  "kind": "website",
+  "url": "local://kotor-lore/kreia",
+  "title": "Kreia / Darth Traya — KOTOR 2 Antagonist and Mentor",
+  "chunkText": "Kreia (Darth Traya, Lord of Betrayal) is the main mentor and eventual antagonist of KOTOR 2. She is a former Jedi Master turned Sith who mentors the Exile. Widely considered one of gaming's best-written villains, Kreia's philosophy questions the nature of the Force itself and the morality of Jedi/Sith duality. She manipulates everyone around her; her true motives are revealed only at the very end. She lost her connection to the Force after the Malachor V catastrophe.",
+  "fetchedAt": 1778939758725,
+  "chunkIndex": 0,
+  "tags": [
+    "lore",
+    "characters",
+    "story",
+    "kotor"
+  ]
+}

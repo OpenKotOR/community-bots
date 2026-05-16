@@ -1,0 +1,17 @@
+{
+  "id": "kotor-lore-seed-star-forge",
+  "sourceId": "kotor-lore-seed",
+  "sourceName": "KOTOR Lore Compendium",
+  "kind": "website",
+  "url": "local://kotor-lore/star-forge",
+  "title": "Star Forge — Ancient Superweapon",
+  "chunkText": "The Star Forge is an ancient Rakatan space station and superweapon that serves as the final location in KOTOR 1. It is a massive factory powered by drawing energy from a nearby star and the dark side of the Force, capable of producing endless Sith warships and droids. Revan discovered and used it to wage war on the Republic. The player must destroy it in the game's climax. It was built by the Rakatan Infinite Empire and is located at the end of the Star Map quest chain.",
+  "fetchedAt": 1778939758725,
+  "chunkIndex": 0,
+  "tags": [
+    "lore",
+    "characters",
+    "story",
+    "kotor"
+  ]
+}

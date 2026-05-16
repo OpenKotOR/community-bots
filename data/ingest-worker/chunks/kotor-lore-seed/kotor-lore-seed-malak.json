@@ -1,0 +1,17 @@
+{
+  "id": "kotor-lore-seed-malak",
+  "sourceId": "kotor-lore-seed",
+  "sourceName": "KOTOR Lore Compendium",
+  "kind": "website",
+  "url": "local://kotor-lore/malak",
+  "title": "Darth Malak — KOTOR Primary Antagonist",
+  "chunkText": "Darth Malak is the primary antagonist of KOTOR 1. He was Revan's best friend and apprentice before falling to the dark side during the Mandalorian Wars. Malak later betrayed Revan by firing on his flagship, which allowed the Jedi to capture and mind-wipe Revan. Malak is recognizable by his metal jaw — lost when Revan cut it off with a lightsaber. He sustains his power by draining the Force energy of captured Jedi imprisoned in Kolto tanks aboard his flagship the Leviathan.",
+  "fetchedAt": 1778939758725,
+  "chunkIndex": 0,
+  "tags": [
+    "lore",
+    "characters",
+    "story",
+    "kotor"
+  ]
+}

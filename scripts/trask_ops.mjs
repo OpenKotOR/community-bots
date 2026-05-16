@@ -60,7 +60,8 @@ Usage:
   node scripts/trask_ops.mjs update         # git pull + pnpm install + build
   node scripts/trask_ops.mjs build-web      # build holocron-web (required before dev-http)
   node scripts/trask_ops.mjs dev-http       # build web + start Trask HTTP server on port 4010
-  node scripts/trask_ops.mjs verify-web     # Playwright browser test: 5 KOTOR queries
+  node scripts/trask_ops.mjs verify-cli     # CLI Trask Q&A via headless ai-researchwizard (5 queries)
+  node scripts/trask_ops.mjs verify-web     # Playwright browser test: 5 KOTOR queries (optional)
   node scripts/trask_ops.mjs smoke-discord  # verify Discord bot slash command registration
 
 Quick start:
@@ -69,7 +70,7 @@ Quick start:
   3. node scripts/trask_ops.mjs setup-venv   # for research support
   4. node scripts/trask_ops.mjs build-web
   5. node scripts/trask_ops.mjs dev-http     # serves on http://127.0.0.1:4010
-  6. node scripts/trask_ops.mjs verify-web   # confirm 5/5 RICH
+  6. node scripts/trask_ops.mjs verify-cli   # confirm CLI Trask Q&A (5/5 RICH)
   7. pnpm dev:trask                          # start Trask Discord bot
   8. pnpm dev:hk                             # start HK-86 Discord bot
   9. pnpm dev:pazaak                         # start Pazaak Discord bot
@@ -147,6 +148,10 @@ try {
         throw new Error(`Port ${port} is already in use. Stop the existing server or set TRASK_HTTP_PORT.`);
       }
       await pnpm("--filter", "@openkotor/trask-http-server", "dev");
+      break;
+    }
+    case "verify-cli": {
+      await run("node", ["--import", "tsx/esm", "scripts/verify_trask_cli_qa.mjs", ...process.argv.slice(3)]);
       break;
     }
     case "verify-web": {

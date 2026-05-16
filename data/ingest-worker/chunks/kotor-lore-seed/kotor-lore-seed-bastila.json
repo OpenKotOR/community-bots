@@ -1,0 +1,17 @@
+{
+  "id": "kotor-lore-seed-bastila",
+  "sourceId": "kotor-lore-seed",
+  "sourceName": "KOTOR Lore Compendium",
+  "kind": "website",
+  "url": "local://kotor-lore/bastila",
+  "title": "Bastila Shan — KOTOR Jedi Companion",
+  "chunkText": "Bastila Shan is a Jedi Knight in KOTOR 1 and a major companion. She possesses the rare Force talent of Battle Meditation — boosting friendly forces while demoralizing enemies. She and Revan share a Force Bond formed during the rescue mission. She is a potential romance option for a male player. Bastila uses a double-bladed yellow lightsaber. She is later captured by Darth Malak and temporarily falls to the dark side before being redeemed.",
+  "fetchedAt": 1778939758725,
+  "chunkIndex": 0,
+  "tags": [
+    "lore",
+    "characters",
+    "story",
+    "kotor"
+  ]
+}
