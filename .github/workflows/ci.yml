@@ -42,3 +42,9 @@ jobs:
 
       - name: Unit tests
         run: node --test packages/*/dist/*.test.js apps/*/dist/*.test.js
+
+      - name: Install Playwright (Chromium)
+        run: pnpm exec playwright install chromium --with-deps
+
+      - name: Holocron web e2e (research polling + UI)
+        run: pnpm holocron:e2e

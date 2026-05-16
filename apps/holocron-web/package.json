@@ -10,7 +10,7 @@
         "lint": "eslint .",
         "optimize": "vite optimize",
         "preview": "vite preview",
-        "test:e2e": "pnpm build && playwright test"
+        "test:e2e": "pnpm run build && pnpm exec playwright test --config playwright.config.ts"
     },
     "dependencies": {
         "@github/spark": ">=0.43.1 <1",

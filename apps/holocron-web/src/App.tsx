@@ -65,6 +65,8 @@ const LEGACY_CONVERSATIONS_KEY = 'qa-conversations'
 const HOLOCRON_RESEARCH_JOBS_KEY = 'holocron-research-jobs'
 const RESEARCH_RETRY_BASE_MS = 5_000
 const RESEARCH_RETRY_MAX_MS = 90_000
+/** ~2.5 min of missing thread rows before re-dispatching (research can run up to ~90s). */
+const RESEARCH_POLL_FAILURE_GIVE_UP = 48
 const SIDEBAR_WIDTH_MIN = 260
 const SIDEBAR_WIDTH_MAX = 520
 
@@ -352,7 +354,31 @@ function mergeHolocronThreadMessages(local: MessageType[], records: TraskHistory
     return local
   }
   const serverMsgs = mapTraskHistoryToMessages(records)
-  return serverMsgs.sort((a, b) => a.timestamp - b.timestamp)
+  const serverQuestions = new Set(records.map((rec) => rec.query.trim().toLowerCase()))
+  const serverMessageIds = new Set(serverMsgs.map((msg) => msg.id))
+
+  const supplemental: MessageType[] = []
+  for (let index = 0; index < local.length; index += 1) {
+    const msg = local[index]!
+    if (msg.role !== 'user') continue
+    const question = msg.content.trim().toLowerCase()
+    if (!question || serverQuestions.has(question)) continue
+    if (serverMessageIds.has(msg.id)) continue
+    supplemental.push(msg)
+    const next = local[index + 1]
+    if (
+      next
+      && next.role === 'assistant'
+      && (isResearchLoadingMessage(next) || next.id.startsWith('pending-'))
+      && !serverMessageIds.has(next.id)
+    ) {
+      supplemental.push(next)
+    }
+  }
+
+  return ensureUniqueMessageIds(
+    [...serverMsgs, ...supplemental].sort((a, b) => a.timestamp - b.timestamp),
+  )
 }
 
 function conversationUpdatedAtFromMessages(messages: MessageType[], fallback: number): number {
@@ -1351,6 +1377,17 @@ function App() {
     [setConversations],
   )
 
+  const failResearchJob = useCallback(
+    (job: HolocronResearchJob, record: TraskHistoryRecordDto) => {
+      replaceResearchAssistantMessage(job, createFailedMessageFromTraskRecord(record, job.queryType))
+      setResearchJobs((current) => normalizeResearchJobs(current).filter((candidate) => candidate.clientId !== job.clientId))
+      if (job.conversationId === activeConversationId) {
+        setActiveAgents([])
+      }
+    },
+    [activeConversationId, replaceResearchAssistantMessage, setResearchJobs],
+  )
+
   const completeResearchJob = useCallback(
     (job: HolocronResearchJob, record: TraskHistoryRecordDto) => {
       const assistantMessage = createAssistantMessageFromTraskRecord(record, job.queryType)
@@ -1474,18 +1511,13 @@ function App() {
             return
           }
           if (record?.status === 'failed') {
-            retryLater(job, {
-              // Explicitly failed on server: re-dispatch with backoff and keep UI pending.
-              serverQueryId: undefined,
-              state: 'queued',
-              pollFailures: 0,
-            })
+            failResearchJob(job, record)
             return
           }
           const pollFailures = record ? 0 : job.pollFailures + 1
           // Missing record can be eventual-consistency or transient backend lag; do not re-dispatch.
-          if (!record && pollFailures >= 12) {
-            retryLater(job, { state: 'submitted', pollFailures })
+          if (!record && pollFailures >= RESEARCH_POLL_FAILURE_GIVE_UP) {
+            retryLater(job, { state: 'submitted', pollFailures: 0, serverQueryId: undefined })
             return
           }
           pollLater(job, { state: 'submitted', pollFailures })
@@ -1550,6 +1582,7 @@ function App() {
   }, [
     activeConversationId,
     completeResearchJob,
+    failResearchJob,
     replaceResearchAssistantMessage,
     researchJobs,
     setResearchJobs,
@@ -1765,7 +1798,7 @@ function App() {
           answerFlux={answerFlux}
           sourceMetrics={sourceMetrics}
           totalInteractions={holocronInteractionCount}
-          isProcessing={isProcessing}
+          isProcessing={isProcessing || hasRunningResearch}
           answerBondTicks={holocronAnswerBondTicks}
           querySignature={holocronQuerySignature(holocronLiveQuery)}
           draftQuery={holocronLiveQuery}

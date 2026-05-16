@@ -68,7 +68,9 @@ const createWebAuth = (
     }
 
     if (config.webAllowAnonymous) {
-      await handler(req, res, { id: config.webDefaultUserId, persistQueries: false });
+      // Async 202 + thread polling (Holocron). persistQueries=false forces a blocking /ask
+      // that outlasts the browser fetch timeout and looks like research never finishes.
+      await handler(req, res, { id: config.webDefaultUserId, persistQueries: true });
       return;
     }
 

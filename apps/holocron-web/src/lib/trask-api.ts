@@ -66,13 +66,26 @@ function authHeaders(apiKey?: string): Record<string, string> {
   return headers
 }
 
-/** Wall-clock cap for each Trask HTTP call so a dead proxy/backend cannot hang the UI. */
+/** Wall-clock cap for routine Trask HTTP calls (session, sources, poll iteration). */
 const DEFAULT_TRASK_FETCH_TIMEOUT_MS = 20_000
+
+/** POST /ask may block until research completes when the server uses synchronous mode. */
+const DEFAULT_TRASK_ASK_TIMEOUT_MS = 120_000
 
 export function traskFetchTimeoutMs(): number {
   const raw = import.meta.env.VITE_TRASK_FETCH_TIMEOUT_MS
   const n = typeof raw === 'string' ? Number(raw.trim()) : NaN
   return Number.isFinite(n) && n >= 3_000 ? n : DEFAULT_TRASK_FETCH_TIMEOUT_MS
+}
+
+export function traskAskTimeoutMs(): number {
+  const askRaw =
+    import.meta.env.VITE_TRASK_ASK_TIMEOUT_MS ?? import.meta.env.VITE_TRASK_RESEARCH_TIMEOUT_MS
+  const askN = typeof askRaw === 'string' ? Number(askRaw.trim()) : NaN
+  if (Number.isFinite(askN) && askN >= 3_000) {
+    return askN
+  }
+  return Math.max(traskFetchTimeoutMs(), DEFAULT_TRASK_ASK_TIMEOUT_MS)
 }
 
 function abortAfterTimeout(ms: number): AbortSignal {
@@ -114,14 +127,14 @@ export function traskErrorMessageFromUnknown(error: unknown): string {
   return 'Trask request failed.'
 }
 
-function traskRequestInit(apiKey?: string, init?: RequestInit): RequestInit {
+function traskRequestInit(apiKey?: string, init?: RequestInit, timeoutMs?: number): RequestInit {
   const sameOrigin = !apiBase()
   const baseHeaders = authHeaders(apiKey)
   const extra =
     init?.headers && typeof init.headers === 'object' && !Array.isArray(init.headers)
       ? (init.headers as Record<string, string>)
       : {}
-  const ms = traskFetchTimeoutMs()
+  const ms = timeoutMs ?? traskFetchTimeoutMs()
   const timeoutSignal = abortAfterTimeout(ms)
   const userSignal = init?.signal ?? undefined
   const signal = userSignal ? mergeAbortSignals(userSignal, timeoutSignal) : timeoutSignal
@@ -240,7 +253,7 @@ export async function traskAsk(
   const res = await fetch(`${apiBase()}/api/trask/ask`, traskRequestInit(apiKey, {
     method: 'POST',
     body: JSON.stringify(body),
-  }))
+  }, traskAskTimeoutMs()))
   const data = (await res.json()) as {
     error?: string
     query?: TraskHistoryRecordDto

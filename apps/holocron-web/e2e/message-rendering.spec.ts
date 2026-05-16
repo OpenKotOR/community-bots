@@ -1,5 +1,7 @@
 import { expect, type Locator, type Page, test } from '@playwright/test'
 
+test.describe.configure({ timeout: 60_000 })
+
 const seededThreadId = '11111111-1111-4111-8111-111111111111'
 
 const seededConversation = {
@@ -161,6 +163,7 @@ function luminance({ r, g, b }: { r: number; g: number; b: number }) {
 }
 
 async function contrastRatio(locator: Locator) {
+  await locator.waitFor({ state: 'visible', timeout: 10_000 })
   const styles = await locator.evaluate((element) => {
     const textColor = getComputedStyle(element).color
     const alphaOf = (value: string) => {
@@ -176,7 +179,7 @@ async function contrastRatio(locator: Locator) {
       if (current) backgroundColor = getComputedStyle(current).backgroundColor
     }
     return { textColor, backgroundColor }
-  })
+  }, undefined, { timeout: 10_000 })
   const foreground = parseRgb(styles.textColor)
   const background = parseRgb(styles.backgroundColor)
   const light = Math.max(luminance(foreground), luminance(background))

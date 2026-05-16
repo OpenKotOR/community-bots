@@ -33,7 +33,7 @@
     "discord:install-links": "tsx scripts/discord-install-links.ts",
     "smoke:trask-gptr-dry": "python scripts/smoke_trask_headless_gptr.py --dry-run",
     "smoke:trask-gptr": "python scripts/smoke_trask_headless_gptr.py",
-    "holocron:e2e": "pnpm --filter @openkotor/holocron-web build",
+    "holocron:e2e": "pnpm --filter @openkotor/holocron-web build && pnpm exec playwright test --config apps/holocron-web/playwright.config.ts",
     "discord:smoke-trask-commands": "node scripts/discord_trask_commands_smoke.mjs"
   },
   "devDependencies": {
