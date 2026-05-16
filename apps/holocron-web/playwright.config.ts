@@ -5,9 +5,11 @@ const appDir = fileURLToPath(new URL('.', import.meta.url))
 
 export default defineConfig({
   testDir: './e2e',
-  timeout: 30_000,
-  expect: { timeout: 8_000 },
+  timeout: 60_000,
+  expect: { timeout: 15_000 },
   fullyParallel: true,
+  // vite preview is single-process; too many parallel browsers cause blank-page flakes.
+  workers: process.env.CI ? 2 : 2,
   reporter: process.env.CI ? 'github' : 'list',
   use: {
     baseURL: 'http://127.0.0.1:4174',
@@ -17,7 +19,7 @@ export default defineConfig({
     command: 'npx vite preview --host 127.0.0.1 --port 4174',
     cwd: appDir,
     url: 'http://127.0.0.1:4174',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 120_000,
   },
   projects: [

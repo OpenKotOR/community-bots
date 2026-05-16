@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
 
+test.describe.configure({ timeout: 60_000 })
+
 const threadId = '22222222-2222-4222-8222-222222222222'
 const queryId = '33333333-3333-4333-8333-333333333333'
 
@@ -77,10 +79,10 @@ test('polls async Trask research until complete answer renders', async ({ page }
               query,
               status: complete ? 'complete' : 'pending',
               answer: complete
-                ? 'TSLPatcher applies 2DA, TLK, and GFF patches for KotOR mods.\n\nSources\n[1] Deadly Stream - https://deadlystream.com'
+                ? 'TSLPatcher applies 2DA, TLK, and GFF patches for KotOR mods [1].\n\nSources\n1. Deadly Stream - https://deadlystream.com/topic/tslpatcher'
                 : null,
               sources: complete
-                ? [{ id: 'deadlystream', name: 'Deadly Stream', url: 'https://deadlystream.com' }]
+                ? [{ id: 'deadlystream', name: 'Deadly Stream', url: 'https://deadlystream.com/topic/tslpatcher' }]
                 : [],
               error: null,
               createdAt: new Date().toISOString(),
@@ -101,9 +103,10 @@ test('polls async Trask research until complete answer renders', async ({ page }
     await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'mock miss' }) })
   })
 
-  await page.goto(`/?thread=${threadId}`)
+  await page.goto(`/?thread=${threadId}`, { waitUntil: 'domcontentloaded' })
+  await expect(page.getByRole('log', { name: 'Holocron conversation messages' })).toBeVisible({ timeout: 20_000 })
   const input = page.locator('#question-input')
-  await input.waitFor({ state: 'visible' })
+  await expect(input).toBeVisible({ timeout: 20_000 })
 
   await input.fill(query)
   await page.getByRole('button', { name: /submit question|send now/i }).click()

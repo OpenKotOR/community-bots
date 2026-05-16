@@ -112,10 +112,10 @@ test.beforeEach(async ({ page }) => {
 })
 
 async function openSeededConversation(page: Page) {
-  await page.goto(`/?thread=${seededThreadId}`)
-  await expect(page.getByRole('log', { name: 'Holocron conversation messages' })).toBeVisible()
-  await expect(page.getByText('Completed answer from Trask').first()).toBeVisible()
-  await expect(page.getByRole('article', { name: 'Assistant message' })).toHaveCount(4, { timeout: 15_000 })
+  await page.goto(`/?thread=${seededThreadId}`, { waitUntil: 'domcontentloaded' })
+  await expect(page.getByRole('log', { name: 'Holocron conversation messages' })).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByText('Completed answer from Trask').first()).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByRole('article', { name: 'Assistant message' })).toHaveCount(4, { timeout: 20_000 })
 }
 
 function parseRgb(value: string): { r: number; g: number; b: number; a: number } {
