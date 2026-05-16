@@ -27,3 +27,57 @@ test("sanitizeHkDialogReply removes mass mentions and enforces length", () => {
   assert.ok(sanitized.length <= 32);
   assert.match(sanitized, /Statement/);
 });
+
+import { hkCuratedRoles, findCuratedRoleById, groupCuratedRolesByCategory } from "./index.js";
+
+// ---------------------------------------------------------------------------
+// hkCuratedRoles data integrity
+// ---------------------------------------------------------------------------
+
+test("hkCuratedRoles array is non-empty", () => {
+  assert.ok(hkCuratedRoles.length > 0);
+});
+
+test("every curated role has a non-empty id, name, and description", () => {
+  for (const role of hkCuratedRoles) {
+    assert.ok(role.id.length > 0, `Role missing id`);
+    assert.ok(role.name.length > 0, `Role '${role.id}' missing name`);
+    assert.ok(role.description.length > 0, `Role '${role.id}' missing description`);
+  }
+});
+
+test("curated role ids are unique", () => {
+  const ids = hkCuratedRoles.map((r) => r.id);
+  assert.equal(new Set(ids).size, ids.length, "Duplicate curated role ids found");
+});
+
+// ---------------------------------------------------------------------------
+// findCuratedRoleById
+// ---------------------------------------------------------------------------
+
+test("findCuratedRoleById returns the correct role", () => {
+  const first = hkCuratedRoles[0]!;
+  const result = findCuratedRoleById(first.id);
+  assert.ok(result);
+  assert.equal(result!.id, first.id);
+});
+
+test("findCuratedRoleById returns undefined for unknown id", () => {
+  assert.equal(findCuratedRoleById("not-a-real-role-xyz"), undefined);
+});
+
+// ---------------------------------------------------------------------------
+// groupCuratedRolesByCategory
+// ---------------------------------------------------------------------------
+
+test("groupCuratedRolesByCategory includes all roles", () => {
+  const groups = groupCuratedRolesByCategory();
+  const total = [...groups.values()].reduce((sum, arr) => sum + arr.length, 0);
+  assert.equal(total, hkCuratedRoles.length);
+});
+
+test("groupCuratedRolesByCategory produces one entry per distinct category", () => {
+  const groups = groupCuratedRolesByCategory();
+  const distinctCategories = new Set(hkCuratedRoles.map((r) => r.category));
+  assert.equal(groups.size, distinctCategories.size);
+});
