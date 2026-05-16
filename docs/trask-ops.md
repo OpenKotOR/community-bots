@@ -93,6 +93,59 @@ Bots automatically load credentials from root `.env` (dotenv walks up from `cwd`
 
 ---
 
+## HK-86 Reaction-Role Setup
+
+After the bot is running you need to configure which message(s) act as reaction panels.
+
+### Step 1 — Create a panel message in Discord
+
+Post a message in any channel (e.g. `#roles`). Users will react to that message to get roles.
+In Discord: **User Settings → Advanced → Developer Mode** to enable copying IDs.
+
+- Right-click the **channel** → "Copy Channel ID"
+- Right-click the **message** → "Copy Message ID"
+
+### Step 2 — Configure `data/hk-bot/reaction-role-panels.json`
+
+The file is auto-created from the template when you run `pnpm discord:setup`. Edit it:
+
+```json
+{
+  "version": 1,
+  "defaultAnnounceMode": "reply",
+  "replyCooldownMs": 3000,
+  "panels": [
+    {
+      "channelId": "123456789012345678",
+      "messageId": "234567890123456789",
+      "mappings": [
+        { "emoji": "🎮", "roleNameHint": "PC Gamer" },
+        { "emoji": "📚", "roleNameHint": "Lore Enthusiast" }
+      ]
+    }
+  ]
+}
+```
+
+Use `roleNameHint` to bind by role name (auto-looked-up), or `roleId` for a stable snowflake ID.
+The bot **hot-reloads** the file — no restart needed after saving changes.
+
+### Step 3 — Invite the bot with correct permissions
+
+The `/designations reactions help` command (ephemeral) outputs a pre-filled invite link.
+Required permissions: **Manage Roles** (must be positioned above any role it assigns), Send Messages, Embed, Read History, Add Reactions.
+
+### Step 4 — Verify
+
+```bash
+# In Discord, as a guild manager:
+/designations reactions status
+```
+
+Shows loaded panels and mapping counts. Then react on the panel message with a test account — HK-86 should reply and apply the role.
+
+---
+
 ## Verification
 
 ### Web UI (Trask / Holocron)

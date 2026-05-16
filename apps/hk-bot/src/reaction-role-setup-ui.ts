@@ -7,13 +7,13 @@ import type { ReactionRoleConfigLoader, ReactionRolePanelsSnapshot } from "./rea
 /** Bitfield for OAuth invite: Manage Roles, Send Messages, Embed, History, Reactions, Slash, External Emojis, View Channel. */
 export const HK_REACTION_BOT_PERMISSIONS = "2416266304";
 
-/** Canonical HK user + operator guide (wiki submodule `community-bots.wiki`). */
+/** Canonical HK user + operator guide. */
 export const HK_USER_GUIDE_WIKI_URL =
-  "https://github.com/OpenKotOR/community-bots/wiki/docs/guides/hk-86";
+  "https://github.com/OpenKotOR/community-bots/blob/main/docs/trask-ops.md";
 
-/** Example reaction panels JSON in this monorepo (`bots`). */
+/** Example reaction panels JSON in this monorepo. */
 export const HK_REACTION_PANELS_EXAMPLE_BLOB_URL =
-  "https://github.com/OpenKotOR/bots/blob/main/apps/hk-bot/reaction-role-panels.example.json";
+  "https://github.com/OpenKotOR/community-bots/blob/main/apps/hk-bot/data-templates/reaction-role-panels.example.json";
 
 export const buildReactionSetupInviteUrl = (appId: string): string => {
   const params = new URLSearchParams({
