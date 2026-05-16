@@ -350,3 +350,71 @@ test("buildSocialAuthAuthorizeUrl respects custom discordApiBase", () => {
   });
   assert.ok(url.startsWith("https://discord.example.com"));
 });
+
+// ---------------------------------------------------------------------------
+// parseConfiguredBases and buildApiUrl (browser.ts)
+// ---------------------------------------------------------------------------
+
+import { parseConfiguredBases, buildApiUrl, resolveBrowserApiBases } from "./browser.js";
+
+test("parseConfiguredBases splits a comma-separated string", () => {
+  const result = parseConfiguredBases("https://a.com,https://b.com,https://c.com");
+  assert.deepEqual(result, ["https://a.com", "https://b.com", "https://c.com"]);
+});
+
+test("parseConfiguredBases trims whitespace around each entry", () => {
+  const result = parseConfiguredBases(" https://a.com , https://b.com ");
+  assert.deepEqual(result, ["https://a.com", "https://b.com"]);
+});
+
+test("parseConfiguredBases filters empty entries", () => {
+  const result = parseConfiguredBases("https://a.com,,https://b.com");
+  assert.deepEqual(result, ["https://a.com", "https://b.com"]);
+});
+
+test("parseConfiguredBases returns empty array for null/undefined", () => {
+  assert.deepEqual(parseConfiguredBases(null), []);
+  assert.deepEqual(parseConfiguredBases(undefined), []);
+});
+
+test("parseConfiguredBases returns empty array for empty string", () => {
+  assert.deepEqual(parseConfiguredBases(""), []);
+});
+
+test("parseConfiguredBases handles a single entry without comma", () => {
+  assert.deepEqual(parseConfiguredBases("https://example.com"), ["https://example.com"]);
+});
+
+test("buildApiUrl joins base and path correctly", () => {
+  assert.equal(buildApiUrl("/api/query", "https://api.example.com"), "https://api.example.com/api/query");
+});
+
+test("buildApiUrl adds leading slash to path if missing", () => {
+  assert.equal(buildApiUrl("api/query", "https://api.example.com"), "https://api.example.com/api/query");
+});
+
+test("buildApiUrl strips trailing slashes from base", () => {
+  assert.equal(buildApiUrl("/api/query", "https://api.example.com///"), "https://api.example.com/api/query");
+});
+
+test("buildApiUrl returns path as-is when base is empty string", () => {
+  assert.equal(buildApiUrl("/api/query", ""), "/api/query");
+});
+
+test("resolveBrowserApiBases returns configuredBases when provided", () => {
+  const result = resolveBrowserApiBases({ configuredBases: ["https://my-api.com"] });
+  assert.deepEqual(result, ["https://my-api.com"]);
+});
+
+test("resolveBrowserApiBases returns [''] when no location and no configuredBases", () => {
+  const result = resolveBrowserApiBases({ location: undefined, configuredBases: undefined });
+  assert.deepEqual(result, [""]);
+});
+
+test("resolveBrowserApiBases injects local API port for localhost", () => {
+  const result = resolveBrowserApiBases({
+    localApiPort: 4001,
+    location: { protocol: "http:", hostname: "localhost", port: "5173" },
+  });
+  assert.ok(result.some((b) => b.includes("4001")));
+});

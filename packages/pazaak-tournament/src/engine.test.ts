@@ -312,3 +312,30 @@ test("attachEngineMatchId records the engine linkage for later settlement", () =
   const refreshed = state.matches.find((entry) => entry.id === active.id);
   assert.equal(refreshed?.engineMatchId, "engine-1");
 });
+
+import { nextPowerOfTwo } from "./seeding.js";
+
+// ---------------------------------------------------------------------------
+// nextPowerOfTwo
+// ---------------------------------------------------------------------------
+
+test("nextPowerOfTwo returns 1 for values <= 1", () => {
+  assert.equal(nextPowerOfTwo(0), 1);
+  assert.equal(nextPowerOfTwo(1), 1);
+  assert.equal(nextPowerOfTwo(-5), 1);
+});
+
+test("nextPowerOfTwo returns exact power for power-of-two inputs", () => {
+  assert.equal(nextPowerOfTwo(2), 2);
+  assert.equal(nextPowerOfTwo(4), 4);
+  assert.equal(nextPowerOfTwo(8), 8);
+  assert.equal(nextPowerOfTwo(16), 16);
+});
+
+test("nextPowerOfTwo rounds up to the next power of two", () => {
+  assert.equal(nextPowerOfTwo(3), 4);
+  assert.equal(nextPowerOfTwo(5), 8);
+  assert.equal(nextPowerOfTwo(9), 16);
+  assert.equal(nextPowerOfTwo(13), 16);
+  assert.equal(nextPowerOfTwo(17), 32);
+});
