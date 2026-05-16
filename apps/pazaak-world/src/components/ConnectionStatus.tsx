@@ -15,7 +15,10 @@ export function ConnectionStatus({ isOnline, socketState = "connecting" }: Conne
 
   useEffect(() => {
     if (!isOnline) {
+      // Reset derived display state when we go offline — intentional synchronous setState.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPing(null);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setHadRecentFailure(false);
       return;
     }

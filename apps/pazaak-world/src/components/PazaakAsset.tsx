@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 interface PazaakAssetProps {
   src?: string;
@@ -11,7 +11,7 @@ interface PazaakAssetProps {
 }
 
 /**
- * PazaakAsset renders game assets with fallback support
+ * PazaakAsset renders game assets with fallback support.
  * Assets can be:
  * - Real images from CDN or local assets
  * - Generated from prompt+seed as deterministic inline SVG art
@@ -26,13 +26,17 @@ export function PazaakAsset({
   size = "md",
   type = "icon",
 }: PazaakAssetProps) {
+  // Track error/load state per src — keyed on src so stale state never bleeds between images.
+  const [imageSrc, setImageSrc] = useState(src);
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
 
-  useEffect(() => {
+  // When src changes, reset error/load state in the render phase (derived-state update).
+  if (imageSrc !== src) {
+    setImageSrc(src);
     setImageError(false);
     setImageLoaded(false);
-  }, [src]);
+  }
 
   const shouldShowImage = src && !imageError;
   const sizePx: Record<string, number> = {
@@ -104,101 +108,6 @@ export function PazaakAsset({
       {fallback}
     </div>
   );
-}
-
-const hashString = (value: string): number => {
-  let hash = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
-  }
-  return hash;
-};
-
-const mulberry32 = (seed: number): (() => number) => {
-  let state = seed >>> 0;
-  return () => {
-    state += 0x6d2b79f5;
-    let t = Math.imul(state ^ (state >>> 15), state | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-};
-
-const toHex = (value: number): string => value.toString(16).padStart(2, "0");
-
-const clampChannel = (value: number): number => Math.max(0, Math.min(255, Math.round(value)));
-
-const pickColor = (rng: () => number, alpha = 1): string => {
-  const r = clampChannel(40 + rng() * 190);
-  const g = clampChannel(30 + rng() * 170);
-  const b = clampChannel(25 + rng() * 145);
-  if (alpha >= 1) {
-    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-  }
-  return `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(2)})`;
-};
-
-const escapeXml = (input: string): string =>
-  input
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/\"/g, "&quot;")
-    .replace(/'/g, "&apos;");
-
-const parseSize = (value?: string): { width: number; height: number } => {
-  const match = value?.trim().match(/^(\d{2,4})x(\d{2,4})$/i);
-  if (!match) {
-    return { width: 256, height: 256 };
-  }
-  const width = Math.max(64, Math.min(1024, Number.parseInt(match[1], 10)));
-  const height = Math.max(64, Math.min(1024, Number.parseInt(match[2], 10)));
-  return { width, height };
-};
-
-/**
- * Generate a deterministic prompt-based image URL as an inline SVG.
- * This keeps rendering local/browser-safe while still producing unique art per prompt.
- */
-export function generateAiImageUrl(prompt: string, options?: { size?: string; seed?: number }): string {
-  const normalizedPrompt = prompt.trim().length > 0 ? prompt.trim() : "Pazaak";
-  const { width, height } = parseSize(options?.size);
-  const computedSeed = options?.seed ?? hashString(normalizedPrompt.toLowerCase());
-  const rng = mulberry32(computedSeed);
-
-  const colorA = pickColor(rng);
-  const colorB = pickColor(rng);
-  const colorC = pickColor(rng);
-  const glow = pickColor(rng, 0.32);
-  const ringCount = 4 + Math.floor(rng() * 4);
-
-  const rings = Array.from({ length: ringCount }, (_, index) => {
-    const cx = (0.15 + rng() * 0.7) * width;
-    const cy = (0.15 + rng() * 0.7) * height;
-    const radius = (0.12 + rng() * 0.32) * Math.min(width, height);
-    const stroke = 1 + Math.floor(rng() * 4);
-    const opacity = (0.2 + rng() * 0.35).toFixed(2);
-    return `<circle cx=\"${cx.toFixed(2)}\" cy=\"${cy.toFixed(2)}\" r=\"${radius.toFixed(2)}\" fill=\"none\" stroke=\"${index % 2 === 0 ? colorB : colorC}\" stroke-opacity=\"${opacity}\" stroke-width=\"${stroke}\" />`;
-  }).join("");
-
-  const words = normalizedPrompt.split(/\s+/).slice(0, 3).join(" ");
-  const label = escapeXml(words.length > 24 ? `${words.slice(0, 23)}...` : words);
-
-  const svg = [
-    `<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"${width}\" height=\"${height}\" viewBox=\"0 0 ${width} ${height}\" role=\"img\" aria-label=\"${escapeXml(normalizedPrompt)}\">`,
-    "<defs>",
-    `<linearGradient id=\"bg\" x1=\"0%\" y1=\"0%\" x2=\"100%\" y2=\"100%\"><stop offset=\"0%\" stop-color=\"${colorA}\"/><stop offset=\"50%\" stop-color=\"${colorB}\"/><stop offset=\"100%\" stop-color=\"${colorC}\"/></linearGradient>`,
-    `<radialGradient id=\"glow\" cx=\"50%\" cy=\"50%\" r=\"65%\"><stop offset=\"0%\" stop-color=\"${glow}\"/><stop offset=\"100%\" stop-color=\"rgba(0,0,0,0)\"/></radialGradient>`,
-    "</defs>",
-    `<rect x=\"0\" y=\"0\" width=\"${width}\" height=\"${height}\" fill=\"url(#bg)\"/>`,
-    `<rect x=\"0\" y=\"0\" width=\"${width}\" height=\"${height}\" fill=\"url(#glow)\"/>`,
-    rings,
-    `<rect x=\"8\" y=\"${height - 44}\" width=\"${width - 16}\" height=\"32\" rx=\"10\" fill=\"rgba(10, 12, 18, 0.48)\"/>`,
-    `<text x=\"50%\" y=\"${height - 22}\" text-anchor=\"middle\" font-family=\"Segoe UI, Arial, sans-serif\" font-size=\"14\" fill=\"#f5f2e8\">${label}</text>`,
-    "</svg>",
-  ].join("");
-
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
 /**

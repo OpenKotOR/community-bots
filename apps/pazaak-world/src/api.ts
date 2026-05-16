@@ -696,7 +696,7 @@ export async function openRewardCrate(accessToken: string, kind: "standard" | "p
     try {
       console.debug("[openRewardCrate] Opening %s crate via Nakama", kind);
 
-      const response = await nakamaRpc<{}>(
+      const response = await nakamaRpc<Record<string, unknown>>(
         accessToken,
         "pazaak.crate_open",
         { kind },

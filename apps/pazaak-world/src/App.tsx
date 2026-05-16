@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useMemo, useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { MAIN_MENU_PRESET, type MainMenuIconKey, type MainMenuModeCardPreset, type MainMenuAiOptionPreset, type MainMenuActionPreset, type MainMenuRulePreset } from "@openkotor/pazaak-engine/menu-preset";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { MAIN_MENU_PRESET, type MainMenuIconKey, type MainMenuModeCardPreset, type MainMenuAiOptionPreset, type MainMenuRulePreset } from "@openkotor/pazaak-engine/menu-preset";
 import type {
   AdvisorDifficulty,
   LeaderboardEntry,
@@ -1571,8 +1571,7 @@ function ModeSelectionScreen({
     }
     return getDefaultLocalOpponentForDifficulty("professional").id;
   });
-  const [matchIntent, setMatchIntent] = useState<"quick_match" | "private_lobby" | "ai_practice">("quick_match");
-  const [quickQueuePlayers, setQuickQueuePlayers] = useState(2);
+  const quickQueuePlayers = 2;
   const lastOpponentClickRef = useRef<{ id: string; timestamp: number } | null>(null);
 
   const availableOpponents = localOpponents;
@@ -1627,20 +1626,6 @@ function ModeSelectionScreen({
   const aiCard = MAIN_MENU_PRESET.modeCards.find((card: MainMenuModeCardPreset) => card.key === "ai");
   const quickMatchCard = MAIN_MENU_PRESET.modeCards.find((card: MainMenuModeCardPreset) => card.key === "quick_match");
   const lobbyCard = MAIN_MENU_PRESET.modeCards.find((card: MainMenuModeCardPreset) => card.key === "private_lobby");
-
-  const launchConfiguredMatch = () => {
-    if (matchIntent === "quick_match") {
-      onQuickMatch(quickQueuePlayers);
-      return;
-    }
-
-    if (matchIntent === "private_lobby") {
-      onOpenLobbies();
-      return;
-    }
-
-    onStartLocalGame(localDifficulty, selectedLocalOpponentId);
-  };
 
   const handleLocalOpponentClick = (opponent: LocalOpponentProfile) => {
     handleLocalOpponentChange(opponent.id);
@@ -2330,8 +2315,7 @@ function AuthDialog({
             : "Could not load OAuth provider status. Set VITE_API_BASES or VITE_LEGACY_HTTP_ORIGIN to a live API and verify OAuth keys in the backend .env.",
         );
       } finally {
-        if (!active) return;
-        setProvidersLoading(false);
+        if (active) setProvidersLoading(false);
       }
     };
 

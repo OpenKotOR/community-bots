@@ -3,7 +3,6 @@ import { soundManager } from "../utils/soundManager.ts";
 import type {
   AdvisorDifficulty,
   PazaakCardBackStyle,
-  PazaakChatAudience,
   PazaakSoundTheme,
   PazaakTableAmbience,
   PazaakTableTheme,

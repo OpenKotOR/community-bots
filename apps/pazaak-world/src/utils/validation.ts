@@ -138,6 +138,7 @@ export function validateDisplayName(input: unknown): DisplayNameValidationResult
   }
 
   // Check for control characters
+  // eslint-disable-next-line no-control-regex
   if (/[\x00-\x1F\x7F-\x9F]/.test(displayName)) {
     errors.push("Display name cannot contain control characters");
   }
@@ -192,7 +193,7 @@ export function validatePassword(input: unknown): PasswordValidationResult {
   const hasUppercase = /[A-Z]/.test(password);
   const hasLowercase = /[a-z]/.test(password);
   const hasNumbers = /[0-9]/.test(password);
-  const hasSpecialChars = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
+  const hasSpecialChars = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password);
 
   if (!hasUppercase) {
     suggestions.push("Add uppercase letters");
@@ -271,6 +272,7 @@ export function validateLobbyName(input: unknown): LobbyNameValidationResult {
   }
 
   // Check for control characters
+  // eslint-disable-next-line no-control-regex
   if (/[\x00-\x1F\x7F-\x9F]/.test(name)) {
     errors.push("Lobby name cannot contain control characters");
   }
@@ -304,6 +306,7 @@ export function validateLobbyPassword(input: unknown): LobbyPasswordValidationRe
   }
 
   // Check for control characters
+  // eslint-disable-next-line no-control-regex
   if (/[\x00-\x1F\x7F-\x9F]/.test(password)) {
     errors.push("Lobby password cannot contain control characters");
   }
@@ -333,6 +336,7 @@ export function sanitizeForDisplay(input: string, maxLength: number = 256): stri
         return entities[char] || char;
       })
       // Remove control characters
+      // eslint-disable-next-line no-control-regex
       .replace(/[\x00-\x1F\x7F-\x9F]/g, "")
   );
 }
