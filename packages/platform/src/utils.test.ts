@@ -223,3 +223,130 @@ test("buildLocalWebOrigins uses DEFAULT_LOCAL_WEB_PORTS when called with no args
   const origins = buildLocalWebOrigins();
   assert.ok(origins.length >= 6);  // at least 3 default ports × 2
 });
+
+// ---------------------------------------------------------------------------
+// createObjectEnvLookup
+// ---------------------------------------------------------------------------
+
+import { createObjectEnvLookup, resolveSocialAuthProviderConfig, listSocialAuthProviders, buildSocialAuthAuthorizeUrl } from "./oauth.js";
+
+test("createObjectEnvLookup returns a string value from the source object", () => {
+  const lookup = createObjectEnvLookup({ MY_KEY: "my-value" });
+  assert.equal(lookup("MY_KEY"), "my-value");
+});
+
+test("createObjectEnvLookup returns undefined for missing keys", () => {
+  const lookup = createObjectEnvLookup({});
+  assert.equal(lookup("MISSING"), undefined);
+});
+
+test("createObjectEnvLookup returns undefined for non-string values", () => {
+  const lookup = createObjectEnvLookup({ NUM: 42, BOOL: true });
+  assert.equal(lookup("NUM"), undefined);
+  assert.equal(lookup("BOOL"), undefined);
+});
+
+// ---------------------------------------------------------------------------
+// resolveSocialAuthProviderConfig
+// ---------------------------------------------------------------------------
+
+test("resolveSocialAuthProviderConfig marks enabled=true when clientId and clientSecret are present", () => {
+  const lookup = createObjectEnvLookup({
+    DISCORD_CLIENT_ID: "my-id",
+    DISCORD_CLIENT_SECRET: "my-secret",
+    DISCORD_CALLBACK_URL: "https://example.com/cb",
+  });
+  const config = resolveSocialAuthProviderConfig("discord", lookup);
+  assert.equal(config.enabled, true);
+  assert.equal(config.clientId, "my-id");
+  assert.equal(config.clientSecret, "my-secret");
+});
+
+test("resolveSocialAuthProviderConfig marks enabled=false when clientSecret is missing", () => {
+  const lookup = createObjectEnvLookup({ DISCORD_CLIENT_ID: "my-id" });
+  const config = resolveSocialAuthProviderConfig("discord", lookup);
+  assert.equal(config.enabled, false);
+});
+
+test("resolveSocialAuthProviderConfig resolves fallback env keys", () => {
+  const lookup = createObjectEnvLookup({ ALT_DISCORD_ID: "alt-id", ALT_DISCORD_SECRET: "alt-secret" });
+  const config = resolveSocialAuthProviderConfig("discord", lookup, {
+    fallbackEnvKeys: {
+      discord: { clientId: "ALT_DISCORD_ID", clientSecret: "ALT_DISCORD_SECRET" },
+    },
+  });
+  assert.equal(config.clientId, "alt-id");
+  assert.equal(config.enabled, true);
+});
+
+// ---------------------------------------------------------------------------
+// listSocialAuthProviders
+// ---------------------------------------------------------------------------
+
+test("listSocialAuthProviders returns an entry for each of the three providers", () => {
+  const lookup = createObjectEnvLookup({});
+  const providers = listSocialAuthProviders(lookup);
+  const ids = providers.map((p) => p.provider);
+  assert.ok(ids.includes("google"));
+  assert.ok(ids.includes("discord"));
+  assert.ok(ids.includes("github"));
+  assert.equal(ids.length, 3);
+});
+
+test("listSocialAuthProviders marks providers as disabled when env is empty", () => {
+  const lookup = createObjectEnvLookup({});
+  const providers = listSocialAuthProviders(lookup);
+  assert.ok(providers.every((p) => !p.enabled));
+});
+
+// ---------------------------------------------------------------------------
+// buildSocialAuthAuthorizeUrl
+// ---------------------------------------------------------------------------
+
+const baseInput = {
+  clientId: "client-123",
+  redirectUri: "https://example.com/callback",
+  state: "csrf-state",
+};
+
+test("buildSocialAuthAuthorizeUrl uses startUrl template when provided", () => {
+  const url = buildSocialAuthAuthorizeUrl("discord", {
+    ...baseInput,
+    startUrl: "https://auth.example.com/start?state={state}&cb={callback}&id={clientId}",
+  });
+  assert.ok(url.includes("csrf-state"), "state should be substituted");
+  assert.ok(url.includes("client-123"), "clientId should be substituted");
+  assert.ok(url.includes("callback"), "redirectUri should be substituted");
+});
+
+test("buildSocialAuthAuthorizeUrl builds a valid Google URL", () => {
+  const url = buildSocialAuthAuthorizeUrl("google", baseInput);
+  assert.ok(url.startsWith("https://accounts.google.com"));
+  const parsed = new URL(url);
+  assert.equal(parsed.searchParams.get("client_id"), "client-123");
+  assert.equal(parsed.searchParams.get("response_type"), "code");
+  assert.equal(parsed.searchParams.get("state"), "csrf-state");
+});
+
+test("buildSocialAuthAuthorizeUrl builds a valid Discord URL", () => {
+  const url = buildSocialAuthAuthorizeUrl("discord", baseInput);
+  assert.ok(url.includes("discord.com"));
+  const parsed = new URL(url);
+  assert.equal(parsed.searchParams.get("client_id"), "client-123");
+  assert.ok(parsed.searchParams.get("scope")?.includes("identify"));
+});
+
+test("buildSocialAuthAuthorizeUrl builds a valid GitHub URL", () => {
+  const url = buildSocialAuthAuthorizeUrl("github", baseInput);
+  assert.ok(url.startsWith("https://github.com/login/oauth/authorize"));
+  const parsed = new URL(url);
+  assert.equal(parsed.searchParams.get("client_id"), "client-123");
+  assert.ok(parsed.searchParams.get("scope")?.includes("read:user"));
+});
+
+test("buildSocialAuthAuthorizeUrl respects custom discordApiBase", () => {
+  const url = buildSocialAuthAuthorizeUrl("discord", baseInput, {
+    discordApiBase: "https://discord.example.com/api/v10",
+  });
+  assert.ok(url.startsWith("https://discord.example.com"));
+});
