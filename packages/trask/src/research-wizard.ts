@@ -1142,3 +1142,18 @@ export const createResearchWizardClient = (
 ): ResearchWizardClient => {
   return new ResearchWizardClient(config, aiConfig, traskApprovedResearchSources, localSearchProvider);
 };
+
+// ---------------------------------------------------------------------------
+// Pure helpers exported for unit testing — not part of the public API surface.
+// ---------------------------------------------------------------------------
+export {
+  normalizeUrl as _normalizeUrl,
+  extractUrls as _extractUrls,
+  hostnameHint as _hostnameHint,
+  uniqueUrlsPreserveOrder as _uniqueUrlsPreserveOrder,
+  isSynthesisFailureText as _isSynthesisFailureText,
+  normalizeReport as _normalizeReport,
+  formatSourcesSection as _formatSourcesSection,
+  normalizePreferredRewriteModel as _normalizePreferredRewriteModel,
+  matchApprovedSource as _matchApprovedSource,
+};

@@ -1,0 +1,259 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+
+import {
+  _normalizeUrl,
+  _extractUrls,
+  _hostnameHint,
+  _uniqueUrlsPreserveOrder,
+  _isSynthesisFailureText,
+  _normalizeReport,
+  _formatSourcesSection,
+  _normalizePreferredRewriteModel,
+  _matchApprovedSource,
+} from "./research-wizard.js";
+import type { SourceDescriptor } from "../../retrieval/src/index.js";
+
+// ---------------------------------------------------------------------------
+// _normalizeUrl
+// ---------------------------------------------------------------------------
+
+test("_normalizeUrl removes trailing slashes", () => {
+  assert.equal(_normalizeUrl("https://example.com/"), "https://example.com");
+  assert.equal(_normalizeUrl("https://example.com///"), "https://example.com");
+});
+
+test("_normalizeUrl trims whitespace", () => {
+  assert.equal(_normalizeUrl("  https://example.com  "), "https://example.com");
+});
+
+test("_normalizeUrl preserves URL path when no trailing slash", () => {
+  assert.equal(_normalizeUrl("https://example.com/path"), "https://example.com/path");
+});
+
+// ---------------------------------------------------------------------------
+// _extractUrls
+// ---------------------------------------------------------------------------
+
+test("_extractUrls extracts HTTP and HTTPS URLs from text", () => {
+  const text = "See https://example.com and http://other.org for more.";
+  const urls = _extractUrls(text);
+  assert.ok(urls.includes("https://example.com"));
+  assert.ok(urls.includes("http://other.org"));
+});
+
+test("_extractUrls strips trailing punctuation from URLs", () => {
+  const urls = _extractUrls("Visit https://example.com. And https://other.com!");
+  assert.ok(urls.includes("https://example.com"));
+  assert.ok(urls.includes("https://other.com"));
+  assert.ok(!urls.some((u) => u.endsWith(".")));
+});
+
+test("_extractUrls deduplicates URLs", () => {
+  const urls = _extractUrls("https://example.com and https://example.com again");
+  assert.equal(urls.filter((u) => u === "https://example.com").length, 1);
+});
+
+test("_extractUrls returns empty array when no URLs are present", () => {
+  assert.deepEqual(_extractUrls("no urls here"), []);
+});
+
+// ---------------------------------------------------------------------------
+// _hostnameHint
+// ---------------------------------------------------------------------------
+
+test("_hostnameHint returns the hostname without www prefix", () => {
+  assert.equal(_hostnameHint("https://www.swtor.com/info"), "swtor.com");
+});
+
+test("_hostnameHint returns just the hostname for bare origins", () => {
+  assert.equal(_hostnameHint("https://kotor.fandom.com"), "kotor.fandom.com");
+});
+
+test("_hostnameHint falls back gracefully for invalid URLs", () => {
+  const result = _hostnameHint("not-a-url");
+  assert.ok(typeof result === "string");
+  assert.ok(result.length <= 48);
+});
+
+// ---------------------------------------------------------------------------
+// _uniqueUrlsPreserveOrder
+// ---------------------------------------------------------------------------
+
+test("_uniqueUrlsPreserveOrder returns unique URLs in first-seen order", () => {
+  const result = _uniqueUrlsPreserveOrder([
+    "https://a.com/",
+    "https://b.com",
+    "https://a.com",  // duplicate of first (after normalization)
+    "https://c.com",
+  ]);
+  assert.equal(result.length, 3);
+  assert.equal(result[0], "https://a.com");
+  assert.equal(result[1], "https://b.com");
+  assert.equal(result[2], "https://c.com");
+});
+
+test("_uniqueUrlsPreserveOrder filters empty strings", () => {
+  const result = _uniqueUrlsPreserveOrder(["", "https://example.com", ""]);
+  assert.equal(result.length, 1);
+  assert.equal(result[0], "https://example.com");
+});
+
+// ---------------------------------------------------------------------------
+// _isSynthesisFailureText
+// ---------------------------------------------------------------------------
+
+test("_isSynthesisFailureText returns true for the Python synthesis-failure message", () => {
+  assert.equal(
+    _isSynthesisFailureText("I could not complete live archive synthesis for this question right now."),
+    true,
+  );
+});
+
+test("_isSynthesisFailureText is case-insensitive", () => {
+  assert.equal(
+    _isSynthesisFailureText("I COULD NOT COMPLETE LIVE ARCHIVE SYNTHESIS FOR THIS QUESTION RIGHT NOW"),
+    true,
+  );
+});
+
+test("_isSynthesisFailureText returns true for the approved-archive-page bullet fallback", () => {
+  assert.equal(
+    _isSynthesisFailureText("- https://example.com is an approved archive page that may answer questions about something"),
+    true,
+  );
+});
+
+test("_isSynthesisFailureText returns false for real answers", () => {
+  assert.equal(
+    _isSynthesisFailureText("Darth Revan was a Sith Lord who fell to the dark side."),
+    false,
+  );
+});
+
+test("_isSynthesisFailureText returns false for empty string", () => {
+  assert.equal(_isSynthesisFailureText(""), false);
+});
+
+// ---------------------------------------------------------------------------
+// _normalizeReport
+// ---------------------------------------------------------------------------
+
+test("_normalizeReport strips a top-level H1 heading", () => {
+  const input = "# Research Report\n\nSome content here.";
+  const result = _normalizeReport(input);
+  assert.ok(!result.startsWith("#"));
+  assert.ok(result.includes("Some content here."));
+});
+
+test("_normalizeReport collapses 3+ blank lines to 2", () => {
+  const input = "Para one.\n\n\n\nPara two.";
+  const result = _normalizeReport(input);
+  assert.ok(!result.includes("\n\n\n"));
+});
+
+test("_normalizeReport trims leading and trailing whitespace", () => {
+  const input = "\n\n  Content.  \n\n";
+  const result = _normalizeReport(input);
+  assert.equal(result, "Content.");
+});
+
+test("_normalizeReport strips a Table of Contents section", () => {
+  const input = "## Introduction\n\n## Table of Contents\n- Item 1\n- Item 2\n\n## Background\n\nContent.";
+  const result = _normalizeReport(input);
+  assert.ok(!result.includes("Table of Contents"));
+  assert.ok(result.includes("Content."));
+});
+
+// ---------------------------------------------------------------------------
+// _formatSourcesSection
+// ---------------------------------------------------------------------------
+
+const fakeSource = (name: string, url: string): SourceDescriptor => ({
+  id: name.toLowerCase().replace(/\s+/g, "-"),
+  name,
+  kind: "website",
+  homeUrl: url,
+  description: `Test source: ${name}`,
+  freshnessPolicy: "static",
+  approvalScope: "full",
+  tags: [],
+});
+
+test("_formatSourcesSection starts with 'Sources'", () => {
+  const result = _formatSourcesSection([fakeSource("KotOR Wiki", "https://kotor.fandom.com")]);
+  assert.ok(result.startsWith("Sources\n"));
+});
+
+test("_formatSourcesSection numbers entries starting at 1", () => {
+  const result = _formatSourcesSection([
+    fakeSource("Site A", "https://a.com"),
+    fakeSource("Site B", "https://b.com"),
+  ]);
+  assert.ok(result.includes("1. Site A - https://a.com"));
+  assert.ok(result.includes("2. Site B - https://b.com"));
+});
+
+test("_formatSourcesSection returns just 'Sources' for empty sources", () => {
+  assert.equal(_formatSourcesSection([]), "Sources");
+});
+
+// ---------------------------------------------------------------------------
+// _normalizePreferredRewriteModel
+// ---------------------------------------------------------------------------
+
+test("_normalizePreferredRewriteModel returns undefined for undefined input", () => {
+  assert.equal(_normalizePreferredRewriteModel(undefined), undefined);
+});
+
+test("_normalizePreferredRewriteModel returns undefined for empty/whitespace string", () => {
+  assert.equal(_normalizePreferredRewriteModel(""), undefined);
+  assert.equal(_normalizePreferredRewriteModel("   "), undefined);
+});
+
+test("_normalizePreferredRewriteModel strips litellm: prefix", () => {
+  assert.equal(_normalizePreferredRewriteModel("litellm:gpt-4o"), "gpt-4o");
+});
+
+test("_normalizePreferredRewriteModel strips openrouter: prefix", () => {
+  assert.equal(_normalizePreferredRewriteModel("openrouter:anthropic/claude-3"), "anthropic/claude-3");
+});
+
+test("_normalizePreferredRewriteModel returns the model name when no prefix", () => {
+  assert.equal(_normalizePreferredRewriteModel("gpt-4o"), "gpt-4o");
+});
+
+test("_normalizePreferredRewriteModel returns undefined for prefix-only string", () => {
+  assert.equal(_normalizePreferredRewriteModel("litellm:"), undefined);
+  assert.equal(_normalizePreferredRewriteModel("openrouter:"), undefined);
+});
+
+// ---------------------------------------------------------------------------
+// _matchApprovedSource
+// ---------------------------------------------------------------------------
+
+test("_matchApprovedSource returns the source for an exact URL match", () => {
+  const sources = [fakeSource("KotOR Wiki", "https://kotor.fandom.com")];
+  const match = _matchApprovedSource("https://kotor.fandom.com", sources);
+  assert.ok(match);
+  assert.equal(match!.name, "KotOR Wiki");
+});
+
+test("_matchApprovedSource matches a URL that starts with the source homeUrl", () => {
+  const sources = [fakeSource("KotOR Wiki", "https://kotor.fandom.com")];
+  const match = _matchApprovedSource("https://kotor.fandom.com/wiki/Darth_Revan", sources);
+  assert.ok(match);
+  assert.equal(match!.name, "KotOR Wiki");
+});
+
+test("_matchApprovedSource returns undefined for a URL not in approved sources", () => {
+  const sources = [fakeSource("KotOR Wiki", "https://kotor.fandom.com")];
+  const match = _matchApprovedSource("https://evil.com/steal-data", sources);
+  assert.equal(match, undefined);
+});
+
+test("_matchApprovedSource does not match a sibling domain", () => {
+  const sources = [fakeSource("KotOR Wiki", "https://kotor.fandom.com")];
+  const match = _matchApprovedSource("https://kotor.fandom.com.evil.com", sources);
+  assert.equal(match, undefined);
+});
