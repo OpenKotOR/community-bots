@@ -418,3 +418,61 @@ test("resolveBrowserApiBases injects local API port for localhost", () => {
   });
   assert.ok(result.some((b) => b.includes("4001")));
 });
+
+// ---------------------------------------------------------------------------
+// buildBrowserCorsAllowedOrigins and resolveCorsHeaders (cors.ts)
+// ---------------------------------------------------------------------------
+
+import { buildBrowserCorsAllowedOrigins, resolveCorsHeaders } from "./cors.js";
+
+test("buildBrowserCorsAllowedOrigins includes discordsays.com when discordAppId is set", () => {
+  const origins = buildBrowserCorsAllowedOrigins({ discordAppId: "123456789" });
+  assert.ok(origins.some((o) => o.includes("123456789") && o.includes("discordsays.com")));
+});
+
+test("buildBrowserCorsAllowedOrigins omits discordsays.com when discordAppId is absent", () => {
+  const origins = buildBrowserCorsAllowedOrigins({});
+  assert.ok(!origins.some((o) => o.includes("discordsays.com")));
+});
+
+test("buildBrowserCorsAllowedOrigins includes publicWebOrigin when provided", () => {
+  const origins = buildBrowserCorsAllowedOrigins({ publicWebOrigin: "https://openkotor.github.io" });
+  assert.ok(origins.some((o) => o === "https://openkotor.github.io"));
+});
+
+test("buildBrowserCorsAllowedOrigins includes default local ports", () => {
+  const origins = buildBrowserCorsAllowedOrigins({});
+  assert.ok(origins.some((o) => o.includes("localhost:3000")));
+  assert.ok(origins.some((o) => o.includes("localhost:5173")));
+});
+
+test("resolveCorsHeaders sets Allow-Origin for a matching origin", () => {
+  const result = resolveCorsHeaders(
+    { method: "GET", origin: "https://example.com" },
+    ["https://example.com"],
+  );
+  assert.equal(result.headers["Access-Control-Allow-Origin"], "https://example.com");
+});
+
+test("resolveCorsHeaders does NOT set Allow-Origin for an unknown origin", () => {
+  const result = resolveCorsHeaders(
+    { method: "GET", origin: "https://evil.com" },
+    ["https://allowed.com"],
+  );
+  assert.equal(result.headers["Access-Control-Allow-Origin"], undefined);
+});
+
+test("resolveCorsHeaders marks preflight correctly for OPTIONS request", () => {
+  const result = resolveCorsHeaders({ method: "OPTIONS", origin: "https://example.com" }, []);
+  assert.equal(result.isPreflight, true);
+});
+
+test("resolveCorsHeaders marks non-OPTIONS as not preflight", () => {
+  const result = resolveCorsHeaders({ method: "POST", origin: "https://example.com" }, []);
+  assert.equal(result.isPreflight, false);
+});
+
+test("resolveCorsHeaders includes Vary: Origin header", () => {
+  const result = resolveCorsHeaders({ method: "GET" }, []);
+  assert.equal(result.headers["Vary"], "Origin");
+});
