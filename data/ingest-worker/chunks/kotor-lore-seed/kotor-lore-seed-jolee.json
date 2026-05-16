@@ -1,0 +1,18 @@
+{
+  "id": "kotor-lore-seed-jolee",
+  "sourceId": "kotor-lore-seed",
+  "sourceName": "KOTOR Lore Compendium",
+  "kind": "website",
+  "url": "local://kotor-lore/jolee-bindo",
+  "title": "Jolee Bindo \u2014 Gray Jedi Companion",
+  "chunkText": "Jolee Bindo is an unconventional companion in KOTOR 1, found living as a hermit in the Shadowlands of Kashyyyk. A gray Jedi who left the Order after his wife fell to the dark side, Jolee rejects both strict Jedi dogma and Sith philosophy. He is older, wise, sardonic, and frequently tells rambling stories with oblique moral lessons. Jolee is a Jedi Consular who excels at Force powers. He represents a middle path between light and dark.",
+  "fetchedAt": 1778942748544,
+  "chunkIndex": 0,
+  "tags": [
+    "lore",
+    "characters",
+    "kotor",
+    "companions",
+    "jedi"
+  ]
+}

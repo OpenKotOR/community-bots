@@ -3,8 +3,8 @@
   "sourceName": "KOTOR Lore Compendium",
   "kind": "website",
   "url": "local://kotor-lore/index",
-  "chunkCount": 9,
-  "lastFetchedAt": 1778939758725,
+  "chunkCount": 15,
+  "lastFetchedAt": 1778942759018,
   "tags": [
     "lore",
     "characters",

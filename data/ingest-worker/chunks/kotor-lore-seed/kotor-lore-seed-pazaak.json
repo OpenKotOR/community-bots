@@ -1,0 +1,17 @@
+{
+  "id": "kotor-lore-seed-pazaak",
+  "sourceId": "kotor-lore-seed",
+  "sourceName": "KOTOR Lore Compendium",
+  "kind": "website",
+  "url": "local://kotor-lore/pazaak-game",
+  "title": "Pazaak \u2014 In-Universe Card Game",
+  "chunkText": "Pazaak is a card game played throughout the Star Wars galaxy, prominent in KOTOR 1 and 2. The goal is to reach 20 points without going over (similar to blackjack). Players draw from a main deck and play cards from their side deck of 10 cards to adjust their score. Side deck cards can add, subtract, or flip values. Players can stand at any time. The winner is whoever is closest to 20 without busting, or who busts last. Pazaak is used in KOTOR lore as a gambling game played in cantinas across the galaxy.",
+  "fetchedAt": 1778942748544,
+  "chunkIndex": 0,
+  "tags": [
+    "lore",
+    "gameplay",
+    "pazaak",
+    "cards"
+  ]
+}

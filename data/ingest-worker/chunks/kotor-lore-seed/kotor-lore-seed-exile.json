@@ -1,0 +1,17 @@
+{
+  "id": "kotor-lore-seed-exile",
+  "sourceId": "kotor-lore-seed",
+  "sourceName": "KOTOR Lore Compendium",
+  "kind": "website",
+  "url": "local://kotor-lore/exile",
+  "title": "The Exile (Meetra Surik) \u2014 KOTOR 2 Protagonist",
+  "chunkText": "The Exile, later named Meetra Surik in expanded lore, is the player character of KOTOR 2: The Sith Lords. A Jedi General who severed their connection to the Force after the Battle of Malachor V, the Exile is condemned by the Jedi Council and hunted by the Sith Triumvirate. Unlike Revan, the Exile forms powerful Force bonds with companions. The Exile's story explores the nature of the Force, wounds in the Force, and whether one can reconnect to the Force after losing it.",
+  "fetchedAt": 1778942748544,
+  "chunkIndex": 0,
+  "tags": [
+    "lore",
+    "characters",
+    "kotor2",
+    "protagonist"
+  ]
+}

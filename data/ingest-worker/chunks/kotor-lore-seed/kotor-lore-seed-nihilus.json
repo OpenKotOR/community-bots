@@ -1,0 +1,18 @@
+{
+  "id": "kotor-lore-seed-nihilus",
+  "sourceId": "kotor-lore-seed",
+  "sourceName": "KOTOR Lore Compendium",
+  "kind": "website",
+  "url": "local://kotor-lore/nihilus",
+  "title": "Darth Nihilus \u2014 Lord of Hunger",
+  "chunkText": "Darth Nihilus is one of the Sith Triumvirate antagonists in KOTOR 2. A survivor of Malachor V, Nihilus became a wound in the Force \u2014 a being that consumes Force energy from living things, stripping planets of all life. He exists as a mask and robes containing little more than an insatiable hunger. Nihilus destroyed the Miraluka colony on Katarr. His weakness is that the Exile, also a wound in the Force, partially resists his drain.",
+  "fetchedAt": 1778942748544,
+  "chunkIndex": 0,
+  "tags": [
+    "lore",
+    "characters",
+    "kotor2",
+    "sith",
+    "antagonists"
+  ]
+}

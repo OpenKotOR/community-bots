@@ -1,5 +1,7 @@
 # OpenKOTOR Discord Bots
 
+[![CI](https://github.com/OpenKotOR/community-bots/actions/workflows/ci.yml/badge.svg)](https://github.com/OpenKotOR/community-bots/actions/workflows/ci.yml)
+
 This repository contains the first implementation pass for a KOTOR-themed Discord bot suite:
 
 - `Trask`: a source-backed KOTOR q&a assistant.

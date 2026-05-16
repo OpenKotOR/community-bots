@@ -1,0 +1,18 @@
+{
+  "id": "kotor-lore-seed-canderous",
+  "sourceId": "kotor-lore-seed",
+  "sourceName": "KOTOR Lore Compendium",
+  "kind": "website",
+  "url": "local://kotor-lore/canderous",
+  "title": "Canderous Ordo / Mandalore the Preserver",
+  "chunkText": "Canderous Ordo is a Mandalorian mercenary companion in KOTOR 1. He fought in the Mandalorian Wars against the Republic and respects strength above all. After KOTOR 1, Canderous becomes Mandalore the Preserver in KOTOR 2, uniting the fractured Mandalorian clans. He is a warrior-class companion who loves blasters and heavy armor.",
+  "fetchedAt": 1778942748544,
+  "chunkIndex": 0,
+  "tags": [
+    "lore",
+    "characters",
+    "kotor",
+    "companions",
+    "mandalorians"
+  ]
+}

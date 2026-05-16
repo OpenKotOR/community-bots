@@ -1,0 +1,17 @@
+{
+  "id": "kotor-lore-seed-juhani",
+  "sourceId": "kotor-lore-seed",
+  "sourceName": "KOTOR Lore Compendium",
+  "kind": "website",
+  "url": "local://kotor-lore/juhani",
+  "title": "Juhani \u2014 Cathar Jedi Companion",
+  "chunkText": "Juhani is a Cathar Jedi companion in KOTOR 1. She grew up as a slave on Taris before being freed and joining the Jedi Order. Juhani fell briefly to the dark side and was defeated by the player in the Dantooine grove, but can be redeemed and recruited. She is the first openly gay character in a Star Wars video game. Juhani is a Guardian who specializes in lightsaber combat.",
+  "fetchedAt": 1778942748544,
+  "chunkIndex": 0,
+  "tags": [
+    "lore",
+    "characters",
+    "kotor",
+    "companions"
+  ]
+}
