@@ -6,13 +6,16 @@ Operations and verification guide for the three OpenKOTOR Discord bots plus the 
 
 | Component | Status | Evidence |
 |-----------|--------|---------|
-| Trask HTTP server (`/api/trask/*`) | ✅ | `pnpm verify:trask-web` — 5/5 RICH responses with source evidence |
+| Trask HTTP server (`/api/trask/*`) | ✅ | `pnpm verify:trask-web` — 5/5 RICH lore answers from local knowledge |
 | Holocron web UI (`apps/holocron-web`) | ✅ | Playwright verifier passes 5 KOTOR Q&A queries |
 | GPTR Python venv auto-discovery | ✅ | No path config needed; walks up from cwd |
-| HK-86 bot unit tests | ✅ | 102/102 passing incl. reaction-role logic |
-| Pazaak bot unit tests | ✅ | Included in 102/102 |
+| Garbage content filtering | ✅ | Cloudflare/JS-challenge blocks stripped from scraped pages |
+| Seeded KOTOR lore (9 entries) | ✅ | Carth/Revan/Bastila/HK-47/etc. answer without LLM key |
+| Local knowledge fallback | ✅ | `localKnowledgeFallbackAnswer` used when synthesis fails |
+| HK-86 bot unit tests | ✅ | 130/130 passing incl. reaction-role logic |
+| Bot cold-start (no tokens) | ✅ | All 3 bots start → only fail at Discord token step |
 | Discord bot code + command registration | ✅ | `pnpm discord:smoke-bots` once tokens provided |
-| Live Discord bot interaction | ⏳ | Requires Discord credentials — see below |
+| Live Discord bot interaction | ⏳ | Run `pnpm discord:setup` to enter credentials — see below |
 
 ---
 
