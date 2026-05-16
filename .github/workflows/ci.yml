@@ -40,6 +40,9 @@ jobs:
       - name: Type check
         run: pnpm check
 
+      - name: Lint (pazaak-world)
+        run: pnpm --filter pazaak-world lint
+
       - name: Unit tests
         run: node --test packages/*/dist/*.test.js apps/*/dist/*.test.js
 
