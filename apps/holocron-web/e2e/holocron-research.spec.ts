@@ -37,7 +37,7 @@ const RESEARCH_QUERIES = [
   },
 ] as const
 
-const SOURCE_SIGNAL_RE = /Sources|deadlystream\.com|strategywiki|pcgamingwiki|https?:\/\/|local:\/\/technical-reference/i
+const MIN_HTTPS_SOURCES = 2
 
 async function waitForHolocronReady(page: Page, threadId = randomUUID()) {
   await page.goto(`/?thread=${threadId}`, { waitUntil: 'domcontentloaded' })
@@ -82,8 +82,13 @@ function assertSubstantiveAnswer(
   expect(bodyText, 'should not be bare synthesis failure stub').not.toMatch(
     /^i could not complete live archive synthesis[^.]*\.\s*$/iu,
   )
-  expect(bodyText, 'should include sources or https links').toMatch(SOURCE_SIGNAL_RE)
   expect(sourcesText, 'sources should stay aligned with the question').toMatch(sourcePattern)
+  expect(sourcesText, 'must not cite repo-local technical-reference URLs').not.toMatch(/local:\/\/technical-reference/i)
+}
+
+function countHttpsUrls(text: string): number {
+  const matches = text.match(/https:\/\/[^\s)\]]+/g)
+  return matches ? new Set(matches).size : 0
 }
 
 test.beforeAll(async ({ request, baseURL }) => {
@@ -117,11 +122,16 @@ for (const [index, querySpec] of RESEARCH_QUERIES.entries()) {
 
     assertSubstantiveAnswer(bodyText, sourcesText, querySpec)
 
+    const httpsCount = Math.max(
+      await httpsInSources.count(),
+      countHttpsUrls(sourcesText),
+      countHttpsUrls(bodyText),
+    )
+    expect(httpsCount, `expected at least ${MIN_HTTPS_SOURCES} distinct https:// sources`).toBeGreaterThanOrEqual(
+      MIN_HTTPS_SOURCES,
+    )
     expect(hasCitationLink || hasSourcesPanel, 'expected clickable citation or Sources panel').toBeTruthy()
-    expect(
-      (await httpsInSources.count()) > 0 || bodyHasHttps || hasCitationLink || hasSourcesPanel,
-      'expected https source, inline https URL, citation, or Sources panel',
-    ).toBeTruthy()
+    expect(bodyHasHttps || httpsCount > 0, 'expected https URLs in answer or Sources panel').toBeTruthy()
   })
 }
 

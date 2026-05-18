@@ -48,7 +48,7 @@ if (researchWizardTimeoutMs !== config.researchWizard.timeoutMs) {
 const researchWizard = createResearchWizardClient({
   ...config.researchWizard,
   timeoutMs: researchWizardTimeoutMs,
-}, config.ai, searchProvider);
+}, config.ai);
 const queryRepository = new JsonTraskQueryRepository(resolveDataFile(config.queryDataDir, "trask-queries.json"));
 
 const traskHttpRuntime = {

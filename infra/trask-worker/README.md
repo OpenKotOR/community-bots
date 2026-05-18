@@ -1,80 +1,37 @@
-# Trask Q&A Cloudflare Worker
+# Trask Cloudflare Worker
 
-This Worker serves Trask Q&A remotely on Cloudflare Workers (workers.dev free tier). It is intended to back both:
+Edge proxy for public Holocron (`qa-webui`) → live GPTR `trask-http-server`.
 
-- Discord `/ask` flows via a remote Trask HTTP origin
-- Holocron static Pages UI at `https://openkotor.github.io/community-bots/qa-webui/`
+## Modes
 
-## Runtime behavior
+- **Proxy mode** (`TRASK_BUILTIN_API=0`, required for research): forwards `/api/trask/*` to `TRASK_RESEARCHWIZARD_BASE_URL` (for example Hugging Face Space `OpenKotOR/holocron-trask-http`).
+- **Builtin stub** (`TRASK_BUILTIN_API=1`): health checks only; `/api/trask/*` returns **503** (bundled reference Q&A was removed).
 
-- **Builtin mode** (`TRASK_BUILTIN_API=1`, default in CI): serves bundled technical-reference answers from `src/builtin-trask-api.ts` (same content as `infra/holocron-trask-api/server.mjs`) for `/api/trask/*`, `/reference/*`, and `GET /healthz`.
-- **Proxy mode** (`TRASK_BUILTIN_API=0` with a real `TRASK_RESEARCHWIZARD_BASE_URL`): forwards `/api/trask/*` to full `trask-http-server` (for example Hugging Face Space `OpenKotOR/holocron-trask-http`).
-- **Proxy fallback** (`TRASK_BUILTIN_FALLBACK=1`, default): on upstream 5xx or network errors, serves bundled references from `builtin-trask-api.ts`.
-- Handles CORS preflight (`OPTIONS`)
-- Optional client auth gate via `TRASK_WEB_API_KEY`
-- Anonymous mode via `TRASK_WEB_ALLOW_ANONYMOUS=1`
+There is **no** bundled fallback when upstream fails (`TRASK_BUILTIN_FALLBACK=0` by default).
 
-## Files
+## Layout
 
-- Entrypoint: `infra/trask-worker/src/worker.ts`
-- Builtin fallback: `infra/trask-worker/src/builtin-trask-api.ts`
-- HF Space mirror (optional): `infra/holocron-trask-api/` (deployed by `.github/workflows/holocron-trask-api.yml`)
-- Wrangler config: `infra/trask-worker/wrangler.toml`
-- CI deploy workflow: `.github/workflows/trask-worker.yml`
+- Worker entry: `src/worker.ts`
+- Deprecated stub: `src/builtin-trask-api.ts`
+- Live GPTR deploy: `infra/trask-http-public/`
 
-## Local build check
+## Local dev
 
-```powershell
-pnpm --dir infra/trask-worker run build
-pnpm dlx wrangler deploy --config infra/trask-worker/wrangler.toml --dry-run
+```bash
+pnpm dlx wrangler@4.92.0 dev --config infra/trask-worker/wrangler.toml \
+  --var "TRASK_WEB_ALLOW_ANONYMOUS:1" \
+  --var "TRASK_BUILTIN_API:0" \
+  --var "TRASK_RESEARCHWIZARD_BASE_URL:http://127.0.0.1:4010"
 ```
 
-## Local dev check
+## Variables
 
-Builtin Holocron fallback (no upstream Trask HTTP server required):
+| Variable | Purpose |
+|----------|---------|
+| `TRASK_WEB_ALLOW_ANONYMOUS` | `1` for public Holocron without API key |
+| `TRASK_BUILTIN_API` | `0` (required) to proxy live GPTR |
+| `TRASK_RESEARCHWIZARD_BASE_URL` | Full `trask-http-server` origin when `TRASK_BUILTIN_API=0` |
+| `TRASK_BUILTIN_FALLBACK` | `0` — do not serve offline reference answers on upstream errors |
+| `TRASK_WEB_API_KEY` | Optional API key for locked-down deployments |
 
-```powershell
-pnpm dlx wrangler@4.92.0 dev --config infra/trask-worker/wrangler.toml --var "TRASK_WEB_ALLOW_ANONYMOUS:1" --var "TRASK_BUILTIN_API:1"
-```
-
-Proxy to a local `trask-http-server` on `:4010`:
-
-```powershell
-pnpm dlx wrangler@4.92.0 dev --config infra/trask-worker/wrangler.toml --var "TRASK_WEB_ALLOW_ANONYMOUS:1" --var "TRASK_BUILTIN_API:0" --var "TRASK_RESEARCHWIZARD_BASE_URL:http://127.0.0.1:4010"
-```
-
-## GitHub Actions deploy (remote)
-
-Workflow: `.github/workflows/trask-worker.yml`
-
-Required repository secrets:
-
-- `CLOUDFLARE_API_TOKEN`
-- `CLOUDFLARE_ACCOUNT_ID`
-
-Recommended repository variables (public Holocron on Pages):
-
-- `TRASK_API_BASE` — worker URL, for example `https://trask-worker.<account>.workers.dev`
-- `TRASK_BUILTIN_API` — `1` bundled only; `0` for live GPTR upstream
-- `TRASK_RESEARCHWIZARD_BASE_URL` — GPTR Space when `TRASK_BUILTIN_API=0` (for example `https://openkotor-holocron-trask-http.hf.space`)
-- `TRASK_BUILTIN_FALLBACK` — `1` (default) to serve bundled references when upstream fails
-
-Optional repository variables:
-
-- `TRASK_WEB_ALLOW_ANONYMOUS` (defaults to `1` in CI deploy)
-
-Optional repository secrets:
-
-- `TRASK_RESEARCHWIZARD_API_KEY` (set as Worker secret if present)
-- `TRASK_WEB_API_KEY` (set as Worker secret if present)
-- `HUGGINGFACE_TOKEN` — required for CI HF deploy (`holocron-trask-api`, `holocron-trask-http`)
-- `OPENAI_API_KEY` / `OPENROUTER_API_KEY` — optional; synced to the GPTR Space only when set
-
-## Pages integration
-
-The Pages build workflow (`.github/workflows/deploy-pazaakworld.yml`) sets:
-
-- `VITE_TRASK_API_BASE` from repository variable `TRASK_API_BASE`
-- fails the Holocron Pages build when `TRASK_API_BASE` is unset instead of publishing a broken API origin
-
-Point `TRASK_API_BASE` at this worker. Use `TRASK_BUILTIN_API=0` + `TRASK_RESEARCHWIZARD_BASE_URL` when `OpenKotOR/holocron-trask-http` serves live GPTR; keep `TRASK_BUILTIN_FALLBACK=1` for resilience.
+Public Holocron: point `TRASK_API_BASE` at this worker with `TRASK_BUILTIN_API=0` and a working GPTR upstream.

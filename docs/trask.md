@@ -105,10 +105,9 @@ Trask's answer generation is pinned to these approved sources by default:
 
 Live research is constrained to the approved base hosts `lucasforumsarchive.org`, `deadlystream.com`, `github.com`, `kotor.neocities.org`, and `pcgamingwiki.com`. GitHub crawling is further narrowed to the approved KotOR project roots in this catalog. The headless bridge passes both `query_domains` and `allowed_url_prefixes`, rejects direct or discovered URLs outside that allowlist before scraping, and reports accepted/rejected URL lists in `research_information` for audit.
 
-When approved web research does not produce grounded passages, Holocron/Trask may cite the repo-local
-`local://technical-reference/...` corpus for well-known technical questions such as `TSLPatcher`,
-`MDLOps`, save-file paths, widescreen troubleshooting, and `reone`. Those local citations are deliberate
-grounded evidence, not heuristic URL-name summaries.
+**Holocron and functional e2e require live approved-web citations only** (`https://…` on the allowlisted hosts).
+Answers come exclusively from GPTR browsing those sources (`report_source: web`). There are no bundled
+`local://` reference chunks or offline citation substitutes.
 
 ## Admin Setup
 
@@ -184,8 +183,8 @@ pnpm holocron:e2e
 ```
 
 Requires `.env` (or `vendor/ai-researchwizard/.env`) only when you want live web synthesis / rewrite.
-Without LLM keys, the verifier should still produce grounded local-reference answers or explicit abstentions
-instead of crashing. Set `HOLOCRON_REUSE_SERVER=1` if the server is already listening on 4010.
+Without LLM keys, GPTR may still retrieve approved web pages; answers must include **at least two**
+distinct `https://` sources or fail explicitly. Set `HOLOCRON_REUSE_SERVER=1` if the server is already listening on 4010.
 
 CLI debug gate:
 
@@ -193,9 +192,8 @@ CLI debug gate:
 pnpm verify:trask-cli
 ```
 
-That script mirrors the same canonical five technical queries as Holocron e2e and accepts either approved
-web citations or repo-local `local://technical-reference/...` citations when those are the grounded sources
-actually returned by the runtime.
+That script mirrors the same canonical five technical queries as Holocron e2e. It is for GPTR/retrieval
+debugging only and does **not** replace browser or Playwright verification of real `https://` citations.
 
 ### Discord bot slash commands (REST smoke)
 

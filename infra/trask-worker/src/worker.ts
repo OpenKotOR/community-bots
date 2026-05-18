@@ -84,7 +84,7 @@ function useBuiltinApi(env: Env): boolean {
 }
 
 function useBuiltinFallback(env: Env): boolean {
-  return envFlag(env.TRASK_BUILTIN_FALLBACK, true);
+  return envFlag(env.TRASK_BUILTIN_FALLBACK, false);
 }
 
 function shouldFallbackToBuiltin(response: Response): boolean {
@@ -170,25 +170,17 @@ async function serveUpstreamOrFallback(
   const upstreamApiKey = (env.TRASK_RESEARCHWIZARD_API_KEY ?? "").trim();
 
   try {
-    const proxied = await proxyToUpstream(request, targetUrl, origin, upstreamApiKey, bodyText);
-    if (!useBuiltinFallback(env) || !shouldFallbackToBuiltin(proxied)) {
-      return proxied;
-    }
+    return await proxyToUpstream(request, targetUrl, origin, upstreamApiKey, bodyText);
   } catch {
-    if (!useBuiltinFallback(env)) {
-      return jsonResponse(502, { error: "Upstream Trask HTTP origin is unreachable." }, origin);
-    }
+    return jsonResponse(
+      502,
+      {
+        error: "Upstream Trask HTTP origin is unreachable.",
+        detail: "Bundled reference fallback is disabled; fix GPTR upstream or TRASK_RESEARCHWIZARD_BASE_URL.",
+      },
+      origin,
+    );
   }
-
-  if (bodyText !== undefined && request.method !== "GET" && request.method !== "HEAD") {
-    const replayed = new Request(request.url, {
-      method: request.method,
-      headers: request.headers,
-      body: bodyText,
-    });
-    return serveBuiltin(replayed, origin);
-  }
-  return serveBuiltin(request, origin);
 }
 
 export default {

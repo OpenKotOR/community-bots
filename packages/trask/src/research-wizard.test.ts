@@ -10,7 +10,8 @@ import {
   _collectVisitedUrlsFromPayload,
   _hostnameHint,
   _uniqueUrlsPreserveOrder,
-  _isSynthesisFailureText,
+  _isSynthesisFailureReport,
+  _countPayloadWebUrls,
   _normalizeReport,
   _formatSourcesSection,
   _normalizePreferredRewriteModel,
@@ -106,39 +107,57 @@ test("_uniqueUrlsPreserveOrder filters empty strings", () => {
 });
 
 // ---------------------------------------------------------------------------
-// _isSynthesisFailureText
+// _isSynthesisFailureReport
 // ---------------------------------------------------------------------------
 
-test("_isSynthesisFailureText returns true for the Python synthesis-failure message", () => {
+const emptyPayload = { report: "" };
+
+test("_isSynthesisFailureReport returns true for the Python synthesis-failure message", () => {
   assert.equal(
-    _isSynthesisFailureText("I could not complete live archive synthesis for this question right now."),
+    _isSynthesisFailureReport("I could not complete live archive synthesis for this question right now.", emptyPayload),
     true,
   );
 });
 
-test("_isSynthesisFailureText is case-insensitive", () => {
+test("_isSynthesisFailureReport is case-insensitive for synthesis failure", () => {
   assert.equal(
-    _isSynthesisFailureText("I COULD NOT COMPLETE LIVE ARCHIVE SYNTHESIS FOR THIS QUESTION RIGHT NOW"),
+    _isSynthesisFailureReport("I COULD NOT COMPLETE LIVE ARCHIVE SYNTHESIS FOR THIS QUESTION RIGHT NOW", emptyPayload),
     true,
   );
 });
 
-test("_isSynthesisFailureText returns true for the approved-archive-page bullet fallback", () => {
+test("_isSynthesisFailureReport treats stub bullets as failure when payload has few URLs", () => {
   assert.equal(
-    _isSynthesisFailureText("- https://example.com is an approved archive page that may answer questions about something"),
+    _isSynthesisFailureReport(
+      "- https://example.com is an approved archive page that may answer questions about something",
+      emptyPayload,
+    ),
     true,
   );
 });
 
-test("_isSynthesisFailureText returns false for real answers", () => {
+test("_isSynthesisFailureReport allows stub report when payload has enough web URLs", () => {
+  const payload = {
+    report: "",
+    research_information: {
+      cited_urls: ["https://deadlystream.com/topic/1", "https://github.com/seedhartha/reone"],
+    },
+  };
   assert.equal(
-    _isSynthesisFailureText("Darth Revan was a Sith Lord who fell to the dark side."),
+    _isSynthesisFailureReport(
+      "- https://deadlystream.com is an approved archive page that may answer questions about mdlops",
+      payload,
+    ),
     false,
   );
+  assert.equal(_countPayloadWebUrls(payload), 2);
 });
 
-test("_isSynthesisFailureText returns false for empty string", () => {
-  assert.equal(_isSynthesisFailureText(""), false);
+test("_isSynthesisFailureReport returns false for real answers", () => {
+  assert.equal(
+    _isSynthesisFailureReport("Darth Revan was a Sith Lord who fell to the dark side.", emptyPayload),
+    false,
+  );
 });
 
 // ---------------------------------------------------------------------------

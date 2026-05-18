@@ -80,7 +80,7 @@ Package manager is **pnpm**; root `package-lock.json` is legacy—ignore it.
 
 **Workflow (browser + API):** terminal A: `TRASK_WEB_ALLOW_ANONYMOUS=1 pnpm dev:trask-http` (or set `TRASK_WEB_API_KEY` and matching `VITE_TRASK_API_KEY`). Build or dev Holocron with `VITE_TRASK_API_BASE` pointing at that origin. Exercise Q&A flows in the browser.
 
-**Public deploy responsibility:** if the task is about public Holocron availability, do not stop after local `:4010` passes. Verify `https://openkotor.github.io/community-bots/qa-webui/?thread=<fresh-uuid>` in a real browser after deploy. Keep `TRASK_API_BASE` pointed at the repo-managed Trask worker (`infra/trask-worker`, `TRASK_BUILTIN_API=1` for bundled references) or redeploy the HF mirror from `infra/holocron-trask-api` via `.github/workflows/holocron-trask-api.yml`. If the public API is broken or missing, fix worker/Pages variables, redeploy worker and Pages yourself, and only then report success.
+**Public deploy responsibility:** if the task is about public Holocron availability, do not stop after local `:4010` passes. Verify `https://openkotor.github.io/community-bots/qa-webui/?thread=<fresh-uuid>` in a real browser after deploy. Keep `TRASK_API_BASE` on the Trask worker with **`TRASK_BUILTIN_API=0`** and a live **`TRASK_RESEARCHWIZARD_BASE_URL`** (GPTR, e.g. `OpenKotOR/holocron-trask-http`). Bundled `holocron-trask-api` reference answers were removed. If the public API is broken, fix worker/Pages variables, redeploy worker + GPTR upstream + Pages yourself, and confirm **multiple `https://` sources** per query before reporting success.
 
 ---
 

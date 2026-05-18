@@ -62,7 +62,7 @@ const resolveFromRoot = (p: string) => (path.isAbsolute(p) ? p : path.resolve(re
 
 const queryRepository = new JsonTraskQueryRepository(resolveDataFile(resolveFromRoot(config.dataDir), "trask-queries.json"));
 const searchProvider = createChunkSearchProvider(resolveFromRoot(config.chunkDir));
-const researchWizard = createResearchWizardClient(config.researchWizard, config.ai, searchProvider);
+const researchWizard = createResearchWizardClient(config.researchWizard, config.ai);
 
 const runtime = {
   searchProvider,

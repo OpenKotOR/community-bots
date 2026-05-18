@@ -20,7 +20,6 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadResearchWizardRuntimeConfig, loadSharedAiConfig } from "../packages/config/dist/index.js";
-import { createChunkSearchProvider } from "../packages/retrieval/dist/index.js";
 import { createResearchWizardClient, splitResearchAnswer } from "../packages/trask/dist/index.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -29,32 +28,38 @@ const DEFAULT_QUERIES = [
   {
     question: "What is TSLPatcher used for in KOTOR modding?",
     expectPattern: /TSLPatcher|2DA|GFF|TLK|patch/i,
-    sourcePattern: /tslpatcher|technical reference|deadlystream|lucasforums|kotor\.neocities|github/i,
+    sourcePattern: /tslpatcher|deadlystream|lucasforums|kotor\.neocities|github|https:\/\//i,
   },
   {
     question: "What does MDLOps do in the KotOR toolchain?",
     expectPattern: /MDLOps|MDL|model|conversion/i,
-    sourcePattern: /mdlops|technical reference|mdledit|kotormax|kotorblender|github|kotor\.neocities/i,
+    sourcePattern: /mdlops|mdledit|kotormax|kotorblender|github|kotor\.neocities|https:\/\//i,
   },
   {
     question: "How do I troubleshoot KOTOR widescreen resolution on PC?",
     expectPattern: /widescreen|resolution|HUD|aspect|graphics/i,
-    sourcePattern: /widescreen|resolution|technical reference|deadlystream|pcgamingwiki|lucasforums|kotor\.neocities/i,
+    sourcePattern: /widescreen|resolution|deadlystream|pcgamingwiki|lucasforums|kotor\.neocities|https:\/\//i,
   },
   {
     question: "Where are Knights of the Old Republic save files stored on Windows?",
     expectPattern: /save|Saves|Windows|profile|KOTOR/i,
-    sourcePattern: /save|windows|technical reference|deadlystream|pcgamingwiki|lucasforums|kotor\.neocities/i,
+    sourcePattern: /save|windows|deadlystream|pcgamingwiki|lucasforums|kotor\.neocities|https:\/\//i,
   },
   {
     question: "What does the reone project provide for Odyssey engine work?",
     expectPattern: /reone|Odyssey|engine|open.?source/i,
-    sourcePattern: /reone|technical reference|github|xoreos|engine/i,
+    sourcePattern: /reone|github|xoreos|engine|https:\/\//i,
   },
 ];
 
-const DEGRADED_RE = /could not complete live archive synthesis/i;
-const SOURCE_LINE_RE = /[a-z][a-z0-9+.-]*:\/\/[^\s)]+/i;
+const DEGRADED_RE = /could not complete live (?:web )?research/i;
+const SOURCE_LINE_RE = /https?:\/\/[^\s)]+/i;
+const MIN_HTTPS_SOURCES = 2;
+
+const countDistinctHttps = (text) => {
+  const matches = text.match(/https:\/\/[^\s)\]]+/gi);
+  return matches ? new Set(matches).size : 0;
+};
 
 const loadEnvFiles = () => {
   for (const rel of [".env", ".env.local", "vendor/ai-researchwizard/.env"]) {
@@ -101,12 +106,21 @@ const scoreAnswer = (query, answer, approvedSources) => {
   const sourceText = `${sourceLines.join(" ")} ${approvedSources.map((source) => `${source.name} ${source.homeUrl}`).join(" ")}`;
   const topicMatch = expectation ? expectation.expectPattern.test(body) : true;
   const sourceMatch = expectation ? expectation.sourcePattern.test(sourceText) : approvedSources.length > 0;
+  const httpsSourceCount = Math.max(
+    approvedSources.filter((source) => source.homeUrl.startsWith("https://")).length,
+    countDistinctHttps(sourceText),
+    countDistinctHttps(answer),
+  );
+  const hasLocalTechnicalRef = /local:\/\/technical-reference/i.test(sourceText)
+    || approvedSources.some((source) => source.homeUrl.startsWith("local://"));
 
   let grade = "FAIL";
   if (
     substantive
     && hasSourceUrls
     && approvedSources.length > 0
+    && httpsSourceCount >= MIN_HTTPS_SOURCES
+    && !hasLocalTechnicalRef
     && hasInlineCitation
     && !degraded
     && topicMatch
@@ -116,7 +130,9 @@ const scoreAnswer = (query, answer, approvedSources) => {
   } else if (
     substantive
     && approvedSources.length > 0
-    && !/^i could not complete live archive synthesis for this question right now\.?$/iu.test(answer.trim())
+    && httpsSourceCount >= MIN_HTTPS_SOURCES
+    && !hasLocalTechnicalRef
+    && !/^i could not complete live (?:web )?research for "/iu.test(answer.trim())
     && topicMatch
     && sourceMatch
   ) {
@@ -134,6 +150,8 @@ const scoreAnswer = (query, answer, approvedSources) => {
     degraded,
     topicMatch,
     sourceMatch,
+    httpsSourceCount,
+    hasLocalTechnicalRef,
     query,
   };
 };
@@ -146,14 +164,11 @@ const main = async () => {
     ? queryArg.split("|").map((q) => q.trim()).filter(Boolean)
     : DEFAULT_QUERIES.map((entry) => entry.question);
 
-  const ingestDir = process.env.INGEST_STATE_DIR?.trim() || resolve(repoRoot, "data/ingest-worker");
   const rwConfig = loadResearchWizardRuntimeConfig();
   const aiConfig = loadSharedAiConfig();
-  const searchProvider = createChunkSearchProvider(ingestDir);
-  const client = createResearchWizardClient(rwConfig, aiConfig, searchProvider);
+  const client = createResearchWizardClient(rwConfig, aiConfig);
 
   console.log("\n🔬  Trask CLI Q&A verification (ResearchWizard → headless ai-researchwizard)\n");
-  console.log(`   INGEST_STATE_DIR=${ingestDir}`);
   console.log(`   Python=${rwConfig.pythonExecutable}`);
   console.log(`   GPTR root=${rwConfig.gptResearcherRoot ?? "(auto)"}`);
   console.log(`   Timeout=${rwConfig.timeoutMs}ms\n`);

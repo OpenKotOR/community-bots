@@ -100,7 +100,6 @@ const traskSearchProvider = createChunkSearchProvider(process.env.INGEST_STATE_D
 const traskResearchWizard = createResearchWizardClient(
   loadResearchWizardRuntimeConfig(),
   loadSharedAiConfig(),
-  traskSearchProvider,
 );
 const cardWorldBotGameType = normalizeCardGameType(process.env.CARDWORLD_BOT_GAME_TYPE?.trim(), "pazaak");
 const pazaakRequiresOwnershipProof = (process.env.CARDWORLD_REQUIRE_CHITIN_KEY?.trim() ?? "1") !== "0";

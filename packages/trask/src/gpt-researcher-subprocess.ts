@@ -134,7 +134,7 @@ export const runHeadlessGptResearcher = async (
   }
 
   const python = config.pythonExecutable?.trim() || "python";
-  const runCwd = process.cwd();
+  const runCwd = root;
 
   const { stdout, stderr, code } = await spawnHeadless(python, script, runCwd, payload, config.timeoutMs);
 

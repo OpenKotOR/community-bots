@@ -191,6 +191,14 @@ def _run_live(py: Path, gptr: Path, script: Path, timeout_ms: int, payload: dict
         sys.stderr.write("JSON missing non-empty string field 'report'.\n")
         raise SystemExit(1)
 
+    if report.strip().casefold().startswith("i could not complete live archive synthesis"):
+        sys.stderr.write(
+            "Headless runner returned synthesis failure (no grounded web evidence).\n"
+            "Configure OPENROUTER_API_KEY or OPENAI_API_KEY plus optional TAVILY_API_KEY in "
+            "vendor/ai-researchwizard/.env or repo .env.local, then retry.\n",
+        )
+        raise SystemExit(1)
+
     info = parsed.get("research_information")
     if info is not None and not isinstance(info, dict):
         sys.stderr.write("'research_information' must be an object or omitted.\n")

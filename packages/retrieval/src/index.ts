@@ -709,68 +709,8 @@ export interface SourceIndexRecord {
   tags: readonly string[];
 }
 
-const BUILT_IN_REFERENCE_CHUNKS: readonly ChunkRecord[] = [
-  {
-    id: "technical-reference-tslpatcher",
-    sourceId: "trask-technical-reference",
-    sourceName: "Trask Technical Reference",
-    kind: "website",
-    url: "local://technical-reference/tslpatcher",
-    title: "TSLPatcher — KOTOR mod installer",
-    chunkText: "TSLPatcher is the standard KotOR and TSL mod installer. Mod authors use it to patch 2DA, GFF, TLK, NSS, and related game data in place so a mod can merge changes into an existing installation instead of overwriting whole files.",
-    fetchedAt: 0,
-    chunkIndex: 0,
-    tags: ["tooling", "modding", "tslpatcher", "installer", "2da", "gff", "tlk"],
-  },
-  {
-    id: "technical-reference-mdlops",
-    sourceId: "trask-technical-reference",
-    sourceName: "Trask Technical Reference",
-    kind: "website",
-    url: "local://technical-reference/mdlops",
-    title: "MDLOps — KOTOR model conversion tool",
-    chunkText: "MDLOps is a KotOR model conversion utility used to inspect, decompile, and rebuild MDL and MDX models. Modders use it in the asset pipeline when converting Odyssey engine models between editable formats and game-ready binaries.",
-    fetchedAt: 0,
-    chunkIndex: 1,
-    tags: ["tooling", "mdlops", "models", "conversion", "mdx", "mdl", "odyssey"],
-  },
-  {
-    id: "technical-reference-widescreen",
-    sourceId: "trask-technical-reference",
-    sourceName: "Trask Technical Reference",
-    kind: "website",
-    url: "local://technical-reference/widescreen",
-    title: "KOTOR widescreen troubleshooting on PC",
-    chunkText: "KOTOR widescreen troubleshooting usually involves matching the game resolution, HUD and menu fixes, and graphics settings. Common checks are the target resolution in the game configuration, widescreen UI patches, and verifying that movies and the HUD are using assets that match the chosen aspect ratio.",
-    fetchedAt: 0,
-    chunkIndex: 2,
-    tags: ["technical", "widescreen", "resolution", "hud", "graphics", "pc", "troubleshooting"],
-  },
-  {
-    id: "technical-reference-save-files",
-    sourceId: "trask-technical-reference",
-    sourceName: "Trask Technical Reference",
-    kind: "website",
-    url: "local://technical-reference/save-files-windows",
-    title: "KOTOR save files on Windows",
-    chunkText: "On Windows, Knights of the Old Republic save files are typically stored under the game installation directory in the saves folder, or under the user's game data area depending on the distribution. Troubleshooting usually starts by checking the installation path used by Steam, GOG, or the retail release and then opening the saves directory inside that install.",
-    fetchedAt: 0,
-    chunkIndex: 3,
-    tags: ["technical", "save", "windows", "paths", "troubleshooting", "pc"],
-  },
-  {
-    id: "technical-reference-reone",
-    sourceId: "trask-technical-reference",
-    sourceName: "Trask Technical Reference",
-    kind: "website",
-    url: "local://technical-reference/reone",
-    title: "reone — Odyssey engine reimplementation",
-    chunkText: "reone is an open-source reimplementation of the Odyssey engine used by KotOR. It provides engine-level code and runtime work for loading game assets, reproducing Odyssey behavior, and experimenting with modern tooling around the original game formats.",
-    fetchedAt: 0,
-    chunkIndex: 4,
-    tags: ["tooling", "engine", "reone", "odyssey", "runtime", "open-source"],
-  },
-];
+const isNonWebChunkUrl = (url: string): boolean =>
+  url.startsWith("local://") || url.startsWith("discord://");
 
 type SerializableValue = object | string | number | boolean | null;
 
@@ -953,7 +893,7 @@ export class ChunkSearchProvider implements SearchProvider {
       this.catalog.search(query, limit),
       this.chunkStore.loadAllChunks(),
     ]);
-    const searchableChunks = [...BUILT_IN_REFERENCE_CHUNKS, ...allChunks];
+    const searchableChunks = allChunks.filter((chunk) => !isNonWebChunkUrl(chunk.url));
 
     const chunkHits: SearchHit[] = searchableChunks
       .map((chunk) => {
