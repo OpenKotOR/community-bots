@@ -87,12 +87,22 @@ jobs:
           VITE_NAKAMA_SERVER_KEY: ${{ vars.VITE_NAKAMA_SERVER_KEY }}
         run: pnpm --filter pazaak-world build
 
+      - name: Check Holocron API base
+        if: hashFiles('apps/holocron-web/package.json') != ''
+        env:
+          TRASK_API_BASE: ${{ vars.TRASK_API_BASE }}
+        run: |
+          if [ -z "$TRASK_API_BASE" ]; then
+            echo "::error::Set repository variable TRASK_API_BASE to the deployed Trask API origin before publishing Holocron."
+            exit 1
+          fi
+
       - name: Build Holocron web (Trask Q&A SPA)
         if: hashFiles('apps/holocron-web/package.json') != ''
         env:
           BASE: /community-bots/qa-webui/
           ENABLE_SPARK: "0"
-          VITE_TRASK_API_BASE: ${{ vars.TRASK_API_BASE != '' && vars.TRASK_API_BASE || 'https://trask-worker.workers.dev' }}
+          VITE_TRASK_API_BASE: ${{ vars.TRASK_API_BASE }}
         run: pnpm --filter @openkotor/holocron-web build
 
       - name: Publish Holocron web under /community-bots/qa-webui/

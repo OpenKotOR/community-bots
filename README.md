@@ -97,12 +97,12 @@ infra/
 ## Trask Worker Remote Deploy
 
 - Cloudflare Worker source lives in `infra/trask-worker` and deploys from `.github/workflows/trask-worker.yml`.
-- This deployment targets workers.dev (free tier) and is designed to keep Trask `/api/trask/ask` remote-only.
+- This deployment targets workers.dev (free tier) and proxies the Holocron `/api/trask/*` surface when the worker path is used.
 - Required secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
 - Required repository variable: `TRASK_RESEARCHWIZARD_BASE_URL`.
 - Optional secrets: `TRASK_RESEARCHWIZARD_API_KEY`, `TRASK_WEB_API_KEY`.
 - Optional variable: `TRASK_WEB_ALLOW_ANONYMOUS` (`1` default).
-- Pages build for `qa-webui` reads `TRASK_API_BASE` (repo variable) and otherwise defaults to `https://trask-worker.workers.dev`.
+- Pages build for `qa-webui` reads `TRASK_API_BASE` (repo variable) and fails if it is unset, so a dead default API origin is never published. The current public fallback API origin is `https://openkotor-holocron-trask-api.hf.space` unless the repository variables are intentionally changed.
 
 ## Getting Started
 

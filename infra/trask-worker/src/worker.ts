@@ -7,7 +7,7 @@ interface Env {
 
 function corsHeaders(origin: string | null): Headers {
   const headers = new Headers();
-  headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  headers.set("Access-Control-Allow-Methods", "GET, HEAD, POST, OPTIONS");
   headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Trask-Api-Key");
   headers.set("Vary", "Origin");
   if (origin) {
@@ -32,8 +32,66 @@ function hasValidClientAuth(request: Request, apiKey: string): boolean {
   return auth === apiKey || auth === `Bearer ${apiKey}`;
 }
 
-function normalizeBackendUrl(rawBaseUrl: string): string {
-  return rawBaseUrl.replace(/\/+$/, "") + "/api/trask/ask";
+function normalizeBackendBaseUrl(rawBaseUrl: string): string {
+  return rawBaseUrl.replace(/\/+$/, "");
+}
+
+function isTraskApiPath(pathname: string): boolean {
+  return pathname === "/api/trask" || pathname.startsWith("/api/trask/");
+}
+
+function buildUpstreamHeaders(request: Request, upstreamApiKey: string): Headers {
+  const headers = new Headers();
+  const contentType = request.headers.get("content-type");
+  const accept = request.headers.get("accept");
+  const auth = request.headers.get("authorization");
+  const apiKeyHeader = request.headers.get("x-trask-api-key");
+
+  if (contentType) {
+    headers.set("Content-Type", contentType);
+  }
+  if (accept) {
+    headers.set("Accept", accept);
+  }
+  if (upstreamApiKey) {
+    headers.set("Authorization", `Bearer ${upstreamApiKey}`);
+  } else {
+    if (auth) {
+      headers.set("Authorization", auth);
+    }
+    if (apiKeyHeader) {
+      headers.set("X-Trask-Api-Key", apiKeyHeader);
+    }
+  }
+  return headers;
+}
+
+async function proxyToUpstream(
+  request: Request,
+  targetUrl: string,
+  origin: string | null,
+  upstreamApiKey: string,
+): Promise<Response> {
+  const upstreamResponse = await fetch(targetUrl, {
+    method: request.method,
+    headers: buildUpstreamHeaders(request, upstreamApiKey),
+    body: request.method === "GET" || request.method === "HEAD" ? undefined : await request.text(),
+    redirect: "manual",
+  });
+
+  const headers = corsHeaders(origin);
+  for (const [name, value] of upstreamResponse.headers) {
+    if (name.toLowerCase().startsWith("access-control-")) {
+      continue;
+    }
+    headers.set(name, value);
+  }
+
+  return new Response(upstreamResponse.body, {
+    status: upstreamResponse.status,
+    statusText: upstreamResponse.statusText,
+    headers,
+  });
 }
 
 export default {
@@ -49,7 +107,7 @@ export default {
       return jsonResponse(200, { ok: true }, origin);
     }
 
-    if (url.pathname !== "/api/trask/ask" || request.method !== "POST") {
+    if (!isTraskApiPath(url.pathname)) {
       return jsonResponse(404, { error: "Not found" }, origin);
     }
 
@@ -69,26 +127,8 @@ export default {
       return jsonResponse(500, { error: "TRASK_RESEARCHWIZARD_BASE_URL is not configured." }, origin);
     }
 
-    const targetUrl = normalizeBackendUrl(baseUrl);
-    const upstreamHeaders = new Headers();
-    upstreamHeaders.set("Content-Type", request.headers.get("content-type") ?? "application/json");
+    const targetUrl = `${normalizeBackendBaseUrl(baseUrl)}${url.pathname}${url.search}`;
     const upstreamApiKey = (env.TRASK_RESEARCHWIZARD_API_KEY ?? "").trim();
-    if (upstreamApiKey) {
-      upstreamHeaders.set("Authorization", `Bearer ${upstreamApiKey}`);
-    }
-
-    const upstreamResponse = await fetch(targetUrl, {
-      method: "POST",
-      headers: upstreamHeaders,
-      body: await request.text(),
-    });
-
-    const headers = corsHeaders(origin);
-    headers.set("Content-Type", upstreamResponse.headers.get("content-type") ?? "application/json");
-    return new Response(upstreamResponse.body, {
-      status: upstreamResponse.status,
-      statusText: upstreamResponse.statusText,
-      headers,
-    });
+    return proxyToUpstream(request, targetUrl, origin, upstreamApiKey);
   },
 };

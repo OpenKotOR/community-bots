@@ -70,7 +70,7 @@ Package manager is **pnpm**; root `package-lock.json` is legacy—ignore it.
 |------|---------|
 | Dev | `pnpm dev:holocron-web` (port **5174** if 5173 is taken) |
 | Production build | `pnpm --filter @openkotor/holocron-web build` |
-| Root “e2e” smoke (build only) | `pnpm holocron:e2e` |
+| Holocron functional browser e2e (live Trask on :4010) | `pnpm holocron:e2e` |
 
 **Env (Vite):**
 
@@ -79,6 +79,8 @@ Package manager is **pnpm**; root `package-lock.json` is legacy—ignore it.
 - **`VITE_TRASK_LEGACY_SPARK=1`** — legacy Spark mode toggle used in `App.tsx`.
 
 **Workflow (browser + API):** terminal A: `TRASK_WEB_ALLOW_ANONYMOUS=1 pnpm dev:trask-http` (or set `TRASK_WEB_API_KEY` and matching `VITE_TRASK_API_KEY`). Build or dev Holocron with `VITE_TRASK_API_BASE` pointing at that origin. Exercise Q&A flows in the browser.
+
+**Public deploy responsibility:** if the task is about public Holocron availability, do not stop after local `:4010` passes. Verify `https://openkotor.github.io/community-bots/qa-webui/?thread=<fresh-uuid>` in a real browser after deploy. Keep GitHub repository variables `TRASK_API_BASE` and `TRASK_RESEARCHWIZARD_BASE_URL` pointed at a real public API origin; the current managed fallback is `https://openkotor-holocron-trask-api.hf.space`. If the public API is broken or missing, provision or repair one yourself, rebuild Pages, and only then report success.
 
 ---
 

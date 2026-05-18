@@ -7,10 +7,10 @@ This Worker serves Trask Q&A remotely on Cloudflare Workers (workers.dev free ti
 
 ## Runtime behavior
 
-- Handles `POST /api/trask/ask`
+- Proxies `/api/trask/*` to the upstream Trask HTTP origin at `TRASK_RESEARCHWIZARD_BASE_URL`
+- Supports the Holocron browser contract (`/session`, `/history`, `/thread/:threadId`, `/ask`, `/query/:queryId/cancel`, etc.)
 - Handles CORS preflight (`OPTIONS`)
 - Exposes `GET /healthz`
-- Proxies requests to `TRASK_RESEARCHWIZARD_BASE_URL/api/trask/ask`
 - Optional client auth gate via `TRASK_WEB_API_KEY`
 - Anonymous mode via `TRASK_WEB_ALLOW_ANONYMOUS=1`
 
@@ -25,6 +25,14 @@ This Worker serves Trask Q&A remotely on Cloudflare Workers (workers.dev free ti
 ```powershell
 pnpm --dir infra/trask-worker run build
 pnpm dlx wrangler deploy --config infra/trask-worker/wrangler.toml --dry-run
+```
+
+## Local dev check
+
+Point the worker at a real Trask HTTP origin that already serves `/api/trask/*` (for example `trask-http-server` on `:4010`):
+
+```powershell
+pnpm dlx wrangler@4.92.0 dev --config infra/trask-worker/wrangler.toml --var "TRASK_WEB_ALLOW_ANONYMOUS:1" --var "TRASK_RESEARCHWIZARD_BASE_URL:http://127.0.0.1:4010"
 ```
 
 ## GitHub Actions deploy (remote)
@@ -53,7 +61,9 @@ Optional repository variable:
 
 The Pages build workflow (`.github/workflows/deploy-pazaakworld.yml`) now sets:
 
-- `VITE_TRASK_API_BASE` from repository variable `TRASK_API_BASE`, or
-- falls back to `https://trask-worker.workers.dev`
+- `VITE_TRASK_API_BASE` from repository variable `TRASK_API_BASE`
+- fails the Holocron Pages build when `TRASK_API_BASE` is unset instead of publishing a broken API origin
 
 This keeps `qa-webui` remote-only and avoids localhost coupling.
+
+`TRASK_RESEARCHWIZARD_BASE_URL` must be a real upstream that mounts the Trask HTTP router. Placeholder origins like `https://example.com` let `/healthz` succeed but break live Holocron queries.

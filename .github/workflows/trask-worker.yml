@@ -70,6 +70,11 @@ jobs:
             echo "::notice::Skipping deploy. Set repository variable TRASK_RESEARCHWIZARD_BASE_URL."
             exit 0
           fi
+          if [[ "$TRASK_RESEARCHWIZARD_BASE_URL" == *"example.com"* ]]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping deploy. Replace placeholder TRASK_RESEARCHWIZARD_BASE_URL with a real Trask HTTP origin."
+            exit 0
+          fi
           echo "configured=true" >> "$GITHUB_OUTPUT"
 
       - name: Checkout
