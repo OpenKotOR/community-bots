@@ -1,8 +1,11 @@
+import { handleBuiltinRequest } from "./builtin-trask-api.js";
+
 interface Env {
   TRASK_WEB_API_KEY?: string;
   TRASK_WEB_ALLOW_ANONYMOUS?: string;
   TRASK_RESEARCHWIZARD_BASE_URL?: string;
   TRASK_RESEARCHWIZARD_API_KEY?: string;
+  TRASK_BUILTIN_API?: string;
 }
 
 function corsHeaders(origin: string | null): Headers {
@@ -38,6 +41,25 @@ function normalizeBackendBaseUrl(rawBaseUrl: string): string {
 
 function isTraskApiPath(pathname: string): boolean {
   return pathname === "/api/trask" || pathname.startsWith("/api/trask/");
+}
+
+function isBuiltinSurface(pathname: string): boolean {
+  return (
+    pathname === "/" ||
+    pathname === "/healthz" ||
+    pathname === "/reference" ||
+    pathname.startsWith("/reference/") ||
+    isTraskApiPath(pathname)
+  );
+}
+
+function useBuiltinApi(env: Env): boolean {
+  const builtinRaw = (env.TRASK_BUILTIN_API ?? "").trim().toLowerCase();
+  if (builtinRaw === "1" || builtinRaw === "true") {
+    return true;
+  }
+  const baseUrl = (env.TRASK_RESEARCHWIZARD_BASE_URL ?? "").trim();
+  return !baseUrl || baseUrl.includes("example.com");
 }
 
 function buildUpstreamHeaders(request: Request, upstreamApiKey: string): Headers {
@@ -100,14 +122,26 @@ export default {
     const url = new URL(request.url);
 
     if (request.method === "OPTIONS") {
+      if (useBuiltinApi(env) && isBuiltinSurface(url.pathname)) {
+        const builtin = await handleBuiltinRequest(request);
+        if (builtin) {
+          return builtin;
+        }
+      }
       return new Response(null, { status: 204, headers: corsHeaders(origin) });
     }
 
-    if (url.pathname === "/healthz" && request.method === "GET") {
-      return jsonResponse(200, { ok: true }, origin);
+    if (url.pathname === "/healthz" && request.method === "GET" && useBuiltinApi(env)) {
+      const builtin = await handleBuiltinRequest(request);
+      if (builtin) {
+        return builtin;
+      }
     }
 
-    if (!isTraskApiPath(url.pathname)) {
+    if (!isTraskApiPath(url.pathname) && !url.pathname.startsWith("/reference/") && url.pathname !== "/reference" && url.pathname !== "/") {
+      if (url.pathname === "/healthz" && request.method === "GET") {
+        return jsonResponse(200, { ok: true }, origin);
+      }
       return jsonResponse(404, { error: "Not found" }, origin);
     }
 
@@ -120,6 +154,14 @@ export default {
     }
     if (!apiKey && !allowAnon) {
       return jsonResponse(401, { error: "Set TRASK_WEB_API_KEY or TRASK_WEB_ALLOW_ANONYMOUS=1." }, origin);
+    }
+
+    if (useBuiltinApi(env)) {
+      const builtin = await handleBuiltinRequest(request);
+      if (builtin) {
+        return builtin;
+      }
+      return jsonResponse(404, { error: "Not found" }, origin);
     }
 
     const baseUrl = (env.TRASK_RESEARCHWIZARD_BASE_URL ?? "").trim();

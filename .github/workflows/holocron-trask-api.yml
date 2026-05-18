@@ -1,0 +1,48 @@
+name: Deploy Holocron Trask API (Hugging Face)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "infra/holocron-trask-api/**"
+      - ".github/workflows/holocron-trask-api.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: holocron-trask-api
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Hugging Face deploy inputs
+        id: hf_check
+        shell: bash
+        env:
+          HUGGINGFACE_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
+        run: |
+          if [ -z "$HUGGINGFACE_TOKEN" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping HF Space deploy. Set repository secret HUGGINGFACE_TOKEN."
+            exit 0
+          fi
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        if: steps.hf_check.outputs.configured == 'true'
+        uses: actions/checkout@v6
+
+      - name: Upload Space files
+        if: steps.hf_check.outputs.configured == 'true'
+        env:
+          HF_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
+        run: |
+          pip install -q "huggingface_hub[cli]"
+          hf upload OpenKotOR/holocron-trask-api infra/holocron-trask-api/ \
+            --repo-type space \
+            --commit-message "Deploy from community-bots@${{ github.sha }}"

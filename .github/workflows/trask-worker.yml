@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "infra/trask-worker/**"
+      - "infra/holocron-trask-api/**"
       - ".github/workflows/trask-worker.yml"
   workflow_dispatch:
 
@@ -42,11 +43,11 @@ jobs:
       - name: Build worker bundle
         run: pnpm --dir infra/trask-worker run build
 
-      - name: Wrangler dry-run (free workers.dev target)
+      - name: Wrangler dry-run (builtin API mode)
         env:
           TRASK_WEB_ALLOW_ANONYMOUS: "1"
-          TRASK_RESEARCHWIZARD_BASE_URL: https://example.com
-        run: pnpm dlx wrangler@4.87.0 deploy --config infra/trask-worker/wrangler.toml --dry-run --var "TRASK_WEB_ALLOW_ANONYMOUS:${TRASK_WEB_ALLOW_ANONYMOUS}" --var "TRASK_RESEARCHWIZARD_BASE_URL:${TRASK_RESEARCHWIZARD_BASE_URL}"
+          TRASK_BUILTIN_API: "1"
+        run: pnpm dlx wrangler@4.87.0 deploy --config infra/trask-worker/wrangler.toml --dry-run --var "TRASK_WEB_ALLOW_ANONYMOUS:${TRASK_WEB_ALLOW_ANONYMOUS}" --var "TRASK_BUILTIN_API:${TRASK_BUILTIN_API}"
 
   deploy:
     needs: verify-bundle
@@ -59,23 +60,34 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           TRASK_RESEARCHWIZARD_BASE_URL: ${{ vars.TRASK_RESEARCHWIZARD_BASE_URL }}
+          TRASK_BUILTIN_API: ${{ vars.TRASK_BUILTIN_API != '' && vars.TRASK_BUILTIN_API || '1' }}
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
             echo "configured=false" >> "$GITHUB_OUTPUT"
             echo "::notice::Skipping deploy. Set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID repository secrets."
             exit 0
           fi
+          builtin_enabled=0
+          case "$(echo "$TRASK_BUILTIN_API" | tr '[:upper:]' '[:lower:]')" in
+            1|true|yes) builtin_enabled=1 ;;
+          esac
+          if [ "$builtin_enabled" -eq 1 ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "builtin=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [ -z "$TRASK_RESEARCHWIZARD_BASE_URL" ]; then
             echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Skipping deploy. Set repository variable TRASK_RESEARCHWIZARD_BASE_URL."
+            echo "::notice::Skipping deploy. Set TRASK_BUILTIN_API=1 or TRASK_RESEARCHWIZARD_BASE_URL."
             exit 0
           fi
           if [[ "$TRASK_RESEARCHWIZARD_BASE_URL" == *"example.com"* ]]; then
             echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Skipping deploy. Replace placeholder TRASK_RESEARCHWIZARD_BASE_URL with a real Trask HTTP origin."
+            echo "::notice::Skipping deploy. Replace placeholder TRASK_RESEARCHWIZARD_BASE_URL or set TRASK_BUILTIN_API=1."
             exit 0
           fi
           echo "configured=true" >> "$GITHUB_OUTPUT"
+          echo "builtin=false" >> "$GITHUB_OUTPUT"
 
       - name: Checkout
         if: steps.cf_check.outputs.configured == 'true'
@@ -140,4 +152,15 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           TRASK_RESEARCHWIZARD_BASE_URL: ${{ vars.TRASK_RESEARCHWIZARD_BASE_URL }}
           TRASK_WEB_ALLOW_ANONYMOUS: ${{ vars.TRASK_WEB_ALLOW_ANONYMOUS != '' && vars.TRASK_WEB_ALLOW_ANONYMOUS || '1' }}
-        run: pnpm dlx wrangler@4.87.0 deploy --config infra/trask-worker/wrangler.toml --var "TRASK_WEB_ALLOW_ANONYMOUS:${TRASK_WEB_ALLOW_ANONYMOUS}" --var "TRASK_RESEARCHWIZARD_BASE_URL:${TRASK_RESEARCHWIZARD_BASE_URL}"
+          TRASK_BUILTIN_API: ${{ vars.TRASK_BUILTIN_API != '' && vars.TRASK_BUILTIN_API || '1' }}
+        run: |
+          set -euo pipefail
+          deploy_args=(
+            --config infra/trask-worker/wrangler.toml
+            --var "TRASK_WEB_ALLOW_ANONYMOUS:${TRASK_WEB_ALLOW_ANONYMOUS}"
+            --var "TRASK_BUILTIN_API:${TRASK_BUILTIN_API}"
+          )
+          if [ "${{ steps.cf_check.outputs.builtin }}" != "true" ] && [ -n "${TRASK_RESEARCHWIZARD_BASE_URL}" ]; then
+            deploy_args+=(--var "TRASK_RESEARCHWIZARD_BASE_URL:${TRASK_RESEARCHWIZARD_BASE_URL}")
+          fi
+          pnpm dlx wrangler@4.87.0 deploy "${deploy_args[@]}"
