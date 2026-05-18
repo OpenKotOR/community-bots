@@ -67,8 +67,8 @@ Optional repository secrets:
 
 - `TRASK_RESEARCHWIZARD_API_KEY` (set as Worker secret if present)
 - `TRASK_WEB_API_KEY` (set as Worker secret if present)
-- `HUGGINGFACE_TOKEN` — HF deploy for `holocron-trask-api` and `holocron-trask-http`
-- `OPENAI_API_KEY` / `OPENROUTER_API_KEY` — synced to the GPTR Space when set
+- `HUGGINGFACE_TOKEN` — required for CI HF deploy (`holocron-trask-api`, `holocron-trask-http`)
+- `OPENAI_API_KEY` / `OPENROUTER_API_KEY` — optional; synced to the GPTR Space only when set
 
 ## Pages integration
 

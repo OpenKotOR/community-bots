@@ -66,8 +66,9 @@ jobs:
           pip install -q "huggingface_hub[cli]"
           hf repo create "${HF_SPACE_ID}" --repo-type space --space-sdk docker --exist-ok
 
-      - name: Sync HF Space secrets and variables
+      - name: Sync HF Space secrets and variables (optional LLM keys)
         if: steps.hf_check.outputs.configured == 'true'
+        continue-on-error: true
         env:
           HF_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -75,7 +76,9 @@ jobs:
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
           OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
           OPENAI_CHAT_MODEL: ${{ secrets.OPENAI_CHAT_MODEL }}
-        run: python3 scripts/sync_hf_space_secrets.py "${HF_SPACE_ID}"
+        run: |
+          pip install -q huggingface_hub
+          python3 scripts/sync_hf_space_secrets.py "${HF_SPACE_ID}"
 
       - name: Pack and upload Space context
         if: steps.hf_check.outputs.configured == 'true'

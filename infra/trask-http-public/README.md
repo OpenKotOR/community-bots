@@ -16,11 +16,15 @@ Public `trask-http-server` with headless **ai-researchwizard** (GPTR), local ing
 - Deployed by `.github/workflows/trask-http-public.yml`
 - Fronted for GitHub Pages by the Cloudflare worker (`TRASK_RESEARCHWIZARD_BASE_URL` when `TRASK_BUILTIN_API=0`)
 
-## Space secrets (required for live research)
+## Space secrets (all optional)
 
-Set in the Space **Settings → Repository secrets** (CI syncs from GitHub when secrets exist):
+CI syncs from GitHub repository secrets when they exist. None are required for deploy.
 
-- `OPENAI_API_KEY` and/or `OPENROUTER_API_KEY`
-- Optional: `TAVILY_API_KEY` (web retrieval)
+| Secret | Purpose |
+|--------|---------|
+| `OPENAI_API_KEY` | Optional OpenAI-compatible chat |
+| `OPENROUTER_API_KEY` | Optional; also used when `OPENAI_API_KEY` is unset (see `loadSharedAiConfig`) |
+| `TAVILY_API_KEY` | Optional web retrieval |
+| `FAST_LLM` / `SMART_LLM` / `STRATEGIC_LLM` | Optional GPTR model overrides |
 
-Without API keys, `/api/trask/ask` may return empty or fallback answers.
+Without paid API keys, Trask uses **vendored `llm_fallbacks` free models** and **bundled local knowledge** (`data/ingest-worker`). Holocron still returns grounded answers for the canonical technical topics.
