@@ -99,10 +99,12 @@ infra/
 - Cloudflare Worker source lives in `infra/trask-worker` and deploys from `.github/workflows/trask-worker.yml`.
 - This deployment targets workers.dev (free tier) and proxies the Holocron `/api/trask/*` surface when the worker path is used.
 - Required secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
-- Required repository variable: `TRASK_RESEARCHWIZARD_BASE_URL`.
-- Optional secrets: `TRASK_RESEARCHWIZARD_API_KEY`, `TRASK_WEB_API_KEY`.
+- Required repository variable for Pages: `TRASK_API_BASE` (typically `https://trask-worker.<account>.workers.dev`).
+- Recommended variable: `TRASK_BUILTIN_API=1` so the worker serves bundled technical-reference answers without an external upstream.
+- Optional variable: `TRASK_RESEARCHWIZARD_BASE_URL` when `TRASK_BUILTIN_API=0` (full `trask-http-server` + GPTR origin).
+- Optional secrets: `TRASK_RESEARCHWIZARD_API_KEY`, `TRASK_WEB_API_KEY`, `HUGGINGFACE_TOKEN` (HF mirror of `infra/holocron-trask-api`).
 - Optional variable: `TRASK_WEB_ALLOW_ANONYMOUS` (`1` default).
-- Pages build for `qa-webui` reads `TRASK_API_BASE` (repo variable) and fails if it is unset, so a dead default API origin is never published. The current public fallback API origin is `https://openkotor-holocron-trask-api.hf.space` unless the repository variables are intentionally changed.
+- Pages build for `qa-webui` fails if `TRASK_API_BASE` is unset so a broken API origin is never published.
 
 ## Getting Started
 
