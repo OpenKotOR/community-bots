@@ -18,6 +18,10 @@ python3 -m venv "${VENV_DIR}"
 # shellcheck disable=SC1091
 source "${VENV_DIR}/bin/activate"
 python -m pip install --upgrade pip
+FALLBACK_PKG="${REPO_ROOT}/vendor/llm_fallbacks"
+if [[ -f "${FALLBACK_PKG}/pyproject.toml" ]]; then
+  python -m pip install "${FALLBACK_PKG}"
+fi
 python -m pip install -r "${REQ_FILE}"
 
 # Install the local gpt_researcher package (vendored copy of ai-researchwizard).

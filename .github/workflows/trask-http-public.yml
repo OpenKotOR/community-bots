@@ -1,0 +1,116 @@
+name: Deploy Trask HTTP (Hugging Face GPTR)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/trask-http-server/**"
+      - "packages/trask/**"
+      - "packages/trask-http/**"
+      - "packages/config/**"
+      - "packages/retrieval/**"
+      - "packages/persistence/**"
+      - "packages/platform/**"
+      - "packages/core/**"
+      - "vendor/ai-researchwizard/**"
+      - "vendor/llm_fallbacks/**"
+      - "data/ingest-worker/**"
+      - "infra/trask-http-public/**"
+      - "scripts/bootstrap_trask_gpt_researcher.sh"
+      - "scripts/pack-trask-http-hf-context.sh"
+      - "scripts/sync_hf_space_secrets.py"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/trask-http-public.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trask-http-public
+  cancel-in-progress: true
+
+env:
+  HF_SPACE_ID: OpenKotOR/holocron-trask-http
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Hugging Face deploy inputs
+        id: hf_check
+        shell: bash
+        env:
+          HUGGINGFACE_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
+        run: |
+          if [ -z "$HUGGINGFACE_TOKEN" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping HF GPTR deploy. Set repository secret HUGGINGFACE_TOKEN."
+            exit 0
+          fi
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        if: steps.hf_check.outputs.configured == 'true'
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          token: ${{ secrets.ACTIONS_SUBMODULES_TOKEN || github.token }}
+
+      - name: Ensure HF Space exists
+        if: steps.hf_check.outputs.configured == 'true'
+        env:
+          HF_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
+        run: |
+          pip install -q "huggingface_hub[cli]"
+          hf repo create "${HF_SPACE_ID}" --repo-type space --space-sdk docker --exist-ok
+
+      - name: Sync HF Space secrets and variables
+        if: steps.hf_check.outputs.configured == 'true'
+        env:
+          HF_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+          OPENAI_CHAT_MODEL: ${{ secrets.OPENAI_CHAT_MODEL }}
+        run: python3 scripts/sync_hf_space_secrets.py "${HF_SPACE_ID}"
+
+      - name: Pack and upload Space context
+        if: steps.hf_check.outputs.configured == 'true'
+        env:
+          HF_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
+        run: |
+          pip install -q "huggingface_hub[cli]"
+          chmod +x scripts/pack-trask-http-hf-context.sh
+          PACK_DIR="$(scripts/pack-trask-http-hf-context.sh)"
+          hf upload "${HF_SPACE_ID}" "$PACK_DIR/" --repo-type space \
+            --commit-message "Deploy trask-http GPTR from community-bots@${{ github.sha }}"
+
+      - name: Wait for Space build
+        if: steps.hf_check.outputs.configured == 'true'
+        env:
+          HF_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
+          HF_SPACE_ID: ${{ env.HF_SPACE_ID }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import time
+          from huggingface_hub import HfApi
+
+          api = HfApi()
+          repo_id = os.environ["HF_SPACE_ID"]
+          for attempt in range(60):
+              info = api.space_info(repo_id, expand=["runtime"])
+              stage = getattr(getattr(info, "runtime", None), "stage", None)
+              print(f"attempt {attempt}: stage={stage}")
+              if stage == "RUNNING":
+                  print(f"Space running: https://{info.subdomain}.hf.space")
+                  break
+              if stage == "ERROR":
+                  raise SystemExit("HF Space build failed")
+              time.sleep(30)
+          else:
+              raise SystemExit("Timed out waiting for HF Space")
+          PY

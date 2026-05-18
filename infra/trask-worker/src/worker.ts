@@ -6,6 +6,7 @@ interface Env {
   TRASK_RESEARCHWIZARD_BASE_URL?: string;
   TRASK_RESEARCHWIZARD_API_KEY?: string;
   TRASK_BUILTIN_API?: string;
+  TRASK_BUILTIN_FALLBACK?: string;
 }
 
 function corsHeaders(origin: string | null): Headers {
@@ -53,13 +54,41 @@ function isBuiltinSurface(pathname: string): boolean {
   );
 }
 
+function envFlag(value: string | undefined, defaultWhenUnset: boolean): boolean {
+  const raw = (value ?? "").trim().toLowerCase();
+  if (!raw) {
+    return defaultWhenUnset;
+  }
+  return raw === "1" || raw === "true" || raw === "yes";
+}
+
+function upstreamBaseUrl(env: Env): string {
+  return (env.TRASK_RESEARCHWIZARD_BASE_URL ?? "").trim();
+}
+
+function hasRealUpstream(env: Env): boolean {
+  const baseUrl = upstreamBaseUrl(env);
+  return Boolean(baseUrl) && !baseUrl.includes("example.com");
+}
+
+/** Serve bundled references only (no GPTR upstream). */
 function useBuiltinApi(env: Env): boolean {
   const builtinRaw = (env.TRASK_BUILTIN_API ?? "").trim().toLowerCase();
+  if (builtinRaw === "0" || builtinRaw === "false") {
+    return false;
+  }
   if (builtinRaw === "1" || builtinRaw === "true") {
     return true;
   }
-  const baseUrl = (env.TRASK_RESEARCHWIZARD_BASE_URL ?? "").trim();
-  return !baseUrl || baseUrl.includes("example.com");
+  return !hasRealUpstream(env);
+}
+
+function useBuiltinFallback(env: Env): boolean {
+  return envFlag(env.TRASK_BUILTIN_FALLBACK, true);
+}
+
+function shouldFallbackToBuiltin(response: Response): boolean {
+  return response.status >= 500 || response.status === 408 || response.status === 429;
 }
 
 function buildUpstreamHeaders(request: Request, upstreamApiKey: string): Headers {
@@ -93,11 +122,12 @@ async function proxyToUpstream(
   targetUrl: string,
   origin: string | null,
   upstreamApiKey: string,
+  bodyText?: string,
 ): Promise<Response> {
   const upstreamResponse = await fetch(targetUrl, {
     method: request.method,
     headers: buildUpstreamHeaders(request, upstreamApiKey),
-    body: request.method === "GET" || request.method === "HEAD" ? undefined : await request.text(),
+    body: request.method === "GET" || request.method === "HEAD" ? undefined : bodyText,
     redirect: "manual",
   });
 
@@ -116,38 +146,103 @@ async function proxyToUpstream(
   });
 }
 
+async function serveBuiltin(request: Request, origin: string | null): Promise<Response> {
+  const builtin = await handleBuiltinRequest(request);
+  if (builtin) {
+    return builtin;
+  }
+  return jsonResponse(404, { error: "Not found" }, origin);
+}
+
+async function serveUpstreamOrFallback(
+  request: Request,
+  env: Env,
+  origin: string | null,
+  url: URL,
+  bodyText?: string,
+): Promise<Response> {
+  const baseUrl = upstreamBaseUrl(env);
+  if (!hasRealUpstream(env)) {
+    return jsonResponse(500, { error: "TRASK_RESEARCHWIZARD_BASE_URL is not configured." }, origin);
+  }
+
+  const targetUrl = `${normalizeBackendBaseUrl(baseUrl)}${url.pathname}${url.search}`;
+  const upstreamApiKey = (env.TRASK_RESEARCHWIZARD_API_KEY ?? "").trim();
+
+  try {
+    const proxied = await proxyToUpstream(request, targetUrl, origin, upstreamApiKey, bodyText);
+    if (!useBuiltinFallback(env) || !shouldFallbackToBuiltin(proxied)) {
+      return proxied;
+    }
+  } catch {
+    if (!useBuiltinFallback(env)) {
+      return jsonResponse(502, { error: "Upstream Trask HTTP origin is unreachable." }, origin);
+    }
+  }
+
+  if (bodyText !== undefined && request.method !== "GET" && request.method !== "HEAD") {
+    const replayed = new Request(request.url, {
+      method: request.method,
+      headers: request.headers,
+      body: bodyText,
+    });
+    return serveBuiltin(replayed, origin);
+  }
+  return serveBuiltin(request, origin);
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const origin = request.headers.get("Origin");
     const url = new URL(request.url);
+    const bodyText =
+      request.method === "GET" || request.method === "HEAD" ? undefined : await request.text();
 
     if (request.method === "OPTIONS") {
-      if (useBuiltinApi(env) && isBuiltinSurface(url.pathname)) {
-        const builtin = await handleBuiltinRequest(request);
-        if (builtin) {
-          return builtin;
+      if (isBuiltinSurface(url.pathname)) {
+        if (useBuiltinApi(env)) {
+          const builtin = await handleBuiltinRequest(request);
+          if (builtin) {
+            return builtin;
+          }
+        }
+        if (hasRealUpstream(env)) {
+          return new Response(null, { status: 204, headers: corsHeaders(origin) });
         }
       }
       return new Response(null, { status: 204, headers: corsHeaders(origin) });
     }
 
-    if (url.pathname === "/healthz" && request.method === "GET" && useBuiltinApi(env)) {
-      const builtin = await handleBuiltinRequest(request);
-      if (builtin) {
-        return builtin;
+    if (url.pathname === "/healthz" && request.method === "GET") {
+      if (useBuiltinApi(env)) {
+        const builtin = await handleBuiltinRequest(request);
+        if (builtin) {
+          return builtin;
+        }
       }
+      return jsonResponse(
+        200,
+        {
+          ok: true,
+          mode: hasRealUpstream(env) ? "proxy" : "builtin-public-api",
+          upstream: hasRealUpstream(env) ? normalizeBackendBaseUrl(upstreamBaseUrl(env)) : undefined,
+          builtinFallback: useBuiltinFallback(env),
+        },
+        origin,
+      );
     }
 
-    if (!isTraskApiPath(url.pathname) && !url.pathname.startsWith("/reference/") && url.pathname !== "/reference" && url.pathname !== "/") {
-      if (url.pathname === "/healthz" && request.method === "GET") {
-        return jsonResponse(200, { ok: true }, origin);
-      }
+    if (
+      !isTraskApiPath(url.pathname) &&
+      !url.pathname.startsWith("/reference/") &&
+      url.pathname !== "/reference" &&
+      url.pathname !== "/"
+    ) {
       return jsonResponse(404, { error: "Not found" }, origin);
     }
 
     const apiKey = (env.TRASK_WEB_API_KEY ?? "").trim();
-    const allowAnonRaw = (env.TRASK_WEB_ALLOW_ANONYMOUS ?? "").trim().toLowerCase();
-    const allowAnon = allowAnonRaw === "1" || allowAnonRaw === "true";
+    const allowAnon = envFlag(env.TRASK_WEB_ALLOW_ANONYMOUS, true);
 
     if (apiKey && !hasValidClientAuth(request, apiKey)) {
       return jsonResponse(401, { error: "Invalid or missing API key." }, origin);
@@ -157,20 +252,25 @@ export default {
     }
 
     if (useBuiltinApi(env)) {
-      const builtin = await handleBuiltinRequest(request);
-      if (builtin) {
-        return builtin;
+      if (bodyText !== undefined) {
+        const replayed = new Request(request.url, {
+          method: request.method,
+          headers: request.headers,
+          body: bodyText,
+        });
+        return serveBuiltin(replayed, origin);
       }
-      return jsonResponse(404, { error: "Not found" }, origin);
+      return serveBuiltin(request, origin);
     }
 
-    const baseUrl = (env.TRASK_RESEARCHWIZARD_BASE_URL ?? "").trim();
-    if (!baseUrl) {
-      return jsonResponse(500, { error: "TRASK_RESEARCHWIZARD_BASE_URL is not configured." }, origin);
+    if (bodyText !== undefined) {
+      const replayed = new Request(request.url, {
+        method: request.method,
+        headers: request.headers,
+        body: bodyText,
+      });
+      return serveUpstreamOrFallback(replayed, env, origin, url, bodyText);
     }
-
-    const targetUrl = `${normalizeBackendBaseUrl(baseUrl)}${url.pathname}${url.search}`;
-    const upstreamApiKey = (env.TRASK_RESEARCHWIZARD_API_KEY ?? "").trim();
-    return proxyToUpstream(request, targetUrl, origin, upstreamApiKey);
+    return serveUpstreamOrFallback(request, env, origin, url);
   },
 };

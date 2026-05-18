@@ -153,12 +153,14 @@ jobs:
           TRASK_RESEARCHWIZARD_BASE_URL: ${{ vars.TRASK_RESEARCHWIZARD_BASE_URL }}
           TRASK_WEB_ALLOW_ANONYMOUS: ${{ vars.TRASK_WEB_ALLOW_ANONYMOUS != '' && vars.TRASK_WEB_ALLOW_ANONYMOUS || '1' }}
           TRASK_BUILTIN_API: ${{ vars.TRASK_BUILTIN_API != '' && vars.TRASK_BUILTIN_API || '1' }}
+          TRASK_BUILTIN_FALLBACK: ${{ vars.TRASK_BUILTIN_FALLBACK != '' && vars.TRASK_BUILTIN_FALLBACK || '1' }}
         run: |
           set -euo pipefail
           deploy_args=(
             --config infra/trask-worker/wrangler.toml
             --var "TRASK_WEB_ALLOW_ANONYMOUS:${TRASK_WEB_ALLOW_ANONYMOUS}"
             --var "TRASK_BUILTIN_API:${TRASK_BUILTIN_API}"
+            --var "TRASK_BUILTIN_FALLBACK:${TRASK_BUILTIN_FALLBACK}"
           )
           if [ "${{ steps.cf_check.outputs.builtin }}" != "true" ] && [ -n "${TRASK_RESEARCHWIZARD_BASE_URL}" ]; then
             deploy_args+=(--var "TRASK_RESEARCHWIZARD_BASE_URL:${TRASK_RESEARCHWIZARD_BASE_URL}")
