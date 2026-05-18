@@ -29,6 +29,8 @@ export interface TraskHistoryRecordDto {
   status: 'pending' | 'complete' | 'failed'
   answer: string | null
   sources: Array<{ id: string; name: string; url: string }>
+  retrievedSources?: Array<{ id: string; name: string; url: string }>
+  visitedUrls?: string[]
   error: string | null
   createdAt: string
   completedAt: string | null

@@ -8,6 +8,8 @@ export interface HeadlessAiResearchWizardResult {
   readonly report: string;
   readonly research_information?: {
     readonly source_urls?: readonly string[] | null;
+    readonly cited_urls?: readonly string[] | null;
+    readonly retrieved_urls?: readonly string[] | null;
     readonly visited_urls?: readonly string[] | null;
     readonly query_domains?: readonly string[] | null;
     readonly allowed_url_prefixes?: readonly string[] | null;

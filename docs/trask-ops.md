@@ -6,8 +6,8 @@ Operations and verification guide for the three OpenKOTOR Discord bots plus the 
 
 | Component | Status | Evidence |
 |-----------|--------|---------|
-| Trask HTTP server (`/api/trask/*`) | ✅ | `pnpm verify:trask-web` — 5/5 RICH lore answers from local knowledge |
-| Holocron web UI (`apps/holocron-web`) | ✅ | Playwright verifier passes 5 KOTOR Q&A queries |
+| Trask HTTP server (`/api/trask/*`) | ✅ | `pnpm holocron:e2e` — 5 live research queries via Playwright on :4010 |
+| Holocron web UI (`apps/holocron-web`) | ✅ | Same functional e2e (`apps/holocron-web/e2e/holocron-research.spec.ts`) |
 | GPTR Python venv auto-discovery | ✅ | No path config needed; walks up from cwd |
 | Garbage content filtering | ✅ | Cloudflare/JS-challenge blocks stripped from scraped pages |
 | Seeded KOTOR lore (15 entries) | ✅ | Revan/Bastila/HK-47/Exile/Nihilus/Pazaak-rules/etc. answer without LLM key |
@@ -154,11 +154,11 @@ Shows loaded panels and mapping counts. Then react on the panel message with a t
 ### Web UI (Trask / Holocron)
 
 ```bash
-pnpm verify:trask-web
+pnpm exec playwright install chromium --with-deps   # once per machine
+pnpm holocron:e2e
 ```
 
-Opens the Holocron web UI with Playwright and submits five dynamic KOTOR queries.
-Passes when each returns source-backed results (RICH) or a graceful degraded response.
+Builds workspace + Holocron, starts `trask-http-server` on **http://127.0.0.1:4010**, and runs five live research queries in Chromium (no API mocks). Each test must finish with a substantive answer and **Sources** / `https://` citations.
 
 ### Discord command registration smoke test
 

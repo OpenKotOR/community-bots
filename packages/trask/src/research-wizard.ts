@@ -4,6 +4,7 @@ import { loadSharedAiConfig, type ResearchWizardRuntimeConfig, type SharedAiConf
 import {
   isTraskApprovedBaseUrl,
   isTraskApprovedResearchUrl,
+  sourceUrlMatchesDescriptor,
   type SearchHit,
   type SearchProvider,
   traskApprovedResearchBaseHosts,
@@ -19,7 +20,12 @@ import {
 
 export interface ResearchWizardAnswer {
   answer: string;
+  /** Sources explicitly cited in the final answer shown to users. */
   approvedSources: readonly SourceDescriptor[];
+  /** Sources retrieved as candidate evidence for the answer/rewrite stage. */
+  retrievedSources: readonly SourceDescriptor[];
+  /** Allowlisted URLs the headless researcher touched while gathering evidence. */
+  visitedUrls: readonly string[];
 }
 
 export interface ResearchWizardBriefAnswer extends ResearchWizardAnswer {
@@ -68,6 +74,8 @@ interface ResearchWizardResponsePayload {
   report?: string | null;
   research_information?: {
     source_urls?: readonly string[] | null;
+    cited_urls?: readonly string[] | null;
+    retrieved_urls?: readonly string[] | null;
     visited_urls?: readonly string[] | null;
     query_domains?: readonly string[] | null;
     allowed_url_prefixes?: readonly string[] | null;
@@ -110,8 +118,19 @@ const buildCustomPromptBrief = (): string => {
 const normalizeUrl = (value: string): string => value.replace(/\/+$/, "").trim();
 
 const extractUrls = (value: string): string[] => {
-  const matches = value.match(/https?:\/\/[^\s)>\]]+/g) ?? [];
+  const matches = value.match(/[a-z][a-z0-9+.-]*:\/\/[^\s)>\]]+/giu) ?? [];
   return [...new Set(matches.map((match) => match.replace(/[.,;:!?]+$/, "")))];
+};
+
+const extractSourceSectionUrls = (value: string): string[] => {
+  const normalized = value.replace(/\r\n/g, "\n");
+  const sourceHeading = /\n(?:#{1,6}\s*)?(?:Sources|References)\s*\n/i;
+  const match = normalized.match(sourceHeading);
+  if (!match || match.index === undefined) {
+    return extractUrls(normalized);
+  }
+  const sourceSection = normalized.slice(match.index + match[0].length);
+  return extractUrls(sourceSection);
 };
 
 const hostnameHint = (url: string): string => {
@@ -135,20 +154,20 @@ const uniqueUrlsPreserveOrder = (urls: readonly string[]): string[] => {
   return out;
 };
 
-/** Visited / cited URLs from ai-researchwizard payload (Holocron live facet pings). */
+const payloadUrls = (values: readonly string[] | null | undefined): string[] =>
+  Array.isArray(values) ? values.filter((value): value is string => typeof value === "string") : [];
+
+const isAllowedSourceUrl = (url: string, sourcePool: readonly SourceDescriptor[]): boolean =>
+  sourcePool.some((source) => sourceUrlMatchesDescriptor(url, source)) || isTraskApprovedResearchUrl(url, sourcePool);
+
+/** Visited URLs from ai-researchwizard payload (Holocron live facet pings). */
 const collectVisitedUrlsFromPayload = (
   payload: ResearchWizardResponsePayload,
   approvedSources: readonly SourceDescriptor[],
 ): string[] => {
   const info = payload.research_information;
-  const rawVisited =
-    (Array.isArray(info?.visited_urls) ? info.visited_urls : []).filter(
-      (value): value is string => typeof value === "string",
-    );
-  const rawSources =
-    (Array.isArray(info?.source_urls) ? info.source_urls : []).filter((value): value is string => typeof value === "string");
-  return uniqueUrlsPreserveOrder([...rawVisited, ...rawSources]).filter((url) =>
-    isTraskApprovedResearchUrl(url, approvedSources),
+  return uniqueUrlsPreserveOrder(payloadUrls(info?.visited_urls)).filter((url) =>
+    isAllowedSourceUrl(url, approvedSources),
   );
 };
 
@@ -202,6 +221,7 @@ const sourceUrlLabel = (source: SourceDescriptor, url: string): string => {
     const base = new URL(source.homeUrl);
     const exactPath = decodeURIComponent(exact.pathname.replace(/\/+$/u, ""));
     const basePath = decodeURIComponent(base.pathname.replace(/\/+$/u, ""));
+    if (exactPath === basePath) return source.name;
     const relativePath = exactPath.startsWith(`${basePath}/`) ? exactPath.slice(basePath.length + 1) : exactPath;
     const cleaned = relativePath
       .replace(/^blob\/[^/]+\//u, "")
@@ -239,25 +259,20 @@ const isCatalogRootUrl = (url: string, approvedSources: readonly SourceDescripto
   return approvedSources.some((source) => normalizeUrl(source.homeUrl) === normalized);
 };
 
-const collectRelevantSources = (
-  report: string,
-  approvedSources: readonly SourceDescriptor[],
-  payload: ResearchWizardResponsePayload,
+const materializeSourcesFromUrls = (
+  urls: readonly string[],
+  sourcePool: readonly SourceDescriptor[],
 ): readonly SourceDescriptor[] => {
-  const candidateUrls = uniqueUrlsPreserveOrder([
-    ...extractUrls(report),
-    ...((Array.isArray(payload.research_information?.source_urls) ? payload.research_information.source_urls : [])
-      .filter((value): value is string => typeof value === "string")),
-    ...((Array.isArray(payload.research_information?.visited_urls) ? payload.research_information.visited_urls : [])
-      .filter((value): value is string => typeof value === "string")),
-  ].filter((url) => isTraskApprovedResearchUrl(url, approvedSources)));
+  const candidateUrls = uniqueUrlsPreserveOrder(
+    urls.filter((url) => isAllowedSourceUrl(url, sourcePool)),
+  );
 
   const matched: SourceDescriptor[] = [];
-  const hasPreciseUrl = candidateUrls.some((url) => !isCatalogRootUrl(url, approvedSources));
+  const hasPreciseUrl = candidateUrls.some((url) => !isCatalogRootUrl(url, sourcePool));
 
   for (const url of candidateUrls) {
-    if (hasPreciseUrl && isCatalogRootUrl(url, approvedSources)) continue;
-    const source = exactSourceFromUrl(url, approvedSources);
+    if (hasPreciseUrl && isCatalogRootUrl(url, sourcePool)) continue;
+    const source = exactSourceFromUrl(url, sourcePool);
 
     if (source && !matched.some((entry) => normalizeUrl(entry.homeUrl) === normalizeUrl(source.homeUrl))) {
       matched.push(source);
@@ -266,6 +281,38 @@ const collectRelevantSources = (
 
   return matched.slice(0, 6);
 };
+
+const collectCitedSources = (
+  report: string,
+  approvedSources: readonly SourceDescriptor[],
+  payload: ResearchWizardResponsePayload,
+): readonly SourceDescriptor[] => {
+  const info = payload.research_information;
+  return materializeSourcesFromUrls([
+    ...extractSourceSectionUrls(report),
+    ...payloadUrls(info?.cited_urls),
+    ...payloadUrls(info?.source_urls),
+  ], approvedSources);
+};
+
+const collectRetrievedSources = (
+  report: string,
+  approvedSources: readonly SourceDescriptor[],
+  payload: ResearchWizardResponsePayload,
+): readonly SourceDescriptor[] => {
+  const info = payload.research_information;
+  return materializeSourcesFromUrls([
+    ...payloadUrls(info?.retrieved_urls),
+    ...payloadUrls(info?.cited_urls),
+    ...payloadUrls(info?.source_urls),
+    ...extractSourceSectionUrls(report),
+  ], approvedSources);
+};
+
+const collectCitedSourcesFromText = (
+  text: string,
+  sourcePool: readonly SourceDescriptor[],
+): readonly SourceDescriptor[] => materializeSourcesFromUrls(extractSourceSectionUrls(text), sourcePool);
 
 const normalizeReport = (value: string): string => {
   return value
@@ -284,8 +331,8 @@ const formatSourcesSection = (sources: readonly SourceDescriptor[]): string => {
 
 const isSynthesisFailureText = (report: string): boolean => {
   const normalized = report.trim();
-  // Python's synthesis failure message.
-  if (/^i could not complete live archive synthesis for this question right now\.?$/iu.test(normalized)) {
+  // Python synthesis failure (exact or query-specific wording).
+  if (/^i could not complete live archive synthesis\b/iu.test(normalized)) {
     return true;
   }
   // Python's _build_report_from_urls fallback: every bullet is the "approved archive page" template.
@@ -298,44 +345,15 @@ const isSynthesisFailureText = (report: string): boolean => {
   return false;
 };
 
-const titleCase = (value: string): string =>
-  value
-    .split(/\s+/u)
-    .filter(Boolean)
-    .map((part) => part.slice(0, 1).toUpperCase() + part.slice(1))
-    .join(" ");
-
-const sourceToolHint = (source: SourceDescriptor): string => {
-  try {
-    const parsed = new URL(source.homeUrl);
-    const parts = parsed.pathname
-      .split("/")
-      .map((part) => decodeURIComponent(part).trim())
-      .filter(Boolean);
-    const candidate = parts[parts.length - 1] ?? "";
-    const cleaned = candidate
-      .replace(/^\d+-?/u, "")
-      .replace(/^file-/u, "")
-      .replace(/[-_]+/gu, " ")
-      .trim();
-    if (!cleaned || cleaned.length < 3) return source.name;
-    return titleCase(cleaned);
-  } catch {
-    return source.name;
-  }
-};
-
-const sourceOnlyFallbackAnswer = (sources: readonly SourceDescriptor[]): string => {
+const sourceOnlyFallbackAnswer = (query: string, sources: readonly SourceDescriptor[]): string => {
   if (sources.length === 0) return "I could not complete live archive synthesis for this question right now.";
-
-  const hints = [...new Set(sources.map(sourceToolHint).filter((hint) => hint.length > 0))].slice(0, 5);
-  const bullets = hints.map((hint, index) => `- ${hint} [${Math.min(index + 1, sources.length)}]`);
-  const summary = [
-    "Here are the most relevant pages I found in the approved KOTOR knowledge sources:",
-    ...bullets,
+  const topic = query.trim().replace(/\?+$/u, "") || "this question";
+  return [
+    `I found candidate sources for ${topic}, but I could not support a grounded answer from the retrieved evidence.`,
+    "Review the sources below or try a narrower wording.",
+    "",
+    formatSourcesSection(sources),
   ].join("\n");
-
-  return `${summary}\n\n${formatSourcesSection(sources)}`;
 };
 
 const DEFAULT_REWRITE_TIMEOUT_MS = 15_000;
@@ -369,12 +387,16 @@ const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number): Promise<T
 };
 
 const fallbackDiscordRewrite = (
+  query: string,
   report: string,
   sources: readonly SourceDescriptor[],
 ): string => {
+  if (sources.length === 0) {
+    return degradedAnswerFallback(query, sources);
+  }
   const normalized = normalizeReport(report);
   if (isSynthesisFailureText(normalized)) {
-    return sourceOnlyFallbackAnswer(sources);
+    return sourceOnlyFallbackAnswer(query, sources);
   }
 
   const sourceIndexByUrl = new Map<string, number>(
@@ -422,10 +444,13 @@ const fallbackDiscordRewrite = (
   return sources.length > 0 ? `${summary}\n\n${formatSourcesSection(sources)}` : summary;
 };
 
-const fallbackDiscordBrief = (report: string, sources: readonly SourceDescriptor[]): string => {
+const fallbackDiscordBrief = (query: string, report: string, sources: readonly SourceDescriptor[]): string => {
+  if (sources.length === 0) {
+    return degradedAnswerFallback(query, sources);
+  }
   const normalized = normalizeReport(report);
   if (isSynthesisFailureText(normalized)) {
-    return sourceOnlyFallbackAnswer(sources);
+    return sourceOnlyFallbackAnswer(query, sources);
   }
 
   const sourceIndexByUrl = new Map<string, number>(
@@ -516,6 +541,107 @@ const applySourcePreferences = (
   return ranked;
 };
 
+type ResearchQueryIntent = "tooling" | "technical" | "lore" | "general";
+
+const TOOLING_QUERY_TERMS = [
+  "mdlops",
+  "mdledit",
+  "kotormax",
+  "kotorblender",
+  "pykotor",
+  "xoreos",
+  "reone",
+  "tslpatcher",
+  "toolchain",
+  "modding",
+  "tool",
+  "script",
+  "gff",
+  "2da",
+  "tlk",
+  "nss",
+  "ncs",
+  "utc",
+  "uti",
+  "mdl",
+  "mdx",
+  "texture",
+  "convert",
+  "blender",
+  "3ds",
+];
+
+const TECHNICAL_QUERY_TERMS = [
+  "widescreen",
+  "resolution",
+  "hud",
+  "screen",
+  "crash",
+  "compatibility",
+  "steam",
+  "windows",
+  "linux",
+  "mac",
+  "save",
+  "saves",
+  "install",
+  "launcher",
+  "driver",
+  "movies",
+  "cutscene",
+  "graphics",
+  "aspect",
+];
+
+const LORE_QUERY_TERMS = [
+  "bastila",
+  "revan",
+  "malak",
+  "shan",
+  "jedi",
+  "sith",
+  "rakata",
+  "star forge",
+  "temple summit",
+  "companion",
+  "romance",
+  "story",
+  "lore",
+];
+
+const LORE_SOURCE_IDS = new Set(["wikipedia-kotor", "strategywiki-kotor"]);
+
+const queryIncludesAny = (query: string, terms: readonly string[]): boolean => {
+  const lowered = query.toLowerCase();
+  return terms.some((term) => lowered.includes(term));
+};
+
+const classifyQueryIntent = (query: string): ResearchQueryIntent => {
+  const lowered = query.toLowerCase();
+  if (queryIncludesAny(lowered, TOOLING_QUERY_TERMS)) return "tooling";
+  if (queryIncludesAny(lowered, TECHNICAL_QUERY_TERMS)) return "technical";
+  if (queryIncludesAny(lowered, LORE_QUERY_TERMS)) return "lore";
+  return "general";
+};
+
+const routeSourcesForQuery = (
+  query: string,
+  approvedSources: readonly SourceDescriptor[],
+): readonly SourceDescriptor[] => {
+  const intent = classifyQueryIntent(query);
+  if (intent === "tooling" || intent === "technical") {
+    const filtered = approvedSources.filter((source) => !LORE_SOURCE_IDS.has(source.id));
+    return filtered.length > 0 ? filtered : approvedSources;
+  }
+  if (intent === "lore") {
+    return [
+      ...approvedSources.filter((source) => LORE_SOURCE_IDS.has(source.id)),
+      ...approvedSources.filter((source) => !LORE_SOURCE_IDS.has(source.id)),
+    ];
+  }
+  return approvedSources;
+};
+
 interface LocalKnowledgePassage {
   title: string;
   text: string;
@@ -557,12 +683,21 @@ const mergeSourcesPreserveOrder = (...groups: readonly (readonly SourceDescripto
 
 const LOCAL_PASSAGE_EXCERPT_CHARS = 700;
 
+const normalizeMatchToken = (token: string): string => {
+  const lowered = token.toLowerCase();
+  if (lowered.length <= 6) return lowered;
+  return lowered.slice(0, 6);
+};
+
 const tokenizeQuery = (query: string): string[] =>
-  query
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s-]/gu, " ")
-    .split(/\s+/)
-    .filter((token) => token.length >= 4);
+  [...new Set(
+    query
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s-]/gu, " ")
+      .split(/\s+/)
+      .filter((token) => token.length >= 4)
+      .map(normalizeMatchToken),
+  )];
 
 const isLocalSourceUrl = (url: string): boolean => url.startsWith("local://");
 
@@ -577,82 +712,12 @@ const passageMatchesQuery = (passage: LocalKnowledgePassage, query: string): boo
   return hits >= Math.min(2, tokens.length);
 };
 
-const buildWebSourceDigestReport = (sources: readonly SourceDescriptor[]): string => {
-  return sources
-    .filter((source) => !isLocalSourceUrl(source.homeUrl))
-    .slice(0, 8)
-    .map((source, index) => {
-      const description = source.description?.trim() || "Approved KOTOR archive page relevant to the question.";
-      return `${index + 1}. ${source.name}\n${description}\nURL: ${source.homeUrl}`;
-    })
-    .join("\n\n");
-};
-
-const deriveWebSourceBlurb = (source: SourceDescriptor): string => {
-  const url = source.homeUrl.toLowerCase();
-  const name = source.name.toLowerCase();
-
-  if (url.includes("tsl-patcher") || url.includes("tslpatcher") || name.includes("tslpatcher")) {
-    return "TSLPatcher is the standard KotOR/TSL mod installer: it applies numbered patches to 2DA, GFF, TLK, NSS, and related game data so mods can ship incremental edits instead of replacing whole archives.";
-  }
-  if (url.includes("mdlops") || name.includes("mdlops")) {
-    return "MDLOps is a KotOR model toolchain utility for converting, inspecting, and re-importing MDL/MDX meshes when building or editing module and placeable models.";
-  }
-  if (url.includes("widescreen") && url.includes("169")) {
-    return "Covers 16:9 widescreen UI layout for KotOR 1 at 800×600 baseline and how to adjust menus/HUD for wider aspect ratios.";
-  }
-  if (url.includes("2560") || url.includes("1440")) {
-    return "Discusses high-resolution (2560×1440) display settings and fixes when KotOR 1 mis-scales or clips the viewport.";
-  }
-  if (url.includes("hud-fix") || url.includes("5760x1080")) {
-    return "Provides ultrawide/multi-monitor HUD correction patches so UI elements stay aligned at non-standard resolutions.";
-  }
-  if (url.includes("main-menu-widescreen")) {
-    return "Ships a main-menu widescreen fix mod for KotOR 1 when the title screen does not scale correctly.";
-  }
-  if (url.includes("movies") && url.includes("resolution")) {
-    return "Troubleshoots cutscene/movie playback failures tied to resolution or graphics driver settings on PC.";
-  }
-  if (url.includes("widescreen") || url.includes("hud-fix") || url.includes("resolution")) {
-    return "Documents widescreen/UI fixes for KotOR on PC—resolution limits, HUD scaling, and related graphics.ini or mod steps.";
-  }
-  if (url.includes("tls-modding") || (url.includes("tls") && url.includes("modding"))) {
-    return "Explains TLS (KotOR II) modding workflows and how TSLPatcher-driven installs fit into a mod build.";
-  }
-  if (url.includes("mod_builds") && url.includes("full")) {
-    return "Neocities mod-build guide listing full KotOR 1 mod stacks where TSLPatcher-based installers are commonly chained.";
-  }
-  if (url.includes("reone") || name.includes("reone")) {
-    return "reone is an open-source recreation of the Odyssey engine used by KotOR/TSL; the thread covers building, running, and contributing to that engine rewrite for modern platforms.";
-  }
-  if (url.includes("strategywiki.org") && (url.includes("bastila") || name.includes("bastila"))) {
-    return "StrategyWiki’s Bastila page walks through her companion role, Temple Summit choices, and romance/light-side or dark-side outcomes in KOTOR 1.";
-  }
-  if (url.includes("wikipedia.org") && name.includes("bastila")) {
-    return "Wikipedia summarizes Bastila Shan’s role as a Jedi companion with Battle Meditation and her story arc tied to Revan in the first game.";
-  }
-
-  const hint = sourceToolHint(source);
-  return `${hint} is covered in this approved community archive page—open the link for install notes, version constraints, and troubleshooting detail.`;
-};
-
 const composeAnswerFromWebSources = (query: string, sources: readonly SourceDescriptor[]): string => {
-  const topic = query.trim().replace(/\?+$/u, "");
   const webSources = sources.filter((source) => !isLocalSourceUrl(source.homeUrl)).slice(0, 5);
   if (webSources.length === 0) {
-    return sourceOnlyFallbackAnswer(sources);
+    return sourceOnlyFallbackAnswer(query, sources);
   }
-
-  const lead = `Here is a concise, source-backed answer about ${topic} from approved KOTOR community archives:`;
-  const seenBlurbs = new Set<string>();
-  const bullets: string[] = [];
-  for (const source of webSources) {
-    const blurb = deriveWebSourceBlurb(source);
-    if (seenBlurbs.has(blurb)) continue;
-    seenBlurbs.add(blurb);
-    bullets.push(`- ${blurb} [${bullets.length + 1}]`);
-  }
-  return `${lead}\n\n${bullets.join("\n")}\n\n${formatSourcesSection(webSources)}`;
+  return sourceOnlyFallbackAnswer(query, webSources);
 };
 
 const sourceMatchesQuery = (source: SourceDescriptor, query: string): boolean => {
@@ -662,6 +727,40 @@ const sourceMatchesQuery = (source: SourceDescriptor, query: string): boolean =>
     url: source.homeUrl,
   };
   return passageMatchesQuery(passage, query);
+};
+
+const sourceRelevanceScore = (source: SourceDescriptor, query: string): number => {
+  const tokens = tokenizeQuery(query);
+  if (tokens.length === 0) return 1;
+  const haystack = [
+    source.name,
+    source.description,
+    source.homeUrl,
+    ...(source.tags ?? []),
+  ].join(" ").toLowerCase();
+  let hits = 0;
+  for (const token of tokens) {
+    if (haystack.includes(token)) hits += 1;
+  }
+  const titleBonus = tokens.some((token) => source.name.toLowerCase().includes(token)) ? 2 : 0;
+  const urlBonus = tokens.some((token) => source.homeUrl.toLowerCase().includes(token)) ? 1 : 0;
+  return hits * 2 + titleBonus + urlBonus;
+};
+
+const rerankEvidenceSources = (query: string, sources: readonly SourceDescriptor[]): readonly SourceDescriptor[] => {
+  const tokens = tokenizeQuery(query);
+  const ranked = sources
+    .map((source, index) => ({
+      source,
+      index,
+      score: sourceRelevanceScore(source, query),
+    }))
+    .sort((left, right) => right.score - left.score || left.index - right.index);
+  if (tokens.length === 0) {
+    return ranked.map((entry) => entry.source).slice(0, 4);
+  }
+  const strong = ranked.filter((entry) => entry.score >= 2).map((entry) => entry.source);
+  return strong.slice(0, 8);
 };
 
 const extractSubstantiveExcerpt = (text: string, maxSentences = 3): string => {
@@ -675,7 +774,26 @@ const extractSubstantiveExcerpt = (text: string, maxSentences = 3): string => {
 };
 
 const hasSubstantiveLocalPassages = (local: LocalKnowledgeContext, query: string): boolean =>
-  local.passages.some((passage) => passage.text.trim().length >= 80 && passageMatchesQuery(passage, query));
+  local.passages.some((passage) => passage.text.trim().length >= 40 && passageMatchesQuery(passage, query));
+
+const selectRelevantLocalKnowledge = (query: string, local: LocalKnowledgeContext): LocalKnowledgeContext => {
+  if (!hasSubstantiveLocalPassages(local, query)) {
+    return { digest: "", passages: [], sources: [] };
+  }
+  const passages = local.passages.filter((passage) => passageMatchesQuery(passage, query));
+  const sources = local.sources.filter((source) =>
+    passages.some((passage) => normalizeUrl(passage.url) === normalizeUrl(source.homeUrl)),
+  );
+  const digest = [
+    "Local Knowledge Context (lower authority than approved web/repo sources)",
+    ...passages.map((passage, index) => `${index + 1}. ${passage.title}: ${passage.text} (${passage.url})`),
+  ].join("\n");
+  return {
+    digest,
+    passages,
+    sources: sources.length > 0 ? sources : local.sources.slice(0, passages.length),
+  };
+};
 
 const composeComprehensiveAnswerFromLocal = (query: string, local: LocalKnowledgeContext): string => {
   const topic = query.trim().replace(/\?+$/u, "");
@@ -700,13 +818,16 @@ const localKnowledgeFallbackAnswer = (query: string, local: LocalKnowledgeContex
       sources: relevantSources.length > 0 ? relevantSources : local.sources.slice(0, relevantPassages.length),
     });
   }
-  if (hasSubstantiveLocalPassages(local, query)) {
-    return composeComprehensiveAnswerFromLocal(query, local);
-  }
-  const header = `I could not complete live archive synthesis for "${query.trim()}", but I found related local knowledge.`;
-  const summary = local.digest.trim();
-  const sources = formatSourcesSection(local.sources);
-  return `${header}\n\n${summary}\n\n${sources}`;
+  return `I could not complete live archive synthesis for "${query.trim()}".`;
+};
+
+const resolveWebSourcesForFailedSynthesis = (
+  query: string,
+  retrievedSources: readonly SourceDescriptor[],
+): readonly SourceDescriptor[] => {
+  const candidates = retrievedSources.filter((source) => !isLocalSourceUrl(source.homeUrl));
+  const matched = candidates.filter((source) => sourceMatchesQuery(source, query));
+  return (matched.length > 0 ? matched : candidates).slice(0, 5);
 };
 
 const researchDomainsForSources = (sources: readonly SourceDescriptor[]): string[] => {
@@ -826,7 +947,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
     preferredModel?: string,
   ): Promise<string> {
     if (!this.openAiClient) {
-      return fallbackDiscordRewrite(report, approvedSources);
+      return fallbackDiscordRewrite(query, report, approvedSources);
     }
 
     const allowedSources = approvedSources
@@ -886,7 +1007,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
       }
     }
 
-    return fallbackDiscordRewrite(report, approvedSources);
+    return fallbackDiscordRewrite(query, report, approvedSources);
   }
 
   private async rewriteForDiscordBrief(
@@ -895,7 +1016,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
     approvedSources: readonly SourceDescriptor[],
   ): Promise<string> {
     if (!this.openAiClient) {
-      return fallbackDiscordBrief(report, approvedSources);
+      return fallbackDiscordBrief(query, report, approvedSources);
     }
 
     const allowedSources = approvedSources
@@ -948,7 +1069,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
       }
     }
 
-    return fallbackDiscordBrief(report, approvedSources);
+    return fallbackDiscordBrief(query, report, approvedSources);
   }
 
   private async fetchResearchReport(
@@ -993,8 +1114,12 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
     onProgress?: (event: ResearchWizardProgressEvent) => void,
     options?: ResearchWizardQueryOptions,
   ): Promise<ResearchWizardAnswer> {
-    const approvedSources = applySourcePreferences(this.approvedSources, options?.sourcePreferences);
+    const approvedSources = routeSourcesForQuery(
+      query,
+      applySourcePreferences(this.approvedSources, options?.sourcePreferences),
+    );
     const localKnowledge = await this.searchLocalKnowledge(query);
+    const relevantLocalKnowledge = selectRelevantLocalKnowledge(query, localKnowledge);
     if (localKnowledge.sources.length > 0) {
       onProgress?.({
         phase: "gather",
@@ -1029,57 +1154,45 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
         phase: "report",
         detail: "Ranking passages and citations…",
       });
-      const reportWithLocalContext = localKnowledge.digest
-        ? `${report}\n\n${localKnowledge.digest}`
+      const reportWithLocalContext = relevantLocalKnowledge.digest
+        ? `${report}\n\n${relevantLocalKnowledge.digest}`
         : report;
-      const relevantSources = mergeSourcesPreserveOrder(
-        collectRelevantSources(reportWithLocalContext, approvedSources, payload),
-        localKnowledge.sources,
+      const retrievedSources = rerankEvidenceSources(
+        query,
+        mergeSourcesPreserveOrder(
+          collectRetrievedSources(report, approvedSources, payload),
+          relevantLocalKnowledge.sources,
+        ),
+      );
+      const citedSourcesFromReport = rerankEvidenceSources(
+        query,
+        mergeSourcesPreserveOrder(
+          collectCitedSources(report, approvedSources, payload),
+          collectCitedSourcesFromText(reportWithLocalContext, relevantLocalKnowledge.sources),
+        ),
       );
       onProgress?.({
         phase: "sources",
-        detail: relevantSources.length ? `${relevantSources.length} sources matched` : "Mapping hosts to archive catalog…",
-        sources: relevantSources,
+        detail: retrievedSources.length ? `${retrievedSources.length} sources retrieved` : "Mapping hosts to archive catalog…",
+        sources: retrievedSources,
       });
       onProgress?.({
         phase: "compose",
         detail: "Rendering Holocron answer…",
       });
       let answer: string;
-      if (isSynthesisFailureText(report)) {
-        const webSources = relevantSources.filter((source) => !isLocalSourceUrl(source.homeUrl));
-        const relevantPassages = localKnowledge.passages.filter((passage) => passageMatchesQuery(passage, query));
-        if (relevantPassages.length > 0) {
-          const relevantLocalSources = localKnowledge.sources.filter((source) =>
-            relevantPassages.some((passage) => normalizeUrl(passage.url) === normalizeUrl(source.homeUrl)),
-          );
-          const localSources =
-            relevantLocalSources.length > 0
-              ? relevantLocalSources
-              : localKnowledge.sources.slice(0, relevantPassages.length);
-          const localBody = composeComprehensiveAnswerFromLocal(query, {
-            digest: localKnowledge.digest,
-            passages: relevantPassages,
-            sources: localSources,
-          });
-          const extraWeb = webSources.filter((source) => sourceMatchesQuery(source, query)).slice(0, 2);
-          if (extraWeb.length > 0) {
-            const mergedSources = mergeSourcesPreserveOrder(localSources, extraWeb);
-            const localParagraph = localBody.split(/\nSources\s*\n/i)[0]?.trim() ?? localBody;
-            const webBullets = extraWeb.map((source, index) => {
-              const citation = localSources.length + index + 1;
-              return `- ${deriveWebSourceBlurb(source)} [${citation}]`;
-            });
-            answer = `${localParagraph}\n\n${webBullets.join("\n")}\n\n${formatSourcesSection(mergedSources)}`;
-          } else {
-            answer = localBody;
-          }
+      if (retrievedSources.length === 0) {
+        answer = degradedAnswerFallback(query, approvedSources);
+      } else if (isSynthesisFailureText(report)) {
+        const webSources = resolveWebSourcesForFailedSynthesis(query, retrievedSources);
+        if (relevantLocalKnowledge.passages.length > 0) {
+          answer = composeComprehensiveAnswerFromLocal(query, relevantLocalKnowledge);
         } else if (webSources.length > 0) {
           answer = composeAnswerFromWebSources(query, webSources);
         } else if (localKnowledge.digest) {
           answer = localKnowledgeFallbackAnswer(query, localKnowledge);
-        } else if (relevantSources.length > 0) {
-          answer = sourceOnlyFallbackAnswer(relevantSources);
+        } else if (retrievedSources.length > 0) {
+          answer = sourceOnlyFallbackAnswer(query, retrievedSources);
         } else {
           answer = degradedAnswerFallback(query, approvedSources);
         }
@@ -1087,16 +1200,26 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
         answer = await this.rewriteForDiscord(
           query,
           reportWithLocalContext,
-          relevantSources,
+          retrievedSources,
           options?.model,
         );
       } else {
-        answer = fallbackDiscordRewrite(reportWithLocalContext, relevantSources);
+        answer = fallbackDiscordRewrite(query, reportWithLocalContext, retrievedSources);
       }
+
+      const citedSources = rerankEvidenceSources(
+        query,
+        mergeSourcesPreserveOrder(
+          collectCitedSourcesFromText(answer, retrievedSources),
+          citedSourcesFromReport,
+        ),
+      );
 
       return {
         answer,
-        approvedSources: relevantSources,
+        approvedSources: citedSources,
+        retrievedSources,
+        visitedUrls: collectVisitedUrlsFromPayload(payload, approvedSources),
       };
     } catch {
       onProgress?.({
@@ -1104,14 +1227,19 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
         detail: "Rendering fallback Holocron answer…",
       });
       if (localKnowledge.sources.length > 0) {
+        const fallbackAnswer = localKnowledgeFallbackAnswer(query, localKnowledge);
         return {
-          answer: localKnowledgeFallbackAnswer(query, localKnowledge),
-          approvedSources: localKnowledge.sources,
+          answer: fallbackAnswer,
+          approvedSources: collectCitedSourcesFromText(fallbackAnswer, localKnowledge.sources),
+          retrievedSources: localKnowledge.sources,
+          visitedUrls: [],
         };
       }
       return {
         answer: degradedAnswerFallback(query, approvedSources),
         approvedSources: [],
+        retrievedSources: [],
+        visitedUrls: [],
       };
     }
   }
@@ -1119,19 +1247,47 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
   /** Shorter rewrite for proactive/channel replies (still source-backed). */
   public async answerQuestionBrief(query: string): Promise<ResearchWizardBriefAnswer> {
     const localKnowledge = await this.searchLocalKnowledge(query);
-    const { report, payload } = await this.fetchResearchReport(query, buildCustomPromptBrief(), this.approvedSources);
-    const reportWithLocalContext = localKnowledge.digest ? `${report}\n\n${localKnowledge.digest}` : report;
-    const relevantSources = mergeSourcesPreserveOrder(
-      collectRelevantSources(reportWithLocalContext, this.approvedSources, payload),
-      localKnowledge.sources,
-    );
-    const answer = await this.rewriteForDiscordBrief(query, reportWithLocalContext, relevantSources);
+    const relevantLocalKnowledge = selectRelevantLocalKnowledge(query, localKnowledge);
+    try {
+      const approvedSources = routeSourcesForQuery(query, this.approvedSources);
+      const { report, payload } = await this.fetchResearchReport(query, buildCustomPromptBrief(), approvedSources);
+      const reportWithLocalContext = relevantLocalKnowledge.digest ? `${report}\n\n${relevantLocalKnowledge.digest}` : report;
+      const retrievedSources = rerankEvidenceSources(
+        query,
+        mergeSourcesPreserveOrder(
+          collectRetrievedSources(report, approvedSources, payload),
+          relevantLocalKnowledge.sources,
+        ),
+      );
+      const answer = retrievedSources.length > 0
+        ? await this.rewriteForDiscordBrief(query, reportWithLocalContext, retrievedSources)
+        : degradedAnswerFallback(query, approvedSources);
 
-    return {
-      answer,
-      approvedSources: relevantSources,
-      researchReport: reportWithLocalContext,
-    };
+      return {
+        answer,
+        approvedSources: rerankEvidenceSources(
+          query,
+          mergeSourcesPreserveOrder(
+            collectCitedSourcesFromText(answer, retrievedSources),
+            collectCitedSources(report, approvedSources, payload),
+          ),
+        ),
+        retrievedSources,
+        visitedUrls: collectVisitedUrlsFromPayload(payload, approvedSources),
+        researchReport: reportWithLocalContext,
+      };
+    } catch {
+      const answer = relevantLocalKnowledge.sources.length > 0
+        ? composeComprehensiveAnswerFromLocal(query, relevantLocalKnowledge)
+        : degradedAnswerFallback(query, this.approvedSources);
+      return {
+        answer,
+        approvedSources: collectCitedSourcesFromText(answer, relevantLocalKnowledge.sources),
+        retrievedSources: relevantLocalKnowledge.sources,
+        visitedUrls: [],
+        researchReport: answer,
+      };
+    }
   }
 }
 
@@ -1151,9 +1307,15 @@ export {
   extractUrls as _extractUrls,
   hostnameHint as _hostnameHint,
   uniqueUrlsPreserveOrder as _uniqueUrlsPreserveOrder,
+  collectCitedSources as _collectCitedSources,
+  collectRetrievedSources as _collectRetrievedSources,
+  collectVisitedUrlsFromPayload as _collectVisitedUrlsFromPayload,
+  collectCitedSourcesFromText as _collectCitedSourcesFromText,
   isSynthesisFailureText as _isSynthesisFailureText,
   normalizeReport as _normalizeReport,
   formatSourcesSection as _formatSourcesSection,
   normalizePreferredRewriteModel as _normalizePreferredRewriteModel,
   matchApprovedSource as _matchApprovedSource,
+  classifyQueryIntent as _classifyQueryIntent,
+  routeSourcesForQuery as _routeSourcesForQuery,
 };

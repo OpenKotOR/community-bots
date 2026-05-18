@@ -37,6 +37,8 @@ const mockWizard: ResearchWizardQueryHandler = {
     return {
       answer: "Stub answer.\n\nSources\n1. Test Source - https://example.com",
       approvedSources: [mockSource],
+      retrievedSources: [mockSource],
+      visitedUrls: ["https://example.com"],
     };
   },
 };
@@ -393,6 +395,8 @@ test("POST /ask forwards source weights to the research wizard", async () => {
       return {
         answer: "Weighted answer.\n\nSources\n1. Test Source - https://example.com",
         approvedSources: [mockSource],
+        retrievedSources: [mockSource],
+        visitedUrls: ["https://example.com"],
       };
     },
   };

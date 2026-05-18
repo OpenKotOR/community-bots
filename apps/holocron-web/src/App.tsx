@@ -213,7 +213,9 @@ function normalizeTraskAnswerText(answer: string | null | undefined): string {
 }
 
 function isTraskSynthesisFailureText(answer: string): boolean {
-  return /could not complete live archive synthesis/i.test(answer)
+  if (!/could not complete live archive synthesis/i.test(answer)) return false
+  // Allow answers that recover with real local or web source material below the header.
+  return !/Sources\s*\n/i.test(answer) && !/\[\d+\]/.test(answer)
 }
 
 function mapSourcesFromTraskRecord(rec: TraskHistoryRecordDto) {
@@ -227,17 +229,30 @@ function mapSourcesFromTraskRecord(rec: TraskHistoryRecordDto) {
   }))
 }
 
+function mapRetrievedSourcesFromTraskRecord(rec: TraskHistoryRecordDto) {
+  const cited = new Set((rec.sources ?? []).map((source) => source.url.trim().toLowerCase()))
+  return (rec.retrievedSources ?? [])
+    .filter((source) => !cited.has(source.url.trim().toLowerCase()))
+    .map((source) => ({
+      name: source.name,
+      url: source.url,
+      confidence: 0.75,
+    }))
+}
+
 function createAssistantMessageFromTraskRecord(rec: TraskHistoryRecordDto, queryType: QueryType): MessageType | null {
   const answer = normalizeTraskAnswerText(rec.answer)
   if (rec.status !== 'complete' || !answer) return null
   const researchSteps = mapResearchStepsFromRecord(rec)
   const mappedSources = mapSourcesFromTraskRecord(rec)
+  const relatedSources = mapRetrievedSourcesFromTraskRecord(rec)
   const failedSynthesis = isTraskSynthesisFailureText(answer)
   return {
     id: `srv-${rec.queryId}-a`,
     role: 'assistant',
     content: answer,
     sources: mappedSources,
+    relatedSources,
     timestamp: Date.parse(rec.completedAt ?? rec.createdAt) || Date.now(),
     isExpanded: false,
     agentResults: [
@@ -500,6 +515,34 @@ function dedupeRecordsByQueryId(records: TraskHistoryRecordDto[]): TraskHistoryR
   return [...byId.values()]
 }
 
+const REMOTE_RECORD_MATCH_SKEW_MS = 5_000
+
+function normalizeQuestionForMatching(question: string): string {
+  return question.replace(/\s+/g, ' ').trim().toLowerCase()
+}
+
+function recordCreatedAtMs(record: TraskHistoryRecordDto): number {
+  const created = Date.parse(record.createdAt)
+  return Number.isFinite(created) ? created : 0
+}
+
+function recordMatchesResearchJob(job: HolocronResearchJob, record: TraskHistoryRecordDto): boolean {
+  if (record.threadId && record.threadId !== job.threadId) {
+    return false
+  }
+  if (job.serverQueryId) {
+    return record.queryId === job.serverQueryId
+  }
+  if (normalizeQuestionForMatching(record.query) !== normalizeQuestionForMatching(job.question)) {
+    return false
+  }
+  const createdAt = recordCreatedAtMs(record)
+  if (!createdAt) {
+    return false
+  }
+  return createdAt >= job.createdAt - REMOTE_RECORD_MATCH_SKEW_MS
+}
+
 function mapTraskHistoryToMessages(records: TraskHistoryRecordDto[]): MessageType[] {
   const sorted = dedupeRecordsByQueryId(records).sort((a, b) => a.createdAt.localeCompare(b.createdAt))
   const syncedMessages: MessageType[] = []
@@ -641,6 +684,7 @@ function App() {
   const [showJumpToLatest, setShowJumpToLatest] = useState(false)
   const [isMobileViewport, setIsMobileViewport] = useState(false)
   const traceSeenRef = useRef<Set<string>>(new Set())
+  const initialHolocronUrlThreadRef = useRef<string | null>(null)
   const { prompts } = usePrompts()
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -737,6 +781,74 @@ function App() {
       const targetRecords = records.filter((rec) => rec.threadId === targetThreadId)
       const animateTrace = (opts?.animateTrace ?? true) && targetThreadId === holocronThreadId
       const prependLocals = opts?.prependLocals ?? []
+
+      const candidateJobs = researchJobsRef.current.filter((job) => job.threadId === targetThreadId)
+      if (candidateJobs.length > 0 && targetRecords.length > 0) {
+        const jobsToRemove = new Set<string>()
+        const hydratedServerQueryIds = new Map<string, string>()
+
+        for (const job of candidateJobs) {
+          const matched = targetRecords.reduce<TraskHistoryRecordDto | null>((best, record) => {
+            if (!recordMatchesResearchJob(job, record)) {
+              return best
+            }
+            if (!best) {
+              return record
+            }
+            return pickPreferredRecord(best, record)
+          }, null)
+
+          if (!matched) continue
+          if (!job.serverQueryId && matched.queryId) {
+            hydratedServerQueryIds.set(job.clientId, matched.queryId)
+          }
+          if (matched.status !== 'pending') {
+            jobsToRemove.add(job.clientId)
+          }
+        }
+
+        if (jobsToRemove.size > 0 || hydratedServerQueryIds.size > 0) {
+          for (const job of candidateJobs) {
+            if (!jobsToRemove.has(job.clientId)) continue
+            researchWorkersRef.current.delete(job.clientId)
+            researchConversationWorkersRef.current.delete(job.conversationId)
+          }
+
+          setResearchJobs((current) => {
+            const jobs = normalizeResearchJobs(current)
+            const now = Date.now()
+            let changed = false
+            const nextJobs: HolocronResearchJob[] = []
+
+            for (const job of jobs) {
+              if (jobsToRemove.has(job.clientId)) {
+                changed = true
+                continue
+              }
+
+              const hydratedQueryId = hydratedServerQueryIds.get(job.clientId)
+              if (hydratedQueryId && job.serverQueryId !== hydratedQueryId) {
+                changed = true
+                nextJobs.push({
+                  ...job,
+                  serverQueryId: hydratedQueryId,
+                  state: 'submitted',
+                  attemptCount: 0,
+                  pollFailures: 0,
+                  updatedAt: now,
+                  nextAttemptAt: now + 1_500,
+                })
+                continue
+              }
+
+              nextJobs.push(job)
+            }
+
+            return changed ? nextJobs : jobs
+          })
+        }
+      }
+
       if (!legacySparkMode && traskUsesSameOriginApi() && animateTrace) {
         const seen = traceSeenRef.current
         const pulses: HolocronRetrievalPulse[] = []
@@ -999,6 +1111,7 @@ function App() {
       const qs = params.toString()
       window.history.replaceState({}, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`)
     }
+    initialHolocronUrlThreadRef.current = tid
     setHolocronThreadId(tid)
   }, [legacySparkMode])
 
@@ -1010,6 +1123,14 @@ function App() {
   useEffect(() => {
     if (legacySparkMode || !traskUsesSameOriginApi() || !activeConversationId) {
       return
+    }
+    const initialThreadId = initialHolocronUrlThreadRef.current
+    if (initialThreadId) {
+      const expectedConversationId = holocronConversationId(initialThreadId)
+      if (activeConversationId !== expectedConversationId) {
+        return
+      }
+      initialHolocronUrlThreadRef.current = null
     }
     if (!activeConversationId.startsWith('holocron-')) {
       return
@@ -1399,7 +1520,7 @@ function App() {
       replaceResearchAssistantMessage(job, assistantMessage)
       setResearchJobs((current) => normalizeResearchJobs(current).filter((candidate) => candidate.clientId !== job.clientId))
       if (job.conversationId === activeConversationId) {
-        setActiveAgents(assistantMessage.agentResults ?? [])
+        setActiveAgents([])
         setCurrentQueryType(job.queryType)
       }
       setHolocronAnswerBondTicks((n) => n + 1)
@@ -1423,7 +1544,7 @@ function App() {
     if (legacySparkMode) return
     const activeJob = normalizeResearchJobs(researchJobs).find((job) => job.conversationId === activeConversationId)
     if (!activeJob) {
-      setActiveAgents((current) => current.some((agent) => agent.status === 'retrieving') ? [] : current)
+      setActiveAgents([])
       return
     }
     setCurrentQueryType(activeJob.queryType)
@@ -1526,6 +1647,45 @@ function App() {
           }
           pollLater(job, { state: 'submitted', pollFailures })
           return
+        }
+
+        const existingHistory = await traskGetThread(job.threadId, traskApiKey || undefined, traskPollIterationSignal())
+          .catch(() => null)
+        if (cancelled || !isJobCurrent()) return
+        if (existingHistory) {
+          syncThreadFromRemote(existingHistory, { animateTrace: true, threadId: job.threadId })
+          const matchedExistingRecord = existingHistory.reduce<TraskHistoryRecordDto | null>((best, record) => {
+            if (!recordMatchesResearchJob(job, record)) {
+              return best
+            }
+            if (!best) {
+              return record
+            }
+            return pickPreferredRecord(best, record)
+          }, null)
+
+          if (matchedExistingRecord?.status === 'complete') {
+            completeResearchJob(job, matchedExistingRecord)
+            return
+          }
+          if (matchedExistingRecord && isCanceledTraskRecord(matchedExistingRecord)) {
+            setResearchJobs((current) => normalizeResearchJobs(current).filter((candidate) => candidate.clientId !== job.clientId))
+            return
+          }
+          if (matchedExistingRecord?.status === 'failed') {
+            failResearchJob(job, matchedExistingRecord)
+            return
+          }
+          if (matchedExistingRecord?.status === 'pending') {
+            patchResearchJob(job, {
+              serverQueryId: matchedExistingRecord.queryId,
+              state: 'submitted',
+              attemptCount: 0,
+              pollFailures: 0,
+              nextAttemptAt: Date.now() + 1_500,
+            })
+            return
+          }
         }
 
         const record = await traskAsk(

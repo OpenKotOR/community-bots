@@ -130,13 +130,16 @@ pnpm discord:setup
 You'll need **App ID**, **Public Key**, and **Bot Token** for each bot (Trask, HK-86, Pazaak).
 See [`docs/trask-ops.md`](docs/trask-ops.md) for the full step-by-step guide.
 
-### 3. Bootstrap Trask's research venv (optional — improves Q&A quality)
+### 3. Bootstrap Trask's research venv (optional — required for live archive research)
 
 ```bash
 node scripts/trask_ops.mjs setup-venv
 ```
 
-Without a venv, Trask returns citation lists. With one (+ an LLM key), it returns synthesized answers.
+Without the research venv, live archive research is unavailable. With the venv, Trask can answer from
+approved web sources plus grounded local technical references. LLM keys are optional: with keys, Holocron
+can do richer live synthesis/rewrite; without them, it should still return grounded local-reference answers
+or explicit abstentions instead of hard-failing.
 
 ### 4. Start the bots
 
@@ -160,7 +163,8 @@ See [`docs/trask-ops.md`](docs/trask-ops.md#hk-86-reaction-role-setup) for full 
 ### Verify
 
 ```bash
-pnpm verify:trask-web        # Playwright: 5 KOTOR queries → expects RICH responses
+pnpm holocron:e2e            # Playwright: 5 live KOTOR research queries on :4010
+pnpm verify:trask-cli        # CLI: same 5 canonical queries, grounded-source gate
 pnpm discord:smoke-bots      # Discord REST: confirm all slash commands are registered
 pnpm test                    # 130 unit tests
 ```

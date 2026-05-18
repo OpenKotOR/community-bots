@@ -208,11 +208,140 @@ export class FileReindexQueueStore {
   }
 }
 
+const RETRIEVAL_STOPWORDS = new Set([
+  "what",
+  "where",
+  "when",
+  "which",
+  "who",
+  "how",
+  "does",
+  "used",
+  "about",
+  "with",
+  "from",
+  "into",
+  "game",
+  "games",
+  "star",
+  "wars",
+  "knights",
+  "republic",
+  "kotor",
+  "kotor1",
+  "kotor2",
+  "pc",
+]);
+
+type RetrievalQueryIntent = "tooling" | "technical" | "lore" | "general";
+
+const TOOLING_QUERY_TERMS = [
+  "mdlops",
+  "mdledit",
+  "kotormax",
+  "kotorblender",
+  "pykotor",
+  "tslpatcher",
+  "toolchain",
+  "modding",
+  "mod",
+  "convert",
+  "conversion",
+  "texture",
+  "tpc",
+  "tga",
+  "mdl",
+  "mdx",
+  "gff",
+  "2da",
+  "tlk",
+  "nss",
+  "script",
+  "engine",
+  "reone",
+  "xoreos",
+];
+
+const TECHNICAL_QUERY_TERMS = [
+  "widescreen",
+  "resolution",
+  "hud",
+  "aspect",
+  "compatibility",
+  "save",
+  "windows",
+  "linux",
+  "mac",
+  "crash",
+  "install",
+  "driver",
+  "cutscene",
+  "movies",
+  "graphics",
+  "display",
+];
+
+const LORE_QUERY_TERMS = [
+  "bastila",
+  "revan",
+  "malak",
+  "kreia",
+  "exile",
+  "canderous",
+  "hk-47",
+  "rakata",
+  "star",
+  "forge",
+  "temple",
+  "summit",
+  "companion",
+  "romance",
+  "story",
+  "lore",
+];
+
+const normalizeToken = (token: string): string => {
+  const lowered = token.toLowerCase();
+  if (lowered.length <= 6) return lowered;
+  return lowered.slice(0, 6);
+};
+
 const tokenize = (value: string): string[] => {
-  return value
-    .toLowerCase()
-    .split(/[^a-z0-9.+-]+/)
-    .filter(Boolean);
+  return [...new Set(
+    value
+      .toLowerCase()
+      .split(/[^a-z0-9.+-]+/)
+      .filter((token) => token.length >= 4 && !RETRIEVAL_STOPWORDS.has(token))
+      .map(normalizeToken),
+  )];
+};
+
+const queryIncludesAny = (query: string, terms: readonly string[]): boolean => {
+  const lowered = query.toLowerCase();
+  return terms.some((term) => lowered.includes(term));
+};
+
+const classifyQueryIntent = (query: string): RetrievalQueryIntent => {
+  if (queryIncludesAny(query, TOOLING_QUERY_TERMS)) return "tooling";
+  if (queryIncludesAny(query, TECHNICAL_QUERY_TERMS)) return "technical";
+  if (queryIncludesAny(query, LORE_QUERY_TERMS)) return "lore";
+  return "general";
+};
+
+const intentScoreDelta = (intent: RetrievalQueryIntent, tags: readonly string[]): number => {
+  const tagSet = new Set(tags.map((tag) => tag.toLowerCase()));
+  const hasLore = ["lore", "story", "characters", "companions", "quests", "walkthrough", "gameplay"].some((tag) => tagSet.has(tag));
+  const hasTooling = ["tooling", "formats", "reference", "automation", "python", "engine", "conversion", "assets", "textures", "mods", "forum", "support", "fixes", "troubleshooting", "compatibility"].some((tag) => tagSet.has(tag));
+
+  if (intent === "tooling" || intent === "technical") {
+    if (hasLore && !hasTooling) return -12;
+    if (hasTooling) return 6;
+  }
+  if (intent === "lore") {
+    if (hasLore) return 6;
+    if (hasTooling && !hasLore) return -4;
+  }
+  return 0;
 };
 
 export const defaultSourceCatalog: readonly SourceDescriptor[] = [
@@ -475,6 +604,7 @@ export class StaticCatalogSearchProvider implements SearchProvider {
 
   public async search(query: string, limit = 5): Promise<readonly SearchHit[]> {
     const tokens = tokenize(query);
+    const intent = classifyQueryIntent(query);
 
     if (tokens.length === 0) {
       return [];
@@ -505,6 +635,8 @@ export class StaticCatalogSearchProvider implements SearchProvider {
             score += 1;
           }
         }
+
+        score += intentScoreDelta(intent, source.tags);
 
         const hit: SearchHit = {
           sourceId: source.id,
@@ -576,6 +708,69 @@ export interface SourceIndexRecord {
   lastFetchedAt: number;
   tags: readonly string[];
 }
+
+const BUILT_IN_REFERENCE_CHUNKS: readonly ChunkRecord[] = [
+  {
+    id: "technical-reference-tslpatcher",
+    sourceId: "trask-technical-reference",
+    sourceName: "Trask Technical Reference",
+    kind: "website",
+    url: "local://technical-reference/tslpatcher",
+    title: "TSLPatcher — KOTOR mod installer",
+    chunkText: "TSLPatcher is the standard KotOR and TSL mod installer. Mod authors use it to patch 2DA, GFF, TLK, NSS, and related game data in place so a mod can merge changes into an existing installation instead of overwriting whole files.",
+    fetchedAt: 0,
+    chunkIndex: 0,
+    tags: ["tooling", "modding", "tslpatcher", "installer", "2da", "gff", "tlk"],
+  },
+  {
+    id: "technical-reference-mdlops",
+    sourceId: "trask-technical-reference",
+    sourceName: "Trask Technical Reference",
+    kind: "website",
+    url: "local://technical-reference/mdlops",
+    title: "MDLOps — KOTOR model conversion tool",
+    chunkText: "MDLOps is a KotOR model conversion utility used to inspect, decompile, and rebuild MDL and MDX models. Modders use it in the asset pipeline when converting Odyssey engine models between editable formats and game-ready binaries.",
+    fetchedAt: 0,
+    chunkIndex: 1,
+    tags: ["tooling", "mdlops", "models", "conversion", "mdx", "mdl", "odyssey"],
+  },
+  {
+    id: "technical-reference-widescreen",
+    sourceId: "trask-technical-reference",
+    sourceName: "Trask Technical Reference",
+    kind: "website",
+    url: "local://technical-reference/widescreen",
+    title: "KOTOR widescreen troubleshooting on PC",
+    chunkText: "KOTOR widescreen troubleshooting usually involves matching the game resolution, HUD and menu fixes, and graphics settings. Common checks are the target resolution in the game configuration, widescreen UI patches, and verifying that movies and the HUD are using assets that match the chosen aspect ratio.",
+    fetchedAt: 0,
+    chunkIndex: 2,
+    tags: ["technical", "widescreen", "resolution", "hud", "graphics", "pc", "troubleshooting"],
+  },
+  {
+    id: "technical-reference-save-files",
+    sourceId: "trask-technical-reference",
+    sourceName: "Trask Technical Reference",
+    kind: "website",
+    url: "local://technical-reference/save-files-windows",
+    title: "KOTOR save files on Windows",
+    chunkText: "On Windows, Knights of the Old Republic save files are typically stored under the game installation directory in the saves folder, or under the user's game data area depending on the distribution. Troubleshooting usually starts by checking the installation path used by Steam, GOG, or the retail release and then opening the saves directory inside that install.",
+    fetchedAt: 0,
+    chunkIndex: 3,
+    tags: ["technical", "save", "windows", "paths", "troubleshooting", "pc"],
+  },
+  {
+    id: "technical-reference-reone",
+    sourceId: "trask-technical-reference",
+    sourceName: "Trask Technical Reference",
+    kind: "website",
+    url: "local://technical-reference/reone",
+    title: "reone — Odyssey engine reimplementation",
+    chunkText: "reone is an open-source reimplementation of the Odyssey engine used by KotOR. It provides engine-level code and runtime work for loading game assets, reproducing Odyssey behavior, and experimenting with modern tooling around the original game formats.",
+    fetchedAt: 0,
+    chunkIndex: 4,
+    tags: ["tooling", "engine", "reone", "odyssey", "runtime", "open-source"],
+  },
+];
 
 type SerializableValue = object | string | number | boolean | null;
 
@@ -751,14 +946,16 @@ export class ChunkSearchProvider implements SearchProvider {
 
   public async search(query: string, limit = 5): Promise<readonly SearchHit[]> {
     const tokens = tokenize(query);
+    const intent = classifyQueryIntent(query);
     if (tokens.length === 0) return [];
 
     const [catalogHits, allChunks] = await Promise.all([
       this.catalog.search(query, limit),
       this.chunkStore.loadAllChunks(),
     ]);
+    const searchableChunks = [...BUILT_IN_REFERENCE_CHUNKS, ...allChunks];
 
-    const chunkHits: SearchHit[] = allChunks
+    const chunkHits: SearchHit[] = searchableChunks
       .map((chunk) => {
         const textTokens = tokenize(chunk.chunkText);
         const titleTokens = tokenize(chunk.title);
@@ -770,6 +967,7 @@ export class ChunkSearchProvider implements SearchProvider {
           score += tagTokens.filter((t) => t === token).length * 3;
           score += textTokens.filter((t) => t === token).length;
         }
+        score += intentScoreDelta(intent, chunk.tags);
 
         return {
           sourceId: chunk.sourceId,

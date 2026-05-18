@@ -35,7 +35,7 @@ const makeSearchProvider = (): SearchProvider => ({
         sourceName: "Approved Discord Knowledge",
         kind: "discord",
         title: "asset-transfer thread",
-        snippet: "Use TPC textures when converting from TGA for this workflow.",
+        snippet: "Use MDLOps for model conversion, and convert TGA textures to TPC for this workflow.",
         url: "discord://approved-channels/123/900-950",
         score: 10,
         tags: ["discord", "qa"],
@@ -56,7 +56,7 @@ test("answerQuestion falls back to local knowledge when research fetch fails", a
 
   const response = await client.answerQuestion("How do I fix texture conversion?");
   assert.equal(response.approvedSources.length, 1);
-  assert.match(response.answer, /local knowledge/i);
+  assert.match(response.answer, /indexed KOTOR archive material/i);
   assert.match(response.answer, /discord:\/\/approved-channels/);
 });
 
@@ -65,11 +65,11 @@ test("answerQuestion merges local knowledge sources into final source list", asy
 
   (client as unknown as { fetchResearchReport: () => Promise<{ report: string; payload: { report: string } }> }).fetchResearchReport
     = async () => ({
-      report: "Use MDLOps for model conversion steps.",
-      payload: { report: "Use MDLOps for model conversion steps." },
+      report: "Convert TGA textures to TPC for this workflow.",
+      payload: { report: "Convert TGA textures to TPC for this workflow." },
     });
 
-  const response = await client.answerQuestion("Which tools convert models?");
+  const response = await client.answerQuestion("How do I convert TGA textures to TPC?");
   assert.ok(response.approvedSources.some((source) => source.homeUrl.startsWith("discord://approved-channels/")));
   assert.match(response.answer, /Sources/i);
 });

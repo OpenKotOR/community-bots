@@ -16,6 +16,7 @@ export interface Message {
   content: string
   expandedContent?: string
   sources?: Source[]
+  relatedSources?: Source[]
   timestamp: number
   isExpanded?: boolean
   agentResults?: AgentResult[]
@@ -74,11 +75,14 @@ export interface ScrapedContent {
 }
 
 export const DEFAULT_SOURCE_WEIGHTS: SourceWeight[] = [
-  { name: 'Lucas Forums Archive', url: 'https://lucasforumsarchive.org', weight: 1.0, enabled: true },
+  { name: 'LucasForums Archive', url: 'https://lucasforumsarchive.org', weight: 1.0, enabled: true },
   { name: 'Deadly Stream', url: 'https://deadlystream.com', weight: 1.0, enabled: true },
-  { name: 'GitHub KOTOR Projects', url: 'https://github.com', weight: 1.2, enabled: true },
   { name: 'KOTOR Neocities', url: 'https://kotor.neocities.org', weight: 1.0, enabled: true },
-  { name: 'PCGamingWiki', url: 'https://www.pcgamingwiki.com', weight: 1.0, enabled: true }
+  { name: 'PyKotor Wiki', url: 'https://github.com/NickHugi/PyKotor/wiki', weight: 1.0, enabled: true },
+  { name: 'GitHub KOTOR Projects', url: 'https://github.com', weight: 1.15, enabled: true },
+  { name: 'Wikipedia — Star Wars KOTOR', url: 'https://en.wikipedia.org/wiki/Star_Wars:_Knights_of_the_Old_Republic', weight: 0.8, enabled: true },
+  { name: 'StrategyWiki KOTOR', url: 'https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic', weight: 0.8, enabled: true },
+  { name: 'PCGamingWiki (reference only)', url: 'https://www.pcgamingwiki.com', weight: 0.75, enabled: false }
 ]
 
 export function mergeSourceWeights(weights: SourceWeight[] | null | undefined): SourceWeight[] {

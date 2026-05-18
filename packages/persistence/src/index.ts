@@ -2014,7 +2014,12 @@ export interface TraskQueryRecord {
   query: string;
   status: "pending" | "complete" | "failed";
   answer: string | null;
+  /** Sources explicitly cited in the final answer. */
   sources: readonly TraskSourceRecord[];
+  /** Sources retrieved as candidate evidence but not necessarily cited. */
+  retrievedSources?: readonly TraskSourceRecord[];
+  /** Raw allowlisted URLs visited while gathering evidence. */
+  visitedUrls?: readonly string[];
   error: string | null;
   createdAt: string;
   completedAt: string | null;
@@ -2042,6 +2047,8 @@ const cloneTraskLiveEvent = (ev: TraskQueryLiveEvent): TraskQueryLiveEvent => ({
 const cloneTraskQueryRecord = (record: TraskQueryRecord): TraskQueryRecord => ({
   ...record,
   sources: record.sources.map(cloneTraskSource),
+  ...(record.retrievedSources ? { retrievedSources: record.retrievedSources.map(cloneTraskSource) } : {}),
+  ...(record.visitedUrls ? { visitedUrls: [...record.visitedUrls] } : {}),
   ...(record.liveTrace ? { liveTrace: record.liveTrace.map(cloneTraskLiveEvent) } : {}),
 });
 

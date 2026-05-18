@@ -10,7 +10,7 @@
         "lint": "eslint .",
         "optimize": "vite optimize",
         "preview": "vite preview",
-        "test:e2e": "pnpm run build && pnpm exec playwright test --config playwright.config.ts"
+        "test:e2e": "node ../../scripts/holocron-e2e-live-build.mjs && pnpm exec playwright test --config playwright.config.ts"
     },
     "dependencies": {
         "@github/spark": ">=0.43.1 <1",

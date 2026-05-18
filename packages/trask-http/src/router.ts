@@ -169,6 +169,10 @@ const readOptionalHttpStatus = (e: AuthHandlerThrown): number | undefined => {
 const mapTraskQueryRecord = (record: TraskQueryRecord): TraskQueryRecord => ({
   ...record,
   sources: record.sources.map((source) => ({ ...source })),
+  ...(record.retrievedSources
+    ? { retrievedSources: record.retrievedSources.map((source) => ({ ...source })) }
+    : {}),
+  ...(record.visitedUrls ? { visitedUrls: [...record.visitedUrls] } : {}),
   ...(record.liveTrace
     ? {
         liveTrace: record.liveTrace.map((ev) => ({
@@ -665,6 +669,12 @@ export const createTraskHttpRouter = <TUser extends TraskHttpUser = TraskHttpUse
               name: source.name,
               url: source.homeUrl,
             })),
+            retrievedSources: result.retrievedSources.map((source) => ({
+              id: source.id,
+              name: source.name,
+              url: source.homeUrl,
+            })),
+            visitedUrls: [...result.visitedUrls],
             error: null,
             createdAt,
             completedAt: new Date().toISOString(),
@@ -705,6 +715,8 @@ export const createTraskHttpRouter = <TUser extends TraskHttpUser = TraskHttpUse
         status: "pending",
         answer: null,
         sources: [],
+        retrievedSources: [],
+        visitedUrls: [],
         error: null,
         createdAt,
         completedAt: null,
@@ -747,6 +759,12 @@ export const createTraskHttpRouter = <TUser extends TraskHttpUser = TraskHttpUse
               name: source.name,
               url: source.homeUrl,
             })),
+            retrievedSources: result.retrievedSources.map((source) => ({
+              id: source.id,
+              name: source.name,
+              url: source.homeUrl,
+            })),
+            visitedUrls: [...result.visitedUrls],
             error: null,
             completedAt: new Date().toISOString(),
           };

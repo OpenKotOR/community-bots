@@ -32,8 +32,12 @@ Ask a KOTOR question and get a source-backed answer.
 - Runs the vendored **headless ai-researchwizard** (`vendor/ai-researchwizard/trask_headless_research.py`) — same core
   engine as `cli.py`, **not** the FastAPI/Web UI server.
 - Restricts research to Trask's approved source list.
+- Treats `TRASK_FAST_QA=1` as an explicit low-latency override; the default path now prefers the higher-quality
+  evidence-first flow and only uses fast/local synthesis when grounded support survives relevance checks.
 - Returns a short Discord-friendly answer with inline numeric citations and a compact `Sources`
   bibliography section.
+- If `OPENAI_API_KEY` / `OPENROUTER_API_KEY` are unset, the runtime degrades to deterministic formatting
+  plus grounded local technical references or an explicit abstention instead of hard-failing.
 - Does not explain retrieval internals unless the user explicitly asks.
 
 **Example:**
@@ -101,6 +105,11 @@ Trask's answer generation is pinned to these approved sources by default:
 
 Live research is constrained to the approved base hosts `lucasforumsarchive.org`, `deadlystream.com`, `github.com`, `kotor.neocities.org`, and `pcgamingwiki.com`. GitHub crawling is further narrowed to the approved KotOR project roots in this catalog. The headless bridge passes both `query_domains` and `allowed_url_prefixes`, rejects direct or discovered URLs outside that allowlist before scraping, and reports accepted/rejected URL lists in `research_information` for audit.
 
+When approved web research does not produce grounded passages, Holocron/Trask may cite the repo-local
+`local://technical-reference/...` corpus for well-known technical questions such as `TSLPatcher`,
+`MDLOps`, save-file paths, widescreen troubleshooting, and `reone`. Those local citations are deliberate
+grounded evidence, not heuristic URL-name summaries.
+
 ## Admin Setup
 
 The following environment variables control Trask's scope:
@@ -163,18 +172,30 @@ spawns `trask_headless_research.py`.
 
 pnpm wrappers (repo root): **`pnpm smoke:trask-gptr-dry`** and **`pnpm smoke:trask-gptr`**.
 
-### Holocron browser E2E (Playwright)
+### Holocron functional E2E (Playwright — no API mocks)
 
-End-to-end UI checks run against **built** `apps/holocron-web` served by **`trask-http-server`** on **4010**
-(the same integrated layout as production Holocron behind the API).
+Tests live in `apps/holocron-web/e2e/holocron-research.spec.ts`. Playwright builds the workspace,
+starts **`trask-http-server`** (Holocron `dist` + `/api/trask` on **4010**), and runs five real research
+queries in Chromium (202 → thread poll → answer + grounded **Sources** / citation badges).
 
 ```bash
-pnpm exec playwright install chromium   # once per machine (repo root)
+pnpm exec playwright install chromium --with-deps   # once per machine (repo root)
 pnpm holocron:e2e
 ```
 
-This exercises the composer, relevance gating, and at least one full **`/api/trask/ask`** round-trip
-(answer with **Sources**, or **Research service error** if Python ai-researchwizard keys are missing).
+Requires `.env` (or `vendor/ai-researchwizard/.env`) only when you want live web synthesis / rewrite.
+Without LLM keys, the verifier should still produce grounded local-reference answers or explicit abstentions
+instead of crashing. Set `HOLOCRON_REUSE_SERVER=1` if the server is already listening on 4010.
+
+CLI debug gate:
+
+```bash
+pnpm verify:trask-cli
+```
+
+That script mirrors the same canonical five technical queries as Holocron e2e and accepts either approved
+web citations or repo-local `local://technical-reference/...` citations when those are the grounded sources
+actually returned by the runtime.
 
 ### Discord bot slash commands (REST smoke)
 
@@ -229,7 +250,9 @@ may not bind** the option—rather than pasting a full pseudo-command string.
 ## Current Limitations
 
 - Trask depends on a working **Python + ai-researchwizard** install under `TRASK_GPT_RESEARCHER_ROOT` (API keys such as
-  `OPENAI_API_KEY` / retriever keys live in `.env` loaded by the headless script).
+  `OPENAI_API_KEY` / retriever keys live in `.env` loaded by the headless script). Missing LLM keys should
+  no longer hard-fail requests, but they do reduce the runtime to deterministic local-reference answers or
+  explicit abstentions when no grounded web synthesis is available.
 - The vendored backend defaults to a report-oriented workflow, so prompt and formatting controls
   still need refinement to keep replies concise under Discord limits.
 - Ingest queue processing is still a separate operator workflow. `/queue-reindex` enqueues work,
@@ -379,7 +402,8 @@ After ai-researchwizard returns a report, Trask optionally calls an **OpenAI-com
 | `OPENROUTER_HTTP_REFERER` / `OPENROUTER_APP_TITLE` | OpenRouter suggested headers |
 | `TRASK_REWRITE_MODEL_FALLBACKS` | Comma-separated fallback model ids if the primary rewrite fails |
 
-If no key is configured, Trask uses a deterministic formatter (`fallbackDiscordRewrite`).
+If no key is configured, Trask uses a deterministic formatter (`fallbackDiscordRewrite`) and relies on
+grounded local/web evidence or an explicit abstention; missing keys should not hard-fail the request path.
 
 ## Shared packages
 
@@ -396,5 +420,5 @@ Uses `JsonTraskQueryRepository` from `@openkotor/persistence`.
 
 ## Next Phase
 
-- Tighten the adapter contract with ai-researchwizard for structured citations instead of formatting plain report text.
+- Replace remaining source-description-only technical reference entries with richer indexed passages from approved docs/forums.
 - Feature flag to hide the PazaakWorld **Ask Trask** entry when the API returns 503 at startup.

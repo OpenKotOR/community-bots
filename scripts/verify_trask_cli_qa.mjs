@@ -26,15 +26,35 @@ import { createResearchWizardClient, splitResearchAnswer } from "../packages/tra
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 const DEFAULT_QUERIES = [
-  "What is TSLPatcher used for in KOTOR modding?",
-  "Who is Bastila Shan in Knights of the Old Republic?",
-  "What does MDLOps do in the KotOR toolchain?",
-  "How do I troubleshoot KOTOR widescreen resolution on PC?",
-  "What does the reone project provide for Odyssey engine work?",
+  {
+    question: "What is TSLPatcher used for in KOTOR modding?",
+    expectPattern: /TSLPatcher|2DA|GFF|TLK|patch/i,
+    sourcePattern: /tslpatcher|technical reference|deadlystream|lucasforums|kotor\.neocities|github/i,
+  },
+  {
+    question: "What does MDLOps do in the KotOR toolchain?",
+    expectPattern: /MDLOps|MDL|model|conversion/i,
+    sourcePattern: /mdlops|technical reference|mdledit|kotormax|kotorblender|github|kotor\.neocities/i,
+  },
+  {
+    question: "How do I troubleshoot KOTOR widescreen resolution on PC?",
+    expectPattern: /widescreen|resolution|HUD|aspect|graphics/i,
+    sourcePattern: /widescreen|resolution|technical reference|deadlystream|pcgamingwiki|lucasforums|kotor\.neocities/i,
+  },
+  {
+    question: "Where are Knights of the Old Republic save files stored on Windows?",
+    expectPattern: /save|Saves|Windows|profile|KOTOR/i,
+    sourcePattern: /save|windows|technical reference|deadlystream|pcgamingwiki|lucasforums|kotor\.neocities/i,
+  },
+  {
+    question: "What does the reone project provide for Odyssey engine work?",
+    expectPattern: /reone|Odyssey|engine|open.?source/i,
+    sourcePattern: /reone|technical reference|github|xoreos|engine/i,
+  },
 ];
 
 const DEGRADED_RE = /could not complete live archive synthesis/i;
-const SOURCE_LINE_RE = /https?:\/\/[^\s)]+/i;
+const SOURCE_LINE_RE = /[a-z][a-z0-9+.-]*:\/\/[^\s)]+/i;
 
 const loadEnvFiles = () => {
   for (const rel of [".env", ".env.local", "vendor/ai-researchwizard/.env"]) {
@@ -67,19 +87,39 @@ const argValue = (name, fallback) => {
   return hit ? hit.slice(prefix.length) : fallback;
 };
 
+const expectationForQuery = (query) => DEFAULT_QUERIES.find((entry) => entry.question === query) ?? null;
+
 const scoreAnswer = (query, answer, approvedSources) => {
   const { body, sourceLines } = splitResearchAnswer(answer);
-  const urlsInAnswer = [...answer.matchAll(/https?:\/\/[^\s)]+/g)].map((m) => m[0]);
+  const urlsInAnswer = [...answer.matchAll(/[a-z][a-z0-9+.-]*:\/\/[^\s)]+/gi)].map((m) => m[0]);
   const hasSourcesHeading = /\nSources\s*\n/i.test(answer);
   const hasInlineCitation = /\[\d+\]/.test(body);
   const hasSourceUrls = sourceLines.some((line) => SOURCE_LINE_RE.test(line)) || urlsInAnswer.length > 0;
   const degraded = DEGRADED_RE.test(answer);
   const substantive = body.replace(/\s+/g, " ").trim().length >= 40;
+  const expectation = expectationForQuery(query);
+  const sourceText = `${sourceLines.join(" ")} ${approvedSources.map((source) => `${source.name} ${source.homeUrl}`).join(" ")}`;
+  const topicMatch = expectation ? expectation.expectPattern.test(body) : true;
+  const sourceMatch = expectation ? expectation.sourcePattern.test(sourceText) : approvedSources.length > 0;
 
   let grade = "FAIL";
-  if (substantive && hasSourceUrls && approvedSources.length > 0 && hasInlineCitation && !degraded) {
+  if (
+    substantive
+    && hasSourceUrls
+    && approvedSources.length > 0
+    && hasInlineCitation
+    && !degraded
+    && topicMatch
+    && sourceMatch
+  ) {
     grade = "RICH";
-  } else if (substantive && (hasSourceUrls || approvedSources.length > 0) && !/^i could not complete live archive synthesis for this question right now\.?$/iu.test(answer.trim())) {
+  } else if (
+    substantive
+    && approvedSources.length > 0
+    && !/^i could not complete live archive synthesis for this question right now\.?$/iu.test(answer.trim())
+    && topicMatch
+    && sourceMatch
+  ) {
     grade = degraded ? "DEGRADED" : "PASS";
   }
 
@@ -92,6 +132,8 @@ const scoreAnswer = (query, answer, approvedSources) => {
     hasInlineCitation,
     hasSourceUrls,
     degraded,
+    topicMatch,
+    sourceMatch,
     query,
   };
 };
@@ -102,7 +144,7 @@ const main = async () => {
   const queryArg = argValue("queries", "");
   const queries = queryArg
     ? queryArg.split("|").map((q) => q.trim()).filter(Boolean)
-    : DEFAULT_QUERIES;
+    : DEFAULT_QUERIES.map((entry) => entry.question);
 
   const ingestDir = process.env.INGEST_STATE_DIR?.trim() || resolve(repoRoot, "data/ingest-worker");
   const rwConfig = loadResearchWizardRuntimeConfig();
@@ -123,7 +165,7 @@ const main = async () => {
     console.log(`[${i + 1}/${queries.length}] ${query}`);
     const started = Date.now();
     try {
-      const { answer, approvedSources } = await client.answerQuestion(query, (ev) => {
+      const { answer, approvedSources, retrievedSources } = await client.answerQuestion(query, (ev) => {
         if (ev.detail) {
           process.stdout.write(`   · ${ev.phase}: ${ev.detail}\n`);
         }
@@ -141,6 +183,14 @@ const main = async () => {
       if (approvedSources.length > 0) {
         const sample = approvedSources.slice(0, 3).map((s) => s.homeUrl).join(", ");
         console.log(`   sources (${approvedSources.length}): ${sample}${approvedSources.length > 3 ? ", …" : ""}`);
+      }
+      if (retrievedSources.length > approvedSources.length) {
+        console.log(`   retrieved (${retrievedSources.length}) candidate source(s)`);
+      }
+      if (!scored.topicMatch || !scored.sourceMatch) {
+        console.log(
+          `   quality flags: topicMatch=${scored.topicMatch} sourceMatch=${scored.sourceMatch}`,
+        );
       }
     } catch (error) {
       const elapsed = ((Date.now() - started) / 1000).toFixed(1);
@@ -173,15 +223,15 @@ const main = async () => {
     `Results: ${counts.RICH} RICH  ${counts.PASS} PASS  ${counts.DEGRADED} DEGRADED  ${counts.FAIL} FAIL`,
   );
 
-  const minRich = Number.parseInt(argValue("min-rich", String(Math.min(3, queries.length))), 10);
-  const ok = counts.FAIL === 0 && counts.RICH >= minRich;
+  const minRich = Number.parseInt(argValue("min-rich", "0"), 10);
+  const ok = counts.FAIL === 0 && counts.DEGRADED === 0 && counts.RICH + counts.PASS === queries.length && counts.RICH >= minRich;
 
   if (ok) {
     console.log("\n✅  Trask CLI Q&A verification passed.\n");
     process.exit(0);
   }
 
-  console.log(`\n❌  Expected at least ${minRich} RICH and zero FAIL.\n`);
+  console.log(`\n❌  Expected all queries to finish as PASS/RICH with zero FAIL/DEGRADED and at least ${minRich} RICH.\n`);
   process.exit(1);
 };
 

@@ -68,7 +68,7 @@ interface AnswerPresentation {
 
 const SOURCE_HEADING_PATTERN = /^\s*sources\s*:?\s*$/i
 const CITATION_PATTERN = /\[(\d{1,3})\]/g
-const URL_PATTERN = /https?:\/\/[^\s)\]]+/g
+const URL_PATTERN = /[a-z][a-z0-9+.-]*:\/\/[^\s)\]]+/gi
 
 function cleanUrl(raw: string): string {
   return raw.trim().replace(/[.,;:]+$/g, '')
@@ -182,28 +182,37 @@ function buildAnswerPresentation(content: string, explicitSources: Source[] = []
     merged.push(source)
   }
 
+  parsedSources.forEach((source) => {
+    addSource(source)
+  })
+
   explicitSources.forEach((source, idx) => {
-    addSource({
+    const candidate: DisplaySource = {
       ...source,
       index: idx + 1,
       url: cleanUrl(source.url),
       hostname: source.url ? sourceHostname(source.url) : '',
-    })
-  })
+    }
+    const explicitKey = sourceKey(candidate)
+    const existingByKey = sourceByKey.get(explicitKey)
+    const existingByIndex = merged.findIndex((existing) => existing.index === candidate.index)
+    const existingIndex = existingByKey ?? (existingByIndex >= 0 ? existingByIndex : undefined)
 
-  parsedSources.forEach((source) => {
-    const sameIndex = merged.findIndex((existing) => existing.index === source.index)
-    if (sameIndex >= 0) {
-      const existing = merged[sameIndex]
-      merged[sameIndex] = {
+    if (existingIndex !== undefined) {
+      const existing = merged[existingIndex]
+      if (!existing) return
+      merged[existingIndex] = {
         ...existing,
-        name: existing.name || source.name,
-        url: existing.url || source.url,
-        hostname: existing.hostname || source.hostname,
+        name: existing.name || candidate.name,
+        url: existing.url || candidate.url,
+        hostname: existing.hostname || candidate.hostname,
       }
       return
     }
-    addSource(source)
+
+    if (parsedSources.length === 0) {
+      addSource(candidate)
+    }
   })
 
   const sources = merged.map((source, idx) => ({
@@ -247,6 +256,10 @@ function MessageView({ message, onToggleExpand }: MessageProps) {
     () => buildAnswerPresentation(visibleContent, message.sources ?? []),
     [message.sources, visibleContent],
   )
+  const relatedSources = useMemo(() => {
+    const citedKeys = new Set(answerPresentation.sources.map((source) => sourceKey(source)))
+    return (message.relatedSources ?? []).filter((source) => !citedKeys.has(sourceKey(source)))
+  }, [answerPresentation.sources, message.relatedSources])
   const fallbackVisibleText = answerPresentation.isSourceOnly
     ? 'Trask returned source references, but no visible answer text. Review the sources below or try asking a narrower question.'
     : message.researchStatus === 'pending'
@@ -292,7 +305,8 @@ function MessageView({ message, onToggleExpand }: MessageProps) {
       messageTimestamp: new Date(message.timestamp).toISOString(),
       answer: message.content.trim() || fallbackVisibleText,
       expandedAnswer: message.expandedContent?.trim() || undefined,
-      sources: message.sources || [],
+      sources: answerPresentation.sources,
+      relatedSources,
       agentResults: message.agentResults.map(agent => ({
         agentName: agent.agentName,
         source: agent.source,
@@ -523,71 +537,111 @@ function MessageView({ message, onToggleExpand }: MessageProps) {
   }
 
   const renderAttachedSources = () => {
-    if (isUser || answerPresentation.sources.length === 0) {
+    if (isUser || (answerPresentation.sources.length === 0 && relatedSources.length === 0)) {
       return null
     }
 
     return (
       <div className="mt-5 border-t border-border/50 pt-4" aria-label="Sources">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            <LinkIcon size={14} weight="bold" className="text-primary" />
-            Sources
-          </div>
-          <Badge variant="secondary" className="h-5 px-2 text-[10px]">
-            {answerPresentation.sources.length}
-          </Badge>
-        </div>
+        {answerPresentation.sources.length > 0 && (
+          <>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <LinkIcon size={14} weight="bold" className="text-primary" />
+                Sources
+              </div>
+              <Badge variant="secondary" className="h-5 px-2 text-[10px]">
+                {answerPresentation.sources.length}
+              </Badge>
+            </div>
 
-        <div className="grid gap-2 sm:grid-cols-2" role="list">
-          {answerPresentation.sources.map((source) => {
-            const sourceContent = (
-              <>
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-primary/25 bg-primary/10 text-xs font-bold text-primary">
-                  {source.index}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-foreground/90">
-                    {source.name}
-                  </span>
-                  {source.hostname && (
-                    <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
-                      {source.hostname}
+            <div className="grid gap-2 sm:grid-cols-2" role="list">
+              {answerPresentation.sources.map((source) => {
+                const sourceContent = (
+                  <>
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-primary/25 bg-primary/10 text-xs font-bold text-primary">
+                      {source.index}
                     </span>
-                  )}
-                </span>
-                <LinkIcon size={14} weight="bold" className="shrink-0 text-muted-foreground transition-colors group-hover/source:text-accent" />
-              </>
-            )
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium text-foreground/90">
+                        {source.name}
+                      </span>
+                      {source.hostname && (
+                        <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
+                          {source.hostname}
+                        </span>
+                      )}
+                    </span>
+                    <LinkIcon size={14} weight="bold" className="shrink-0 text-muted-foreground transition-colors group-hover/source:text-accent" />
+                  </>
+                )
 
-            if (!source.url) {
-              return (
-                <div
-                  key={`${source.index}:${source.name}`}
-                  className="flex min-w-0 items-center gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5"
+                if (!source.url) {
+                  return (
+                    <div
+                      key={`${source.index}:${source.name}`}
+                      className="flex min-w-0 items-center gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5"
+                      role="listitem"
+                    >
+                      {sourceContent}
+                    </div>
+                  )
+                }
+
+                return (
+                  <a
+                    key={`${source.index}:${source.url}`}
+                    href={source.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(event) => event.stopPropagation()}
+                    className="group/source flex min-w-0 items-center gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5 hover:border-primary/45 hover:bg-primary/10 transition-colors"
+                    role="listitem"
+                    title={source.url}
+                  >
+                    {sourceContent}
+                  </a>
+                )
+              })}
+            </div>
+          </>
+        )}
+
+        {relatedSources.length > 0 && (
+          <div className={answerPresentation.sources.length > 0 ? 'mt-4' : ''}>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <Database size={14} weight="bold" className="text-current" />
+                Retrieved archives
+              </div>
+              <Badge variant="outline" className="h-5 px-2 text-[10px]">
+                {relatedSources.length}
+              </Badge>
+            </div>
+
+            <div className="flex flex-wrap gap-2" role="list">
+              {relatedSources.map((source, idx) => (
+                <a
+                  key={`${source.url}-${idx}`}
+                  href={source.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(event) => event.stopPropagation()}
+                  className="inline-flex items-center gap-1"
                   role="listitem"
                 >
-                  {sourceContent}
-                </div>
-              )
-            }
-
-            return (
-              <a
-                key={`${source.index}:${source.url}`}
-                href={source.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(event) => event.stopPropagation()}
-                className="group/source flex min-w-0 items-center gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5 hover:border-primary/45 hover:bg-primary/10 transition-colors"
-                role="listitem"
-                title={source.url}
-              >
-                {sourceContent}
-              </a>
-            )
-          })}
-        </div>
+                  <Badge
+                    variant="outline"
+                    className="text-xs border-border/60 text-muted-foreground hover:bg-muted/40 transition-colors"
+                  >
+                    <LinkIcon size={12} className="mr-1" />
+                    {source.name}
+                  </Badge>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     )
   }
@@ -691,7 +745,7 @@ function MessageView({ message, onToggleExpand }: MessageProps) {
               </div>
             )}
 
-            {!isUser && message.sources && message.sources.length > 0 && (
+            {!isUser && answerPresentation.sources.length > 0 && (
               <AnimatePresence>
                 {message.isExpanded && (
                   <motion.div
@@ -702,7 +756,7 @@ function MessageView({ message, onToggleExpand }: MessageProps) {
                   >
                     <p className="text-xs text-muted-foreground mb-2 font-medium">Sources:</p>
                     <div className="flex flex-wrap gap-2" role="list">
-                      {message.sources.map((source, idx) => (
+                      {answerPresentation.sources.map((source, idx) => (
                         <a
                           key={idx}
                           href={source.url}
@@ -722,6 +776,32 @@ function MessageView({ message, onToggleExpand }: MessageProps) {
                         </a>
                       ))}
                     </div>
+                    {relatedSources.length > 0 && (
+                      <div className="mt-3">
+                        <p className="text-xs text-muted-foreground mb-2 font-medium">Retrieved archives:</p>
+                        <div className="flex flex-wrap gap-2" role="list">
+                          {relatedSources.map((source, idx) => (
+                            <a
+                              key={`${source.url}-${idx}`}
+                              href={source.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1"
+                              onClick={(e) => e.stopPropagation()}
+                              role="listitem"
+                            >
+                              <Badge
+                                variant="outline"
+                                className="text-xs border-border/60 text-muted-foreground hover:bg-muted/40 transition-colors"
+                              >
+                                <LinkIcon size={12} className="mr-1" />
+                                {source.name}
+                              </Badge>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>

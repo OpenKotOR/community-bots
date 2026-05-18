@@ -223,6 +223,12 @@ export const registerTraskProactiveHandlers = (
             name: source.name,
             url: source.homeUrl,
           })),
+          retrievedSources: brief.retrievedSources.map((source) => ({
+            id: source.id,
+            name: source.name,
+            url: source.homeUrl,
+          })),
+          visitedUrls: [...brief.visitedUrls],
           error: null,
           createdAt,
           completedAt: createdAt,

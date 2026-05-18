@@ -49,5 +49,7 @@ jobs:
       - name: Install Playwright (Chromium)
         run: pnpm exec playwright install chromium --with-deps
 
-      - name: Holocron web e2e (research polling + UI)
+      - name: Holocron functional e2e (live Trask research in browser)
         run: pnpm holocron:e2e
+        env:
+          TRASK_WEB_ALLOW_ANONYMOUS: "1"

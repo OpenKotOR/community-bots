@@ -408,6 +408,12 @@ const handleAskCommand = async (interaction: ChatInputCommandInteraction): Promi
         name: source.name,
         url: source.homeUrl,
       })),
+      retrievedSources: result.retrievedSources.map((source) => ({
+        id: source.id,
+        name: source.name,
+        url: source.homeUrl,
+      })),
+      visitedUrls: [...result.visitedUrls],
       error: null,
       createdAt,
       completedAt,

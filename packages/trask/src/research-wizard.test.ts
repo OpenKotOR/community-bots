@@ -4,6 +4,10 @@ import assert from "node:assert/strict";
 import {
   _normalizeUrl,
   _extractUrls,
+  _collectCitedSources,
+  _collectCitedSourcesFromText,
+  _collectRetrievedSources,
+  _collectVisitedUrlsFromPayload,
   _hostnameHint,
   _uniqueUrlsPreserveOrder,
   _isSynthesisFailureText,
@@ -11,6 +15,8 @@ import {
   _formatSourcesSection,
   _normalizePreferredRewriteModel,
   _matchApprovedSource,
+  _classifyQueryIntent,
+  _routeSourcesForQuery,
 } from "./research-wizard.js";
 import type { SourceDescriptor } from "../../retrieval/src/index.js";
 
@@ -256,4 +262,75 @@ test("_matchApprovedSource does not match a sibling domain", () => {
   const sources = [fakeSource("KotOR Wiki", "https://kotor.fandom.com")];
   const match = _matchApprovedSource("https://kotor.fandom.com.evil.com", sources);
   assert.equal(match, undefined);
+});
+
+test("_collectVisitedUrlsFromPayload keeps visited URLs separate from citations", () => {
+  const sources = [
+    fakeSource("MDLOps", "https://github.com/bead-v/mdlops"),
+    fakeSource("Wikipedia", "https://en.wikipedia.org/wiki/Star_Wars:_Knights_of_the_Old_Republic"),
+  ];
+  const payload = {
+    report: "Sources\n1. MDLOps - https://github.com/bead-v/mdlops",
+    research_information: {
+      cited_urls: ["https://github.com/bead-v/mdlops"],
+      retrieved_urls: [
+        "https://github.com/bead-v/mdlops",
+        "https://en.wikipedia.org/wiki/Star_Wars:_Knights_of_the_Old_Republic",
+      ],
+      visited_urls: ["https://en.wikipedia.org/wiki/Star_Wars:_Knights_of_the_Old_Republic"],
+    },
+  };
+
+  const cited = _collectCitedSources(payload.report, sources, payload);
+  const retrieved = _collectRetrievedSources(payload.report, sources, payload);
+  const visited = _collectVisitedUrlsFromPayload(payload, sources);
+
+  assert.deepEqual(cited.map((source) => source.homeUrl), ["https://github.com/bead-v/mdlops"]);
+  assert.deepEqual(
+    retrieved.map((source) => source.homeUrl),
+    [
+      "https://github.com/bead-v/mdlops",
+      "https://en.wikipedia.org/wiki/Star_Wars:_Knights_of_the_Old_Republic",
+    ],
+  );
+  assert.deepEqual(visited, ["https://en.wikipedia.org/wiki/Star_Wars:_Knights_of_the_Old_Republic"]);
+});
+
+test("_collectCitedSourcesFromText only trusts the Sources section", () => {
+  const sources = [
+    fakeSource("MDLOps", "https://github.com/bead-v/mdlops"),
+    fakeSource("StrategyWiki", "https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic"),
+  ];
+  const answer = [
+    "MDLOps converts and re-imports KotOR models [1].",
+    "Background: https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic",
+    "",
+    "Sources",
+    "1. MDLOps - https://github.com/bead-v/mdlops",
+  ].join("\n");
+
+  const cited = _collectCitedSourcesFromText(answer, sources);
+  assert.deepEqual(cited.map((source) => source.homeUrl), ["https://github.com/bead-v/mdlops"]);
+});
+
+test("_classifyQueryIntent identifies tooling and lore questions separately", () => {
+  assert.equal(_classifyQueryIntent("What is MDLOps used for in the KOTOR toolchain?"), "tooling");
+  assert.equal(_classifyQueryIntent("Who is Bastila Shan in KOTOR?"), "lore");
+});
+
+test("_routeSourcesForQuery keeps lore sources out of tooling searches", () => {
+  const sources = [
+    fakeSource("Deadly Stream", "https://deadlystream.com"),
+    {
+      ...fakeSource("Wikipedia — Star Wars KOTOR", "https://en.wikipedia.org/wiki/Star_Wars:_Knights_of_the_Old_Republic"),
+      id: "wikipedia-kotor",
+    },
+    {
+      ...fakeSource("StrategyWiki KOTOR", "https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic"),
+      id: "strategywiki-kotor",
+    },
+  ];
+
+  const routed = _routeSourcesForQuery("What is MDLOps used for in the KOTOR toolchain?", sources);
+  assert.deepEqual(routed.map((source) => source.name), ["Deadly Stream"]);
 });
