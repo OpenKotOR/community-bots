@@ -132,23 +132,167 @@ const buildCustomPromptBrief = (): string => {
   ].join("\n");
 };
 
-const normalizeUrl = (value: string): string => value.replace(/\/+$/, "").trim();
+const stripTrailingChars = (value: string, chars: string): string => {
+  let end = value.length;
+  while (end > 0 && chars.includes(value[end - 1]!)) end -= 1;
+  return value.slice(0, end);
+};
 
-const extractUrls = (value: string): string[] => {
-  const matches = value.match(/[a-z][a-z0-9+.-]*:\/\/[^\s)>\]]+/giu) ?? [];
-  return [...new Set(matches.map((match) => match.replace(/[.,;:!?]+$/, "")))];
+const stripTrailingSlashes = (value: string): string => stripTrailingChars(value, "/");
+
+const stripTrailingQuestionMarks = (value: string): string => stripTrailingChars(value.trim(), "?");
+
+const collapseExcessiveNewlines = (value: string): string => {
+  const lines = value.split("\n");
+  const out: string[] = [];
+  let blankRun = 0;
+  for (const line of lines) {
+    if (line.trim() === "") {
+      blankRun += 1;
+      if (blankRun <= 1) out.push("");
+    } else {
+      blankRun = 0;
+      out.push(line);
+    }
+  }
+  return out.join("\n").trim();
+};
+
+const isSourcesHeadingLine = (line: string): boolean => {
+  let trimmed = line.trim();
+  if (trimmed.startsWith("#")) {
+    while (trimmed.startsWith("#")) trimmed = trimmed.slice(1);
+    trimmed = trimmed.trimStart();
+  }
+  return /^sources$/iu.test(trimmed) || /^references$/iu.test(trimmed);
+};
+
+const splitAtSourcesHeading = (value: string): string => {
+  const normalized = value.replace(/\r\n/g, "\n");
+  const lines = normalized.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    if (isSourcesHeadingLine(lines[i] ?? "")) {
+      return lines.slice(0, i).join("\n");
+    }
+  }
+  return normalized;
 };
 
 const extractSourceSectionUrls = (value: string): string[] => {
   const normalized = value.replace(/\r\n/g, "\n");
-  const sourceHeading = /\n(?:#{1,6}\s*)?(?:Sources|References)\s*\n/i;
-  const match = normalized.match(sourceHeading);
-  if (!match || match.index === undefined) {
-    return extractUrls(normalized);
+  const lines = normalized.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    if (isSourcesHeadingLine(lines[i] ?? "")) {
+      return extractUrls(lines.slice(i + 1).join("\n"));
+    }
   }
-  const sourceSection = normalized.slice(match.index + match[0].length);
-  return extractUrls(sourceSection);
+  return extractUrls(normalized);
 };
+
+const isUrlTerminator = (ch: string): boolean => /\s/u.test(ch) || ch === ")" || ch === ">" || ch === "]";
+
+const extractUrls = (value: string): string[] => {
+  const urls: string[] = [];
+  const lower = value.toLowerCase();
+  let i = 0;
+  while (i < value.length) {
+    const httpsIdx = lower.indexOf("https://", i);
+    const httpIdx = lower.indexOf("http://", i);
+    if (httpsIdx === -1 && httpIdx === -1) break;
+    const start = httpsIdx === -1
+      ? httpIdx
+      : httpIdx === -1
+        ? httpsIdx
+        : Math.min(httpsIdx, httpIdx);
+    let end = start;
+    while (end < value.length && !isUrlTerminator(value[end]!)) end += 1;
+    urls.push(stripTrailingChars(value.slice(start, end), ".,;:!?"));
+    i = end;
+  }
+  return [...new Set(urls)];
+};
+
+const rewriteMarkdownLinks = (
+  text: string,
+  onLink: (label: string, url: string) => string,
+): string => {
+  let result = "";
+  let i = 0;
+  while (i < text.length) {
+    if (text[i] !== "[") {
+      result += text[i];
+      i += 1;
+      continue;
+    }
+    const closeBracket = text.indexOf("]", i + 1);
+    if (closeBracket === -1 || text[closeBracket + 1] !== "(") {
+      result += text[i];
+      i += 1;
+      continue;
+    }
+    const closeParen = text.indexOf(")", closeBracket + 2);
+    if (closeParen === -1) {
+      result += text[i];
+      i += 1;
+      continue;
+    }
+    const label = text.slice(i + 1, closeBracket);
+    const url = text.slice(closeBracket + 2, closeParen);
+    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+      result += text.slice(i, closeParen + 1);
+      i = closeParen + 1;
+      continue;
+    }
+    result += onLink(label, url);
+    i = closeParen + 1;
+  }
+  return result;
+};
+
+const stripMarkdownHeaders = (text: string): string =>
+  text
+    .split("\n")
+    .filter((line) => !/^#{1,6}\s+/.test(line))
+    .join("\n");
+
+const stripMarkdownTableRows = (text: string): string =>
+  text
+    .split("\n")
+    .filter((line) => !/^\|.*\|$/.test(line.trim()))
+    .join("\n");
+
+const stripAsteriskRuns = (text: string): string => {
+  let out = "";
+  let i = 0;
+  while (i < text.length) {
+    if (text[i] === "*") {
+      while (i < text.length && text[i] === "*") i += 1;
+      continue;
+    }
+    out += text[i];
+    i += 1;
+  }
+  return out;
+};
+
+const splitParagraphs = (text: string): string[] => {
+  const paragraphs: string[] = [];
+  let current: string[] = [];
+  for (const line of text.split("\n")) {
+    if (line.trim() === "") {
+      if (current.length > 0) {
+        paragraphs.push(current.join("\n").trim());
+        current = [];
+      }
+    } else {
+      current.push(line);
+    }
+  }
+  if (current.length > 0) paragraphs.push(current.join("\n").trim());
+  return paragraphs.filter((paragraph) => paragraph.length > 0);
+};
+
+const normalizeUrl = (value: string): string => stripTrailingSlashes(value).trim();
 
 const hostnameHint = (url: string): string => {
   try {
@@ -240,8 +384,8 @@ const sourceUrlLabel = (source: SourceDescriptor, url: string): string => {
   try {
     const exact = new URL(url);
     const base = new URL(source.homeUrl);
-    const exactPath = decodeURIComponent(exact.pathname.replace(/\/+$/u, ""));
-    const basePath = decodeURIComponent(base.pathname.replace(/\/+$/u, ""));
+    const exactPath = decodeURIComponent(stripTrailingSlashes(exact.pathname));
+    const basePath = decodeURIComponent(stripTrailingSlashes(base.pathname));
     if (exactPath === basePath) return source.name;
     const relativePath = exactPath.startsWith(`${basePath}/`) ? exactPath.slice(basePath.length + 1) : exactPath;
     const cleaned = relativePath
@@ -349,11 +493,30 @@ const collectCitedSourcesFromText = (
 ): readonly SourceDescriptor[] => materializeSourcesFromUrls(extractSourceSectionUrls(text), sourcePool);
 
 const normalizeReport = (value: string): string => {
-  return value
-    .replace(/^#\s+.*$/m, "")
-    .replace(/^##\s+Table of Contents[\s\S]*?(?=^##\s+|^Sources\s*$|^#\s+|$)/im, "")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+  const lines = value.replace(/\r\n/g, "\n").split("\n");
+  const out: string[] = [];
+  let skippingToc = false;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (/^##\s+table of contents/iu.test(trimmed)) {
+      skippingToc = true;
+      continue;
+    }
+    if (skippingToc) {
+      if (
+        /^##\s+/u.test(trimmed)
+        || isSourcesHeadingLine(line)
+        || (/^#\s+/u.test(trimmed) && !/^##\s+/u.test(trimmed))
+      ) {
+        skippingToc = false;
+      } else {
+        continue;
+      }
+    }
+    if (/^#\s+/u.test(trimmed) && !/^##\s+/u.test(trimmed)) continue;
+    out.push(line);
+  }
+  return collapseExcessiveNewlines(out.join("\n"));
 };
 
 const formatSourcesSection = (sources: readonly SourceDescriptor[]): string => {
@@ -393,7 +556,7 @@ const isSynthesisFailureReport = (report: string, payload: WebResearchResponsePa
 
 const sourceOnlyFallbackAnswer = (query: string, sources: readonly SourceDescriptor[]): string => {
   if (sources.length === 0) return "I could not complete live archive synthesis for this question right now.";
-  const topic = query.trim().replace(/\?+$/u, "") || "this question";
+  const topic = stripTrailingQuestionMarks(query) || "this question";
   return [
     `I found candidate sources for ${topic}, but I could not support a grounded answer from the retrieved evidence.`,
     "Review the sources below or try a narrower wording.",
@@ -449,23 +612,21 @@ const fallbackDiscordRewrite = (
     sources.map((source, index) => [normalizeUrl(source.homeUrl), index + 1]),
   );
 
-  const [bodyOnlyCandidate = ""] = normalized.split(/\n(?:#{1,6}\s*)?(?:Sources|References)\s*\n/i, 1);
-  const bodyOnly = bodyOnlyCandidate
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, (_match, text: string, url: string) => {
-      const matchedSource = matchApprovedSource(url, sources);
-      const citationIndex = matchedSource ? sourceIndexByUrl.get(normalizeUrl(matchedSource.homeUrl)) : undefined;
-      return citationIndex ? `${text} [${citationIndex}]` : text;
-    })
-    .replace(/^#{1,6}\s+.*$/gm, "")
-    .replace(/^\|.*\|$/gm, "")
-    .replace(/\*+/g, "")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+  const bodyOnly = collapseExcessiveNewlines(
+    stripAsteriskRuns(
+      stripMarkdownTableRows(
+        stripMarkdownHeaders(
+          rewriteMarkdownLinks(splitAtSourcesHeading(normalized), (text, url) => {
+            const matchedSource = matchApprovedSource(url, sources);
+            const citationIndex = matchedSource ? sourceIndexByUrl.get(normalizeUrl(matchedSource.homeUrl)) : undefined;
+            return citationIndex ? `${text} [${citationIndex}]` : text;
+          }),
+        ),
+      ),
+    ),
+  );
 
-  const paragraphs = bodyOnly
-    .split(/\n{2,}/)
-    .map((paragraph) => paragraph.trim())
-    .filter((paragraph) => paragraph.length > 0);
+  const paragraphs = splitParagraphs(bodyOnly);
 
   const selected: string[] = [];
   let totalLength = 0;
@@ -503,19 +664,19 @@ const fallbackDiscordBrief = (query: string, report: string, sources: readonly S
     sources.map((source, index) => [normalizeUrl(source.homeUrl), index + 1]),
   );
 
-  const [bodyOnlyCandidate = ""] = normalized.split(/\n(?:#{1,6}\s*)?(?:Sources|References)\s*\n/i, 1);
-  const bodyOnly = bodyOnlyCandidate
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, (_match, text: string, url: string) => {
-      const matchedSource = matchApprovedSource(url, sources);
-      const citationIndex = matchedSource ? sourceIndexByUrl.get(normalizeUrl(matchedSource.homeUrl)) : undefined;
-      return citationIndex ? `${text} [${citationIndex}]` : text;
-    })
-    .replace(/^#{1,6}\s+.*$/gm, "")
-    .replace(/\*+/g, "")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+  const bodyOnly = collapseExcessiveNewlines(
+    stripAsteriskRuns(
+      stripMarkdownHeaders(
+        rewriteMarkdownLinks(splitAtSourcesHeading(normalized), (text, url) => {
+          const matchedSource = matchApprovedSource(url, sources);
+          const citationIndex = matchedSource ? sourceIndexByUrl.get(normalizeUrl(matchedSource.homeUrl)) : undefined;
+          return citationIndex ? `${text} [${citationIndex}]` : text;
+        }),
+      ),
+    ),
+  );
 
-  const firstChunk = bodyOnly.split(/\n{2,}/)[0]?.trim() ?? bodyOnly;
+  const firstChunk = splitParagraphs(bodyOnly)[0] ?? bodyOnly;
   let summary = firstChunk.slice(0, 420).trim();
 
   if (!summary) {
@@ -535,7 +696,7 @@ const degradedAnswerFallback = (_query: string, _approvedSources: readonly Sourc
 
 const normalizePreferenceUrl = (url: string): URL | undefined => {
   try {
-    return new URL(url.trim().replace(/\/+$/, ""));
+    return new URL(stripTrailingSlashes(url.trim()));
   } catch {
     return undefined;
   }
@@ -548,8 +709,8 @@ const preferenceMatchesSource = (preference: WebResearchSourcePreference, source
   if (preferenceUrl && sourceUrl) {
     const preferenceHost = preferenceUrl.hostname.replace(/^www\./, "").toLowerCase();
     const sourceHost = sourceUrl.hostname.replace(/^www\./, "").toLowerCase();
-    const preferencePath = preferenceUrl.pathname.replace(/\/+$/, "");
-    const sourcePath = sourceUrl.pathname.replace(/\/+$/, "");
+    const preferencePath = stripTrailingSlashes(preferenceUrl.pathname);
+    const sourcePath = stripTrailingSlashes(sourceUrl.pathname);
 
     if (preferenceHost === sourceHost && (preferencePath === "" || sourcePath === preferencePath || sourcePath.startsWith(`${preferencePath}/`))) {
       return true;
@@ -1260,7 +1421,7 @@ export class WebResearchClient implements WebResearchQueryHandler {
         phase: "compose",
         detail: `Live web research failed: ${detail.slice(0, 240)}`,
       });
-      const topic = query.trim().replace(/\?+$/u, "") || "this question";
+      const topic = stripTrailingQuestionMarks(query) || "this question";
       return {
         answer: `I could not complete live web research for "${topic}" right now (${detail}). Run scripts/bootstrap_trask_research.sh, set TRASK_WEB_RESEARCH_PYTHON, OPENAI_API_KEY or OPENROUTER_API_KEY, and TRASK_WEB_RESEARCH_TIMEOUT_MS, then retry.`,
         approvedSources: [],
@@ -1300,7 +1461,7 @@ export class WebResearchClient implements WebResearchQueryHandler {
         researchReport: report,
       };
     } catch {
-      const topic = query.trim().replace(/\?+$/u, "") || "this question";
+      const topic = stripTrailingQuestionMarks(query) || "this question";
       const answer = `I could not complete live web research for "${topic}" right now.`;
       return {
         answer,
