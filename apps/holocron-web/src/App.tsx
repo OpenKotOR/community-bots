@@ -268,6 +268,8 @@ function createAssistantMessageFromTraskRecord(rec: TraskHistoryRecordDto, query
     queryType,
     researchStatus: failedSynthesis ? 'failed' : 'complete',
     researchSteps,
+    groundingStatus: rec.groundingStatus,
+    consultedSourceCount: (rec.retrievedSources ?? rec.sources ?? []).length,
   }
 }
 

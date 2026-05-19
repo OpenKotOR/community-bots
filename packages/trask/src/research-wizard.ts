@@ -7,14 +7,33 @@ import {
   sourceUrlMatchesDescriptor,
   traskApprovedResearchBaseHosts,
   traskApprovedResearchSources,
+  type SearchProvider,
   type SourceDescriptor,
 } from "@openkotor/retrieval";
 
 import {
-  listHeadlessGptResearcherModels,
-  runHeadlessGptResearcher,
-  type HeadlessAiResearchWizardModelOption,
-} from "./gpt-researcher-subprocess.js";
+  collectCitedSourcesFromAnswer,
+  collectCitationIndicesFromAnswer,
+  composeGroundedAnswerFromClaims,
+  composeGroundedAnswerWithLlm,
+  claimsFromDistinctPassages,
+  rankPassagesForQuery,
+  extractClaimsHeuristic,
+  extractClaimsWithLlm,
+  hasMinimumGroundedSupport,
+  inferGroundingStatus,
+  passagesFromRetrieveRows,
+  splitReportIntoPassages,
+  type GroundingStatus,
+  type RetrievePassageRow,
+} from "./grounded-evidence.js";
+
+import {
+  isGroundedComposeEnabled,
+  isIndexMissPayload,
+  isRewriteComposeEnabled,
+} from "./research-compose.js";
+import { runTraskWebResearch } from "./trask-research-subprocess.js";
 
 export interface ResearchWizardAnswer {
   answer: string;
@@ -24,6 +43,8 @@ export interface ResearchWizardAnswer {
   retrievedSources: readonly SourceDescriptor[];
   /** Allowlisted URLs the headless researcher touched while gathering evidence. */
   visitedUrls: readonly string[];
+  /** Grounding quality signal for Holocron provenance UI. */
+  groundingStatus?: GroundingStatus;
 }
 
 export interface ResearchWizardBriefAnswer extends ResearchWizardAnswer {
@@ -39,7 +60,7 @@ export interface ResearchWizardProgressEvent {
 }
 
 export interface ResearchWizardQueryOptions {
-  /** Preferred ai-researchwizard model id, e.g. `openrouter:openrouter/auto` or `litellm:moonshotai/kimi-k2`. */
+  /** Preferred rewrite model id, e.g. `openrouter:openrouter/auto` or `litellm:moonshotai/kimi-k2`. */
   model?: string;
   /** Optional per-request source enablement and weight hints from Holocron's Source Prioritization dialog. */
   sourcePreferences?: readonly ResearchWizardSourcePreference[];
@@ -52,7 +73,12 @@ export interface ResearchWizardSourcePreference {
   enabled: boolean;
 }
 
-export interface ResearchWizardModelOption extends HeadlessAiResearchWizardModelOption {}
+export interface ResearchWizardModelOption {
+  readonly id: string;
+  readonly label: string;
+  readonly provider: string;
+  readonly recommended?: boolean;
+}
 
 /** Structural type for adapters that only need full Q&A (e.g. Trask HTTP `/ask`). */
 export interface ResearchWizardQueryHandler {
@@ -70,6 +96,7 @@ const DEFAULT_RESEARCH_WIZARD_MODELS: readonly ResearchWizardModelOption[] = [
 
 interface ResearchWizardResponsePayload {
   report?: string | null;
+  passages?: readonly RetrievePassageRow[] | null;
   research_information?: {
     source_urls?: readonly string[] | null;
     cited_urls?: readonly string[] | null;
@@ -78,6 +105,7 @@ interface ResearchWizardResponsePayload {
     query_domains?: readonly string[] | null;
     allowed_url_prefixes?: readonly string[] | null;
     rejected_source_urls?: readonly string[] | null;
+    index_miss?: boolean | null;
   };
 }
 
@@ -162,7 +190,7 @@ const isAllowedSourceUrl = (url: string, sourcePool: readonly SourceDescriptor[]
   return isTraskApprovedBaseUrl(url);
 };
 
-/** Visited URLs from ai-researchwizard payload (Holocron live facet pings). */
+/** Visited URLs from web research payload (Holocron live facet pings). */
 const collectVisitedUrlsFromPayload = (
   payload: ResearchWizardResponsePayload,
   approvedSources: readonly SourceDescriptor[],
@@ -274,6 +302,17 @@ const isCatalogRootUrl = (url: string, approvedSources: readonly SourceDescripto
   return approvedSources.some((source) => normalizeUrl(source.homeUrl) === normalized);
 };
 
+/** Bare host roots (e.g. `https://deadlystream.com`) — not deep catalog pages like `https://github.com/reone/reone`. */
+const isShallowCatalogRootUrl = (url: string, approvedSources: readonly SourceDescriptor[]): boolean => {
+  if (!isCatalogRootUrl(url, approvedSources)) return false;
+  try {
+    const path = new URL(url).pathname.replace(/\/+$/u, "");
+    return path === "";
+  } catch {
+    return false;
+  }
+};
+
 const materializeSourcesFromUrls = (
   urls: readonly string[],
   sourcePool: readonly SourceDescriptor[],
@@ -283,10 +322,10 @@ const materializeSourcesFromUrls = (
   );
 
   const matched: SourceDescriptor[] = [];
-  const hasPreciseUrl = candidateUrls.some((url) => !isCatalogRootUrl(url, sourcePool));
+  const hasPreciseUrl = candidateUrls.some((url) => !isShallowCatalogRootUrl(url, sourcePool));
 
   for (const url of candidateUrls) {
-    if (hasPreciseUrl && isCatalogRootUrl(url, sourcePool)) continue;
+    if (hasPreciseUrl && isShallowCatalogRootUrl(url, sourcePool)) continue;
     const source = exactSourceFromUrl(url, sourcePool);
 
     if (source && !matched.some((entry) => normalizeUrl(entry.homeUrl) === normalizeUrl(source.homeUrl))) {
@@ -464,10 +503,6 @@ const fallbackDiscordRewrite = (
     summary = bodyOnly.slice(0, 900).trim();
   }
 
-  if (sources.length > 0 && !/\[\d+\]/.test(summary)) {
-    summary = `${summary} [1]`.trim();
-  }
-
   return sources.length > 0 ? `${summary}\n\n${formatSourcesSection(sources)}` : summary;
 };
 
@@ -501,10 +536,6 @@ const fallbackDiscordBrief = (query: string, report: string, sources: readonly S
 
   if (!summary) {
     summary = bodyOnly.slice(0, 420).trim();
-  }
-
-  if (sources.length > 0 && !/\[\d+\]/.test(summary)) {
-    summary = `${summary} [1]`.trim();
   }
 
   return sources.length > 0 ? `${summary}\n\n${formatSourcesSection(sources)}` : summary;
@@ -699,7 +730,7 @@ const tokenizeQuery = (query: string): string[] =>
       .map(normalizeMatchToken),
   )];
 
-/** Citations must be real public web pages on the approved allowlist (live GPTR research only). */
+/** Citations must be real public web pages on the approved allowlist (live web research only). */
 const isPublicWebCitationUrl = (url: string): boolean => {
   if (url.startsWith("local://") || url.startsWith("discord://")) return false;
   try {
@@ -730,41 +761,36 @@ const collectWebEvidenceSources = (
   return rerankEvidenceSources(query, filterPublicWebCitationSources(pool));
 };
 
-const ensureMinimumWebCitations = (
-  query: string,
-  cited: readonly SourceDescriptor[],
-  evidence: readonly SourceDescriptor[],
-  payload?: ResearchWizardResponsePayload,
-  approvedSources: readonly SourceDescriptor[] = [],
-): readonly SourceDescriptor[] => {
-  const info = payload?.research_information;
-  const payloadBacked = payload
-    ? materializeSourcesFromUrls(
-      uniqueUrlsPreserveOrder([
-        ...payloadUrls(info?.cited_urls),
-        ...payloadUrls(info?.retrieved_urls),
-        ...payloadUrls(info?.visited_urls),
-        ...payloadUrls(info?.source_urls),
-      ]),
-      approvedSources,
-    )
-    : [];
-
-  const merged = rerankEvidenceSources(
-    query,
-    mergeSourcesPreserveOrder(cited, evidence, payloadBacked),
+const resolveEvidencePassages = (
+  report: string,
+  payload: ResearchWizardResponsePayload,
+): ReturnType<typeof splitReportIntoPassages> => {
+  const structured = payload.passages?.filter(
+    (row): row is RetrievePassageRow =>
+      Boolean(row?.quote?.trim() && row?.url?.trim()),
   );
-  const webOnly = filterPublicWebCitationSources(merged);
-  if (webOnly.length >= MIN_HOLOCRON_WEB_CITATIONS) {
-    return webOnly.slice(0, 8);
+  if (structured && structured.length > 0) {
+    return passagesFromRetrieveRows(structured);
   }
-  const padded = rerankEvidenceSources(
-    query,
-    mergeSourcesPreserveOrder(webOnly, filterPublicWebCitationSources(evidence), payloadBacked),
-  );
-  return padded.length >= MIN_HOLOCRON_WEB_CITATIONS
-    ? padded.slice(0, 8)
-    : filterPublicWebCitationSources(payloadBacked).slice(0, 8);
+  return splitReportIntoPassages(report);
+};
+
+const alignCitedSourcesToAnswer = (
+  answer: string,
+  candidateSources: readonly SourceDescriptor[],
+): readonly SourceDescriptor[] =>
+  collectCitedSourcesFromAnswer(answer, candidateSources, collectCitedSourcesFromText);
+
+const hostnamesFromUrls = (urls: readonly string[]): string[] => {
+  const hosts = new Set<string>();
+  for (const url of urls) {
+    try {
+      hosts.add(new URL(url).hostname.replace(/^www\./, ""));
+    } catch {
+      continue;
+    }
+  }
+  return [...hosts];
 };
 
 const composeAnswerFromWebSources = (query: string, sources: readonly SourceDescriptor[]): string => {
@@ -881,6 +907,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
     private readonly config: ResearchWizardRuntimeConfig,
     private readonly aiConfig: SharedAiConfig,
     private readonly approvedSources: readonly SourceDescriptor[] = traskApprovedResearchSources,
+    private readonly localSearchProvider?: SearchProvider,
   ) {
     this.openAiClient = aiConfig.openAiApiKey
       ? new OpenAI({
@@ -892,20 +919,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
   }
 
   public async listModels(): Promise<readonly ResearchWizardModelOption[]> {
-    try {
-      const dynamicModels = await listHeadlessGptResearcherModels(this.config);
-      const seen = new Set(DEFAULT_RESEARCH_WIZARD_MODELS.map((model) => model.id));
-      return [
-        ...DEFAULT_RESEARCH_WIZARD_MODELS,
-        ...dynamicModels.filter((model) => {
-          if (seen.has(model.id)) return false;
-          seen.add(model.id);
-          return true;
-        }),
-      ];
-    } catch {
-      return DEFAULT_RESEARCH_WIZARD_MODELS;
-    }
+    return DEFAULT_RESEARCH_WIZARD_MODELS;
   }
 
   private async rewriteForDiscord(
@@ -1040,6 +1054,84 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
     return fallbackDiscordBrief(query, report, approvedSources);
   }
 
+  private async searchLocalKnowledge(query: string): Promise<string> {
+    if (!this.localSearchProvider) return "";
+    try {
+      const hits = await this.localSearchProvider.search(query, 4);
+      const approved = hits.filter((hit) => isTraskApprovedBaseUrl(hit.url));
+      if (approved.length === 0) return "";
+      const lines = approved.map(
+        (hit) => `- ${hit.title}: ${hit.snippet} (${hit.url})`,
+      );
+      return [
+        "Local Knowledge Context (lower authority than live web research; never cite as https Sources):",
+        ...lines,
+      ].join("\n");
+    } catch {
+      return "";
+    }
+  }
+
+  private async tryGroundedCompose(
+    query: string,
+    report: string,
+    payload: ResearchWizardResponsePayload,
+    retrievedSources: readonly SourceDescriptor[],
+    preferredModel?: string,
+  ): Promise<{ answer: string; approvedSources: readonly SourceDescriptor[] } | null> {
+    if (!isGroundedComposeEnabled(this.config)) {
+      return null;
+    }
+
+    if (isIndexMissPayload(payload)) {
+      return null;
+    }
+
+    const passages = rankPassagesForQuery(resolveEvidencePassages(report, payload), query);
+    if (passages.length === 0) {
+      return null;
+    }
+
+    const model = normalizePreferredRewriteModel(preferredModel) ?? this.aiConfig.chatModel;
+
+    let claims = claimsFromDistinctPassages(passages);
+    if (!hasMinimumGroundedSupport(claims) && this.openAiClient) {
+      const llmClaims = await extractClaimsWithLlm(this.openAiClient, model, query, passages);
+      if (hasMinimumGroundedSupport(llmClaims)) {
+        claims = llmClaims;
+      }
+    }
+    if (!hasMinimumGroundedSupport(claims)) {
+      const heuristicClaims = extractClaimsHeuristic(query, passages);
+      if (hasMinimumGroundedSupport(heuristicClaims)) {
+        claims = heuristicClaims;
+      }
+    }
+
+    if (!hasMinimumGroundedSupport(claims)) {
+      return null;
+    }
+
+    const webSources = filterPublicWebCitationSources(
+      materializeSourcesFromUrls(claims.map((claim) => claim.url), this.approvedSources),
+    );
+
+    let answer = composeGroundedAnswerFromClaims(query, claims, webSources);
+    if (this.openAiClient) {
+      answer =
+        (await composeGroundedAnswerWithLlm(this.openAiClient, model, query, claims, webSources))
+        ?? answer;
+    }
+
+    let approvedSources = alignCitedSourcesToAnswer(answer, webSources);
+    if (approvedSources.length < MIN_HOLOCRON_WEB_CITATIONS) {
+      answer = sourceOnlyFallbackAnswer(query, webSources.slice(0, 5));
+      approvedSources = alignCitedSourcesToAnswer(answer, webSources);
+    }
+
+    return { answer, approvedSources };
+  }
+
   private async fetchResearchReport(
     query: string,
     customPrompt: string,
@@ -1051,18 +1143,15 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
     }
 
     const allowedDomains = researchDomainsForSources(approvedSources);
-    const raw = await runHeadlessGptResearcher(this.config, {
+    const raw = await runTraskWebResearch(this.config, {
       query: buildResearchTask(query),
-      custom_prompt: customPrompt,
       query_domains: allowedDomains,
       allowed_url_prefixes: approvedSources.map((source) => source.homeUrl),
-      ...(options?.model?.trim() ? { model: options.model.trim() } : {}),
-      report_type: "research_report",
-      report_source: "web",
     });
 
     const payload: ResearchWizardResponsePayload = {
       report: raw.report,
+      ...(raw.passages?.length ? { passages: [...raw.passages] } : {}),
       ...(raw.research_information !== undefined
         ? { research_information: { ...raw.research_information } }
         : {}),
@@ -1071,7 +1160,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
     const report = typeof raw.report === "string" ? normalizeReport(raw.report) : "";
 
     if (!report) {
-      throw new Error("ai-researchwizard returned an empty report.");
+      throw new Error("Trask web research returned an empty report.");
     }
 
     return { report, payload };
@@ -1101,6 +1190,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
         onProgress,
         async () => await this.fetchResearchReport(query, buildCustomPrompt(), approvedSources, options),
       );
+      const enrichedReport = report;
       const rejectedUrls = collectRejectedUrlsFromPayload(payload);
       if (rejectedUrls.length > 0) {
         onProgress?.({
@@ -1113,18 +1203,22 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
         phase: "report",
         detail: "Ranking passages and citations…",
       });
-      const webEvidenceSources = collectWebEvidenceSources(query, report, approvedSources, payload);
+      const webEvidenceSources = collectWebEvidenceSources(query, enrichedReport, approvedSources, payload);
       const retrievedSources = webEvidenceSources;
+      const visitedUrls = collectVisitedUrlsFromPayload(payload, approvedSources);
+      const visitedHosts = hostnamesFromUrls(visitedUrls);
       const citedSourcesFromReport = rerankEvidenceSources(
         query,
         mergeSourcesPreserveOrder(
-          collectCitedSources(report, approvedSources, payload),
-          collectCitedSourcesFromText(report, approvedSources),
+          collectCitedSources(enrichedReport, approvedSources, payload),
+          collectCitedSourcesFromText(enrichedReport, approvedSources),
         ),
       );
       onProgress?.({
         phase: "sources",
-        detail: retrievedSources.length ? `${retrievedSources.length} sources retrieved` : "Mapping hosts to archive catalog…",
+        detail: retrievedSources.length
+          ? `${retrievedSources.length} sources retrieved${visitedHosts.length ? ` · ${visitedHosts.slice(0, 4).join(", ")}` : ""}`
+          : "Mapping hosts to archive catalog…",
         sources: retrievedSources,
       });
       onProgress?.({
@@ -1132,55 +1226,96 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
         detail: "Rendering Holocron answer…",
       });
       let answer: string;
-      if (retrievedSources.length === 0) {
+      const grounded =
+        !isIndexMissPayload(payload) && !isSynthesisFailureReport(enrichedReport, payload)
+          ? await this.tryGroundedCompose(query, enrichedReport, payload, retrievedSources, options?.model)
+          : null;
+
+      if (grounded) {
+        answer = grounded.answer;
+      } else if (isIndexMissPayload(payload)) {
+        const webSources = filterPublicWebCitationSources(retrievedSources);
+        answer =
+          webSources.length > 0
+            ? sourceOnlyFallbackAnswer(query, webSources)
+            : degradedAnswerFallback(query, approvedSources);
+      } else if (retrievedSources.length === 0) {
         answer = degradedAnswerFallback(query, approvedSources);
-      } else if (isSynthesisFailureReport(report, payload)) {
+      } else if (isSynthesisFailureReport(enrichedReport, payload)) {
         const webSources = resolveWebSourcesForFailedSynthesis(query, retrievedSources);
-        if (webSources.length >= MIN_HOLOCRON_WEB_CITATIONS) {
+        if (webSources.length >= MIN_HOLOCRON_WEB_CITATIONS && isRewriteComposeEnabled(this.config)) {
           const sourcesForRewrite = filterPublicWebCitationSources(webSources);
           answer = this.openAiClient
-            ? await this.rewriteForDiscord(query, report, sourcesForRewrite, options?.model)
-            : fallbackDiscordRewrite(query, report, sourcesForRewrite);
+            ? await this.rewriteForDiscord(query, enrichedReport, sourcesForRewrite, options?.model)
+            : fallbackDiscordRewrite(query, enrichedReport, sourcesForRewrite);
         } else if (webSources.length > 0) {
           answer = sourceOnlyFallbackAnswer(query, webSources);
-        } else if (retrievedSources.length > 0) {
-          answer = sourceOnlyFallbackAnswer(query, retrievedSources);
         } else {
           answer = degradedAnswerFallback(query, approvedSources);
         }
-      } else if (this.openAiClient) {
+      } else if (
+        isRewriteComposeEnabled(this.config)
+        && this.openAiClient
+        && (payload.passages?.length ?? 0) === 0
+      ) {
         answer = await this.rewriteForDiscord(
           query,
-          report,
+          enrichedReport,
           filterPublicWebCitationSources(retrievedSources),
           options?.model,
         );
-      } else {
+      } else if (this.openAiClient) {
+        answer = sourceOnlyFallbackAnswer(
+          query,
+          filterPublicWebCitationSources(retrievedSources),
+        );
+      } else if (isRewriteComposeEnabled(this.config)) {
         answer = fallbackDiscordRewrite(
           query,
-          report,
+          enrichedReport,
+          filterPublicWebCitationSources(retrievedSources),
+        );
+      } else {
+        answer = sourceOnlyFallbackAnswer(
+          query,
           filterPublicWebCitationSources(retrievedSources),
         );
       }
 
-      const citedSources = ensureMinimumWebCitations(
-        query,
-        filterPublicWebCitationSources(
-          mergeSourcesPreserveOrder(
-            collectCitedSourcesFromText(answer, retrievedSources),
-            citedSourcesFromReport,
-          ),
+      const candidatePool = filterPublicWebCitationSources(
+        mergeSourcesPreserveOrder(
+          collectCitedSourcesFromText(answer, retrievedSources),
+          citedSourcesFromReport,
+          retrievedSources,
         ),
-        webEvidenceSources,
-        payload,
-        approvedSources,
       );
+
+      let citedSources = grounded
+        ? grounded.approvedSources
+        : alignCitedSourcesToAnswer(answer, candidatePool);
+
+      if (
+        citedSources.length < MIN_HOLOCRON_WEB_CITATIONS
+        && collectCitationIndicesFromAnswer(answer).length < MIN_HOLOCRON_WEB_CITATIONS
+        && !grounded
+      ) {
+        const fallbackSources = filterPublicWebCitationSources(
+          resolveWebSourcesForFailedSynthesis(query, retrievedSources),
+        );
+        if (fallbackSources.length > 0) {
+          answer = sourceOnlyFallbackAnswer(query, fallbackSources);
+          citedSources = alignCitedSourcesToAnswer(answer, fallbackSources);
+        }
+      }
+
+      const groundingStatus = inferGroundingStatus(answer, citedSources.length);
 
       return {
         answer,
         approvedSources: citedSources,
         retrievedSources,
-        visitedUrls: collectVisitedUrlsFromPayload(payload, approvedSources),
+        visitedUrls,
+        groundingStatus,
       };
     } catch (error: unknown) {
       const detail = error instanceof Error ? error.message : String(error);
@@ -1190,7 +1325,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
       });
       const topic = query.trim().replace(/\?+$/u, "") || "this question";
       return {
-        answer: `I could not complete live web research for "${topic}" right now (${detail}). Ensure GPTR Python (TRASK_GPT_RESEARCHER_PYTHON), retriever keys (e.g. TAVILY_API_KEY), and TRASK_RESEARCHWIZARD_TIMEOUT_MS are configured, then retry.`,
+        answer: `I could not complete live web research for "${topic}" right now (${detail}). Ensure the Trask indexer or research venv is running (TRASK_INDEXER_BASE_URL, TRASK_WEB_RESEARCH_PYTHON, bootstrap via scripts/bootstrap_trask_research.sh), then retry.`,
         approvedSources: [],
         retrievedSources: [],
         visitedUrls: [],
@@ -1199,33 +1334,69 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
   }
 
   /** Shorter rewrite for proactive/channel replies (still source-backed). */
-  public async answerQuestionBrief(query: string): Promise<ResearchWizardBriefAnswer> {
+  public async answerQuestionBrief(
+    query: string,
+    options?: ResearchWizardQueryOptions,
+  ): Promise<ResearchWizardBriefAnswer> {
     try {
-      const approvedSources = routeSourcesForQuery(query, this.approvedSources);
-      const { report, payload } = await this.fetchResearchReport(query, buildCustomPromptBrief(), approvedSources);
-      const webEvidenceSources = collectWebEvidenceSources(query, report, approvedSources, payload);
+      const approvedSources = routeSourcesForQuery(
+        query,
+        applySourcePreferences(this.approvedSources, options?.sourcePreferences),
+      );
+      const { report, payload } = await this.fetchResearchReport(
+        query,
+        buildCustomPromptBrief(),
+        approvedSources,
+        options,
+      );
+      const enrichedReport = report;
+      const webEvidenceSources = collectWebEvidenceSources(query, enrichedReport, approvedSources, payload);
       const retrievedSources = webEvidenceSources;
-      const answer = retrievedSources.length > 0
-        ? await this.rewriteForDiscordBrief(query, report, retrievedSources)
-        : degradedAnswerFallback(query, approvedSources);
+      const grounded =
+        !isIndexMissPayload(payload) && !isSynthesisFailureReport(enrichedReport, payload)
+          ? await this.tryGroundedCompose(query, enrichedReport, payload, retrievedSources, options?.model)
+          : null;
+
+      let answer: string;
+      if (grounded) {
+        answer = grounded.answer;
+      } else if (isIndexMissPayload(payload)) {
+        const webSources = filterPublicWebCitationSources(retrievedSources);
+        answer =
+          webSources.length > 0
+            ? sourceOnlyFallbackAnswer(query, webSources)
+            : degradedAnswerFallback(query, approvedSources);
+      } else if (
+        isRewriteComposeEnabled(this.config)
+        && retrievedSources.length > 0
+        && (payload.passages?.length ?? 0) === 0
+      ) {
+        answer = await this.rewriteForDiscordBrief(query, enrichedReport, retrievedSources);
+      } else if (retrievedSources.length > 0) {
+        answer = sourceOnlyFallbackAnswer(query, filterPublicWebCitationSources(retrievedSources));
+      } else {
+        answer = degradedAnswerFallback(query, approvedSources);
+      }
+
+      const candidatePool = filterPublicWebCitationSources(
+        mergeSourcesPreserveOrder(
+          collectCitedSourcesFromText(answer, retrievedSources),
+          collectCitedSources(enrichedReport, approvedSources, payload),
+          retrievedSources,
+        ),
+      );
+
+      const citedSources = grounded
+        ? grounded.approvedSources
+        : alignCitedSourcesToAnswer(answer, candidatePool);
 
       return {
         answer,
-        approvedSources: ensureMinimumWebCitations(
-          query,
-          filterPublicWebCitationSources(
-            mergeSourcesPreserveOrder(
-              collectCitedSourcesFromText(answer, retrievedSources),
-              collectCitedSources(report, approvedSources, payload),
-            ),
-          ),
-          webEvidenceSources,
-          payload,
-          approvedSources,
-        ),
+        approvedSources: citedSources,
         retrievedSources,
         visitedUrls: collectVisitedUrlsFromPayload(payload, approvedSources),
-        researchReport: report,
+        researchReport: enrichedReport,
+        groundingStatus: inferGroundingStatus(answer, citedSources.length),
       };
     } catch {
       const topic = query.trim().replace(/\?+$/u, "") || "this question";
@@ -1244,8 +1415,9 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
 export const createResearchWizardClient = (
   config: ResearchWizardRuntimeConfig,
   aiConfig: SharedAiConfig = loadSharedAiConfig(),
+  localSearchProvider?: SearchProvider,
 ): ResearchWizardClient => {
-  return new ResearchWizardClient(config, aiConfig, traskApprovedResearchSources);
+  return new ResearchWizardClient(config, aiConfig, traskApprovedResearchSources, localSearchProvider);
 };
 
 // ---------------------------------------------------------------------------
@@ -1268,4 +1440,6 @@ export {
   matchApprovedSource as _matchApprovedSource,
   classifyQueryIntent as _classifyQueryIntent,
   routeSourcesForQuery as _routeSourcesForQuery,
+  alignCitedSourcesToAnswer as _alignCitedSourcesToAnswer,
+  isGroundedComposeEnabled as _isGroundedComposeEnabled,
 };

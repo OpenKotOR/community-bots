@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * CLI verification for Trask Q&A (ResearchWizardClient → trask_headless_research.py).
+ * CLI verification for Trask Q&A (ResearchWizardClient → scripts/trask_web_research.py).
  *
  * Exercises the same path as Discord `/ask` and trask-http-server — not the browser.
  * Validates non-empty answers, Sources block, https URLs, and inline [n] citations when RICH.
@@ -11,8 +11,8 @@
  *
  * Environment:
  *   INGEST_STATE_DIR — must match ingest-worker / Docker volume (default data/ingest-worker)
- *   TRASK_GPT_RESEARCHER_PYTHON, OPENAI_API_KEY / OPENROUTER_API_KEY, TAVILY_API_KEY (optional)
- *   Loads .env, .env.local, vendor/ai-researchwizard/.env when present (does not print secrets).
+ *   TRASK_WEB_RESEARCH_PYTHON, TRASK_INDEXER_BASE_URL, OPENAI_API_KEY / OPENROUTER_API_KEY (optional)
+ *   Loads .env, .env.local when present (does not print secrets).
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -62,7 +62,7 @@ const countDistinctHttps = (text) => {
 };
 
 const loadEnvFiles = () => {
-  for (const rel of [".env", ".env.local", "vendor/ai-researchwizard/.env"]) {
+  for (const rel of [".env", ".env.local"]) {
     const path = resolve(repoRoot, rel);
     if (!existsSync(path)) continue;
     const text = readFileSync(path, "utf8");
@@ -94,11 +94,38 @@ const argValue = (name, fallback) => {
 
 const expectationForQuery = (query) => DEFAULT_QUERIES.find((entry) => entry.question === query) ?? null;
 
+const auditCitationAlignment = (answer, approvedSources) => {
+  const { body, sourceLines } = splitResearchAnswer(answer);
+  const citedIndices = [...body.matchAll(/\[(\d{1,3})\]/g)]
+    .map((match) => Number(match[1]))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  const sourceUrls = sourceLines
+    .map((line) => line.match(/https?:\/\/\S+/i)?.[0])
+    .filter(Boolean);
+
+  if (citedIndices.length === 0 && sourceUrls.length > 0) {
+    return "Sources listed without inline [n] citations in the answer body";
+  }
+
+  for (const index of citedIndices) {
+    if (!sourceUrls[index - 1]) {
+      return `Citation [${index}] is missing a matching Sources line`;
+    }
+  }
+
+  if (approvedSources.length > citedIndices.length) {
+    return "approvedSources includes URLs not cited in the answer body";
+  }
+
+  return null;
+};
+
 const scoreAnswer = (query, answer, approvedSources) => {
   const { body, sourceLines } = splitResearchAnswer(answer);
   const urlsInAnswer = [...answer.matchAll(/[a-z][a-z0-9+.-]*:\/\/[^\s)]+/gi)].map((m) => m[0]);
   const hasSourcesHeading = /\nSources\s*\n/i.test(answer);
   const hasInlineCitation = /\[\d+\]/.test(body);
+  const citationMisaligned = auditCitationAlignment(answer, approvedSources);
   const hasSourceUrls = sourceLines.some((line) => SOURCE_LINE_RE.test(line)) || urlsInAnswer.length > 0;
   const degraded = DEGRADED_RE.test(answer);
   const substantive = body.replace(/\s+/g, " ").trim().length >= 40;
@@ -122,6 +149,7 @@ const scoreAnswer = (query, answer, approvedSources) => {
     && httpsSourceCount >= MIN_HTTPS_SOURCES
     && !hasLocalTechnicalRef
     && hasInlineCitation
+    && !citationMisaligned
     && !degraded
     && topicMatch
     && sourceMatch
@@ -152,6 +180,7 @@ const scoreAnswer = (query, answer, approvedSources) => {
     sourceMatch,
     httpsSourceCount,
     hasLocalTechnicalRef,
+    citationMisaligned,
     query,
   };
 };
@@ -168,9 +197,9 @@ const main = async () => {
   const aiConfig = loadSharedAiConfig();
   const client = createResearchWizardClient(rwConfig, aiConfig);
 
-  console.log("\n🔬  Trask CLI Q&A verification (ResearchWizard → headless ai-researchwizard)\n");
+  console.log("\n🔬  Trask CLI Q&A verification (ResearchWizard → trask_web_research.py)\n");
   console.log(`   Python=${rwConfig.pythonExecutable}`);
-  console.log(`   GPTR root=${rwConfig.gptResearcherRoot ?? "(auto)"}`);
+  console.log(`   Indexer=${rwConfig.indexerBaseUrl}`);
   console.log(`   Timeout=${rwConfig.timeoutMs}ms\n`);
 
   const results = [];

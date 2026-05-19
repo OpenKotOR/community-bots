@@ -56,11 +56,11 @@ const help = () => {
 
 Usage:
   node scripts/trask_ops.mjs setup          # pnpm install + init submodules + type-check
-  node scripts/trask_ops.mjs setup-venv     # create .venv-trask-gptr and install Python deps
+  node scripts/trask_ops.mjs setup-venv     # create .venv-trask-research (trask_web_research.py)
   node scripts/trask_ops.mjs update         # git pull + pnpm install + build
   node scripts/trask_ops.mjs build-web      # build holocron-web (required before dev-http)
   node scripts/trask_ops.mjs dev-http       # build web + start Trask HTTP server on port 4010
-  node scripts/trask_ops.mjs verify-cli     # CLI Trask Q&A via headless ai-researchwizard (5 queries)
+  node scripts/trask_ops.mjs verify-cli     # CLI Trask Q&A smoke (5 queries)
   node scripts/trask_ops.mjs verify-web     # Playwright browser test: 5 KOTOR queries (optional)
   node scripts/trask_ops.mjs smoke-discord  # verify Discord bot slash command registration
 
@@ -77,7 +77,7 @@ Quick start:
 
 Notes:
   - Falls back to npx pnpm@${pnpmVersion} when pnpm is not on PATH.
-  - Set TRASK_GPT_RESEARCHER_ROOT + TRASK_GPT_RESEARCHER_PYTHON in .env for live research.
+  - Run setup-venv and set TRASK_WEB_RESEARCH_PYTHON / TRASK_INDEXER_BASE_URL for live research.
   - Without an LLM API key (OPENAI_API_KEY or OPENROUTER_API_KEY) results are citation-only.
 `);
 };
@@ -89,45 +89,22 @@ try {
       await run("git", ["submodule", "update", "--init", "--recursive"]);
       await pnpm("install");
       await pnpm("rebuild", "esbuild");
-      if (!existsSync(resolve(repoRoot, ".venv-trask-gptr"))) {
+      if (!existsSync(resolve(repoRoot, ".venv-trask-research"))) {
         console.log("⚠  Python venv not found. Run `node scripts/trask_ops.mjs setup-venv` for live research.");
       }
       await pnpm("check");
       break;
     }
     case "setup-venv": {
-      const venvPath = resolve(repoRoot, ".venv-trask-gptr");
-      const gptRoot  = resolve(repoRoot, "vendor/ai-researchwizard");
-      const reqFile  = resolve(gptRoot, "requirements.txt");
-      if (!existsSync(gptRoot + "/trask_headless_research.py")) {
-        console.log("Initializing ai-researchwizard submodule…");
-        await run("git", ["submodule", "update", "--init", "vendor/ai-researchwizard"]);
-      }
-      if (!existsSync(venvPath)) {
-        console.log("Creating .venv-trask-gptr…");
-        const python3 = process.platform === "win32" ? "python" : "python3";
-        await run(python3, ["-m", "venv", venvPath]);
-      }
-      const pip = resolve(venvPath, process.platform === "win32" ? "Scripts/pip.exe" : "bin/pip");
-      console.log("Installing pre-release numpy (Python 3.14 compat)…");
-      await run(pip, ["install", "--quiet", "--pre", "numpy", "pandas"]);
-      console.log("Installing remaining requirements…");
-      // Filter out numpy/pandas to avoid version conflict with the pre-release we just installed
-      const { writeFileSync, readFileSync } = await import("node:fs");
-      const filtered = readFileSync(reqFile, "utf8")
-        .split("\n")
-        .filter(l => !/^numpy|^pandas/.test(l.trim()))
-        .join("\n");
-      const tmpReq = resolve(repoRoot, ".tmp-gptr-req.txt");
-      writeFileSync(tmpReq, filtered);
-      await run(pip, ["install", "--quiet", "-r", tmpReq]);
-      try { require("node:fs").unlinkSync(tmpReq); } catch { /* ignore */ }
-      console.log("✅  .venv-trask-gptr ready.");
-      console.log(`   Python: ${resolve(venvPath, "bin/python")}`);
-      console.log(`   GPTR:   ${gptRoot}`);
+      await run("bash", ["scripts/bootstrap_trask_research.sh"]);
+      const py =
+        process.platform === "win32"
+          ? resolve(repoRoot, ".venv-trask-research", "Scripts", "python.exe")
+          : resolve(repoRoot, ".venv-trask-research", "bin", "python");
+      console.log("✅  .venv-trask-research ready.");
       console.log("   Add to your .env:");
-      console.log(`   TRASK_GPT_RESEARCHER_ROOT=${gptRoot}`);
-      console.log(`   TRASK_GPT_RESEARCHER_PYTHON=${resolve(venvPath, "bin/python")}`);
+      console.log(`   TRASK_WEB_RESEARCH_PYTHON=${py}`);
+      console.log("   TRASK_INDEXER_BASE_URL=http://127.0.0.1:8790");
       break;
     }
     case "update": {

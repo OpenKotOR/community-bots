@@ -29,6 +29,12 @@ import {
 import { createResearchWizardClient } from "@openkotor/trask";
 import { isTraskThreadId } from "@openkotor/trask-http";
 
+import {
+  ensureAskDeferred,
+  safeEditReply,
+  safeReply,
+} from "./discord-ask-interaction.js";
+import { startDiscordIndexSync } from "./discord-index-sync.js";
 import { registerTraskProactiveHandlers } from "./proactive-handler.js";
 import { registerTraskWelcomeHandler } from "./welcome-handler.js";
 import { startEmbeddedTraskWebUi } from "./web-server.js";
@@ -48,7 +54,7 @@ if (researchWizardTimeoutMs !== config.researchWizard.timeoutMs) {
 const researchWizard = createResearchWizardClient({
   ...config.researchWizard,
   timeoutMs: researchWizardTimeoutMs,
-}, config.ai);
+}, config.ai, searchProvider);
 const queryRepository = new JsonTraskQueryRepository(resolveDataFile(config.queryDataDir, "trask-queries.json"));
 
 const traskHttpRuntime = {
@@ -256,89 +262,17 @@ const buildResearchEmbed = (rawAnswer: string, approvedSources: readonly SourceD
   });
 };
 
-type ChatReplyPayload = Parameters<ChatInputCommandInteraction["reply"]>[0];
-
-const isUnknownInteractionError = (error: unknown): boolean => {
-  if (!error || typeof error !== "object") {
-    return false;
-  }
-
-  const candidate = error as { code?: unknown };
-  return candidate.code === 10062;
-};
-
-const safeReply = async (interaction: ChatInputCommandInteraction, payload: ChatReplyPayload): Promise<void> => {
-  try {
-    if (interaction.deferred || interaction.replied) {
-      await interaction.followUp(payload);
-      return;
-    }
-
-    await interaction.reply(payload);
-  } catch (error) {
-    if (isUnknownInteractionError(error)) {
-      logger.warn("Skipping reply for stale Discord interaction.", {
-        guildId: interaction.guildId,
-        channelId: interaction.channelId,
-      });
-      return;
-    }
-    throw error;
-  }
-};
-
-const ensureAskDeferred = async (interaction: ChatInputCommandInteraction): Promise<boolean> => {
-  if (interaction.deferred || interaction.replied) {
-    return true;
-  }
-
-  try {
-    await interaction.deferReply();
-    return true;
-  } catch (error) {
-    if (isUnknownInteractionError(error)) {
-      logger.warn("Discord reported stale interaction before deferReply; skipping command execution.", {
-        guildId: interaction.guildId,
-        channelId: interaction.channelId,
-      });
-      return false;
-    }
-
-    logger.warn("Trask /ask deferReply failed; retrying with ephemeral response.", {
-      error: toErrorMessage(error),
-      guildId: interaction.guildId,
-      channelId: interaction.channelId,
-    });
-  }
-
-  if (interaction.deferred || interaction.replied) {
-    return true;
-  }
-
-  try {
-    await interaction.deferReply({ ephemeral: true });
-    return true;
-  } catch (error) {
-    if (isUnknownInteractionError(error)) {
-      logger.warn("Discord reported stale interaction during deferReply fallback; skipping command execution.", {
-        guildId: interaction.guildId,
-        channelId: interaction.channelId,
-      });
-      return false;
-    }
-    throw error;
-  }
-};
-
 const handleAskCommand = async (interaction: ChatInputCommandInteraction): Promise<void> => {
   const query = interaction.options.getString("query", true);
   rememberRecentQuery(interaction.user.id, query);
   const threadOpt = interaction.options.getString("thread")?.trim();
   const threadId = threadOpt && isTraskThreadId(threadOpt) ? threadOpt : randomUUID();
 
-  const deferred = await ensureAskDeferred(interaction);
-  if (!deferred) {
-    return;
+  if (!interaction.deferred && !interaction.replied) {
+    const deferred = await ensureAskDeferred(interaction, logger);
+    if (!deferred) {
+      return;
+    }
   }
 
   const queryId = randomUUID();
@@ -518,15 +452,19 @@ const dispatchChatCommand = async (interaction: ChatInputCommandInteraction): Pr
       await handleReindexCommand(interaction);
       break;
     default:
-      await safeReply(interaction, {
-        embeds: [
-          buildErrorEmbed({
-            title: "Unknown Command",
-            description: `Trask does not recognize /${interaction.commandName}.`,
-          }),
-        ],
-        ephemeral: true,
-      });
+      await safeReply(
+        interaction,
+        {
+          embeds: [
+            buildErrorEmbed({
+              title: "Unknown Command",
+              description: `Trask does not recognize /${interaction.commandName}.`,
+            }),
+          ],
+          ephemeral: true,
+        },
+        logger,
+      );
   }
 };
 
@@ -566,11 +504,31 @@ client.on("error", (error) => {
   });
 });
 
+const stopDiscordIndexSync = startDiscordIndexSync(config, logger);
+
 client.once("ready", (readyClient) => {
   logger.info("Trask is online.", {
     user: readyClient.user.tag,
     approvedGuildCount: config.allowedGuildIds.length,
     approvedChannelCount: config.approvedChannelIds.length,
+    discordIndexSyncMs: config.discordSyncIntervalMs,
+    discordChannelBlacklistCount: config.discordChannelBlacklist.length,
+  });
+});
+
+process.on("beforeExit", () => {
+  stopDiscordIndexSync?.();
+});
+
+process.on("unhandledRejection", (reason) => {
+  logger.error("Unhandled promise rejection in Trask bot.", {
+    error: reason instanceof Error ? reason.message : String(reason),
+  });
+});
+
+process.on("uncaughtException", (error) => {
+  logger.error("Uncaught exception in Trask bot.", {
+    error: toErrorMessage(error),
   });
 });
 
@@ -607,30 +565,46 @@ client.on("interactionCreate", async (interaction) => {
     return;
   }
 
+  const isAsk = interaction.commandName === "ask";
+  if (isAsk) {
+    const deferred = await ensureAskDeferred(interaction, logger);
+    if (!deferred) {
+      return;
+    }
+  }
+
   if (!isAllowedGuild(interaction.guildId)) {
-    await safeReply(interaction, {
+    const payload = {
       embeds: [
         buildErrorEmbed({
           title: "Not Available Here",
           description: "Trask is not authorized to operate in this guild.",
         }),
       ],
-      ephemeral: true,
-    });
+      allowedMentions: { parse: [] as const },
+    };
+
+    if (interaction.deferred || interaction.replied) {
+      await safeEditReply(interaction, payload, logger);
+    } else {
+      await safeReply(interaction, { ...payload, ephemeral: true }, logger);
+    }
     return;
   }
 
   // Channel restriction only applies to /ask (the content-producing command).
-  if (interaction.commandName === "ask" && !isAllowedChannel(interaction.channelId)) {
-    await safeReply(interaction, {
+  if (isAsk && !isAllowedChannel(interaction.channelId)) {
+    const payload = {
       embeds: [
         buildErrorEmbed({
           title: "Wrong Channel",
           description: "Trask can only answer questions in approved channels on this server.",
         }),
       ],
-      ephemeral: true,
-    });
+      allowedMentions: { parse: [] as const },
+    };
+
+    await safeEditReply(interaction, payload, logger);
     return;
   }
 
@@ -654,7 +628,7 @@ client.on("interactionCreate", async (interaction) => {
       return;
     }
 
-    await safeReply(interaction, payload);
+    await safeReply(interaction, payload, logger);
   }
 });
 

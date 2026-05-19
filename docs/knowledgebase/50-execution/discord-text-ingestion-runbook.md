@@ -5,7 +5,22 @@ status: active
 lastUpdated: 2026-05-15
 ---
 
-# Export
+# Chroma auto-index (preferred for Trask RAG)
+
+1. [REPO] Seed or run the indexer: `bash scripts/bootstrap_trask_indexer.sh`, `bash scripts/trask_index_seed_for_qa.sh` (fixtures), `trask-indexer serve` on `TRASK_INDEXER_BASE_URL`.
+2. [REPO] One-time or CI sync (all guilds in `TRASK_ALLOWED_GUILD_IDS`):
+
+```bash
+export TRASK_DISCORD_BOT_TOKEN=...
+export TRASK_ALLOWED_GUILD_IDS=123,456
+export TRASK_DISCORD_CHANNEL_BLACKLIST=   # optional comma-separated channel IDs to skip
+python scripts/trask_discord_sync.py
+```
+
+3. [REPO] Continuous sync on the Trask bot: set `TRASK_DISCORD_SYNC_INTERVAL_MS` (e.g. `3600000`). Blacklist via `TRASK_DISCORD_CHANNEL_BLACKLIST`. Sync logs chunk counts; `GET /health` on the indexer may include `last_discord_sync` from `data/trask-indexer/discord_sync_status.json`.
+4. [SYNTH] This path writes to **Chroma** (`infra/trask-indexer`). It does **not** populate `FileChunkStore` under `INGEST_STATE_DIR`.
+
+# Legacy export + FileChunkStore import
 
 1. [REPO] Ensure bot token and guild id are available.
 2. [REPO] Run text-focused export:

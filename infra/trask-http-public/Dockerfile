@@ -13,13 +13,13 @@ FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json tsconfig.workspace.json ./
 COPY packages ./packages
 COPY apps/trask-http-server ./apps/trask-http-server
-COPY vendor/ai-researchwizard ./vendor/ai-researchwizard
+COPY infra/trask-indexer ./infra/trask-indexer
+COPY scripts ./scripts
 COPY vendor/llm_fallbacks ./vendor/llm_fallbacks
-COPY scripts/bootstrap_trask_gpt_researcher.sh ./scripts/bootstrap_trask_gpt_researcher.sh
 COPY data/ingest-worker ./data/ingest-worker
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @openkotor/trask-http-server build
-RUN bash scripts/bootstrap_trask_gpt_researcher.sh
+RUN bash scripts/bootstrap_trask_research.sh
 
 FROM base AS runtime
 WORKDIR /workspace
@@ -28,8 +28,10 @@ ENV PORT=${PORT}
 ENV TRASK_HTTP_PORT=${PORT}
 ENV TRASK_WEB_ALLOW_ANONYMOUS=1
 ENV TRASK_WEB_DEFAULT_USER_ID=qa-webui
-ENV TRASK_GPT_RESEARCHER_PYTHON=/workspace/.venv-trask-gptr/bin/python
+ENV TRASK_WEB_RESEARCH_PYTHON=/workspace/.venv-trask-research/bin/python
+ENV TRASK_INDEXER_BASE_URL=http://127.0.0.1:8790
 ENV TRASK_PUBLIC_WEB_ORIGIN=https://openkotor.github.io
+ENV TRASK_RESEARCH_TIMEOUT_MS=900000
 ENV TRASK_RESEARCHWIZARD_TIMEOUT_MS=900000
 ENV INGEST_STATE_DIR=/workspace/data/ingest-worker
 ENV TRASK_HTTP_DATA_DIR=/workspace/data/trask-http-server

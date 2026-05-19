@@ -131,9 +131,9 @@ async function main() {
   if (rich + passed + degraded === queries.length) {
     if (degraded > 0 && rich === 0) {
       console.log("\n⚠  All queries returned degraded answers. The server round-trip works but the");
-      console.log("   Python ai-researchwizard is not configured. To get full results set:");
+      console.log("   Python research stack is not configured. To get full results set:");
       console.log("   OPENAI_API_KEY or OPENROUTER_API_KEY, then run:");
-      console.log("   TRASK_GPT_RESEARCHER_ROOT=$(pwd)/vendor/ai-researchwizard ./scripts/trask_ops.mjs setup-venv");
+      console.log("   bash scripts/bootstrap_trask_research.sh && node scripts/trask_ops.mjs setup-venv");
     } else {
       console.log("\n✅  Trask Web UI browser verification passed.");
     }

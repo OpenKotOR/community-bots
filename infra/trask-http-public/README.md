@@ -1,30 +1,22 @@
 ---
-title: Holocron Trask HTTP (GPTR)
-emoji: 🔮
-colorFrom: blue
-colorTo: purple
-sdk: docker
-app_port: 7860
-pinned: false
+title: Holocron Trask HTTP
 ---
 
-# Holocron Trask HTTP (live research)
+# Holocron Trask HTTP (Hugging Face Space)
 
-Public `trask-http-server` with headless **ai-researchwizard** (GPTR), local ingest chunks, and `/api/trask/*` for Holocron.
+Public `trask-http-server` with **Crawl4AI indexer retrieval** (`scripts/trask_web_research.py`), local ingest chunks, and `/api/trask/*` for Holocron.
 
-- Source: `apps/trask-http-server` in [OpenKotOR/community-bots](https://github.com/OpenKotOR/community-bots)
-- Deployed by `.github/workflows/trask-http-public.yml`
-- Fronted for GitHub Pages by the Cloudflare worker (`TRASK_RESEARCHWIZARD_BASE_URL` when `TRASK_BUILTIN_API=0`)
+## Deploy
 
-## Space secrets (all optional)
+- Workflow: `.github/workflows/trask-http-public.yml`
+- Space: `OpenKotOR/holocron-trask-http`
+- Secret: `HUGGINGFACE_TOKEN` (repository secret)
 
-CI syncs from GitHub repository secrets when they exist. None are required for deploy.
+## Runtime
 
-| Secret | Purpose |
-|--------|---------|
-| `OPENAI_API_KEY` | Optional OpenAI-compatible chat |
-| `OPENROUTER_API_KEY` | Optional; also used when `OPENAI_API_KEY` is unset (see `loadSharedAiConfig`) |
-| `TAVILY_API_KEY` | Optional web retrieval |
-| `FAST_LLM` / `SMART_LLM` / `STRATEGIC_LLM` | Optional GPTR model overrides |
-
-Without paid API keys, Trask uses **vendored `llm_fallbacks` free models** and **bundled local knowledge** (`data/ingest-worker`). Holocron still returns grounded answers for the canonical technical topics.
+| Variable | Purpose |
+|----------|---------|
+| `TRASK_WEB_RESEARCH_PYTHON` | `.venv-trask-research` from Docker build |
+| `TRASK_INDEXER_BASE_URL` | Retrieve API (default in image: `http://127.0.0.1:8790`) |
+| `OPENAI_API_KEY` / `OPENROUTER_API_KEY` | Optional answer rewrite |
+| `TRASK_RESEARCH_TIMEOUT_MS` | Research subprocess timeout (default 900000) |

@@ -84,9 +84,9 @@ test("loadSharedAiConfig returns undefined headers when no OpenRouter vars are s
 // loadResearchWizardRuntimeConfig — timeout and script path
 // ---------------------------------------------------------------------------
 
-test("loadResearchWizardRuntimeConfig defaults timeout to 90000 ms when TRASK_RESEARCHWIZARD_TIMEOUT_MS is absent", () => {
+test("loadResearchWizardRuntimeConfig defaults timeout to 900000 ms when TRASK_RESEARCH_TIMEOUT_MS is absent", () => {
   const cfg = loadResearchWizardRuntimeConfig({});
-  assert.equal(cfg.timeoutMs, 90000);
+  assert.equal(cfg.timeoutMs, 900000);
 });
 
 test("loadResearchWizardRuntimeConfig respects TRASK_RESEARCHWIZARD_TIMEOUT_MS override", () => {
@@ -94,21 +94,45 @@ test("loadResearchWizardRuntimeConfig respects TRASK_RESEARCHWIZARD_TIMEOUT_MS o
   assert.equal(cfg.timeoutMs, 120000);
 });
 
-test("loadResearchWizardRuntimeConfig sets headlessScriptPath to undefined when TRASK_GPT_RESEARCHER_SCRIPT is absent", () => {
+test("loadResearchWizardRuntimeConfig sets researchScriptPath to undefined when TRASK_WEB_RESEARCH_SCRIPT is absent", () => {
   const cfg = loadResearchWizardRuntimeConfig({});
-  assert.equal(cfg.headlessScriptPath, undefined);
+  assert.equal(cfg.researchScriptPath, undefined);
 });
 
-test("loadResearchWizardRuntimeConfig resolves an explicit headless script path", () => {
-  const cfg = loadResearchWizardRuntimeConfig({ TRASK_GPT_RESEARCHER_SCRIPT: "/tmp/my_script.py" });
-  assert.ok(cfg.headlessScriptPath?.endsWith("my_script.py"));
+test("loadResearchWizardRuntimeConfig resolves an explicit research script path", () => {
+  const cfg = loadResearchWizardRuntimeConfig({ TRASK_WEB_RESEARCH_SCRIPT: "/tmp/my_script.py" });
+  assert.ok(cfg.researchScriptPath?.endsWith("my_script.py"));
 });
 
-test("loadResearchWizardRuntimeConfig falls back to 'python' when no venv path is present", () => {
-  // Force no auto-discovery by pointing at a non-existent root.
-  const cfg = loadResearchWizardRuntimeConfig({ TRASK_GPT_RESEARCHER_ROOT: "/nonexistent/path/that/does/not/exist" });
-  // Explicit TRASK_GPT_RESEARCHER_ROOT is set but has no gpt_researcher/ inside, so
-  // root resolves but the venv walk still yields 'python'.
+test("loadResearchWizardRuntimeConfig defaults indexer base URL", () => {
+  const cfg = loadResearchWizardRuntimeConfig({});
+  assert.equal(cfg.indexerBaseUrl, "http://127.0.0.1:8790");
+});
+
+test("loadResearchWizardRuntimeConfig respects TRASK_INDEXER_BASE_URL", () => {
+  const cfg = loadResearchWizardRuntimeConfig({ TRASK_INDEXER_BASE_URL: "http://127.0.0.1:9999" });
+  assert.equal(cfg.indexerBaseUrl, "http://127.0.0.1:9999");
+});
+
+test("loadResearchWizardRuntimeConfig defaults grounded compose on and composeMode grounded", () => {
+  const cfg = loadResearchWizardRuntimeConfig({});
+  assert.equal(cfg.groundedComposeEnabled, true);
+  assert.equal(cfg.composeMode, "grounded");
+});
+
+test("loadResearchWizardRuntimeConfig enables rewrite compose mode when TRASK_RESEARCH_COMPOSE_MODE=rewrite", () => {
+  const cfg = loadResearchWizardRuntimeConfig({ TRASK_RESEARCH_COMPOSE_MODE: "rewrite" });
+  assert.equal(cfg.composeMode, "rewrite");
+  assert.equal(cfg.groundedComposeEnabled, false);
+});
+
+test("loadResearchWizardRuntimeConfig disables grounded compose when TRASK_GROUNDED_COMPOSE=0", () => {
+  const cfg = loadResearchWizardRuntimeConfig({ TRASK_GROUNDED_COMPOSE: "0" });
+  assert.equal(cfg.groundedComposeEnabled, false);
+});
+
+test("loadResearchWizardRuntimeConfig falls back to 'python' when no research venv is present", () => {
+  const cfg = loadResearchWizardRuntimeConfig({ TRASK_REPO_ROOT: "/nonexistent/path/that/does/not/exist" });
   assert.ok(typeof cfg.pythonExecutable === "string");
   assert.ok(cfg.pythonExecutable.length > 0);
 });

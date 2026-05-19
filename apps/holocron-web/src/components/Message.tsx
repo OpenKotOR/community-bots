@@ -507,10 +507,36 @@ function MessageView({ message, onToggleExpand }: MessageProps) {
     return nodes.length > 0 ? nodes : text
   }
 
+  const renderProvenanceStrip = () => {
+    if (isUser || message.researchStatus === 'pending') return null
+    const cited = answerPresentation.sources.length
+    const consulted = message.consultedSourceCount ?? (cited + relatedSources.length)
+    const status = message.groundingStatus ?? (message.researchStatus === 'failed' ? 'failed' : 'partial')
+    return (
+      <p
+        className="mb-3 text-xs text-muted-foreground"
+        aria-label={`Provenance: ${cited} cited sources, ${consulted} consulted, status ${status}`}
+      >
+        Cited: {cited} · Consulted: {consulted} · Status: {status}
+      </p>
+    )
+  }
+
+  const renderFailedBanner = () => {
+    if (message.researchStatus !== 'failed' && message.groundingStatus !== 'failed') return null
+    return (
+      <p className="mb-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        Research could not produce a fully grounded answer. Review sources or rephrase your question.
+      </p>
+    )
+  }
+
   const renderAnswerBody = () => {
     if (!answerPresentation.hasAnswerText) {
       return (
         <div className="min-w-0 flex-1 text-[15px] leading-7 text-foreground/95">
+          {renderFailedBanner()}
+          {renderProvenanceStrip()}
           <p className="rounded-md border border-primary/25 bg-background/55 px-3 py-2 text-sm leading-6 text-muted-foreground">
             {fallbackVisibleText}
           </p>
@@ -525,6 +551,8 @@ function MessageView({ message, onToggleExpand }: MessageProps) {
 
     return (
       <div className="min-w-0 flex-1 space-y-4 text-[15px] leading-7 text-foreground/95">
+        {renderFailedBanner()}
+        {renderProvenanceStrip()}
         {blocks.length > 0 ? blocks.map((block, idx) => (
           <p key={`${idx}:${block.slice(0, 24)}`} className="whitespace-pre-wrap">
             {renderInlineCitations(block)}

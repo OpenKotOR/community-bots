@@ -675,6 +675,7 @@ export const createTraskHttpRouter = <TUser extends TraskHttpUser = TraskHttpUse
               url: source.homeUrl,
             })),
             visitedUrls: [...result.visitedUrls],
+            ...(result.groundingStatus ? { groundingStatus: result.groundingStatus } : {}),
             error: null,
             createdAt,
             completedAt: new Date().toISOString(),
@@ -765,6 +766,7 @@ export const createTraskHttpRouter = <TUser extends TraskHttpUser = TraskHttpUse
               url: source.homeUrl,
             })),
             visitedUrls: [...result.visitedUrls],
+            ...(result.groundingStatus ? { groundingStatus: result.groundingStatus } : {}),
             error: null,
             completedAt: new Date().toISOString(),
           };

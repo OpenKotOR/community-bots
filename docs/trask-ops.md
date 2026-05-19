@@ -8,14 +8,14 @@ Operations and verification guide for the three OpenKOTOR Discord bots plus the 
 |-----------|--------|---------|
 | Trask HTTP server (`/api/trask/*`) | ✅ | `pnpm holocron:e2e` — 5 live research queries via Playwright on :4010 |
 | Holocron web UI (`apps/holocron-web`) | ✅ | Same functional e2e (`apps/holocron-web/e2e/holocron-research.spec.ts`) |
-| GPTR Python venv auto-discovery | ✅ | No path config needed; walks up from cwd |
+| Research Python venv auto-discovery | ✅ | `.venv-trask-research` when present |
 | Garbage content filtering | ✅ | Cloudflare/JS-challenge blocks stripped from scraped pages |
 | Seeded KOTOR lore (15 entries) | ✅ | Revan/Bastila/HK-47/Exile/Nihilus/Pazaak-rules/etc. answer without LLM key |
 | Local knowledge fallback | ✅ | `localKnowledgeFallbackAnswer` used when synthesis fails |
 | Unit test suite | ✅ | 453/453 passing — persistence, retrieval, config, core, platform (utils+oauth+cors+browser), policy (merge+public+file-loader), pazaak-engine (rules+opponents), discord-ui, personas, bots, Trask (reply-format+research-wizard), and tournament |
 | Bot cold-start (no tokens) | ✅ | All 3 bots start → only fail at Discord token step |
 | Discord bot code + command registration | ✅ | `pnpm discord:smoke-bots` once tokens provided |
-| Live Discord bot interaction | ⏳ | Run `pnpm discord:setup` to enter credentials — see below |
+| Live Discord bot interaction | ⏳ | Keep `pnpm dev:trask` (or container) running; verify channels — see below |
 
 ---
 
@@ -35,8 +35,8 @@ pnpm build
 node scripts/trask_ops.mjs setup-venv
 ```
 
-This creates `.venv-trask-gptr/` at the repo root with all Python dependencies.
-**Both the venv path and the ai-researchwizard root are auto-discovered — no path configuration needed.**
+This creates `.venv-trask-research/` at the repo root (`scripts/bootstrap_trask_research.sh`).
+**The venv path is auto-discovered by `loadResearchWizardRuntimeConfig` — no path configuration needed when bootstrap ran.**
 
 ### 3. Configure Discord credentials
 
@@ -82,8 +82,12 @@ TAVILY_API_KEY=tvly-...
 # Start Trask web Q&A server (port 4010)
 pnpm dev:trask-http
 
-# Start Trask Discord bot
+# Start Trask Discord bot (must stay running — Discord shows
+# "The application did not respond" if no process is connected)
 pnpm dev:trask
+
+# Verify TRASK_APPROVED_CHANNEL_IDS matches real channel snowflakes
+node scripts/trask_discord_channel_verify.mjs
 
 # Start HK-86 Discord bot (react-for-role)
 pnpm dev:hk
@@ -199,7 +203,7 @@ node scripts/trask_ops.mjs --help
 
 # Commands:
 #   setup          Install deps, init submodules, build
-#   setup-venv     Create/update .venv-trask-gptr Python venv
+#   setup-venv     Create/update .venv-trask-research Python venv
 #   update         git pull + rebuild
 #   build-web      Build holocron-web static assets
 #   dev-http       Start trask-http-server (port 4010)

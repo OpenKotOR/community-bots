@@ -2,7 +2,7 @@
 
 - Do not install, enable, or recommend the **Runlayer** Cursor marketplace plugin (MCP governance hooks block browser/MCP tools without tenant login).
 - Prefer taking full initiative: run commands, start services, and verify behavior in this environment instead of telling the user to perform manual setup or testing steps themselves.
-- For repo-wide TypeScript tightening (replacing `any` or unjustified `unknown`), leave `./vendor/ai-researchwizard` out of scope unless the user explicitly includes it.
+- Holocron live research uses **Crawl4AI indexer + DuckDuckGo** (`scripts/trask_web_research.py`, `infra/trask-indexer`) and Node LLM synthesis; bootstrap with `bash scripts/bootstrap_trask_research.sh`. `docs/solutions/` holds documented fixes and cutovers (YAML frontmatter: `module`, `tags`, `problem_type`).
 
 ## Learned Workspace Facts
 
@@ -10,7 +10,7 @@
 - **PazaakWorld HTTP API failover** (non-Nakama paths): `@openkotor/platform` `createBrowserApiClient` walks comma-separated `VITE_API_BASES` in order and retries the next origin on **network errors or 5xx** (4xx does not hop). **`VITE_LEGACY_HTTP_ORIGIN`** origins are **prepended** (deduped) before `VITE_API_BASES`, so Pages can set `VITE_LEGACY_HTTP_ORIGIN` to a public bot and `PAZAAK_API_BASES` to a Cloudflare Worker URL for bot-first → Worker fallback. Worker lives in `infra/pazaak-matchmaking-worker`; CI runs `wrangler deploy --dry-run` in `.github/workflows/pazaak-matchmaking-worker.yml` without secrets; live deploy needs `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` repository secrets.
 - **PazaakWorld on GitHub Pages** (static client only): `OpenKotOR/community-bots` is published at `https://openkotor.github.io/community-bots/`; CI and Vite should use `BASE=/community-bots/` (and `import.meta.env.BASE_URL` in app code). Treat legacy `/bots/` org URLs as mismatched with the renamed repo unless a separate redirect or `bots` Pages repo exists.
 - For KotOR-authentic color theming in PazaakWorld (including fixing mismatched labels like “KotOR classic”), reference OpenKotOR ModSync’s K1 and TSL theme definitions rather than inventing standalone palettes.
-- **Trask Q&A:** Node side uses `@openkotor/trask` and `@openkotor/trask-http`; `apps/trask-http-server` can serve `apps/holocron-web` and expose `/api/trask/*`, including a minimal in-memory `/__spark-kv` shim for static Holocron builds. Research calls go to `vendor/ai-researchwizard` (GPTR). When `TRASK_GPT_RESEARCHER_PYTHON` is unset, `loadResearchWizardRuntimeConfig` prefers the monorepo bootstrap interpreter at `.venv-trask-gptr` (`Scripts/python.exe` on Windows, `bin/python` on Unix), matching `scripts/smoke_trask_headless_gptr.py`. The vendored `vendor/ai-researchwizard/requirements.txt` omits `langchain-netmind` by default (LangChain version pin conflict); install it with `pip install langchain-netmind --no-deps` only if you need it. Python LLM fallback ordering comes from `vendor/llm_fallbacks` (`FREE_CHAT_MODELS` / `get_fallback_list("chat")`, not a `FREE_LLM_MODELS` env var). `loadSharedAiConfig` may fall back to `OPENROUTER_API_KEY` when `OPENAI_API_KEY` is unset for OpenAI-compatible clients (optional `OPENAI_BASE_URL` and OpenRouter headers). Holocron browser sessions allow anonymous `/api/trask/*` when `TRASK_WEB_API_KEY` is unset unless `TRASK_WEB_ALLOW_ANONYMOUS=0`; set `TRASK_WEB_API_KEY` for locked-down deployments. `TRASK_RESEARCHWIZARD_TIMEOUT_MS` defaults to **900000** ms when unset (`loadResearchWizardRuntimeConfig` in `packages/config`). **Public Holocron (Pages):** set `TRASK_API_BASE` to the Trask worker with **`TRASK_BUILTIN_API=0`**. Deploy live GPTR via `OpenKotOR/holocron-trask-http` (`infra/trask-http-public/`, `.github/workflows/trask-http-public.yml`; repository secret `HUGGINGFACE_TOKEN` only), set `TRASK_RESEARCHWIZARD_BASE_URL=https://openkotor-holocron-trask-http.hf.space`, and **`TRASK_BUILTIN_FALLBACK=0`** (no offline reference substitute). Answers must cite multiple approved **`https://`** pages from GPTR web research only. `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, and other LLM env vars are **optional** on the Space — when unset, GPTR uses vendored `llm_fallbacks` free models.
+- **Trask / Holocron:** UI in **`apps/holocron-web`**; API in **`apps/trask-http-server`** (`/api/trask/*`, serves built Holocron on port **4010**). Live research: **`scripts/trask_web_research.py`** (indexer `POST /retrieve` at `TRASK_INDEXER_BASE_URL`, local Chroma, DuckDuckGo fallback; stdout includes structured **`passages`**) + **grounded compose** in `@openkotor/trask` (`TRASK_GROUNDED_COMPOSE` on by default; set `0`/`false` to disable digest rewrite). Bootstrap: `bash scripts/bootstrap_trask_research.sh`; set `TRASK_WEB_RESEARCH_PYTHON` and `OPENAI_API_KEY` or `OPENROUTER_API_KEY`. **Discord RAG:** index all readable channels except `TRASK_DISCORD_CHANNEL_BLACKLIST`; bot auto-sync when `TRASK_DISCORD_SYNC_INTERVAL_MS` > 0 (`scripts/trask_discord_sync.py`). Holocron allows anonymous `/api/trask/*` when `TRASK_WEB_ALLOW_ANONYMOUS=1`. `TRASK_RESEARCH_TIMEOUT_MS` (alias `TRASK_RESEARCHWIZARD_TIMEOUT_MS`) defaults to **900000** ms. **Public Holocron:** `TRASK_API_BASE` on the Trask worker with **`TRASK_BUILTIN_API=0`** and live `trask-http-server` (`infra/trask-http-public/`).
 
 ## Cursor Cloud specific instructions
 
@@ -54,7 +54,8 @@ Holocron e2e is **functional only** (no mocked `/api/trask` routes, no UI regres
 #### Mandatory verification (run before “done”)
 
 1. Ensure **`trask-http-server`** serves built Holocron on **http://127.0.0.1:4010** (`TRASK_WEB_ALLOW_ANONYMOUS=1`).
-2. Run the **full** Playwright suite (all five searches — not a subset):
+2. Seed Chroma for the five golden queries: `bash scripts/bootstrap_trask_indexer.sh`, `bash scripts/trask_index_seed_for_qa.sh`, and `trask-indexer serve` on `TRASK_INDEXER_BASE_URL` (CI does this automatically before e2e).
+3. Run the **full** Playwright suite (all five searches — not a subset):
 
 ```bash
 pnpm exec playwright install chromium --with-deps   # once per machine
@@ -63,10 +64,10 @@ pnpm holocron:e2e
 HOLOCRON_REUSE_SERVER=1 pnpm holocron:e2e
 ```
 
-3. When the Cursor **browser** MCP is available, you must run **all five** canonical queries in the web UI (not a subset). Use a **fresh** `?thread=<uuid>` per query so history does not bleed across tests. Workflow: `browser_navigate` → `browser_lock` → fill **Question input** → **Submit question** (only after the button is enabled) → wait until **Thinking** clears and an assistant message plus citation links appear → `browser_unlock` when finished. Report pass/fail per query in your completion message. Playwright alone does **not** satisfy this step when browser MCP works.
-4. If the task touches deployed/public Holocron behavior, also verify **`https://openkotor.github.io/community-bots/qa-webui/?thread=<fresh-uuid>`** in a real browser after deploy. Agents must keep `TRASK_API_BASE` on the Trask worker with **`TRASK_BUILTIN_API=0`** and a working **`TRASK_RESEARCHWIZARD_BASE_URL`** (live GPTR, e.g. `OpenKotOR/holocron-trask-http`), trigger Pages rebuild themselves, and confirm at least one public query returns **multiple `https://` sources** before reporting success.
+4. When the Cursor **browser** MCP is available, you must run **all five** canonical queries in the web UI (not a subset). Use a **fresh** `?thread=<uuid>` per query so history does not bleed across tests. Workflow: `browser_navigate` → `browser_lock` → fill **Question input** → **Submit question** (only after the button is enabled) → wait until **Thinking** clears and an assistant message plus citation links appear → `browser_unlock` when finished. Report pass/fail per query in your completion message. Playwright alone does **not** satisfy this step when browser MCP works.
+5. If the task touches deployed/public Holocron behavior, also verify **`https://openkotor.github.io/community-bots/qa-webui/?thread=<fresh-uuid>`** in a real browser after deploy. Keep `TRASK_API_BASE` on the Trask worker with **`TRASK_BUILTIN_API=0`** and a live research backend, then confirm at least one public query returns **multiple `https://` sources** before reporting success.
 
-**Pass criteria (each of the five queries):** question input enabled → submit → user message visible → assistant answer substantive and on-topic → no stuck **Thinking** (≤ ~200s) → **at least two distinct `https://` sources** on approved hosts from live GPTR web research (Deadly Stream, PCGamingWiki, GitHub project roots, kotor.neocities.org, lucasforumsarchive.org, etc.). There is no bundled or `local://` citation path — if you see those URLs, the wrong API or an old build is running.
+**Pass criteria (each of the five queries):** question input enabled → submit → user message visible → assistant answer substantive and on-topic → no stuck **Thinking** (≤ ~200s) → **Sources** panel or visible `https://` citations (≥2) on approved hosts.
 
 **Canonical five queries** (defined in `holocron-research.spec.ts`):
 
@@ -99,9 +100,10 @@ Confirm the server answers before opening the UI: `curl -sf http://127.0.0.1:401
 | Variable | Purpose |
 |----------|---------|
 | `TRASK_WEB_ALLOW_ANONYMOUS=1` | Anonymous Holocron sessions on standalone `trask-http-server` |
-| `OPENAI_API_KEY` / `OPENROUTER_API_KEY` | GPTR + answer rewrite (see `.env`, `.env.local`, `vendor/ai-researchwizard/.env`) |
+| `OPENAI_API_KEY` / `OPENROUTER_API_KEY` | LLM synthesis for Holocron answers (see `.env`, `.env.local`) |
 | `INGEST_STATE_DIR` | Defaults to `data/ingest-worker` for local knowledge chunks |
-| `TRASK_GPT_RESEARCHER_PYTHON` | Optional; defaults to `.venv-trask-gptr/bin/python` when present |
+| `TRASK_WEB_RESEARCH_PYTHON` | Optional; defaults to `.venv-trask-research/bin/python` when present |
+| `TRASK_INDEXER_BASE_URL` | Trask indexer retrieve API (default `http://127.0.0.1:8790`) |
 
 `trask-http-server` must use **`persistQueries: true`** for anonymous users so Holocron’s **202 + thread poll** path completes (configured in `apps/trask-http-server/src/main.ts`).
 
@@ -119,4 +121,14 @@ Confirm the server answers before opening the UI: `curl -sf http://127.0.0.1:401
 pnpm verify:trask-cli
 ```
 
-Use only when debugging GPTR/retrieval without the Holocron UI; it does **not** replace `pnpm holocron:e2e`.
+Use only when debugging retrieval without the Holocron UI; it does **not** replace `pnpm holocron:e2e`.
+
+#### Offline faithfulness gate (citation alignment)
+
+After code changes to answer formatting, citation alignment, or `grounded-evidence.ts`, run:
+
+```bash
+pnpm trask:faithfulness-eval
+```
+
+This replays committed golden fixtures under `data/trask-eval/fixtures/` (no live web research). It does **not** replace Holocron e2e for end-to-end research validation.

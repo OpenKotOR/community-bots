@@ -36,6 +36,7 @@ export interface TraskHistoryRecordDto {
   completedAt: string | null
   /** Progress timeline while pending (and retained after completion for replay/debug). */
   liveTrace?: TraskHistoryLiveEventDto[]
+  groundingStatus?: 'grounded' | 'partial' | 'failed'
 }
 
 export interface TraskSessionDto {

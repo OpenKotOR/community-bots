@@ -107,29 +107,29 @@ export interface SharedAiConfig {
   databaseUrl: string | undefined;
 }
 
+export type ResearchComposeMode = "grounded" | "rewrite";
+
 export interface ResearchWizardRuntimeConfig {
-  /** Absolute path to vendored `ai-researchwizard` (folder containing `gpt_researcher/`). */
-  gptResearcherRoot: string | undefined;
-  /** Python interpreter for `trask_headless_research.py` (default `python`). */
+  /** Base URL for `infra/trask-indexer` retrieve API (POST /retrieve). */
+  indexerBaseUrl: string;
+  /** Python interpreter for `scripts/trask_web_research.py` (default `python`). */
   pythonExecutable: string;
-  /** Optional absolute path to the headless runner; default `<gptResearcherRoot>/trask_headless_research.py`. */
-  headlessScriptPath: string | undefined;
+  /** Optional absolute path to the research runner; default `<repo>/scripts/trask_web_research.py`. */
+  researchScriptPath: string | undefined;
   timeoutMs: number;
+  /** When true (default), use question-last grounded compose when passages exist. */
+  groundedComposeEnabled: boolean;
+  /** `rewrite` enables legacy digest rewrite; default `grounded`. */
+  composeMode: ResearchComposeMode;
+  /** Kill Discord index sync subprocess after this many ms (0 = no timeout). */
+  discordSyncTimeoutMs: number;
 }
 
-const hasAiResearchWizardPackage = (rootDir: string): boolean =>
-  existsSync(join(rootDir, "gpt_researcher"));
-
-/**
- * Walks upward from `startDir` looking for `vendor/ai-researchwizard` with a `gpt_researcher/` tree.
- * Covers `pnpm --filter … dev` where cwd is `apps/trask-http-server` instead of the monorepo root.
- */
-const findVendorAiResearchWizard = (startDir: string, maxHops = 24): string | undefined => {
+const findMonorepoRoot = (startDir: string, maxHops = 24): string | undefined => {
   let dir = resolve(startDir);
   for (let hop = 0; hop < maxHops; hop++) {
-    const candidate = join(dir, "vendor", "ai-researchwizard");
-    if (hasAiResearchWizardPackage(candidate)) {
-      return candidate;
+    if (existsSync(join(dir, "pnpm-workspace.yaml")) && existsSync(join(dir, "scripts", "trask_web_research.py"))) {
+      return dir;
     }
     const parent = dirname(dir);
     if (parent === dir) {
@@ -140,48 +140,35 @@ const findVendorAiResearchWizard = (startDir: string, maxHops = 24): string | un
   return undefined;
 };
 
-const resolveGptResearcherRoot = (env: NodeJS.ProcessEnv): string | undefined => {
-  const explicit = readOptionalEnv("TRASK_GPT_RESEARCHER_ROOT", env);
-
+const resolveMonorepoRoot = (env: NodeJS.ProcessEnv): string => {
+  const explicit = readOptionalEnv("TRASK_REPO_ROOT", env)?.trim();
   if (explicit) {
-    return resolve(explicit.trim());
+    return resolve(explicit);
   }
 
-  const fromCwd = findVendorAiResearchWizard(process.cwd());
+  const fromCwd = findMonorepoRoot(process.cwd());
   if (fromCwd) {
     return fromCwd;
   }
 
   const configModuleDir = dirname(fileURLToPath(import.meta.url));
-  const fromPackage = findVendorAiResearchWizard(configModuleDir);
-  if (fromPackage) {
-    return fromPackage;
-  }
-
-  return undefined;
+  return findMonorepoRoot(configModuleDir) ?? resolve(configModuleDir, "..", "..", "..");
 };
 
 /**
- * Prefer the monorepo bootstrap venv (scripts/bootstrap_trask_gpt_researcher.*) when
- * `TRASK_GPT_RESEARCHER_PYTHON` is unset so Trask HTTP / Discord match `smoke_trask_headless_gptr.py`.
+ * Prefer the monorepo bootstrap venv (`scripts/bootstrap_trask_research.sh`) when
+ * `TRASK_WEB_RESEARCH_PYTHON` is unset.
  */
-const resolveTraskHeadlessPythonExecutable = (
-  gptResearcherRoot: string | undefined,
-  env: NodeJS.ProcessEnv,
-): string => {
-  const explicit = readOptionalEnv("TRASK_GPT_RESEARCHER_PYTHON", env)?.trim();
+const resolveTraskResearchPythonExecutable = (repoRoot: string, env: NodeJS.ProcessEnv): string => {
+  const explicit =
+    readOptionalEnv("TRASK_WEB_RESEARCH_PYTHON", env)?.trim() ??
+    readOptionalEnv("TRASK_RESEARCH_PYTHON", env)?.trim();
   if (explicit) {
     return explicit;
   }
 
-  if (!gptResearcherRoot) {
-    return "python";
-  }
-
-  const vendorDir = dirname(gptResearcherRoot);
-  const repoRoot = dirname(vendorDir);
-  const winPy = join(repoRoot, ".venv-trask-gptr", "Scripts", "python.exe");
-  const unixPy = join(repoRoot, ".venv-trask-gptr", "bin", "python");
+  const winPy = join(repoRoot, ".venv-trask-research", "Scripts", "python.exe");
+  const unixPy = join(repoRoot, ".venv-trask-research", "bin", "python");
 
   if (process.platform === "win32" && existsSync(winPy)) {
     return winPy;
@@ -195,14 +182,34 @@ const resolveTraskHeadlessPythonExecutable = (
 };
 
 export const loadResearchWizardRuntimeConfig = (env: NodeJS.ProcessEnv = process.env): ResearchWizardRuntimeConfig => {
-  const scriptRaw = readOptionalEnv("TRASK_GPT_RESEARCHER_SCRIPT", env);
-  const gptResearcherRoot = resolveGptResearcherRoot(env);
+  const repoRoot = resolveMonorepoRoot(env);
+  const scriptRaw =
+    readOptionalEnv("TRASK_WEB_RESEARCH_SCRIPT", env) ?? readOptionalEnv("TRASK_RESEARCH_SCRIPT", env);
+  const timeoutRaw =
+    readOptionalEnv("TRASK_RESEARCH_TIMEOUT_MS", env) ??
+    readOptionalEnv("TRASK_WEB_RESEARCH_TIMEOUT_MS", env) ??
+    readOptionalEnv("TRASK_RESEARCHWIZARD_TIMEOUT_MS", env) ??
+    "900000";
+
+  const composeModeRaw = readOptionalEnv("TRASK_RESEARCH_COMPOSE_MODE", env)?.trim().toLowerCase();
+  const composeMode: ResearchComposeMode = composeModeRaw === "rewrite" ? "rewrite" : "grounded";
+
+  const groundedRaw = readOptionalEnv("TRASK_GROUNDED_COMPOSE", env)?.trim().toLowerCase();
+  let groundedComposeEnabled = composeMode === "grounded";
+  if (groundedRaw === "0" || groundedRaw === "false" || groundedRaw === "no" || groundedRaw === "off") {
+    groundedComposeEnabled = false;
+  }
+
+  const syncTimeoutRaw = readOptionalEnv("TRASK_DISCORD_SYNC_TIMEOUT_MS", env) ?? "600000";
 
   return {
-    gptResearcherRoot,
-    pythonExecutable: resolveTraskHeadlessPythonExecutable(gptResearcherRoot, env),
-    headlessScriptPath: scriptRaw ? resolve(scriptRaw.trim()) : undefined,
-    timeoutMs: integerish.parse(readOptionalEnv("TRASK_RESEARCHWIZARD_TIMEOUT_MS", env) ?? "900000"),
+    indexerBaseUrl: (readOptionalEnv("TRASK_INDEXER_BASE_URL", env) ?? "http://127.0.0.1:8790").trim(),
+    pythonExecutable: resolveTraskResearchPythonExecutable(repoRoot, env),
+    researchScriptPath: scriptRaw ? resolve(scriptRaw.trim()) : undefined,
+    timeoutMs: integerish.parse(timeoutRaw),
+    groundedComposeEnabled,
+    composeMode,
+    discordSyncTimeoutMs: integerish.parse(syncTimeoutRaw),
   };
 };
 
@@ -240,6 +247,10 @@ export interface TraskBotConfig {
   researchWizard: ResearchWizardRuntimeConfig;
   allowedGuildIds: string[];
   approvedChannelIds: string[];
+  /** Channel IDs excluded from automatic Discord indexing (`TRASK_DISCORD_CHANNEL_BLACKLIST`). */
+  discordChannelBlacklist: string[];
+  /** When > 0, Trask bot runs `scripts/trask_discord_sync.py` on this interval (ms). */
+  discordSyncIntervalMs: number;
   /** Guild IDs where slash commands are registered (comma list in `TRASK_SLASH_GUILD_IDS`). */
   slashCommandGuildIds: string[];
   chunkDir: string;
@@ -383,6 +394,8 @@ export const loadTraskBotConfig = (env: NodeJS.ProcessEnv = process.env): TraskB
     researchWizard: loadResearchWizardRuntimeConfig(env),
     allowedGuildIds: readListEnv("TRASK_ALLOWED_GUILD_IDS", env),
     approvedChannelIds,
+    discordChannelBlacklist: readListEnv("TRASK_DISCORD_CHANNEL_BLACKLIST", env),
+    discordSyncIntervalMs: integerish.parse(readOptionalEnv("TRASK_DISCORD_SYNC_INTERVAL_MS", env) ?? "0"),
     slashCommandGuildIds: readListEnv("TRASK_SLASH_GUILD_IDS", env),
     chunkDir: readOptionalEnv("INGEST_STATE_DIR", env) ?? "data/ingest-worker",
     queryDataDir: readOptionalEnv("TRASK_QUERY_DATA_DIR", env) ?? "data/trask-bot",

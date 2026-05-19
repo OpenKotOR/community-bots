@@ -2,7 +2,7 @@
 title: Trask Configuration Environment Map
 owner: trask-bot
 status: active
-lastUpdated: 2026-05-15
+lastUpdated: 2026-05-19
 ---
 
 [SYNTH] Quick map of **Trask-related** process env vars to loaders in `packages/config/src/index.ts`. For narrative setup, see [docs/trask.md](../../trask.md).
@@ -22,10 +22,16 @@ lastUpdated: 2026-05-15
 
 | Variable | Notes |
 |----------|--------|
-| `TRASK_GPT_RESEARCHER_ROOT` | [REPO] Explicit vendor tree; else walk-up `vendor/ai-researchwizard`. |
-| `TRASK_GPT_RESEARCHER_PYTHON` | [REPO] Override Python; else `.venv-trask-gptr` bootstrap path when present. |
-| `TRASK_GPT_RESEARCHER_SCRIPT` | [REPO] Optional explicit headless script path. |
+| `TRASK_INDEXER_BASE_URL` | [REPO] Trask indexer retrieve API (default `http://127.0.0.1:8790`). |
+| `TRASK_WEB_RESEARCH_PYTHON` | [REPO] Override Python; else `.venv-trask-research` from `scripts/bootstrap_trask_research.sh`. |
+| `TRASK_WEB_RESEARCH_SCRIPT` | [REPO] Optional explicit path to `scripts/trask_web_research.py`. |
+| `TRASK_RESEARCH_TIMEOUT_MS` | [REPO] Research subprocess timeout (aliases `TRASK_RESEARCHWIZARD_TIMEOUT_MS`, default **900000**). |
 | `TRASK_RESEARCHWIZARD_TIMEOUT_MS` | [REPO] Default **90000** ms in config loader; Discord clamps to **90s** SLA at runtime. |
+| `TRASK_GROUNDED_COMPOSE` | [REPO] When `0` / `false` / `no`, disables grounded compose. Default **on** (`groundedComposeEnabled` in `loadResearchWizardRuntimeConfig`). |
+| `TRASK_RESEARCH_COMPOSE_MODE` | [REPO] `rewrite` enables legacy digest rewrite fallbacks; default `grounded`. |
+| `TRASK_WEB_RESEARCH_DDG_FALLBACK` | [REPO] When `1` / `true`, Python runner may use DuckDuckGo only after empty Chroma retrieve (operator bootstrap; not used for compose when index miss). |
+| `TRASK_INDEXER_DATA_DIR` | [REPO] Chroma persist dir (default `data/trask-indexer`). |
+| `TRASK_DISCORD_SYNC_TIMEOUT_MS` | [REPO] Kill `trask_discord_sync.py` subprocess after N ms (default **600000**; `0` = no timeout). |
 
 # Trask Discord bot (`loadTraskBotConfig`)
 
@@ -34,7 +40,9 @@ lastUpdated: 2026-05-15
 | `TRASK_DISCORD_APP_ID`, `TRASK_DISCORD_PUBLIC_KEY`, `TRASK_DISCORD_BOT_TOKEN` | [REPO] Required via `loadDiscordRuntimeConfig("TRASK", …)`. |
 | `TRASK_DISCORD_CLIENT_SECRET` | [REPO] Optional (OAuth flows). |
 | `TRASK_DISCORD_GUILD_ID` / `DISCORD_TARGET_GUILD_ID` | [REPO] Guild id fallback. |
-| `TRASK_ALLOWED_GUILD_IDS` | [REPO] Allow-list. |
+| `TRASK_ALLOWED_GUILD_IDS` | [REPO] Allow-list; all listed guilds are exported when running `scripts/trask_discord_sync.py`. |
+| `TRASK_DISCORD_CHANNEL_BLACKLIST` | [REPO] Channel IDs excluded from Discord export/indexing (comma-separated). |
+| `TRASK_DISCORD_SYNC_INTERVAL_MS` | [REPO] When &gt; 0, Trask bot runs `scripts/trask_discord_sync.py` on an interval (Chroma path). |
 | `TRASK_SLASH_GUILD_IDS` | [REPO] Guilds for slash registration. |
 | `TRASK_APPROVED_CHANNEL_IDS`, `TRASK_PROACTIVE_CHANNEL_IDS` | [REPO] Proactive scoping. |
 | `TRASK_PROACTIVE_ENABLED`, `TRASK_PROACTIVE_*` | [REPO] Debounce, cooldown, classifier, length limits (see `loadTraskBotConfig`). |

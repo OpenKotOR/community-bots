@@ -2025,6 +2025,8 @@ export interface TraskQueryRecord {
   completedAt: string | null;
   /** Server-written progression while status is pending (and frozen at completion). */
   liveTrace?: readonly TraskQueryLiveEvent[];
+  /** Grounding quality for Holocron provenance (grounded | partial | failed). */
+  groundingStatus?: "grounded" | "partial" | "failed";
 }
 
 interface PazaakMatchHistoryFileShape {

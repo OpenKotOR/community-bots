@@ -49,7 +49,29 @@ jobs:
       - name: Install Playwright (Chromium)
         run: pnpm exec playwright install chromium --with-deps
 
+      - name: Bootstrap Trask indexer venv
+        run: bash scripts/bootstrap_trask_indexer.sh
+
+      - name: Seed Chroma golden fixtures for Holocron e2e
+        run: .venv-trask-indexer/bin/python scripts/smoke_trask_indexed_stack.py --golden-fixtures --verify-retrieve
+        env:
+          TRASK_INDEXER_DATA_DIR: data/trask-indexer
+
+      - name: Start Trask indexer (background)
+        run: |
+          .venv-trask-indexer/bin/trask-indexer serve &
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8790/health; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Indexer failed to start" >&2
+          exit 1
+
       - name: Holocron functional e2e (live Trask research in browser)
         run: pnpm holocron:e2e
         env:
           TRASK_WEB_ALLOW_ANONYMOUS: "1"
+          TRASK_INDEXER_BASE_URL: http://127.0.0.1:8790
+          TRASK_WEB_RESEARCH_PYTHON: .venv-trask-indexer/bin/python

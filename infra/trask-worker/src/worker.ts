@@ -71,7 +71,7 @@ function hasRealUpstream(env: Env): boolean {
   return Boolean(baseUrl) && !baseUrl.includes("example.com");
 }
 
-/** Serve bundled references only (no GPTR upstream). */
+/** Serve bundled references only (no live Trask HTTP upstream). */
 function useBuiltinApi(env: Env): boolean {
   const builtinRaw = (env.TRASK_BUILTIN_API ?? "").trim().toLowerCase();
   if (builtinRaw === "0" || builtinRaw === "false") {
@@ -176,7 +176,7 @@ async function serveUpstreamOrFallback(
       502,
       {
         error: "Upstream Trask HTTP origin is unreachable.",
-        detail: "Bundled reference fallback is disabled; fix GPTR upstream or TRASK_RESEARCHWIZARD_BASE_URL.",
+        detail: "Bundled reference fallback is disabled; fix Trask HTTP upstream or TRASK_RESEARCHWIZARD_BASE_URL.",
       },
       origin,
     );

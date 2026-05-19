@@ -24,6 +24,8 @@ export interface Message {
   queryType?: QueryType
   researchStatus?: 'pending' | 'complete' | 'failed'
   researchSteps?: MessageResearchStep[]
+  groundingStatus?: 'grounded' | 'partial' | 'failed'
+  consultedSourceCount?: number
 }
 
 export interface Source {

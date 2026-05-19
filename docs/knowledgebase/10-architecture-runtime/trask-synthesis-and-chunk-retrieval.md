@@ -2,12 +2,12 @@
 title: Trask Synthesis And Chunk Retrieval
 owner: trask-bot
 status: active
-lastUpdated: 2026-05-15
+lastUpdated: 2026-05-19
 ---
 
 # Package roles
 
-- [REPO] **`@openkotor/trask`** — `ResearchWizardClient`, headless `ai-researchwizard` subprocess bridge, optional OpenAI-compatible rewrite passes (`research-wizard.ts`).
+- [REPO] **`@openkotor/trask`** — `ResearchWizardClient`, `scripts/trask_web_research.py` subprocess bridge, optional OpenAI-compatible rewrite passes (`research-wizard.ts`).
 - [REPO] **`@openkotor/retrieval`** — `defaultSourceCatalog`, `FileChunkStore`, `ChunkSearchProvider`, `createChunkSearchProvider`, URL allowlist helpers (`traskApprovedResearchSources`, `isTraskApprovedBaseUrl`, …).
 
 # `createResearchWizardClient`
@@ -27,11 +27,12 @@ lastUpdated: 2026-05-15
 # `answerQuestion` (full Holocron / Discord `/ask`)
 
 - [REPO] Applies **`applySourcePreferences`** to `traskApprovedResearchSources` when `options.sourcePreferences` is present.
-- [REPO] Loads local digest; emits **`onProgress`** `gather` when local hits exist.
-- [REPO] **`fetchResearchReport`** → `runHeadlessGptResearcher` with `report_type: "research_report"`, `report_source: "web"`, `allowed_url_prefixes` from approved sources, optional `model`, and custom prompt **`buildCustomPrompt()`** (Discord-native KOTOR assistant instructions + **Sources** heading contract).
-- [REPO] Appends local digest to the normalized report for citation extraction; **`mergeSourcesPreserveOrder`** merges **`collectRelevantSources(...)`** with local sources.
-- [REPO] Final answer text uses **`fallbackDiscordRewrite(reportWithLocalContext, relevantSources)`** (deterministic excerpt + **Sources** block from the merged report). A private **`rewriteForDiscord`** helper exists for OpenAI-style rewrites but is **not** invoked by **`answerQuestion`** in the current tree—brief/proactive uses **`rewriteForDiscordBrief`** instead.
-- [REPO] **Catch path**: if local sources exist → **`localKnowledgeFallbackAnswer`**; else **`degradedAnswerFallback`** with empty sources.
+- [REPO] Loads local digest via **`searchLocalKnowledge`**; emits **`onProgress`** `gather` when local hits exist. Local digest is appended to the web research report for passage extraction only — **`local://`** URLs are not emitted in public **Sources**.
+- [REPO] **`fetchResearchReport`** → `runTraskWebResearch` with `allowed_url_prefixes` from approved sources, optional `model`, and custom prompt **`buildCustomPrompt()`**.
+- [REPO] When **`TRASK_GROUNDED_COMPOSE=1`** and an OpenAI-compatible client is configured, **`tryGroundedCompose`** (`grounded-evidence.ts`) splits the enriched report into passages, extracts claims (LLM with heuristic fallback), and composes an answer with inline `[n]` citations. **`approvedSources`** are **`alignCitedSourcesToAnswer`** — only URLs cited in the body; no URL-padding to meet **`MIN_HOLOCRON_WEB_CITATIONS`**.
+- [REPO] Otherwise: **`rewriteForDiscord`** when an LLM client exists, else **`fallbackDiscordRewrite`**; synthesis-failure reports may use **`sourceOnlyFallbackAnswer`**. Final **`approvedSources`** always pass through **`alignCitedSourcesToAnswer`** (except the grounded path, which already aligned).
+- [REPO] Returns **`groundingStatus`** (`grounded` | `partial` | `failed`) via **`inferGroundingStatus`** for Holocron provenance UX and persistence.
+- [REPO] **Catch path**: research/timeout errors return a user-visible failure string with empty sources (no fake citations).
 
 # `answerQuestionBrief` (proactive)
 
@@ -41,11 +42,11 @@ lastUpdated: 2026-05-15
 
 # Model listing
 
-- [REPO] **`listModels()`** merges `DEFAULT_RESEARCH_WIZARD_MODELS` (`auto`) with `listHeadlessGptResearcherModels`; on failure returns defaults only.
+- [REPO] **`listModels()`** returns `DEFAULT_RESEARCH_WIZARD_MODELS` (`auto` and configured rewrite ids).
 
 # Operator troubleshooting
 
-- [trask-research-troubleshooting.md](../50-execution/trask-research-troubleshooting.md) — timeouts, GPTR / empty report, `INGEST_STATE_DIR` layout and mismatches, proactive gates, lexical chunk search limits.
+- [trask-research-troubleshooting.md](../50-execution/trask-research-troubleshooting.md) — timeouts, empty research report, `INGEST_STATE_DIR` layout and mismatches, proactive gates, lexical chunk search limits.
 
 # Related
 

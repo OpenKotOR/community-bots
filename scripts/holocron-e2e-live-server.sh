@@ -9,7 +9,7 @@ export TRASK_WEB_ALLOW_ANONYMOUS="${TRASK_WEB_ALLOW_ANONYMOUS:-1}"
 export TRASK_HTTP_PORT="${TRASK_HTTP_PORT:-4010}"
 export TRASK_RESEARCHWIZARD_TIMEOUT_MS="${TRASK_RESEARCHWIZARD_TIMEOUT_MS:-900000}"
 
-for envfile in ".env" ".env.local" "vendor/ai-researchwizard/.env"; do
+for envfile in ".env" ".env.local"; do
   if [[ -f "$envfile" ]]; then
     set -a
     # shellcheck disable=SC1090
@@ -26,8 +26,14 @@ for key in OPENAI_API_KEY OPENROUTER_API_KEY GEMINI_API_KEY GOOGLE_API_KEY GROQ_
   fi
 done
 if [[ "$has_llm" -eq 0 ]]; then
-  echo "holocron-e2e-live-server: warning — no LLM API keys in .env / .env.local / vendor/ai-researchwizard/.env." >&2
-  echo "  Holocron will use DuckDuckGo retriever-only research (slower, lower quality). Add OPENROUTER_API_KEY for best results." >&2
+  echo "holocron-e2e-live-server: warning — no LLM API keys in .env / .env.local." >&2
+  echo "  Holocron answers may be slower or lower quality without OPENROUTER_API_KEY or OPENAI_API_KEY." >&2
+fi
+
+INDEXER_URL="${TRASK_INDEXER_BASE_URL:-http://127.0.0.1:8790}"
+if ! curl -sf "${INDEXER_URL%/}/health" >/dev/null 2>&1; then
+  echo "holocron-e2e-live-server: warning — indexer not reachable at $INDEXER_URL." >&2
+  echo "  Run: bash scripts/trask_index_seed_for_qa.sh && trask-indexer serve" >&2
 fi
 
 DIST="$ROOT/apps/holocron-web/dist"

@@ -20,7 +20,7 @@ lastUpdated: 2026-05-15
 # Non-Goals
 
 - [SYNTH] Do not treat casual Discord chatter as factual ground truth.
-- [SYNTH] Do not replace the existing ai-researchwizard web pipeline in one step.
+- [SYNTH] Live research uses the owned Crawl4AI indexer path (`scripts/trask_web_research.py`); keep Holocron API contracts stable during cutovers.
 - [SYNTH] Do not ingest private channels or private archived threads without explicit approval.
 
 # Definition Of Done

@@ -18,6 +18,7 @@ import {
   _matchApprovedSource,
   _classifyQueryIntent,
   _routeSourcesForQuery,
+  _alignCitedSourcesToAnswer,
 } from "./research-wizard.js";
 import type { SourceDescriptor } from "../../retrieval/src/index.js";
 
@@ -352,4 +353,29 @@ test("_routeSourcesForQuery keeps lore sources out of tooling searches", () => {
 
   const routed = _routeSourcesForQuery("What is MDLOps used for in the KOTOR toolchain?", sources);
   assert.deepEqual(routed.map((source) => source.name), ["Deadly Stream"]);
+});
+
+test("_alignCitedSourcesToAnswer returns only body-cited sources", () => {
+  const sources = [
+    fakeSource("Deadly Stream", "https://deadlystream.com/topic/1"),
+    fakeSource("Neocities", "https://kotor.neocities.org/modding/tslpatcher/"),
+    fakeSource("GitHub", "https://github.com/bead-v/mdlops"),
+  ];
+  const answer = [
+    "TSLPatcher edits 2DA and GFF files [1].",
+    "",
+    "Sources",
+    "1. Deadly Stream - https://deadlystream.com/topic/1",
+    "2. Neocities - https://kotor.neocities.org/modding/tslpatcher/",
+    "3. GitHub - https://github.com/bead-v/mdlops",
+  ].join("\n");
+
+  const aligned = _alignCitedSourcesToAnswer(answer, sources);
+  assert.deepEqual(aligned.map((source) => source.homeUrl), ["https://deadlystream.com/topic/1"]);
+});
+
+test("_alignCitedSourcesToAnswer returns empty when body has no citations", () => {
+  const sources = [fakeSource("Deadly Stream", "https://deadlystream.com/topic/1")];
+  const answer = "I found pages but cannot cite them yet.\n\nSources\n1. Deadly Stream - https://deadlystream.com/topic/1";
+  assert.deepEqual(_alignCitedSourcesToAnswer(answer, sources), []);
 });
