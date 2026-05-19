@@ -468,12 +468,11 @@ const maybeUpgradeGuestSession = async (session: ActivitySession): Promise<Activ
 
 const LEGACY_PAZAAK_WORLD_ROUTE_BASES = [
   "/pazaakworld",
-  "/bots/pazaakworld",
   "/community-bots/pazaakworld",
 ] as const;
 
 const LEGACY_DISCORD_HUB_ROUTE_BASES = [
-  "/bots",
+  "/discord",
   "/community-bots/discord",
 ] as const;
 

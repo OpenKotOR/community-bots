@@ -24,7 +24,7 @@ Output: `apps/holocron-web/dist`.
 
 - `VITE_TRASK_API_BASE` — optional absolute API origin
 - `VITE_TRASK_API_KEY` — optional build-time bearer
-- `BASE` — Vite base path (e.g. `/bots/qa-webui/` for GitHub Pages)
+- `BASE` — Vite base path (e.g. `/community-bots/qa-webui/` for GitHub Pages)
 - `ENABLE_SPARK=1` — enable GitHub Spark Vite plugin when deploying on Spark
 
 See `docs/trask.md` for full Trask + Holocron setup.

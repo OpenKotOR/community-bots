@@ -14,7 +14,7 @@ function inviteHref(appId: string, permissions: string): string {
 }
 
 /** Canonical upstream (matches `origin`); forks override with `VITE_REPO_BASE_URL` at build time. */
-const DEFAULT_REPO_BASE = "https://github.com/OpenKotOR/bots";
+const DEFAULT_REPO_BASE = "https://github.com/OpenKotOR/community-bots";
 const repoBaseRaw = (import.meta.env.VITE_REPO_BASE_URL ?? "").trim();
 const repoBase = (repoBaseRaw || DEFAULT_REPO_BASE).replace(/\/$/, "");
 

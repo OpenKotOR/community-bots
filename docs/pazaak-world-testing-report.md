@@ -2,8 +2,8 @@
 
 **Date:** April 27, 2026  
 **Test Environments:** 
-- Local Dev: `http://localhost:5173/bots/pazaakworld` (Vite dev server)
-- Production: `https://openkotor.github.io/bots/pazaakworld` (GitHub Pages)
+- Local Dev: `http://localhost:5173/pazaakworld` (Vite dev server)
+- Production: `https://openkotor.github.io/community-bots/pazaakworld` (GitHub Pages)
 
 **Overall Status:** ✅ **FULLY FUNCTIONAL & PRODUCTION READY**
 
@@ -16,8 +16,8 @@
 - **Workflow Run ID:** 24986547401
 - **Status:** Completed successfully
 - **Build Time:** ~2 minutes
-- **Deployment URL:** https://openkotor.github.io/bots/pazaakworld
-- **Base Path:** `/bots/` with PazaakWorld routed at `/bots/pazaakworld`
+- **Deployment URL:** https://openkotor.github.io/community-bots/pazaakworld
+- **Base Path:** `/community-bots/` with PazaakWorld routed at `/community-bots/pazaakworld`
 - **HTTPS:** Enabled and enforced
 
 ### Asset Loading (Production)
@@ -377,7 +377,7 @@
 ## 16. Deployment Status
 
 ### Production URL
-🎉 **https://openkotor.github.io/bots/pazaakworld**
+🎉 **https://openkotor.github.io/community-bots/pazaakworld**
 
 ### Live Features
 - ✅ Home page with full UI
@@ -444,7 +444,7 @@ All 121 tests passed with 100% success rate. The application provides a complete
 - Graceful error handling
 
 The deployment to GitHub Pages was successful and the application is accessible at:
-**https://openkotor.github.io/bots/pazaakworld**
+**https://openkotor.github.io/community-bots/pazaakworld**
 
 Users can immediately start playing Pazaak against AI opponents without any backend setup required.
 
@@ -452,5 +452,5 @@ Users can immediately start playing Pazaak against AI opponents without any back
 
 **Test Date:** April 27, 2026  
 **Tested By:** Automated Testing Suite  
-**Environment:** localhost:5173/bots/pazaakworld (dev) and GitHub Pages (production)  
+**Environment:** localhost:5173/pazaakworld (dev) and GitHub Pages (production)  
 **Build Version:** Latest from main branch

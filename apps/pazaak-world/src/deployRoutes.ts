@@ -28,7 +28,7 @@ export function operatorConsoleRoute(): string {
 /** Discord invite hub (lightweight). */
 export function discordHubRoute(): string {
   const b = viteBasePath();
-  return b ? `${b}/discord` : "/bots";
+  return b ? `${b}/discord` : "/discord";
 }
 
 /** PazaakWorld / Activity browser route. */

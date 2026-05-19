@@ -130,8 +130,6 @@ const primaryApiBase = apiClient.apiBases.find((base) => base.trim().length > 0)
 const STATIC_PAZAAK_PAGES_PATH_PREFIXES = [
   "/community-bots",
   "/community-bots/pazaakworld",
-  "/bots",
-  "/bots/pazaakworld",
 ] as const;
 
 const isStaticPagesApiBase = (rawBase: string): boolean => {

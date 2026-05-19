@@ -407,7 +407,7 @@ const DASHBOARD_RUNBOOKS: DashboardRunbook[] = [
       "Copy .env.example to .env and fill Discord app id, bot token, guild id, and client secret.",
       "Keep PAZAAK_ACTIVITY_URL and PAZAAK_PUBLIC_WEB_ORIGIN pointed at https://openkotor.github.io/community-bots/pazaakworld for production-style callbacks.",
       "Start the Pazaak bot process first; it owns the embedded HTTP and WebSocket server on port 4001.",
-      "Start the Vite frontend: operator console at `/`, Discord invite hub at `/bots` (dev) or `/community-bots/discord` (production BASE), PazaakWorld at `/pazaakworld` (dev) or `/community-bots/pazaakworld` (production).",
+      "Start the Vite frontend: operator console at `/`, Discord invite hub at `/discord` (dev) or `/community-bots/discord` (production BASE), PazaakWorld at `/pazaakworld` (dev) or `/community-bots/pazaakworld` (production).",
     ],
     commands: [
       { label: "Install", command: "corepack pnpm install --frozen-lockfile", detail: "Use after clone or lockfile changes." },

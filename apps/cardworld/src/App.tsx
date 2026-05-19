@@ -445,16 +445,18 @@ const isCardWorldRoute = (): boolean => {
     || pathname.startsWith("/cardworld/")
     || pathname === "/pazaakworld"
     || pathname.startsWith("/pazaakworld/")
-    || pathname === "/bots/pazaakworld"
-    || pathname.startsWith("/bots/pazaakworld/");
+    || pathname === "/community-bots/pazaakworld"
+    || pathname.startsWith("/community-bots/pazaakworld/");
 };
 
 const isDiscordBotsHubRoute = (): boolean => {
   const pathname = normalizePathname();
   const hub = discordHubRoute();
   return pathname === hub || pathname === `${hub}/`
-    || pathname === "/bots"
-    || pathname === "/bots/";
+    || pathname === "/discord"
+    || pathname === "/discord/"
+    || pathname === "/community-bots/discord"
+    || pathname === "/community-bots/discord/";
 };
 
 export default function App() {
@@ -508,7 +510,7 @@ function readSubpathFromBases(pathname: string, bases: string[]): string {
 }
 
 function cardWorldRouteBases(): string[] {
-  return uniqueRouteBases([cardWorldRoute(), "/cardworld", "/pazaakworld", "/bots/pazaakworld"]);
+  return uniqueRouteBases([cardWorldRoute(), "/cardworld", "/pazaakworld", "/community-bots/pazaakworld"]);
 }
 
 function createDefaultLocalGameState(auth: ActivitySession): Extract<AppState, { stage: "local_game" }> {
