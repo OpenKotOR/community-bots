@@ -114,6 +114,7 @@ class GatherResult:
     retrieved_urls: list[str] = field(default_factory=list)
     rejected_urls: list[str] = field(default_factory=list)
     candidate_urls: list[str] = field(default_factory=list)
+    cache_stats: dict[str, int] = field(default_factory=dict)
 
 
 def _query_tokens(query: str) -> set[str]:
@@ -138,7 +139,24 @@ def discover_urls(
     query_domains: list[str],
     source_urls: list[str],
     allowed_prefixes: list[str],
+    cache_client: Any | None = None,
+    cache_stats: dict[str, int] | None = None,
 ) -> list[str]:
+    if cache_client is not None:
+        try:
+            from trask_cache import get_search, set_search
+
+            cached = get_search(cache_client, query, query_domains)
+            if cached is not None:
+                if cache_stats is not None:
+                    cache_stats["search_hits"] = cache_stats.get("search_hits", 0) + 1
+                filtered = [u for u in cached if _url_allowed(u, allowed_prefixes)]
+                return filtered[:MAX_CANDIDATE_URLS]
+            if cache_stats is not None:
+                cache_stats["search_misses"] = cache_stats.get("search_misses", 0) + 1
+        except Exception:
+            pass
+
     allowed_sources = [u for u in _unique_urls(source_urls) if _url_allowed(u, allowed_prefixes)]
     candidates: list[str] = _rank_source_urls(query, allowed_sources)
 
@@ -176,7 +194,17 @@ def discover_urls(
             candidates.append(url)
 
     filtered = [u for u in _unique_urls(candidates) if _url_allowed(u, allowed_prefixes)]
-    return filtered[:MAX_CANDIDATE_URLS]
+    result = filtered[:MAX_CANDIDATE_URLS]
+
+    if cache_client is not None and result:
+        try:
+            from trask_cache import set_search
+
+            set_search(cache_client, query, query_domains, result)
+        except Exception:
+            pass
+
+    return result
 
 
 def _trafilatura_fetch(url: str) -> str:
@@ -215,6 +243,44 @@ def _redirect_stdout_to_stderr():
         sys.stdout = previous
 
 
+def _page_from_cache(url: str, cached_pages: dict[str, str]) -> str | None:
+    body = cached_pages.get(url)
+    if not body or len(body) < MIN_USABLE_BODY_CHARS or _looks_like_forum_chrome(body):
+        return None
+    return _truncate(body, MAX_MARKDOWN_CHARS_PER_PAGE)
+
+
+async def _resolve_page_body(
+    url: str,
+    crawler: Any | None,
+    cache_client: Any | None,
+    cached_pages: dict[str, str],
+    cache_stats: dict[str, int],
+) -> str:
+    cached = _page_from_cache(url, cached_pages)
+    if cached is not None:
+        cache_stats["page_hits"] = cache_stats.get("page_hits", 0) + 1
+        return cached
+
+    cache_stats["page_misses"] = cache_stats.get("page_misses", 0) + 1
+    if crawler is not None:
+        body = await _crawl_with_shared_crawler(crawler, url)
+    else:
+        body = _trafilatura_fetch(url)
+
+    if body and len(body) >= MIN_USABLE_BODY_CHARS and not _looks_like_forum_chrome(body):
+        trimmed = _truncate(body, MAX_MARKDOWN_CHARS_PER_PAGE)
+        if cache_client is not None:
+            try:
+                from trask_cache import set_page
+
+                set_page(cache_client, url, trimmed)
+            except Exception:
+                pass
+        return trimmed
+    return ""
+
+
 async def gather_evidence(
     query: str,
     query_domains: list[str],
@@ -222,9 +288,46 @@ async def gather_evidence(
     allowed_prefixes: list[str],
 ) -> GatherResult:
     result = GatherResult()
-    result.candidate_urls = discover_urls(query, query_domains, source_urls, allowed_prefixes)
+    cache_client = None
+    try:
+        from trask_cache import get_client, ping
+
+        candidate = get_client()
+        if candidate is not None and ping(candidate):
+            cache_client = candidate
+    except Exception:
+        cache_client = None
+
+    stats = result.cache_stats
+    result.candidate_urls = discover_urls(
+        query,
+        query_domains,
+        source_urls,
+        allowed_prefixes,
+        cache_client=cache_client,
+        cache_stats=stats,
+    )
     scrape_targets = list(result.candidate_urls[:MAX_SCRAPE_URLS])
     seen_targets = set(scrape_targets)
+
+    cached_pages: dict[str, str] = {}
+    if cache_client is not None and scrape_targets:
+        try:
+            from trask_cache import get_pages_bulk
+
+            cached_pages = get_pages_bulk(cache_client, scrape_targets)
+        except Exception:
+            cached_pages = {}
+
+    async def accept_url(url: str, crawler: Any | None) -> str | None:
+        result.visited_urls.append(url)
+        body = await _resolve_page_body(url, crawler, cache_client, cached_pages, stats)
+        if not body:
+            result.rejected_urls.append(url)
+            return None
+        result.pages.append(PageEvidence(url=url, markdown=body))
+        result.retrieved_urls.append(url)
+        return body
 
     try:
         from crawl4ai import AsyncWebCrawler, BrowserConfig
@@ -232,51 +335,28 @@ async def gather_evidence(
         browser_config = BrowserConfig(headless=True, verbose=False)
         with _redirect_stdout_to_stderr():
             async with AsyncWebCrawler(config=browser_config) as crawler:
-                for url in scrape_targets:
-                    result.visited_urls.append(url)
-                    body = await _crawl_with_shared_crawler(crawler, url)
-                    if not body or len(body) < MIN_USABLE_BODY_CHARS:
-                        result.rejected_urls.append(url)
+                for url in list(scrape_targets):
+                    body = await accept_url(url, crawler)
+                    if not body:
                         continue
-                    if _looks_like_forum_chrome(body):
-                        result.rejected_urls.append(url)
-                        continue
-                    result.pages.append(
-                        PageEvidence(url=url, markdown=_truncate(body, MAX_MARKDOWN_CHARS_PER_PAGE)),
-                    )
-                    result.retrieved_urls.append(url)
                     for follow_up in _extract_follow_up_links(body, query, allowed_prefixes):
                         if follow_up in seen_targets or len(scrape_targets) >= MAX_SCRAPE_URLS:
                             continue
                         seen_targets.add(follow_up)
                         scrape_targets.append(follow_up)
-                        result.visited_urls.append(follow_up)
-                        follow_body = await _crawl_with_shared_crawler(crawler, follow_up)
-                        if (
-                            not follow_body
-                            or len(follow_body) < MIN_USABLE_BODY_CHARS
-                            or _looks_like_forum_chrome(follow_body)
-                        ):
-                            result.rejected_urls.append(follow_up)
-                            continue
-                        result.pages.append(
-                            PageEvidence(
-                                url=follow_up,
-                                markdown=_truncate(follow_body, MAX_MARKDOWN_CHARS_PER_PAGE),
-                            ),
-                        )
-                        result.retrieved_urls.append(follow_up)
+                        if cache_client is not None:
+                            try:
+                                from trask_cache import get_pages_bulk
+
+                                cached_pages.update(get_pages_bulk(cache_client, [follow_up]))
+                            except Exception:
+                                pass
+                        await accept_url(follow_up, crawler)
     except Exception:
         for url in scrape_targets:
-            result.visited_urls.append(url)
-            body = _trafilatura_fetch(url)
-            if not body or len(body) < MIN_USABLE_BODY_CHARS or _looks_like_forum_chrome(body):
-                result.rejected_urls.append(url)
+            if url in result.retrieved_urls:
                 continue
-            result.pages.append(
-                PageEvidence(url=url, markdown=_truncate(body, MAX_MARKDOWN_CHARS_PER_PAGE)),
-            )
-            result.retrieved_urls.append(url)
+            await accept_url(url, None)
 
     return result
 
@@ -315,12 +395,40 @@ def run_payload(payload: dict[str, Any]) -> dict[str, Any]:
     if env_domains and not query_domains:
         query_domains = [line.strip() for line in env_domains.splitlines() if line.strip()]
 
+    try:
+        from trask_cache import (
+            annotate_cache_meta,
+            get_client,
+            get_research,
+            ping,
+            research_key_for_payload,
+            set_research,
+        )
+
+        cache_client = get_client()
+        if cache_client is not None and ping(cache_client):
+            rkey = research_key_for_payload(
+                {
+                    "query": query,
+                    "query_domains": query_domains,
+                    "allowed_url_prefixes": allowed_prefixes,
+                    "source_urls": source_urls,
+                },
+            )
+            cached_result = get_research(cache_client, rkey)
+            if cached_result is not None:
+                stats = dict((cached_result.get("research_information") or {}).get("cache") or {})
+                stats["research_hits"] = stats.get("research_hits", 0) + 1
+                return annotate_cache_meta(cached_result, stats)
+    except Exception:
+        pass
+
     gather = asyncio.run(
         gather_evidence(query, query_domains, source_urls, allowed_prefixes),
     )
     report = build_report(query, gather)
 
-    return {
+    result = {
         "report": report,
         "research_information": {
             "source_urls": gather.retrieved_urls,
@@ -332,6 +440,37 @@ def run_payload(payload: dict[str, Any]) -> dict[str, Any]:
             "rejected_source_urls": gather.rejected_urls,
         },
     }
+
+    try:
+        from trask_cache import annotate_cache_meta, get_client, ping, research_key_for_payload, set_research
+
+        cache_client = get_client()
+        if cache_client is not None and ping(cache_client) and gather.pages:
+            rkey = research_key_for_payload(
+                {
+                    "query": query,
+                    "query_domains": query_domains,
+                    "allowed_url_prefixes": allowed_prefixes,
+                    "source_urls": source_urls,
+                },
+            )
+            stats = dict(gather.cache_stats)
+            stats["research_misses"] = stats.get("research_misses", 0) + 1
+            to_store = annotate_cache_meta(result, stats)
+            set_research(cache_client, rkey, to_store)
+            return to_store
+    except Exception:
+        pass
+
+    if gather.cache_stats:
+        try:
+            from trask_cache import annotate_cache_meta
+
+            return annotate_cache_meta(result, gather.cache_stats)
+        except Exception:
+            pass
+
+    return result
 
 
 def main() -> int:

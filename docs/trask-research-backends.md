@@ -29,6 +29,30 @@ Fedora/RHEL hosts need `libxml2-devel` and `libxslt-devel` before the first boot
 | `TRASK_GPT_RESEARCHER_PYTHON` | Deprecated alias for `TRASK_WEB_RESEARCH_PYTHON` |
 | `TRASK_WEB_RESEARCH_TIMEOUT_MS` | Subprocess timeout (default **900000**; legacy alias `TRASK_RESEARCHWIZARD_TIMEOUT_MS`) |
 | `OPENAI_API_KEY` / `OPENROUTER_API_KEY` | LLM rewrite for final Holocron answers |
+| `REDIS_URL` / `TRASK_REDIS_URL` | Optional Redis for research cache (`scripts/trask_cache.py`) |
+| `TRASK_CACHE_DISABLED` | Set to `1` to bypass Redis even when `REDIS_URL` is set |
+| `TRASK_CACHE_SEARCH_TTL_SECONDS` | DuckDuckGo URL-list cache TTL (default **21600** = 6h) |
+| `TRASK_CACHE_PAGE_TTL_SECONDS` | Per-page markdown cache TTL (default **604800** = 7d) |
+| `TRASK_CACHE_RESEARCH_TTL_SECONDS` | Full research JSON cache TTL (default **3600** = 1h) |
+
+### Redis cache (optional, no Pinecone)
+
+When `REDIS_URL` is set, `scripts/trask_web_research.py` uses `scripts/trask_cache.py` to avoid repeat work:
+
+| Layer | Key pattern | What it skips |
+|--------|-------------|----------------|
+| Search | `trask:search:{hash}` | DuckDuckGo discovery for the same query + domains |
+| Page | `trask:page:{hash}` | Crawl4AI / trafilatura fetch for the same URL |
+| Research | `trask:research:{hash}` | Entire subprocess result for identical payload |
+
+Cache stats appear under `research_information.cache` (e.g. `page_hits`, `search_misses`, `research_hits`).
+
+```bash
+# Local Redis (example)
+podman run -d --name trask-redis -p 6379:6379 redis:7-alpine
+export REDIS_URL=redis://localhost:6379/0
+python scripts/trask_cache.py   # connectivity self-test
+```
 
 ### Verification
 

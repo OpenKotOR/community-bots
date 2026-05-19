@@ -30,8 +30,23 @@ def resolve_python() -> str:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true", help="Only verify imports")
+    parser.add_argument(
+        "--cache-demo",
+        action="store_true",
+        help="Run trask_cache self-test against REDIS_URL (no crawl)",
+    )
     parser.add_argument("--query", default="What is TSLPatcher used for in KOTOR modding?")
     args = parser.parse_args()
+
+    if args.cache_demo:
+        cache_script = REPO_ROOT / "scripts" / "trask_cache.py"
+        proc = subprocess.run(
+            [resolve_python(), str(cache_script)],
+            cwd=str(REPO_ROOT),
+            env={**os.environ},
+            check=False,
+        )
+        return proc.returncode
 
     python = resolve_python()
     if not SCRIPT.is_file():
