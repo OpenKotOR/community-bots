@@ -21,8 +21,8 @@ lastUpdated: 2026-05-20
 |-------|------|--------|
 | `query` | string | Required; trimmed; **max 200 characters** or **422** (`normalizeTraskQuery`). |
 | `threadId` | UUID string (optional) | Omitted, null, or empty string → server assigns a **new random UUID** thread; invalid UUID → **422**. |
-| `model` | string (optional) | Must appear in the current ResearchWizard model list or **422**. |
-| `sourceWeights` | object (optional) | Normalized to `ResearchWizardSourcePreference[]` and forwarded to `answerQuestion`. |
+| `model` | string (optional) | Must appear in the current WebResearch model list or **422**. |
+| `sourceWeights` | object (optional) | Normalized to `WebResearchSourcePreference[]` and forwarded to `answerQuestion`. |
 
 ## Responses
 
@@ -33,7 +33,7 @@ lastUpdated: 2026-05-20
 
 ## Local chunk context
 
-- [REPO] When `TraskHttpRuntime` includes a `SearchProvider` backed by `FileChunkStore`, `ResearchWizardClient.answerQuestion` merges local hits into synthesis (see [answer-pipeline.md](answer-pipeline.md)); HTTP contract does not expose chunk IDs separately from the completed `sources` list on the stored record.
+- [REPO] When `TraskHttpRuntime` includes a `SearchProvider` backed by `FileChunkStore`, `webResearch.answerQuestion` merges local hits into synthesis (see [answer-pipeline.md](answer-pipeline.md)); HTTP contract does not expose chunk IDs separately from the completed `sources` list on the stored record.
 
 # Related
 

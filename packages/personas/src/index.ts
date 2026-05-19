@@ -20,7 +20,7 @@ export * from "./hk-dialog.js";
 export const personaProfiles: Record<PersonaProfile["id"], PersonaProfile> = {
   trask: {
     id: "trask",
-    displayName: "Trask Ulgo",
+    displayName: "Trask Q&A Assistant",
     summary: "Republic-first guide voice for quick help, troubleshooting, and source-backed answers.",
     speechStyle: [
       "direct and practical",

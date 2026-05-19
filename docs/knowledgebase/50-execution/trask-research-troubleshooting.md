@@ -2,21 +2,21 @@
 title: Trask Research Troubleshooting
 owner: trask-bot
 status: active
-lastUpdated: 2026-05-15
+lastUpdated: 2026-05-18
 ---
 
 [SYNTH] Operator-facing symptoms for **live research + local chunks**. Deep setup remains in [docs/trask.md](../../trask.md); architecture in [trask-synthesis-and-chunk-retrieval.md](../10-architecture-runtime/trask-synthesis-and-chunk-retrieval.md).
 
-# Headless GPTR / empty or missing answers
+# Headless web research / empty or missing answers
 
-- [REPO] **“No approved research sources are enabled.”** — `ResearchWizardClient` received an empty approved list after Holocron source preferences (or misconfiguration). Check enabled roots in the UI and [trask-configuration-env-map.md](trask-configuration-env-map.md).
-- [REPO] **“ai-researchwizard returned an empty report.”** — subprocess returned no `report` text. Verify `TRASK_GPT_RESEARCHER_PYTHON` / `.venv-trask-gptr`, `TRASK_GPT_RESEARCHER_ROOT`, keys, and that the vendor tree runs headless ([docs/trask.md](../../trask.md)).
-- [SYNTH] **Python import / version errors in logs** — align with `vendor/ai-researchwizard/requirements.txt`; optional `langchain-netmind` is documented as a narrow install in [AGENTS.md](../../../AGENTS.md).
+- [REPO] **“No approved research sources are enabled.”** — `WebResearchClient` received an empty approved list after Holocron source preferences (or misconfiguration). Check enabled roots in the UI and [trask-configuration-env-map.md](trask-configuration-env-map.md).
+- [REPO] **“Trask web research returned an empty report.”** — subprocess returned no `report` text. Run `bash scripts/bootstrap_trask_research.sh`, set `TRASK_WEB_RESEARCH_PYTHON`, and verify `python scripts/smoke_trask_web_research.py --dry-run` ([docs/trask-research-backends.md](../../trask-research-backends.md)).
+- [SYNTH] **Python import / version errors in logs** — reinstall with `bash scripts/bootstrap_trask_research.sh` (`requirements-trask-research.txt`). On Fedora/RHEL install `libxml2-devel` and `libxslt-devel` before bootstrap.
 
 # Timeouts
 
-- [REPO] Config default **`TRASK_RESEARCHWIZARD_TIMEOUT_MS`** is **90000** ms when unset (`packages/config/src/index.ts`).
-- [REPO] Discord **`/ask`** uses **`Math.min(config.researchWizard.timeoutMs, 90_000)`** and a **90s** interaction race in `apps/trask-bot/src/main.ts` — raising the env var above 90s does **not** extend Discord beyond that SLA.
+- [REPO] Config default **`TRASK_WEB_RESEARCH_TIMEOUT_MS`** is **900000** ms when unset (legacy alias **`TRASK_RESEARCHWIZARD_TIMEOUT_MS`**) (`packages/config/src/index.ts`).
+- [REPO] Discord **`/ask`** uses **`Math.min(config.webResearch.timeoutMs, 90_000)`** and a **90s** interaction race in `apps/trask-bot/src/main.ts` — raising the env var above 90s does **not** extend Discord beyond that SLA.
 - [SYNTH] Holocron via **`trask-http-server`** can use the full configured timeout unless another proxy cuts the connection first.
 
 # Local chunks never appear

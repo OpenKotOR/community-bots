@@ -17,7 +17,7 @@ import {
   type StringSelectMenuInteraction,
 } from "discord.js";
 
-import { loadPazaakBotConfig, loadResearchWizardRuntimeConfig, loadSharedAiConfig } from "@openkotor/config";
+import { loadPazaakBotConfig, loadSharedAiConfig, loadWebResearchRuntimeConfig } from "@openkotor/config";
 import { createBotClient, createLogger, deployGuildCommands, toErrorMessage } from "@openkotor/core";
 import { asBulletList, buildErrorEmbed, buildInfoEmbed, buildSuccessEmbed, buildWarningEmbed } from "@openkotor/discord-ui";
 import {
@@ -34,7 +34,7 @@ import {
 } from "@openkotor/persistence";
 import { personaProfiles } from "@openkotor/personas";
 import { createChunkSearchProvider } from "@openkotor/retrieval";
-import { createResearchWizardClient } from "@openkotor/trask";
+import { createWebResearchClient } from "@openkotor/trask";
 import { normalizeCardGameType } from "@openkotor/platform";
 
 import {
@@ -97,10 +97,7 @@ const lobbyRepository = new JsonPazaakLobbyRepository(resolveDataFile(config.dat
 const matchHistoryRepository = new JsonPazaakMatchHistoryRepository(resolveDataFile(config.dataDir, "match-history.json"));
 const traskQueryRepository = new JsonTraskQueryRepository(resolveDataFile(config.dataDir, "trask-queries.json"));
 const traskSearchProvider = createChunkSearchProvider(process.env.INGEST_STATE_DIR?.trim() || "data/ingest-worker");
-const traskResearchWizard = createResearchWizardClient(
-  loadResearchWizardRuntimeConfig(),
-  loadSharedAiConfig(),
-);
+const traskWebResearch = createWebResearchClient(loadWebResearchRuntimeConfig(), loadSharedAiConfig());
 const cardWorldBotGameType = normalizeCardGameType(process.env.CARDWORLD_BOT_GAME_TYPE?.trim(), "pazaak");
 const pazaakRequiresOwnershipProof = (process.env.CARDWORLD_REQUIRE_CHITIN_KEY?.trim() ?? "1") !== "0";
 const workerSyncUrl = process.env.PAZAAK_WORKER_SYNC_URL?.trim();
@@ -3416,7 +3413,7 @@ const { listen: startApiServer } = createApiServer(coordinator, {
   matchHistoryRepository,
   trask: {
     searchProvider: traskSearchProvider,
-    researchWizard: traskResearchWizard,
+    webResearch: traskWebResearch,
     queryRepository: traskQueryRepository,
   },
   botGameType: cardWorldBotGameType,

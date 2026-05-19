@@ -3,6 +3,7 @@ import { readFile, readdir, stat } from "node:fs/promises";
 import path from "node:path";
 
 import {
+  buildDiscordMessagePermalink,
   defaultSourceCatalog,
   FileChunkStore,
   type ChunkRecord,
@@ -127,6 +128,8 @@ const loadJsonFile = async <T>(filePath: string): Promise<T> => {
 export interface ImportDiscordExportOptions {
   dryRun: boolean;
   chunkStore: FileChunkStore;
+  /** Guild id for `https://discord.com/channels/...` permalinks. Loaded from `guild.json` when omitted. */
+  guildId?: string;
   onWarn?: (message: string, meta?: Record<string, unknown>) => void;
 }
 
@@ -151,6 +154,17 @@ export const importDiscordExport = async (
     throw new Error(`Expected containers directory at ${containersDir}.`);
   }
   await loadJsonFile<object>(manifestPath);
+
+  let guildId = options.guildId?.trim() || "";
+  if (!guildId) {
+    const guildJsonPath = path.join(exportDir, "guild.json");
+    try {
+      const guildPayload = await loadJsonFile<{ id?: string | number }>(guildJsonPath);
+      guildId = String(guildPayload.id ?? "").trim();
+    } catch {
+      guildId = "";
+    }
+  }
 
   const source = resolveDiscordSource();
   const fetchedAt = Date.now();
@@ -192,24 +206,36 @@ export const importDiscordExport = async (
 
     const flushWindow = async (): Promise<void> => {
       if (windowLines.length === 0 || !firstMessageId || !lastMessageId) return;
-      const url = `discord://approved-channels/${channelId}/${firstMessageId}-${lastMessageId}`;
+      const internalUrl = `discord://approved-channels/${channelId}/${firstMessageId}-${lastMessageId}`;
+      const permalink = guildId
+        ? buildDiscordMessagePermalink(guildId, channelId, firstMessageId)
+        : internalUrl;
       const chunkText = buildDiscordChunkText(channelName, scope, windowLines);
       const chunkId = createHash("sha1")
         .update(`${source.id}:${channelId}:${firstMessageId}:${lastMessageId}:${chunkText}`)
         .digest("hex")
         .slice(0, 16);
 
+      const chunkTags = [
+        ...source.tags,
+        "discord",
+        `scope:${scope}`,
+        `channel:${channelId}`,
+        `anchorMessage:${firstMessageId}`,
+        ...(guildId ? [`guild:${guildId}`] : []),
+      ];
+
       const chunk: ChunkRecord = {
         id: chunkId,
         sourceId: source.id,
         sourceName: source.name,
         kind: source.kind,
-        url,
+        url: permalink || internalUrl,
         title: `${source.name}: #${channelName}`,
         chunkText,
         fetchedAt,
         chunkIndex: chunkIndex++,
-        tags: [...source.tags, "discord", `scope:${scope}`],
+        tags: chunkTags,
       };
 
       chunks.push(chunk);

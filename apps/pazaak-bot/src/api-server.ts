@@ -54,7 +54,7 @@ import { InMemoryTopicMessageStore, JsonWebSocketHub } from "@openkotor/platform
 import { hashPazaakPassword, verifyPazaakPassword } from "@openkotor/persistence";
 import type { SearchProvider } from "@openkotor/retrieval";
 import { createTraskHttpRouter } from "@openkotor/trask-http";
-import type { ResearchWizardClient } from "@openkotor/trask";
+import type { WebResearchClient } from "@openkotor/trask";
 import type {
   PazaakLobbyRecord,
   PazaakAccountRepositoryContract,
@@ -275,7 +275,7 @@ export function createApiServer(
     matchHistoryRepository: JsonPazaakMatchHistoryRepository;
     trask?: {
       searchProvider: SearchProvider;
-      researchWizard: ResearchWizardClient;
+      webResearch: WebResearchClient;
       queryRepository: JsonTraskQueryRepository;
     } | undefined;
     botGameType?: CardGameType | undefined;

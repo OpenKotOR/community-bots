@@ -1,6 +1,16 @@
 import { mkdir, open, readFile, readdir, rename, rm, stat, utimes, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+export {
+  anchorMessageIdFromChunkTags,
+  buildDiscordMessagePermalink,
+  channelIdFromChunkTags,
+  guildIdFromChunkTags,
+  isDiscordCitationUrl,
+  parseDiscordChunkUrl,
+  resolveDiscordChunkCitationUrl,
+} from "./discord-permalink.js";
+
 export type SourceKind = "website" | "github" | "discord";
 
 export interface SourceDescriptor {
@@ -709,8 +719,9 @@ export interface SourceIndexRecord {
   tags: readonly string[];
 }
 
-const isNonWebChunkUrl = (url: string): boolean =>
-  url.startsWith("local://") || url.startsWith("discord://");
+import { isDiscordCitationUrl, resolveDiscordChunkCitationUrl } from "./discord-permalink.js";
+
+const isExcludedChunkUrl = (url: string): boolean => url.startsWith("local://");
 
 type SerializableValue = object | string | number | boolean | null;
 
@@ -874,10 +885,16 @@ export class FileChunkStore {
   }
 }
 
+export interface ChunkSearchProviderOptions {
+  /** Resolves `discord://` chunk URLs to HTTPS permalinks when tags omit guild id. */
+  discordGuildId?: string;
+}
+
 export class ChunkSearchProvider implements SearchProvider {
   public constructor(
     private readonly chunkStore: FileChunkStore,
     private readonly catalog: StaticCatalogSearchProvider,
+    private readonly options: ChunkSearchProviderOptions = {},
   ) {}
 
   public async listSources(): Promise<readonly SourceDescriptor[]> {
@@ -893,7 +910,7 @@ export class ChunkSearchProvider implements SearchProvider {
       this.catalog.search(query, limit),
       this.chunkStore.loadAllChunks(),
     ]);
-    const searchableChunks = allChunks.filter((chunk) => !isNonWebChunkUrl(chunk.url));
+    const searchableChunks = allChunks.filter((chunk) => !isExcludedChunkUrl(chunk.url));
 
     const chunkHits: SearchHit[] = searchableChunks
       .map((chunk) => {
@@ -908,6 +925,11 @@ export class ChunkSearchProvider implements SearchProvider {
           score += textTokens.filter((t) => t === token).length;
         }
         score += intentScoreDelta(intent, chunk.tags);
+        if (isDiscordCitationUrl(chunk.url)) {
+          score += 1;
+        }
+
+        const citationUrl = resolveDiscordChunkCitationUrl(chunk, this.options.discordGuildId);
 
         return {
           sourceId: chunk.sourceId,
@@ -915,7 +937,7 @@ export class ChunkSearchProvider implements SearchProvider {
           kind: chunk.kind,
           title: chunk.title,
           snippet: chunk.chunkText.slice(0, 800).trim() + (chunk.chunkText.length > 800 ? "\u2026" : ""),
-          url: chunk.url,
+          url: citationUrl,
           score,
           tags: chunk.tags,
         } satisfies SearchHit;
@@ -942,9 +964,13 @@ export class ChunkSearchProvider implements SearchProvider {
   }
 }
 
-export const createChunkSearchProvider = (stateDir: string): ChunkSearchProvider => {
+export const createChunkSearchProvider = (
+  stateDir: string,
+  options?: ChunkSearchProviderOptions,
+): ChunkSearchProvider => {
   return new ChunkSearchProvider(
     new FileChunkStore(stateDir),
     new StaticCatalogSearchProvider(defaultSourceCatalog, new FileReindexQueueStore(stateDir)),
+    options ?? {},
   );
 };

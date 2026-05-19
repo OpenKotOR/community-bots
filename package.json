@@ -31,10 +31,11 @@
     "build:pazaak-nakama": "pnpm --filter @openkotor/pazaak-nakama build",
     "dev:ingest": "pnpm --filter @openkotor/ingest-worker dev",
     "discord:install-links": "tsx scripts/discord-install-links.ts",
-    "smoke:trask-gptr-dry": "python scripts/smoke_trask_headless_gptr.py --dry-run",
-    "smoke:trask-gptr": "python scripts/smoke_trask_headless_gptr.py",
     "holocron:e2e": "node scripts/holocron-e2e-live-build.mjs && pnpm exec playwright test --config apps/holocron-web/playwright.config.ts",
-    "discord:smoke-trask-commands": "node scripts/discord_trask_commands_smoke.mjs"
+    "discord:smoke-trask-commands": "node scripts/discord_trask_commands_smoke.mjs",
+    "trask:env:fetch": "node scripts/discord_fetch_trask_env.mjs",
+    "trask:start": "bash scripts/trask_bot_start.sh",
+    "trask:wait-token": "bash scripts/discord_wait_token_and_start.sh"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.0",

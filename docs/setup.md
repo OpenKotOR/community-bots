@@ -78,14 +78,13 @@ FIRECRAWL_API_KEY=         # optional — used by future ingest pipeline
 DATABASE_URL=              # optional — defaults to local file storage
 ```
 
-For Trask's headless ai-researchwizard `/ask` flow (and Holocron Q&A), create a Python venv with
-`vendor/ai-researchwizard/requirements.txt` — see **`scripts/bootstrap_trask_gpt_researcher.ps1`** /
-**`scripts/bootstrap_trask_gpt_researcher.sh`** and [docs/trask.md](trask.md) — then set:
+For Trask web research (`/ask` and Holocron Q&A), bootstrap Crawl4AI + DDG — see
+**`scripts/bootstrap_trask_research.sh`** and [docs/trask-research-backends.md](trask-research-backends.md) — then set:
 
 ```
-TRASK_GPT_RESEARCHER_ROOT=vendor/ai-researchwizard
-TRASK_GPT_RESEARCHER_PYTHON=.venv-trask-gptr/Scripts/python.exe   # or bin/python on Unix
-TRASK_RESEARCHWIZARD_TIMEOUT_MS=120000
+TRASK_WEB_RESEARCH_PYTHON=.venv-trask-research/bin/python
+TRASK_WEB_RESEARCH_TIMEOUT_MS=900000
+OPENAI_API_KEY=                    # or OPENROUTER_API_KEY
 ```
 
 ## 4. Build

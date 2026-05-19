@@ -19,6 +19,7 @@ const shortcuts = [
   { keys: ['Ctrl/⌘', '/'], description: 'Show shortcuts' },
   { keys: ['Ctrl/⌘', 'E'], description: 'Export conversations' },
   { keys: ['Esc'], description: 'Close dialogs' },
+  { keys: ['↑'], description: 'Edit last message (empty input)' },
 ]
 
 export function KeyboardShortcutsDialog({ open, onOpenChange }: KeyboardShortcutsDialogProps) {

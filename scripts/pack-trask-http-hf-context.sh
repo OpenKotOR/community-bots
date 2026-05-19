@@ -14,24 +14,15 @@ cp "$ROOT/package.json" "$ROOT/pnpm-lock.yaml" "$ROOT/pnpm-workspace.yaml" "$ROO
 
 rsync -a --exclude node_modules --exclude dist "$ROOT/packages/" "$OUT/packages/"
 rsync -a --exclude node_modules --exclude dist "$ROOT/apps/trask-http-server/" "$OUT/apps/trask-http-server/"
-rsync -a \
-  --exclude .git \
-  --exclude node_modules \
-  --exclude dist \
-  --exclude docs \
-  --exclude tests \
-  --exclude frontend \
-  --exclude '**/*.png' \
-  --exclude '**/*.jpg' \
-  --exclude '**/*.jpeg' \
-  --exclude '**/*.webp' \
-  --exclude '**/*.gif' \
-  --exclude '**/*.pdf' \
-  --exclude '**/__pycache__' \
-  "$ROOT/vendor/ai-researchwizard/" "$OUT/vendor/ai-researchwizard/"
 rsync -a --exclude .git --exclude node_modules --exclude dist --exclude tests \
   "$ROOT/vendor/llm_fallbacks/" "$OUT/vendor/llm_fallbacks/"
 rsync -a "$ROOT/data/ingest-worker/" "$OUT/data/ingest-worker/"
-cp "$ROOT/scripts/bootstrap_trask_gpt_researcher.sh" "$OUT/scripts/bootstrap_trask_gpt_researcher.sh"
+mkdir -p "$OUT/docs"
+cp "$ROOT/docs/trask-research-backends.md" "$OUT/docs/trask-research-backends.md"
+
+# Docker COPY expects these at repo root / scripts/ (see infra/trask-http-public/Dockerfile).
+cp "$ROOT/requirements-trask-research.txt" "$OUT/requirements-trask-research.txt"
+cp "$ROOT/scripts/trask_web_research.py" "$OUT/scripts/trask_web_research.py"
+cp "$ROOT/scripts/trask_cache.py" "$OUT/scripts/trask_cache.py"
 
 echo "$OUT"

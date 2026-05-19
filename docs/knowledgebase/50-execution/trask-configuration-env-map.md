@@ -18,14 +18,15 @@ lastUpdated: 2026-05-15
 | `DATABASE_URL` | [REPO] `loadSharedAiConfig` | Passed through for embeddings / DB features when used. |
 | `TRASK_REWRITE_MODEL_FALLBACKS` | [REPO] `loadSharedAiConfig` (`chatModelFallbacks`) | |
 
-# Research wizard (Trask bot + Trask HTTP server)
+# Web research (Trask bot + Trask HTTP server)
 
 | Variable | Notes |
 |----------|--------|
-| `TRASK_GPT_RESEARCHER_ROOT` | [REPO] Explicit vendor tree; else walk-up `vendor/ai-researchwizard`. |
-| `TRASK_GPT_RESEARCHER_PYTHON` | [REPO] Override Python; else `.venv-trask-gptr` bootstrap path when present. |
-| `TRASK_GPT_RESEARCHER_SCRIPT` | [REPO] Optional explicit headless script path. |
-| `TRASK_RESEARCHWIZARD_TIMEOUT_MS` | [REPO] Default **90000** ms in config loader; Discord clamps to **90s** SLA at runtime. |
+| `TRASK_WEB_RESEARCH_PYTHON` | [REPO] Python for `scripts/trask_web_research.py`; else `.venv-trask-research` when present. |
+| `TRASK_WEB_RESEARCH_SCRIPT` | [REPO] Optional override for headless script path. |
+| `TRASK_WEB_RESEARCH_TIMEOUT_MS` | [REPO] Default **900000** ms in config loader; Discord `/ask` clamps to **90s** SLA at runtime. |
+| `TRASK_GPT_RESEARCHER_PYTHON` | [REPO] Deprecated alias of `TRASK_WEB_RESEARCH_PYTHON`. |
+| `TRASK_RESEARCHWIZARD_TIMEOUT_MS` | [REPO] Deprecated alias of `TRASK_WEB_RESEARCH_TIMEOUT_MS`. |
 
 # Trask Discord bot (`loadTraskBotConfig`)
 

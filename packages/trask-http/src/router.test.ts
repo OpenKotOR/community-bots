@@ -7,10 +7,10 @@ import path from "node:path";
 import { JsonTraskQueryRepository } from "@openkotor/persistence";
 import type { SourceDescriptor } from "@openkotor/retrieval";
 import type {
-  ResearchWizardAnswer,
-  ResearchWizardProgressEvent,
-  ResearchWizardQueryHandler,
-  ResearchWizardQueryOptions,
+  WebResearchAnswer,
+  WebResearchProgressEvent,
+  WebResearchQueryHandler,
+  WebResearchQueryOptions,
 } from "@openkotor/trask";
 import express from "express";
 import request from "supertest";
@@ -28,11 +28,11 @@ const mockSource: SourceDescriptor = {
   tags: [],
 };
 
-const mockWizard: ResearchWizardQueryHandler = {
+const mockWizard: WebResearchQueryHandler = {
   async answerQuestion(
     _query: string,
-    onProgress?: (event: ResearchWizardProgressEvent) => void,
-  ): Promise<ResearchWizardAnswer> {
+    onProgress?: (event: WebResearchProgressEvent) => void,
+  ): Promise<WebResearchAnswer> {
     onProgress?.({ phase: "gather", detail: "test" });
     return {
       answer: "Stub answer.\n\nSources\n1. Test Source - https://example.com",
@@ -76,7 +76,7 @@ test("GET /session returns anonymous payload by default", async () => {
     createTraskHttpRouter({
       runtime: {
         searchProvider,
-        researchWizard: mockWizard,
+        webResearch: mockWizard,
         queryRepository,
       },
       auth: {
@@ -112,7 +112,7 @@ test("GET /session uses getSession override", async () => {
     createTraskHttpRouter({
       runtime: {
         searchProvider,
-        researchWizard: mockWizard,
+        webResearch: mockWizard,
         queryRepository,
       },
       auth: {
@@ -153,7 +153,7 @@ test("POST /auth/logout returns 204 by default", async () => {
     createTraskHttpRouter({
       runtime: {
         searchProvider,
-        researchWizard: mockWizard,
+        webResearch: mockWizard,
         queryRepository,
       },
       auth: {
@@ -187,7 +187,7 @@ test("GET /sources returns JSON when authenticated", async () => {
     createTraskHttpRouter({
       runtime: {
         searchProvider,
-        researchWizard: mockWizard,
+        webResearch: mockWizard,
         queryRepository,
       },
       auth: {
@@ -223,7 +223,7 @@ test("GET /models defaults to Auto only when the wizard has no live model list",
     createTraskHttpRouter({
       runtime: {
         searchProvider,
-        researchWizard: mockWizard,
+        webResearch: mockWizard,
         queryRepository,
       },
       auth: {
@@ -235,7 +235,7 @@ test("GET /models defaults to Auto only when the wizard has no live model list",
   const res = await request(app).get("/api/trask/models");
   assert.equal(res.status, 200);
   assert.deepEqual(res.body.models, [
-    { id: "auto", label: "Auto", provider: "ResearchWizard fallback", recommended: true },
+    { id: "auto", label: "Auto", provider: "Trask web research", recommended: true },
   ]);
 });
 
@@ -253,12 +253,12 @@ test("GET /models filters out non-free model ids", async () => {
     },
   };
 
-  const researchWizard = {
+  const webResearch = {
     ...mockWizard,
     async listModels() {
       return [
         { id: "openrouter:openrouter/free", label: "Free", provider: "OpenRouter" },
-        { id: "litellm:foo/bar", label: "Paid-ish", provider: "ResearchWizard" },
+        { id: "litellm:foo/bar", label: "Paid-ish", provider: "Trask web research" },
         { id: "vendor/model:free", label: "Free tag", provider: "Vendor" },
       ];
     },
@@ -271,7 +271,7 @@ test("GET /models filters out non-free model ids", async () => {
     createTraskHttpRouter({
       runtime: {
         searchProvider,
-        researchWizard,
+        webResearch,
         queryRepository,
       },
       auth: {
@@ -283,13 +283,13 @@ test("GET /models filters out non-free model ids", async () => {
   const res = await request(app).get("/api/trask/models");
   assert.equal(res.status, 200);
   assert.deepEqual(res.body.models, [
-    { id: "auto", label: "Auto", provider: "ResearchWizard fallback", recommended: true },
+    { id: "auto", label: "Auto", provider: "Trask web research", recommended: true },
     { id: "openrouter:openrouter/free", label: "Free", provider: "OpenRouter" },
     { id: "vendor/model:free", label: "Free tag", provider: "Vendor" },
   ]);
 });
 
-test("POST /ask rejects model ids outside the current ResearchWizard list", async () => {
+test("POST /ask rejects model ids outside the current web research model list", async () => {
   const queryRepository = new JsonTraskQueryRepository(path.join(tmpDir, `qmr-${Math.random()}.json`));
   const searchProvider = {
     async listSources() {
@@ -310,7 +310,7 @@ test("POST /ask rejects model ids outside the current ResearchWizard list", asyn
     createTraskHttpRouter({
       runtime: {
         searchProvider,
-        researchWizard: mockWizard,
+        webResearch: mockWizard,
         queryRepository,
       },
       auth: {
@@ -348,7 +348,7 @@ test("POST /ask persists, returns 202, completes asynchronously", async () => {
     createTraskHttpRouter({
       runtime: {
         searchProvider,
-        researchWizard: mockWizard,
+        webResearch: mockWizard,
         queryRepository,
       },
       auth: {
@@ -388,8 +388,8 @@ test("POST /ask forwards source weights to the research wizard", async () => {
       return { queuedSourceIds: [] as string[], mode: "file-queue" as const };
     },
   };
-  let receivedOptions: ResearchWizardQueryOptions | undefined;
-  const weightedWizard: ResearchWizardQueryHandler = {
+  let receivedOptions: WebResearchQueryOptions | undefined;
+  const weightedWizard: WebResearchQueryHandler = {
     async answerQuestion(_query, _onProgress, options) {
       receivedOptions = options;
       return {
@@ -408,7 +408,7 @@ test("POST /ask forwards source weights to the research wizard", async () => {
     createTraskHttpRouter({
       runtime: {
         searchProvider,
-        researchWizard: weightedWizard,
+        webResearch: weightedWizard,
         queryRepository,
       },
       auth: {
@@ -455,7 +455,7 @@ test("GET /thread/:threadId returns persisted rows for the authenticated user", 
     createTraskHttpRouter({
       runtime: {
         searchProvider,
-        researchWizard: mockWizard,
+        webResearch: mockWizard,
         queryRepository,
       },
       auth: {
@@ -510,7 +510,7 @@ test("GET /thread/:threadId requires authentication", async () => {
     createTraskHttpRouter({
       runtime: {
         searchProvider,
-        researchWizard: mockWizard,
+        webResearch: mockWizard,
         queryRepository,
       },
       auth: {
@@ -554,7 +554,7 @@ test("anonymous persistQueries=false skips disk but still returns threadId", asy
     createTraskHttpRouter({
       runtime: {
         searchProvider,
-        researchWizard: mockWizard,
+        webResearch: mockWizard,
         queryRepository,
       },
       auth: {

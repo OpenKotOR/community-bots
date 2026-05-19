@@ -4,13 +4,128 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { CaretDown, CaretUp, Link as LinkIcon, Copy, Check, Clock, MagnifyingGlass, CheckCircle, XCircle, ListDashes, Download, Database } from '@phosphor-icons/react'
+import { CaretDown, CaretUp, Link as LinkIcon, Copy, Check, Clock, MagnifyingGlass, CheckCircle, XCircle, ListDashes, Download, Database, PencilSimple, ArrowsClockwise, ArrowClockwise } from '@phosphor-icons/react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { toast } from 'sonner'
 
 interface MessageProps {
   message: MessageType
   onToggleExpand: (id: string) => void
+  canEdit?: boolean
+  canRegenerate?: boolean
+  canRetry?: boolean
+  onEditUserMessage?: () => void
+  onRegenerateAssistant?: () => void
+  onRetryAssistant?: () => void
+  actionsDisabled?: boolean
+}
+
+interface MessageToolbarProps {
+  variant: 'user' | 'assistant'
+  isCopied: boolean
+  actionsDisabled?: boolean
+  canEdit?: boolean
+  canRegenerate?: boolean
+  canRetry?: boolean
+  hasExport?: boolean
+  onCopy: (e: React.MouseEvent) => void
+  onEdit?: () => void
+  onRegenerate?: () => void
+  onRetry?: () => void
+  onExport?: (e: React.MouseEvent) => void
+}
+
+function MessageToolbar({
+  variant,
+  isCopied,
+  actionsDisabled,
+  canEdit,
+  canRegenerate,
+  canRetry,
+  hasExport,
+  onCopy,
+  onEdit,
+  onRegenerate,
+  onRetry,
+  onExport,
+}: MessageToolbarProps) {
+  const isUser = variant === 'user'
+  const iconClass = isUser
+    ? 'h-7 w-7 text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10'
+    : 'h-7 w-7 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
+
+  const run = (handler: (() => void) | undefined, event: React.MouseEvent) => {
+    event.stopPropagation()
+    if (actionsDisabled || !handler) return
+    handler()
+  }
+
+  return (
+    <div className="flex gap-0.5 flex-shrink-0" role="toolbar" aria-label="Message actions">
+      {hasExport && onExport && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onExport}
+          disabled={actionsDisabled}
+          className={`${iconClass} transition-opacity`}
+          aria-label="Export agent data"
+          title="Export agent retrieval data"
+        >
+          <Download size={14} weight="bold" />
+        </Button>
+      )}
+      {canEdit && onEdit && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={(event) => run(onEdit, event)}
+          disabled={actionsDisabled}
+          className={iconClass}
+          aria-label="Edit message"
+          title="Edit message"
+        >
+          <PencilSimple size={14} weight="bold" />
+        </Button>
+      )}
+      {canRegenerate && onRegenerate && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={(event) => run(onRegenerate, event)}
+          disabled={actionsDisabled}
+          className={iconClass}
+          aria-label="Regenerate answer"
+          title="Regenerate answer"
+        >
+          <ArrowsClockwise size={14} weight="bold" />
+        </Button>
+      )}
+      {canRetry && onRetry && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={(event) => run(onRetry, event)}
+          disabled={actionsDisabled}
+          className={iconClass}
+          aria-label="Retry answer"
+          title="Retry answer"
+        >
+          <ArrowClockwise size={14} weight="bold" />
+        </Button>
+      )}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={onCopy}
+        className={iconClass}
+        aria-label="Copy message"
+        title="Copy message"
+      >
+        {isCopied ? <Check size={14} weight="bold" /> : <Copy size={14} weight="bold" />}
+      </Button>
+    </div>
+  )
 }
 
 function getConfidenceColor(confidence: number): string {
@@ -68,7 +183,100 @@ interface AnswerPresentation {
 
 const SOURCE_HEADING_PATTERN = /^\s*sources\s*:?\s*$/i
 const CITATION_PATTERN = /\[(\d{1,3})\]/g
-const URL_PATTERN = /[a-z][a-z0-9+.-]*:\/\/[^\s)\]]+/gi
+
+function isHttpUrlSchemeTerminator(ch: string): boolean {
+  return ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r' || ch === ')' || ch === ']' || ch === '>'
+}
+
+/** Collect http(s) URLs without regex backtracking (CodeQL-safe). */
+function extractHttpUrls(text: string): string[] {
+  const urls: string[] = []
+  const lower = text.toLowerCase()
+  let i = 0
+  while (i < text.length) {
+    const httpsIdx = lower.indexOf('https://', i)
+    const httpIdx = lower.indexOf('http://', i)
+    const start =
+      httpsIdx === -1 ? httpIdx : httpIdx === -1 ? httpsIdx : Math.min(httpsIdx, httpIdx)
+    if (start === -1) break
+    let end = start
+    while (end < text.length && !isHttpUrlSchemeTerminator(text[end]!)) end += 1
+    urls.push(text.slice(start, end))
+    i = end
+  }
+  return urls
+}
+
+function stripHttpUrls(text: string): string {
+  const lower = text.toLowerCase()
+  let out = ''
+  let i = 0
+  while (i < text.length) {
+    const httpsIdx = lower.indexOf('https://', i)
+    const httpIdx = lower.indexOf('http://', i)
+    const start =
+      httpsIdx === -1 ? httpIdx : httpIdx === -1 ? httpsIdx : Math.min(httpsIdx, httpIdx)
+    if (start === -1) {
+      out += text.slice(i)
+      break
+    }
+    out += text.slice(i, start)
+    let end = start
+    while (end < text.length && !isHttpUrlSchemeTerminator(text[end]!)) end += 1
+    i = end
+  }
+  return out
+}
+
+/** Replace `[label](https://…)` with `label` using linear scanning (avoids nested-quantifier regex). */
+function stripMarkdownHttpLinks(text: string): string {
+  let result = ''
+  let i = 0
+  while (i < text.length) {
+    if (text[i] !== '[') {
+      result += text[i]
+      i += 1
+      continue
+    }
+    const closeBracket = text.indexOf(']', i + 1)
+    if (closeBracket === -1 || text[closeBracket + 1] !== '(') {
+      result += text[i]
+      i += 1
+      continue
+    }
+    const closeParen = text.indexOf(')', closeBracket + 2)
+    if (closeParen === -1) {
+      result += text[i]
+      i += 1
+      continue
+    }
+    const url = text.slice(closeBracket + 2, closeParen)
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      result += text.slice(i + 1, closeBracket)
+      i = closeParen + 1
+    } else {
+      result += text.slice(i, closeParen + 1)
+      i = closeParen + 1
+    }
+  }
+  return result
+}
+
+function parseBracketCitationLine(line: string): { index: number; rest: string } | null {
+  if (!line.startsWith('[')) return null
+  const close = line.indexOf(']', 1)
+  if (close <= 1) return null
+  const num = line.slice(1, close)
+  if (!/^\d{1,3}$/.test(num)) return null
+  const rest = line.slice(close + 1).trimStart()
+  return { index: Number(num), rest }
+}
+
+function parseNumberedSourceLine(line: string): { index: number; rest: string } | null {
+  const match = /^(\d{1,3})\.\s+/u.exec(line)
+  if (!match) return null
+  return { index: Number(match[1]), rest: line.slice(match[0].length) }
+}
 
 function cleanUrl(raw: string): string {
   return raw.trim().replace(/[.,;:]+$/g, '')
@@ -89,9 +297,9 @@ function sourceKey(source: Pick<Source, 'name' | 'url'>): string {
 }
 
 function stripSourceNoise(text: string): string {
-  return text
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '$1')
-    .replace(URL_PATTERN, '')
+  let t = stripMarkdownHttpLinks(text)
+  t = stripHttpUrls(t)
+  return t
     .replace(/[()[\]]+/g, ' ')
     .replace(/\s{2,}/g, ' ')
     .trim()
@@ -120,15 +328,15 @@ function parseSourcesFromText(sourceText: string): DisplaySource[] {
     const line = rawLine.trim()
     if (!line) continue
 
-    const citationMatch = line.match(/^\[(\d{1,3})\]\s*(.*)$/)
-    if (citationMatch) {
-      entries.push({ index: Number(citationMatch[1]), body: [citationMatch[2] ?? ''] })
+    const citation = parseBracketCitationLine(line)
+    if (citation) {
+      entries.push({ index: citation.index, body: [citation.rest] })
       continue
     }
 
-    const numberedMatch = line.match(/^(\d{1,3})\.\s+(.*)$/)
-    if (numberedMatch) {
-      entries.push({ index: Number(numberedMatch[1]), body: [numberedMatch[2] ?? ''] })
+    const numbered = parseNumberedSourceLine(line)
+    if (numbered) {
+      entries.push({ index: numbered.index, body: [numbered.rest] })
       continue
     }
 
@@ -139,7 +347,7 @@ function parseSourcesFromText(sourceText: string): DisplaySource[] {
   return entries
     .map((entry) => {
       const body = entry.body.join(' ').trim()
-      const urls = body.match(URL_PATTERN) ?? []
+      const urls = extractHttpUrls(body)
       const url = cleanUrl(urls[0] ?? '')
       const name = stripSourceNoise(body) || (url ? sourceHostname(url) : `Source ${entry.index}`)
 
@@ -232,13 +440,20 @@ function buildAnswerPresentation(content: string, explicitSources: Source[] = []
   }
 }
 
-function MessageView({ message, onToggleExpand }: MessageProps) {
+function MessageView({
+  message,
+  onToggleExpand,
+  canEdit,
+  canRegenerate,
+  canRetry,
+  onEditUserMessage,
+  onRegenerateAssistant,
+  onRetryAssistant,
+  actionsDisabled,
+}: MessageProps) {
   const prefersReducedMotion = useReducedMotion()
   const [isCopied, setIsCopied] = useState(false)
-  const [isAgentPanelOpen, setIsAgentPanelOpen] = useState(false)
   const [isResearchPanelOpen, setIsResearchPanelOpen] = useState(false)
-  const [isFailedSourcesOpen, setIsFailedSourcesOpen] = useState(false)
-  const [expandedAgents, setExpandedAgents] = useState<Set<string>>(new Set())
   const isUser = message.role === 'user'
   const isSystem = message.role === 'system'
   const hasResearchTimeline = !isUser && Boolean(message.researchSteps && message.researchSteps.length > 0)
@@ -261,22 +476,10 @@ function MessageView({ message, onToggleExpand }: MessageProps) {
     return (message.relatedSources ?? []).filter((source) => !citedKeys.has(sourceKey(source)))
   }, [answerPresentation.sources, message.relatedSources])
   const fallbackVisibleText = answerPresentation.isSourceOnly
-    ? 'Trask returned source references, but no visible answer text. Review the sources below or try asking a narrower question.'
+    ? 'Holocron returned source references, but no visible answer text. Review the sources below or try asking a narrower question.'
     : message.researchStatus === 'pending'
       ? 'Consulting the archives. The answer will appear here when the research completes.'
       : 'No visible answer text was returned for this message.'
-
-  const toggleAgentDetail = (agentName: string) => {
-    setExpandedAgents(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(agentName)) {
-        newSet.delete(agentName)
-      } else {
-        newSet.add(agentName)
-      }
-      return newSet
-    })
-  }
 
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -369,9 +572,6 @@ function MessageView({ message, onToggleExpand }: MessageProps) {
   }
 
   const hasAgentResults = !isUser && message.agentResults && message.agentResults.length > 0
-  const showLegacyAgentPanel = hasAgentResults && !hasResearchTimeline
-  const successfulAgents = hasAgentResults ? (message.agentResults || []).filter(a => a.status === 'complete' && a.confidence > 0.65) : []
-  const failedAgents = hasAgentResults ? (message.agentResults || []).filter(a => a.status === 'failed' || a.confidence <= 0.65) : []
 
   const renderResearchTimeline = () => {
     if (!hasResearchTimeline) {
@@ -542,7 +742,7 @@ function MessageView({ message, onToggleExpand }: MessageProps) {
     }
 
     return (
-      <div className="mt-5 border-t border-border/50 pt-4" aria-label="Sources">
+      <div className="mt-4 border-t border-border/50 pt-3" aria-label="Sources">
         {answerPresentation.sources.length > 0 && (
           <>
             <div className="mb-3 flex items-center justify-between gap-3">
@@ -651,7 +851,7 @@ function MessageView({ message, onToggleExpand }: MessageProps) {
       initial={prefersReducedMotion ? false : { opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: prefersReducedMotion ? 0 : 0.3 }}
-      className={`w-full mb-4 group ${isUser ? 'flex justify-end' : 'flex justify-center'}`}
+      className={`w-full group ${isUser ? 'flex justify-end' : 'flex justify-center'}`}
       role="article"
       aria-label={`${isUser ? 'User' : 'Assistant'} message`}
     >
@@ -671,141 +871,20 @@ function MessageView({ message, onToggleExpand }: MessageProps) {
               <p className="text-[15px] leading-relaxed whitespace-pre-wrap flex-1">
                 {visibleContent}
               </p>
-              <div className="flex gap-1 flex-shrink-0">
-                {hasAgentResults && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleExportAgentData}
-                    className="h-6 w-6 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                    aria-label="Export agent data"
-                    title="Export agent retrieval data"
-                  >
-                    <Download size={14} weight="bold" />
-                  </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleCopy}
-                  className={`h-6 w-6 transition-opacity ${
-                    isUser
-                      ? 'text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10'
-                      : 'text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100'
-                  }`}
-                  aria-label="Copy message"
-                  title="Copy message"
-                >
-                  {isCopied ? <Check size={14} weight="bold" /> : <Copy size={14} weight="bold" />}
-                </Button>
-              </div>
+              <MessageToolbar
+                variant="user"
+                isCopied={isCopied}
+                actionsDisabled={actionsDisabled}
+                canEdit={canEdit}
+                onCopy={handleCopy}
+                onEdit={onEditUserMessage}
+              />
             </div>
 
-            <div className={`flex items-center gap-1.5 mt-2 text-xs ${
-              isUser ? 'text-primary-foreground/60' : 'text-muted-foreground'
-            }`}>
+            <div className="flex items-center gap-1.5 mt-2 text-xs text-primary-foreground/60">
               <Clock size={12} weight="bold" />
               <span>{formatTime(message.timestamp)}</span>
-              {hasAgentResults && (
-                <Badge
-                  variant="secondary"
-                  className="ml-1.5 h-5 border border-accent/35 bg-background/70 px-1.5 text-[10px] font-medium text-foreground hover:bg-accent/20 transition-colors"
-                  title="This message has exportable agent retrieval data"
-                >
-                  <Database size={10} weight="bold" className="mr-1" />
-                  Data
-                </Badge>
-              )}
             </div>
-
-            {hasDistinctExpandedContent && (
-              <div className="mt-3 pt-3 border-t border-border/50">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onToggleExpand(message.id)
-                  }}
-                  className="h-auto p-0 text-sm font-medium text-accent hover:bg-accent/10 hover:text-foreground focus-visible:ring-accent/45"
-                  aria-label={message.isExpanded ? 'Show less' : 'Show more'}
-                >
-                  {message.isExpanded ? (
-                    <>
-                      <CaretUp className="mr-1" weight="bold" size={14} />
-                      Show less
-                    </>
-                  ) : (
-                    <>
-                      <CaretDown className="mr-1" weight="bold" size={14} />
-                      Show more
-                    </>
-                  )}
-                </Button>
-              </div>
-            )}
-
-            {!isUser && answerPresentation.sources.length > 0 && (
-              <AnimatePresence>
-                {message.isExpanded && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="mt-3 pt-3 border-t border-border/50"
-                  >
-                    <p className="text-xs text-muted-foreground mb-2 font-medium">Sources:</p>
-                    <div className="flex flex-wrap gap-2" role="list">
-                      {answerPresentation.sources.map((source, idx) => (
-                        <a
-                          key={idx}
-                          href={source.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1"
-                          onClick={(e) => e.stopPropagation()}
-                          role="listitem"
-                        >
-                          <Badge
-                            variant="outline"
-                            className="text-xs hover:bg-accent/20 transition-colors"
-                          >
-                            <LinkIcon size={12} className="mr-1" />
-                            {source.name}
-                          </Badge>
-                        </a>
-                      ))}
-                    </div>
-                    {relatedSources.length > 0 && (
-                      <div className="mt-3">
-                        <p className="text-xs text-muted-foreground mb-2 font-medium">Retrieved archives:</p>
-                        <div className="flex flex-wrap gap-2" role="list">
-                          {relatedSources.map((source, idx) => (
-                            <a
-                              key={`${source.url}-${idx}`}
-                              href={source.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1"
-                              onClick={(e) => e.stopPropagation()}
-                              role="listitem"
-                            >
-                              <Badge
-                                variant="outline"
-                                className="text-xs border-border/60 text-muted-foreground hover:bg-muted/40 transition-colors"
-                              >
-                                <LinkIcon size={12} className="mr-1" />
-                                {source.name}
-                              </Badge>
-                            </a>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            )}
           </div>
         </Card>
       ) : (
@@ -815,109 +894,6 @@ function MessageView({ message, onToggleExpand }: MessageProps) {
           <Card
             className="w-full px-5 py-4 relative bg-card/85 hover:bg-card/90 transition-colors border-border/60 shadow-[0_12px_40px_-24px_rgba(0,0,0,0.65)]"
           >
-            {showLegacyAgentPanel && (
-              <div className="mb-3 pb-3 border-b border-border/50">
-                <Collapsible
-                  open={isAgentPanelOpen}
-                  onOpenChange={setIsAgentPanelOpen}
-                >
-                  <CollapsibleTrigger className="flex items-center justify-between w-full group/trigger -mx-2 rounded px-2 py-1.5 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45">
-                    <div className="flex items-center gap-2">
-                      <ListDashes size={14} weight="bold" className="text-current" />
-                      <span className="text-xs font-medium">
-                        {isAgentPanelOpen ? 'Hide' : 'Show'} retrieval details ({successfulAgents.length} source{successfulAgents.length !== 1 ? 's' : ''})
-                      </span>
-                    </div>
-                    {isAgentPanelOpen ? (
-                      <CaretUp size={14} weight="bold" className="text-current" />
-                    ) : (
-                      <CaretDown size={14} weight="bold" className="text-current" />
-                    )}
-                  </CollapsibleTrigger>
-
-                  <CollapsibleContent>
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="mt-2 space-y-1.5"
-                    >
-                      {successfulAgents.map((agent) => {
-                        const isExpanded = expandedAgents.has(agent.agentName)
-                        return (
-                          <div key={agent.agentName}>
-                            <button
-                              onClick={() => toggleAgentDetail(agent.agentName)}
-                              className="flex items-center justify-between w-full bg-muted/30 hover:bg-muted/50 px-2.5 py-2 rounded-md transition-colors group/agent"
-                            >
-                              <div className="flex items-center gap-2 min-w-0 flex-1">
-                                <CheckCircle size={14} weight="fill" className="text-accent flex-shrink-0" />
-                                <span className="text-xs font-medium text-foreground truncate">
-                                  {agent.agentName}
-                                </span>
-                                <Badge
-                                  variant="secondary"
-                                  className={`text-[10px] px-1.5 py-0 h-auto ml-auto mr-1 font-semibold border ${getConfidenceColor(agent.confidence)}`}
-                                >
-                                  {Math.round(agent.confidence * 100)}%
-                                </Badge>
-                              </div>
-                              {isExpanded ? (
-                                <CaretUp size={12} weight="bold" className="text-muted-foreground flex-shrink-0" />
-                              ) : (
-                                <CaretDown size={12} weight="bold" className="text-muted-foreground flex-shrink-0" />
-                              )}
-                            </button>
-
-                            {isExpanded && (
-                              <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: 'auto' }}
-                                exit={{ opacity: 0, height: 0 }}
-                                className="ml-6 mt-1.5 text-xs text-muted-foreground bg-muted/20 px-2.5 py-2 rounded-md"
-                              >
-                                <p className="font-medium mb-1">Summary:</p>
-                                <p className="leading-relaxed">{agent.snippet || 'No preview available'}</p>
-                                {agent.retrievedContent && agent.retrievedContent.length > 150 && (
-                                  <p className="text-[10px] mt-1.5 italic">
-                                    Retrieved {agent.retrievedContent.length} characters of content
-                                  </p>
-                                )}
-                              </motion.div>
-                            )}
-                          </div>
-                        )
-                      })}
-
-                      {failedAgents.length > 0 && (
-                        <Collapsible open={isFailedSourcesOpen} onOpenChange={setIsFailedSourcesOpen}>
-                          <CollapsibleTrigger className="mt-2 flex w-full items-center justify-between rounded-md px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45">
-                            <span className="flex items-center gap-1.5">
-                              <XCircle size={12} weight="bold" />
-                              {failedAgents.length} source{failedAgents.length !== 1 ? 's' : ''} unavailable
-                            </span>
-                            {isFailedSourcesOpen ? (
-                              <CaretUp size={12} weight="bold" />
-                            ) : (
-                              <CaretDown size={12} weight="bold" />
-                            )}
-                          </CollapsibleTrigger>
-                          <CollapsibleContent>
-                            <div className="ml-5 mt-1 space-y-0.5 text-muted-foreground">
-                              {failedAgents.map((agent) => (
-                                <div key={agent.agentName} className="text-[10px]">
-                                  {agent.agentName}
-                                </div>
-                              ))}
-                            </div>
-                          </CollapsibleContent>
-                        </Collapsible>
-                      )}
-                    </motion.div>
-                  </CollapsibleContent>
-                </Collapsible>
-              </div>
-            )}
 
             <div
               className={hasDistinctExpandedContent ? 'cursor-pointer' : ''}
@@ -925,34 +901,18 @@ function MessageView({ message, onToggleExpand }: MessageProps) {
             >
               <div className="flex items-start justify-between gap-2">
                 {renderAnswerBody()}
-                <div className="flex gap-1 flex-shrink-0">
-                  {hasAgentResults && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={handleExportAgentData}
-                      className="h-6 w-6 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                      aria-label="Export agent data"
-                      title="Export agent retrieval data"
-                    >
-                      <Download size={14} weight="bold" />
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleCopy}
-                    className={`h-6 w-6 transition-opacity ${
-                      isUser
-                        ? 'text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10'
-                        : 'text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100'
-                    }`}
-                    aria-label="Copy message"
-                    title="Copy message"
-                  >
-                    {isCopied ? <Check size={14} weight="bold" /> : <Copy size={14} weight="bold" />}
-                  </Button>
-                </div>
+                <MessageToolbar
+                  variant="assistant"
+                  isCopied={isCopied}
+                  actionsDisabled={actionsDisabled}
+                  canRegenerate={canRegenerate}
+                  canRetry={canRetry}
+                  hasExport={hasAgentResults}
+                  onExport={handleExportAgentData}
+                  onCopy={handleCopy}
+                  onRegenerate={onRegenerateAssistant}
+                  onRetry={onRetryAssistant}
+                />
               </div>
 
               <div className={`flex items-center gap-1.5 mt-2 text-xs ${

@@ -22,7 +22,7 @@ lastUpdated: 2026-05-20
 # `GET /api/trask/models`
 
 - [REPO] Requires auth (`requireAuth`).
-- [REPO] Returns `{ models }` built from default free-model options plus optional `researchWizard.listModels()`, filtered to “free” model ids (same helper as `/ask` model validation).
+- [REPO] Returns `{ models }` built from default free-model options plus optional `webResearch.listModels()`, filtered to “free” model ids (same helper as `/ask` model validation).
 
 # `GET /api/trask/sources`
 

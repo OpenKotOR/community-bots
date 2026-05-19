@@ -28,17 +28,10 @@ Ask a KOTOR question and get a source-backed answer.
 |---|---|---|
 | `query` | yes | Question or topic (max 200 characters) |
 
-**Behavior:**
-- Runs the vendored **headless ai-researchwizard** (`vendor/ai-researchwizard/trask_headless_research.py`) — same core
-  engine as `cli.py`, **not** the FastAPI/Web UI server.
-- Restricts research to Trask's approved source list.
-- Treats `TRASK_FAST_QA=1` as an explicit low-latency override; the default path now prefers the higher-quality
-  evidence-first flow and only uses fast/local synthesis when grounded support survives relevance checks.
-- Returns a short Discord-friendly answer with inline numeric citations and a compact `Sources`
-  bibliography section.
-- If `OPENAI_API_KEY` / `OPENROUTER_API_KEY` are unset, the runtime degrades to deterministic formatting
-  plus grounded local technical references or an explicit abstention instead of hard-failing.
-- Does not explain retrieval internals unless the user explicitly asks.
+**Behavior (current repo):**
+- Spawns **`scripts/trask_web_research.py`** (Crawl4AI + DuckDuckGo) for allowlisted web gather, then Node LLM rewrite for Holocron/Discord formatting.
+- Bootstrap: `bash scripts/bootstrap_trask_research.sh`; set `TRASK_WEB_RESEARCH_PYTHON` and `OPENAI_API_KEY` or `OPENROUTER_API_KEY`.
+- See **`docs/trask-research-backends.md`** for alternatives and verification commands.
 
 **Example:**
 ```
@@ -106,8 +99,8 @@ Trask's answer generation is pinned to these approved sources by default:
 Live research is constrained to the approved base hosts `lucasforumsarchive.org`, `deadlystream.com`, `github.com`, `kotor.neocities.org`, and `pcgamingwiki.com`. GitHub crawling is further narrowed to the approved KotOR project roots in this catalog. The headless bridge passes both `query_domains` and `allowed_url_prefixes`, rejects direct or discovered URLs outside that allowlist before scraping, and reports accepted/rejected URL lists in `research_information` for audit.
 
 **Holocron and functional e2e require live approved-web citations only** (`https://…` on the allowlisted hosts).
-Answers come exclusively from GPTR browsing those sources (`report_source: web`). There are no bundled
-`local://` reference chunks or offline citation substitutes.
+Answers come from Crawl4AI + DuckDuckGo discovery on those hosts, then Node LLM synthesis. Imported Discord
+chunks may supply lower-authority community context but are not a substitute for web citations in e2e.
 
 ## Admin Setup
 
@@ -118,58 +111,37 @@ The following environment variables control Trask's scope:
 | `TRASK_ALLOWED_GUILD_IDS` | Comma-separated guild IDs where Trask is active |
 | `TRASK_APPROVED_CHANNEL_IDS` | Comma-separated channel IDs where `/ask` is allowed |
 | `TRASK_SLASH_GUILD_IDS` | Comma-separated guild IDs where slash commands are **registered** (use when the bot serves multiple servers; overrides single-guild deploy when non-empty) |
-| `TRASK_GPT_RESEARCHER_ROOT` | Absolute path to `vendor/ai-researchwizard` (optional if you run the bot from the monorepo root — auto-detected when `vendor/ai-researchwizard/gpt_researcher` exists) |
-| `TRASK_GPT_RESEARCHER_PYTHON` | Python interpreter for the headless runner (default `python`; point at the venv that has `ai-researchwizard` deps installed) |
-| `TRASK_GPT_RESEARCHER_SCRIPT` | Optional absolute path to override `trask_headless_research.py` |
-| `TRASK_RESEARCHWIZARD_TIMEOUT_MS` | Max time for one research run (default `120000`) |
+| `TRASK_WEB_RESEARCH_PYTHON` | Python for `scripts/trask_web_research.py` (defaults to `.venv-trask-research` when present) |
+| `TRASK_WEB_RESEARCH_SCRIPT` | Optional absolute path override for the headless runner |
+| `TRASK_WEB_RESEARCH_TIMEOUT_MS` | Max time for one research run (default **900000**; legacy alias `TRASK_RESEARCHWIZARD_TIMEOUT_MS`) |
+| `OPENAI_API_KEY` / `OPENROUTER_API_KEY` | LLM rewrite for final Holocron/Discord answers |
+
+Deprecated aliases: `TRASK_GPT_RESEARCHER_PYTHON` → `TRASK_WEB_RESEARCH_PYTHON`; `TRASK_GPT_RESEARCHER_SCRIPT` → `TRASK_WEB_RESEARCH_SCRIPT`.
 
 When `TRASK_APPROVED_CHANNEL_IDS` is set, Trask only answers `/ask` in those channels. It does not
 perform blanket server-history reads unless proactive mode is enabled (see below).
 
-### ai-researchwizard Python environment (required for `/ask` and Holocron research)
+### Web research Python environment (required for `/ask` and Holocron research)
 
-Trask spawns **`vendor/ai-researchwizard/trask_headless_research.py`**, which loads `.env` via
-**`python-dotenv`** and imports the vendored **`gpt_researcher`** package. Use a dedicated virtualenv
-and point **`TRASK_GPT_RESEARCHER_PYTHON`** at its interpreter (plain `python` on PATH is fine only if
-that environment already has the dependencies).
+Trask spawns **`scripts/trask_web_research.py`** (Crawl4AI + DuckDuckGo). Bootstrap a dedicated venv:
 
-**Bootstrap (recommended)**
-
-- **Windows (PowerShell):** `.\scripts\bootstrap_trask_gpt_researcher.ps1`
-- **macOS / Linux:** `bash scripts/bootstrap_trask_gpt_researcher.sh`
-
-Each script creates **`.venv-trask-gptr`** at the repo root and runs
-
-`pip install -r vendor/ai-researchwizard/requirements.txt` (includes **`python-dotenv`** and the rest
-of ai-researchwizard’s stack).
-
-**Manual**
+- **Windows (PowerShell):** `.\scripts\bootstrap_trask_research.ps1`
+- **macOS / Linux:** `bash scripts/bootstrap_trask_research.sh`
 
 ```bash
-python3 -m venv .venv-trask-gptr
-source .venv-trask-gptr/bin/activate   # Windows: .venv-trask-gptr\Scripts\activate
-pip install -r vendor/ai-researchwizard/requirements.txt
-export TRASK_GPT_RESEARCHER_PYTHON="$(pwd)/.venv-trask-gptr/bin/python"
+export TRASK_WEB_RESEARCH_PYTHON="$(pwd)/.venv-trask-research/bin/python"
 ```
 
-If you see **`ModuleNotFoundError: No module named 'dotenv'`**, install deps from that requirements
-file (or `pip install python-dotenv`) into the **same** interpreter **`TRASK_GPT_RESEARCHER_PYTHON`**
-uses — not only the Node/pnpm toolchain.
+Fedora/RHEL hosts need `libxml2-devel` and `libxslt-devel` before the first bootstrap (for `lxml`).
 
-API keys and retriever settings are read from **`.env`** in **`vendor/ai-researchwizard`** (or the
-process environment); copy upstream `.env.example` there if you need a template.
+Full backend notes: **`docs/trask-research-backends.md`**.
 
 ### Smoke test (headless JSON contract)
 
-Use **`scripts/smoke_trask_headless_gptr.py`** to verify the same stdin/stdout shape Node uses when it
-spawns `trask_headless_research.py`.
-
 | Command | Purpose |
 |---|---|
-| `python scripts/smoke_trask_headless_gptr.py --dry-run` | Confirms **`TRASK_GPT_RESEARCHER_PYTHON`** (or `.venv-trask-gptr`) can import **`dotenv`** and **`gpt_researcher`** with **`cwd`** set to `vendor/ai-researchwizard`. **No API calls.** |
-| `python scripts/smoke_trask_headless_gptr.py` | Runs one minimal **`research_report`** / **`web`** payload; stdout must be **JSON** with a non-empty **`report`**. Uses **`--timeout-ms`** (default **180000**). Requires working **`.env`** (LLM + default retriever, often Tavily). |
-
-pnpm wrappers (repo root): **`pnpm smoke:trask-gptr-dry`** and **`pnpm smoke:trask-gptr`**.
+| `python scripts/smoke_trask_web_research.py --dry-run` | Confirms **`TRASK_WEB_RESEARCH_PYTHON`** can import Crawl4AI/DDG deps. **No API calls.** |
+| `python scripts/smoke_trask_web_research.py` | Runs one minimal research payload; stdout must be JSON with a non-empty **`report`**. |
 
 ### Holocron functional E2E (Playwright — no API mocks)
 
@@ -182,9 +154,9 @@ pnpm exec playwright install chromium --with-deps   # once per machine (repo roo
 pnpm holocron:e2e
 ```
 
-Requires `.env` (or `vendor/ai-researchwizard/.env`) only when you want live web synthesis / rewrite.
-Without LLM keys, GPTR may still retrieve approved web pages; answers must include **at least two**
-distinct `https://` sources or fail explicitly. Set `HOLOCRON_REUSE_SERVER=1` if the server is already listening on 4010.
+Requires repo **`.env`** with **at least one working LLM provider** (`OPENROUTER_API_KEY` or `OPENAI_API_KEY`)
+and **`TRASK_WEB_RESEARCH_PYTHON`** from bootstrap. Answers are **LLM-synthesized** from scraped main content.
+E2E requires **at least two** distinct `https://` sources. Set `HOLOCRON_REUSE_SERVER=1` if the server is already listening on 4010.
 
 CLI debug gate:
 
@@ -192,7 +164,7 @@ CLI debug gate:
 pnpm verify:trask-cli
 ```
 
-That script mirrors the same canonical five technical queries as Holocron e2e. It is for GPTR/retrieval
+That script mirrors the same canonical five technical queries as Holocron e2e. It is for subprocess/retrieval
 debugging only and does **not** replace browser or Playwright verification of real `https://` citations.
 
 ### Discord bot slash commands (REST smoke)
@@ -229,7 +201,7 @@ not the long embed briefing).
    `TRASK_PROACTIVE_COMPETING_MIN_LENGTH` characters long, Trask stays silent so humans can answer first.
 3. **Classifier** (`TRASK_PROACTIVE_CLASSIFIER_MODEL`, default `gpt-4o-mini`): JSON output gates obvious non-questions
    and off-topic chatter.
-4. **Research**: runs headless ai-researchwizard with a **brief** digest prompt and a short Discord rewrite.
+4. **Research**: runs web research (Crawl4AI + DDG) with a **brief** digest prompt and a short Discord rewrite.
 5. **Semantic gate** (`TRASK_PROACTIVE_SIMILARITY_THRESHOLD`): embedding similarity between the user question / brief
    answer and the normalized report must clear the threshold, reducing confident-but-ungrounded replies.
 6. **Per-user cooldown** (`TRASK_PROACTIVE_USER_COOLDOWN_MS`) limits spam.
@@ -247,12 +219,9 @@ may not bind** the option—rather than pasting a full pseudo-command string.
 
 ## Current Limitations
 
-- Trask depends on a working **Python + ai-researchwizard** install under `TRASK_GPT_RESEARCHER_ROOT` (API keys such as
-  `OPENAI_API_KEY` / retriever keys live in `.env` loaded by the headless script). Missing LLM keys should
-  no longer hard-fail requests, but they do reduce the runtime to deterministic local-reference answers or
-  explicit abstentions when no grounded web synthesis is available.
-- The vendored backend defaults to a report-oriented workflow, so prompt and formatting controls
-  still need refinement to keep replies concise under Discord limits.
+- Trask depends on a working **`.venv-trask-research`** (or explicit `TRASK_WEB_RESEARCH_PYTHON`) plus LLM keys in `.env`.
+  Missing LLM keys reduce the runtime to explicit abstentions when no grounded web synthesis is available.
+- Web research latency and crawl failures vary by host; Discord `/ask` is clamped to a **90s** SLA regardless of `TRASK_WEB_RESEARCH_TIMEOUT_MS`.
 - Ingest queue processing is still a separate operator workflow. `/queue-reindex` enqueues work,
   while indexing execution is managed by ingest-worker CLI commands.
 - With **`TRASK_PROACTIVE_ENABLED=0`** (default), Trask is slash-command-only and does not use privileged message intents.
@@ -263,17 +232,15 @@ may not bind** the option—rather than pasting a full pseudo-command string.
 
 | Piece | Role |
 |---|---|
-| `@openkotor/trask` | Spawns `trask_headless_research.py` (ai-researchwizard); optional OpenAI-compatible rewrite pass |
+| `@openkotor/trask` | `WebResearchClient` — spawns `trask_web_research.py`; optional OpenAI-compatible rewrite pass |
 | `@openkotor/trask-http` | Express router factory: `GET/POST /sources`, `/history`, `/ask` under `/api/trask` with pluggable auth |
 | `apps/trask-bot` | Discord slash commands; optional proactive listener uses `@openkotor/trask` brief answers + LLM gates |
 | `apps/trask-http-server` | Standalone API + optional static serving of `apps/holocron-web/dist` |
 | `apps/pazaak-bot` | Still mounts the same router at `/api/trask` for PazaakWorld |
-| `apps/holocron-web` | Holocron SPA; **default** path calls the Trask HTTP API (legacy Spark simulation behind `VITE_TRASK_LEGACY_SPARK=1`) |
-| `vendor/ai-researchwizard` | Upstream ai-researchwizard tree; Trask uses `trask_headless_research.py` (+ optional `cli.py` for humans) |
-| `vendor/llm_fallbacks` | Python ordering for free/chat models; optional helper script for GPTR env |
+| `apps/holocron-web` | Holocron Archive SPA; calls the Trask HTTP API (`/api/trask/*`) for live research |
+| `scripts/trask_web_research.py` | Crawl4AI + DuckDuckGo headless gather (see `requirements-trask-research.txt`) |
 
-Trask Q&A does **not** require PazaakWorld: run `trask-http-server` + `holocron-web` against the same headless ai-researchwizard
-install on disk (`TRASK_GPT_RESEARCHER_ROOT`).
+Trask Q&A does **not** require PazaakWorld: run `trask-http-server` + `holocron-web` with bootstrap venv and LLM keys.
 
 ## Layered knowledgebase
 
@@ -304,7 +271,7 @@ Point both processes at the same JSON store: set **`TRASK_HTTP_DATA_DIR`** on `t
 ## Holocron Web UI (`apps/holocron-web`)
 
 - **Default:** questions go to `/api/trask/ask` (relative URL). Vite dev proxies `/api/trask` → `TRASK_HTTP_PROXY_TARGET` (default `http://127.0.0.1:4010`). The usual Holocron dev URL is `http://localhost:5174`; the Trask HTTP server also permits `5173`, `4174`, `4173`, and `3000` for local browser/proxy testing.
-- **Env:** `VITE_TRASK_API_BASE` (optional absolute API origin), `VITE_TRASK_API_KEY` (optional build-time bearer), `VITE_TRASK_LEGACY_SPARK=1` to restore the old Spark + simulated multi-agent path.
+- **Env:** `VITE_TRASK_API_BASE` (optional absolute API origin), `VITE_TRASK_API_KEY` (optional build-time bearer).
 
 ```bash
 pnpm install   # monorepo root
@@ -370,10 +337,10 @@ interface TraskQueryRecord {
 
 ## LLM configuration
 
-### ai-researchwizard (`vendor/ai-researchwizard`)
+### Web research subprocess
 
-Install Python deps in a venv rooted at `vendor/ai-researchwizard` (see upstream README), then point
-`TRASK_GPT_RESEARCHER_PYTHON` at that interpreter. Configure the stack with standard upstream env vars, for example:
+Install Python deps via `bash scripts/bootstrap_trask_research.sh`, then set `TRASK_WEB_RESEARCH_PYTHON`.
+Optional tuning in repo `.env`:
 
 - `OPENAI_API_KEY` / `OPENROUTER_API_KEY` — LLM + embeddings
 - `TAVILY_API_KEY` is optional (only needed if you explicitly choose Tavily retrievers)
@@ -389,7 +356,7 @@ Paste or export the printed `FAST_LLM=` / `SMART_LLM=` lines into the same `.env
 
 ### Post-report rewrite (`@openkotor/trask`)
 
-After ai-researchwizard returns a report, Trask optionally calls an **OpenAI-compatible** chat completion to tighten Discord formatting.
+After web research returns a report, Trask optionally calls an **OpenAI-compatible** chat completion to tighten Discord formatting.
 
 | Variable | Purpose |
 |---|---|
@@ -405,7 +372,7 @@ grounded local/web evidence or an explicit abstention; missing keys should not h
 
 ## Shared packages
 
-`packages/trask/` exports `ResearchWizardClient` and `createResearchWizardClient`.
+`packages/trask/` exports `WebResearchClient` and `createWebResearchClient` (legacy `ResearchWizard*` aliases are deprecated).
 
 `packages/trask-http/` exports `createTraskHttpRouter` for any host (pazaak-bot, trask-http-server, tests).
 
