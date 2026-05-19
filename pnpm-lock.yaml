@@ -637,6 +637,8 @@ importers:
         specifier: ^4.21.0
         version: 4.21.0
 
+  infra/holocron-trask-api: {}
+
   infra/matchmaking-inducer:
     dependencies:
       http-proxy:
