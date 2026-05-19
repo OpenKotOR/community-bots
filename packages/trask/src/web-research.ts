@@ -249,16 +249,35 @@ const rewriteMarkdownLinks = (
   return result;
 };
 
+/** True when the line opens with 1–6 `#` characters followed by Unicode whitespace (ATX heading). */
+const isAtxMarkdownHeadingLine = (line: string): boolean => {
+  let i = 0;
+  let hashes = 0;
+  while (i < line.length && line[i] === "#" && hashes < 6) {
+    hashes += 1;
+    i += 1;
+  }
+  if (hashes === 0 || hashes > 6) return false;
+  if (i >= line.length) return false;
+  return /\s/u.test(line[i]!);
+};
+
 const stripMarkdownHeaders = (text: string): string =>
   text
     .split("\n")
-    .filter((line) => !/^#{1,6}\s+/.test(line))
+    .filter((line) => !isAtxMarkdownHeadingLine(line))
     .join("\n");
+
+/** Pipe-delimited markdown table row heuristic: trimmed line starts and ends with `|`. */
+const looksLikeMarkdownTableRow = (line: string): boolean => {
+  const trimmed = line.trim();
+  return trimmed.length >= 2 && trimmed[0] === "|" && trimmed[trimmed.length - 1] === "|";
+};
 
 const stripMarkdownTableRows = (text: string): string =>
   text
     .split("\n")
-    .filter((line) => !/^\|.*\|$/.test(line.trim()))
+    .filter((line) => !looksLikeMarkdownTableRow(line))
     .join("\n");
 
 const stripAsteriskRuns = (text: string): string => {
@@ -492,28 +511,47 @@ const collectCitedSourcesFromText = (
   sourcePool: readonly SourceDescriptor[],
 ): readonly SourceDescriptor[] => materializeSourcesFromUrls(extractSourceSectionUrls(text), sourcePool);
 
+const startsWithTableOfContentsHeading = (trimmed: string): boolean => {
+  const lower = trimmed.toLowerCase();
+  if (!lower.startsWith("##")) return false;
+  let i = 2;
+  while (i < lower.length && /\s/u.test(lower[i]!)) i += 1;
+  return lower.startsWith("table of contents", i);
+};
+
+/** `##` at line start followed by Unicode whitespace (matches prior `^##\\s+` checks). */
+const startsWithH2WithSpace = (trimmed: string): boolean =>
+  trimmed.startsWith("##") && trimmed.length > 2 && /\s/u.test(trimmed[2]!);
+
+/** Single-level ATX heading: `# ` but not `## …` (H1 title line). */
+const isH1AtxHeadingLine = (trimmed: string): boolean => {
+  if (!trimmed.startsWith("#")) return false;
+  if (trimmed.startsWith("##")) return false;
+  return trimmed.length > 1 && /\s/u.test(trimmed[1]!);
+};
+
 const normalizeReport = (value: string): string => {
   const lines = value.replace(/\r\n/g, "\n").split("\n");
   const out: string[] = [];
   let skippingToc = false;
   for (const line of lines) {
     const trimmed = line.trim();
-    if (/^##\s+table of contents/iu.test(trimmed)) {
+    if (startsWithTableOfContentsHeading(trimmed)) {
       skippingToc = true;
       continue;
     }
     if (skippingToc) {
       if (
-        /^##\s+/u.test(trimmed)
+        startsWithH2WithSpace(trimmed)
         || isSourcesHeadingLine(line)
-        || (/^#\s+/u.test(trimmed) && !/^##\s+/u.test(trimmed))
+        || isH1AtxHeadingLine(trimmed)
       ) {
         skippingToc = false;
       } else {
         continue;
       }
     }
-    if (/^#\s+/u.test(trimmed) && !/^##\s+/u.test(trimmed)) continue;
+    if (isH1AtxHeadingLine(trimmed)) continue;
     out.push(line);
   }
   return collapseExcessiveNewlines(out.join("\n"));
@@ -537,6 +575,24 @@ const countPayloadWebUrls = (payload: WebResearchResponsePayload): number => {
   return urls.filter((url) => isPublicWebCitationUrl(url)).length;
 };
 
+const LEGACY_APPROVED_ARCHIVE_BULLET_MARKER =
+  "is an approved archive page that may answer questions about";
+
+/**
+ * Legacy failure copy used a markdown bullet whose tail contained a fixed phrase.
+ * Implemented without `.*`-style regexes to avoid polynomial backtracking on adversarial input.
+ */
+const hasLegacyApprovedArchiveFailureBullet = (normalized: string): boolean => {
+  const lower = normalized.toLowerCase();
+  const marker = LEGACY_APPROVED_ARCHIVE_BULLET_MARKER.toLowerCase();
+  if (!lower.startsWith("-")) return false;
+  let i = 1;
+  while (i < lower.length && /\s/u.test(lower[i]!)) i += 1;
+  if (i >= lower.length || /\s/u.test(lower[i]!)) return false;
+  while (i < lower.length && /\S/u.test(lower[i]!)) i += 1;
+  return lower.indexOf(marker, i) !== -1;
+};
+
 const isSynthesisFailureReport = (report: string, payload: WebResearchResponsePayload): boolean => {
   const normalized = report.trim();
   const webUrlCount = countPayloadWebUrls(payload);
@@ -546,9 +602,7 @@ const isSynthesisFailureReport = (report: string, payload: WebResearchResponsePa
   if (/^i could not complete live archive synthesis\b/iu.test(normalized)) {
     return true;
   }
-  if (
-    /^-\s+\S+.*is an approved archive page that may answer questions about/iu.test(normalized)
-  ) {
+  if (hasLegacyApprovedArchiveFailureBullet(normalized)) {
     return true;
   }
   return false;

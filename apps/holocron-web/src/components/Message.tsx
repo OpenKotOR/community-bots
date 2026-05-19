@@ -183,7 +183,100 @@ interface AnswerPresentation {
 
 const SOURCE_HEADING_PATTERN = /^\s*sources\s*:?\s*$/i
 const CITATION_PATTERN = /\[(\d{1,3})\]/g
-const URL_PATTERN = /[a-z][a-z0-9+.-]*:\/\/[^\s)\]]+/gi
+
+function isHttpUrlSchemeTerminator(ch: string): boolean {
+  return ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r' || ch === ')' || ch === ']' || ch === '>'
+}
+
+/** Collect http(s) URLs without regex backtracking (CodeQL-safe). */
+function extractHttpUrls(text: string): string[] {
+  const urls: string[] = []
+  const lower = text.toLowerCase()
+  let i = 0
+  while (i < text.length) {
+    const httpsIdx = lower.indexOf('https://', i)
+    const httpIdx = lower.indexOf('http://', i)
+    const start =
+      httpsIdx === -1 ? httpIdx : httpIdx === -1 ? httpsIdx : Math.min(httpsIdx, httpIdx)
+    if (start === -1) break
+    let end = start
+    while (end < text.length && !isHttpUrlSchemeTerminator(text[end]!)) end += 1
+    urls.push(text.slice(start, end))
+    i = end
+  }
+  return urls
+}
+
+function stripHttpUrls(text: string): string {
+  const lower = text.toLowerCase()
+  let out = ''
+  let i = 0
+  while (i < text.length) {
+    const httpsIdx = lower.indexOf('https://', i)
+    const httpIdx = lower.indexOf('http://', i)
+    const start =
+      httpsIdx === -1 ? httpIdx : httpIdx === -1 ? httpsIdx : Math.min(httpsIdx, httpIdx)
+    if (start === -1) {
+      out += text.slice(i)
+      break
+    }
+    out += text.slice(i, start)
+    let end = start
+    while (end < text.length && !isHttpUrlSchemeTerminator(text[end]!)) end += 1
+    i = end
+  }
+  return out
+}
+
+/** Replace `[label](https://…)` with `label` using linear scanning (avoids nested-quantifier regex). */
+function stripMarkdownHttpLinks(text: string): string {
+  let result = ''
+  let i = 0
+  while (i < text.length) {
+    if (text[i] !== '[') {
+      result += text[i]
+      i += 1
+      continue
+    }
+    const closeBracket = text.indexOf(']', i + 1)
+    if (closeBracket === -1 || text[closeBracket + 1] !== '(') {
+      result += text[i]
+      i += 1
+      continue
+    }
+    const closeParen = text.indexOf(')', closeBracket + 2)
+    if (closeParen === -1) {
+      result += text[i]
+      i += 1
+      continue
+    }
+    const url = text.slice(closeBracket + 2, closeParen)
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      result += text.slice(i + 1, closeBracket)
+      i = closeParen + 1
+    } else {
+      result += text.slice(i, closeParen + 1)
+      i = closeParen + 1
+    }
+  }
+  return result
+}
+
+function parseBracketCitationLine(line: string): { index: number; rest: string } | null {
+  if (!line.startsWith('[')) return null
+  const close = line.indexOf(']', 1)
+  if (close <= 1) return null
+  const num = line.slice(1, close)
+  if (!/^\d{1,3}$/.test(num)) return null
+  const rest = line.slice(close + 1).trimStart()
+  return { index: Number(num), rest }
+}
+
+function parseNumberedSourceLine(line: string): { index: number; rest: string } | null {
+  const match = /^(\d{1,3})\.\s+/u.exec(line)
+  if (!match) return null
+  return { index: Number(match[1]), rest: line.slice(match[0].length) }
+}
 
 function cleanUrl(raw: string): string {
   return raw.trim().replace(/[.,;:]+$/g, '')
@@ -204,9 +297,9 @@ function sourceKey(source: Pick<Source, 'name' | 'url'>): string {
 }
 
 function stripSourceNoise(text: string): string {
-  return text
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '$1')
-    .replace(URL_PATTERN, '')
+  let t = stripMarkdownHttpLinks(text)
+  t = stripHttpUrls(t)
+  return t
     .replace(/[()[\]]+/g, ' ')
     .replace(/\s{2,}/g, ' ')
     .trim()
@@ -235,15 +328,15 @@ function parseSourcesFromText(sourceText: string): DisplaySource[] {
     const line = rawLine.trim()
     if (!line) continue
 
-    const citationMatch = line.match(/^\[(\d{1,3})\]\s*(.*)$/)
-    if (citationMatch) {
-      entries.push({ index: Number(citationMatch[1]), body: [citationMatch[2] ?? ''] })
+    const citation = parseBracketCitationLine(line)
+    if (citation) {
+      entries.push({ index: citation.index, body: [citation.rest] })
       continue
     }
 
-    const numberedMatch = line.match(/^(\d{1,3})\.\s+(.*)$/)
-    if (numberedMatch) {
-      entries.push({ index: Number(numberedMatch[1]), body: [numberedMatch[2] ?? ''] })
+    const numbered = parseNumberedSourceLine(line)
+    if (numbered) {
+      entries.push({ index: numbered.index, body: [numbered.rest] })
       continue
     }
 
@@ -254,7 +347,7 @@ function parseSourcesFromText(sourceText: string): DisplaySource[] {
   return entries
     .map((entry) => {
       const body = entry.body.join(' ').trim()
-      const urls = body.match(URL_PATTERN) ?? []
+      const urls = extractHttpUrls(body)
       const url = cleanUrl(urls[0] ?? '')
       const name = stripSourceNoise(body) || (url ? sourceHostname(url) : `Source ${entry.index}`)
 
