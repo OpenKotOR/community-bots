@@ -9,7 +9,7 @@ import {
   classifyTraskProactiveMessage,
   createOpenAiClient,
   formatProactivePlainReply,
-  type ResearchWizardClient,
+  type WebResearchClient,
   scoreResearchAlignment,
 } from "@openkotor/trask";
 
@@ -57,7 +57,7 @@ const shouldIgnoreMessage = (message: Message, config: TraskBotConfig): boolean 
 export const registerTraskProactiveHandlers = (
   client: Client,
   config: TraskBotConfig,
-  researchWizard: ResearchWizardClient,
+  webResearch: WebResearchClient,
   logger: Logger,
   queryRepository?: JsonTraskQueryRepository,
 ): void => {
@@ -170,7 +170,7 @@ export const registerTraskProactiveHandlers = (
         return;
       }
 
-      const brief = await researchWizard.answerQuestionBrief(pending.content);
+      const brief = await webResearch.answerQuestionBrief(pending.content);
 
       const similarity = await scoreResearchAlignment(openAi, config.ai.embeddingModel, {
         question: pending.content,

@@ -15,7 +15,7 @@ lastUpdated: 2026-05-20
 
 # Runtime payload
 
-- [REPO] `apps/pazaak-bot/src/main.ts` wires `createChunkSearchProvider(process.env.INGEST_STATE_DIR?.trim() || "data/ingest-worker")` and `createResearchWizardClient(...)` into the `trask` option object.
+- [REPO] `apps/pazaak-bot/src/main.ts` wires `createChunkSearchProvider(process.env.INGEST_STATE_DIR?.trim() || "data/ingest-worker")` and `createWebResearchClient(...)` into the `trask` option object as **`webResearch`**.
 - [REPO] `JsonTraskQueryRepository` under **`resolveDataFile(config.dataDir, "trask-queries.json")`** where `dataDir` comes from **`PAZAAK_DATA_DIR`** (default `data/pazaak-bot`, `loadPazaakBotConfig`).
 
 # Purpose

@@ -1,4 +1,4 @@
-name: Deploy Trask HTTP (Hugging Face GPTR)
+name: Deploy Trask HTTP (Hugging Face)
 
 on:
   push:
@@ -13,11 +13,10 @@ on:
       - "packages/persistence/**"
       - "packages/platform/**"
       - "packages/core/**"
-      - "vendor/ai-researchwizard/**"
       - "vendor/llm_fallbacks/**"
+      - "docs/trask-research-backends.md"
       - "data/ingest-worker/**"
       - "infra/trask-http-public/**"
-      - "scripts/bootstrap_trask_gpt_researcher.sh"
       - "scripts/pack-trask-http-hf-context.sh"
       - "scripts/sync_hf_space_secrets.py"
       - "pnpm-lock.yaml"
@@ -46,7 +45,7 @@ jobs:
         run: |
           if [ -z "$HUGGINGFACE_TOKEN" ]; then
             echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Skipping HF GPTR deploy. Set repository secret HUGGINGFACE_TOKEN."
+            echo "::notice::Skipping HF web-research deploy. Set repository secret HUGGINGFACE_TOKEN."
             exit 0
           fi
           echo "configured=true" >> "$GITHUB_OUTPUT"
@@ -89,7 +88,7 @@ jobs:
           chmod +x scripts/pack-trask-http-hf-context.sh
           PACK_DIR="$(scripts/pack-trask-http-hf-context.sh)"
           hf upload "${HF_SPACE_ID}" "$PACK_DIR/" --repo-type space \
-            --commit-message "Deploy trask-http GPTR from community-bots@${{ github.sha }}"
+            --commit-message "Deploy trask-http web research from community-bots@${{ github.sha }}"
 
       - name: Wait for Space build
         if: steps.hf_check.outputs.configured == 'true'

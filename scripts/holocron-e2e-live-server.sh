@@ -18,18 +18,6 @@ for envfile in ".env" ".env.local" "vendor/ai-researchwizard/.env"; do
   fi
 done
 
-has_llm=0
-for key in OPENAI_API_KEY OPENROUTER_API_KEY GEMINI_API_KEY GOOGLE_API_KEY GROQ_API_KEY ANTHROPIC_API_KEY; do
-  if [[ -n "${!key:-}" ]]; then
-    has_llm=1
-    break
-  fi
-done
-if [[ "$has_llm" -eq 0 ]]; then
-  echo "holocron-e2e-live-server: warning — no LLM API keys in .env / .env.local / vendor/ai-researchwizard/.env." >&2
-  echo "  Holocron will use DuckDuckGo retriever-only research (slower, lower quality). Add OPENROUTER_API_KEY for best results." >&2
-fi
-
 DIST="$ROOT/apps/holocron-web/dist"
 if [[ ! -f "$DIST/index.html" ]]; then
   echo "holocron-e2e-live-server: missing $DIST — run holocron build first" >&2

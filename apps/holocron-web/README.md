@@ -1,4 +1,4 @@
-# Holocron web (Trask Q&A)
+# Holocron Archive
 
 Vite + React SPA served by `apps/trask-http-server` and `apps/trask-bot` as static files (`dist/`). It talks to `/api/trask/*` on the same origin by default.
 
@@ -24,7 +24,6 @@ Output: `apps/holocron-web/dist`.
 
 - `VITE_TRASK_API_BASE` — optional absolute API origin
 - `VITE_TRASK_API_KEY` — optional build-time bearer
-- `VITE_TRASK_LEGACY_SPARK=1` — legacy Spark / simulated multi-agent path
 - `BASE` — Vite base path (e.g. `/bots/qa-webui/` for GitHub Pages)
 - `ENABLE_SPARK=1` — enable GitHub Spark Vite plugin when deploying on Spark
 

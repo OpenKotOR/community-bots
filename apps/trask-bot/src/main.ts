@@ -26,34 +26,41 @@ import {
   type SourceDescriptor,
   type SourceKind,
 } from "@openkotor/retrieval";
-import { createResearchWizardClient } from "@openkotor/trask";
+import { createWebResearchClient } from "@openkotor/trask";
 import { isTraskThreadId } from "@openkotor/trask-http";
 
+import { mergeDiscordSearchHits, searchLiveDiscordHistory } from "./discord-channel-search.js";
 import { registerTraskProactiveHandlers } from "./proactive-handler.js";
 import { registerTraskWelcomeHandler } from "./welcome-handler.js";
 import { startEmbeddedTraskWebUi } from "./web-server.js";
 
 const logger = createLogger("trask-bot");
 const config = loadTraskBotConfig();
-const searchProvider = createChunkSearchProvider(config.chunkDir);
+const discordGuildId = config.discord.guildId;
+const searchProvider = createChunkSearchProvider(config.chunkDir, {
+  ...(discordGuildId ? { discordGuildId } : {}),
+});
 const DISCORD_ASK_RESPONSE_SLA_MS = 90_000;
 const DISCORD_ASK_SYNTHESIS_FAILURE_MESSAGE = "I could not complete live archive synthesis for this question right now.";
-const researchWizardTimeoutMs = Math.min(config.researchWizard.timeoutMs, DISCORD_ASK_RESPONSE_SLA_MS);
-if (researchWizardTimeoutMs !== config.researchWizard.timeoutMs) {
-  logger.warn("TRASK_RESEARCHWIZARD_TIMEOUT_MS exceeds Discord /ask SLA; clamping at runtime.", {
-    configuredTimeoutMs: config.researchWizard.timeoutMs,
-    effectiveTimeoutMs: researchWizardTimeoutMs,
+const discordWebResearchTimeoutMs = Math.min(config.webResearch.timeoutMs, DISCORD_ASK_RESPONSE_SLA_MS);
+if (discordWebResearchTimeoutMs !== config.webResearch.timeoutMs) {
+  logger.warn("TRASK_WEB_RESEARCH_TIMEOUT_MS exceeds Discord /ask SLA; clamping subprocess timeout for /ask only.", {
+    configuredTimeoutMs: config.webResearch.timeoutMs,
+    effectiveTimeoutMs: discordWebResearchTimeoutMs,
   });
 }
-const researchWizard = createResearchWizardClient({
-  ...config.researchWizard,
-  timeoutMs: researchWizardTimeoutMs,
-}, config.ai);
+const webResearchFactoryOptions = { localSearchProvider: searchProvider };
+const webResearch = createWebResearchClient(config.webResearch, config.ai, webResearchFactoryOptions);
+const discordWebResearch = createWebResearchClient(
+  { ...config.webResearch, timeoutMs: discordWebResearchTimeoutMs },
+  config.ai,
+  webResearchFactoryOptions,
+);
 const queryRepository = new JsonTraskQueryRepository(resolveDataFile(config.queryDataDir, "trask-queries.json"));
 
 const traskHttpRuntime = {
   searchProvider,
-  researchWizard,
+  webResearch,
   queryRepository,
 };
 
@@ -77,11 +84,11 @@ const sourceChoices = defaultSourceCatalog.map((source) => ({
 
 const askCommand = new SlashCommandBuilder()
   .setName("ask")
-  .setDescription("Ask Trask to search the approved KOTOR source registry.")
+  .setDescription("Ask the Trask Q&A Assistant to search approved archives and this server's history.")
   .addStringOption((option) => {
     return option
       .setName("query")
-      .setDescription("What should Trask look up?")
+      .setDescription("What should the assistant look up?")
       .setRequired(true)
       .setMaxLength(200)
       .setAutocomplete(true);
@@ -96,7 +103,7 @@ const askCommand = new SlashCommandBuilder()
 
 const sourcesCommand = new SlashCommandBuilder()
   .setName("sources")
-  .setDescription("Inspect Trask's approved source policy.")
+  .setDescription("Inspect the Trask Q&A Assistant approved source policy.")
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
   .addStringOption((option) => {
     return option
@@ -331,23 +338,54 @@ const ensureAskDeferred = async (interaction: ChatInputCommandInteraction): Prom
 };
 
 const handleAskCommand = async (interaction: ChatInputCommandInteraction): Promise<void> => {
+  const deferred = await ensureAskDeferred(interaction);
+  if (!deferred) {
+    return;
+  }
+
   const query = interaction.options.getString("query", true);
   rememberRecentQuery(interaction.user.id, query);
   const threadOpt = interaction.options.getString("thread")?.trim();
   const threadId = threadOpt && isTraskThreadId(threadOpt) ? threadOpt : randomUUID();
 
-  const deferred = await ensureAskDeferred(interaction);
-  if (!deferred) {
-    return;
+  try {
+    await interaction.editReply({
+      embeds: [
+        buildInfoEmbed({
+          title: `${personaProfiles.trask.displayName}`,
+          description: "Searching the archive…",
+        }),
+      ],
+      allowedMentions: { parse: [] },
+    });
+  } catch {
+    /* non-fatal — main pipeline still runs */
   }
 
   const queryId = randomUUID();
   const createdAt = new Date().toISOString();
 
   try {
-    const answerPromise = researchWizard.answerQuestion(query);
+    const liveSearchBudgetMs = Math.max(5_000, DISCORD_ASK_RESPONSE_SLA_MS - 15_000);
+    const localSearchPromise = Promise.all([
+      searchProvider.search(query, 6),
+      discordGuildId && config.approvedChannelIds.length > 0
+        ? searchLiveDiscordHistory({
+            client: interaction.client,
+            guildId: discordGuildId,
+            channelIds: config.approvedChannelIds,
+            query,
+            limit: 6,
+            deadlineMs: liveSearchBudgetMs,
+          })
+        : Promise.resolve([]),
+    ]).then(([chunkHits, liveHits]) => mergeDiscordSearchHits(chunkHits, liveHits));
+
+    const answerPromise = localSearchPromise.then((localHits) =>
+      discordWebResearch.answerQuestion(query, undefined, { localHits }),
+    );
     const timedResult = await Promise.race<
-      { kind: "result"; value: Awaited<ReturnType<typeof researchWizard.answerQuestion>> }
+      { kind: "result"; value: Awaited<ReturnType<typeof discordWebResearch.answerQuestion>> }
       | { kind: "timeout" }
     >([
       answerPromise.then((value) => ({ kind: "result", value })),
@@ -553,7 +591,7 @@ if (config.proactive.enabled && !proactiveRuntimeReady) {
 }
 
 if (proactiveRuntimeReady) {
-  registerTraskProactiveHandlers(client, config, researchWizard, logger, queryRepository);
+  registerTraskProactiveHandlers(client, config, webResearch, logger, queryRepository);
 }
 
 if (welcomeRuntimeReady) {

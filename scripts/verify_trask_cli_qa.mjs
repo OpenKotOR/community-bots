@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * CLI verification for Trask Q&A (ResearchWizardClient → trask_headless_research.py).
+ * CLI verification for Trask Q&A (WebResearchClient → scripts/trask_web_research.py).
  *
  * Exercises the same path as Discord `/ask` and trask-http-server — not the browser.
  * Validates non-empty answers, Sources block, https URLs, and inline [n] citations when RICH.
@@ -11,16 +11,16 @@
  *
  * Environment:
  *   INGEST_STATE_DIR — must match ingest-worker / Docker volume (default data/ingest-worker)
- *   TRASK_GPT_RESEARCHER_PYTHON, OPENAI_API_KEY / OPENROUTER_API_KEY, TAVILY_API_KEY (optional)
- *   Loads .env, .env.local, vendor/ai-researchwizard/.env when present (does not print secrets).
+ *   TRASK_WEB_RESEARCH_PYTHON (or bootstrap .venv-trask-research), OPENAI_API_KEY / OPENROUTER_API_KEY
+ *   Loads .env and .env.local when present (does not print secrets).
  */
 
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { loadResearchWizardRuntimeConfig, loadSharedAiConfig } from "../packages/config/dist/index.js";
-import { createResearchWizardClient, splitResearchAnswer } from "../packages/trask/dist/index.js";
+import { loadSharedAiConfig, loadWebResearchRuntimeConfig } from "../packages/config/dist/index.js";
+import { createWebResearchClient, splitResearchAnswer } from "../packages/trask/dist/index.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -62,7 +62,7 @@ const countDistinctHttps = (text) => {
 };
 
 const loadEnvFiles = () => {
-  for (const rel of [".env", ".env.local", "vendor/ai-researchwizard/.env"]) {
+  for (const rel of [".env", ".env.local"]) {
     const path = resolve(repoRoot, rel);
     if (!existsSync(path)) continue;
     const text = readFileSync(path, "utf8");
@@ -164,11 +164,11 @@ const main = async () => {
     ? queryArg.split("|").map((q) => q.trim()).filter(Boolean)
     : DEFAULT_QUERIES.map((entry) => entry.question);
 
-  const rwConfig = loadResearchWizardRuntimeConfig();
+  const rwConfig = loadWebResearchRuntimeConfig();
   const aiConfig = loadSharedAiConfig();
-  const client = createResearchWizardClient(rwConfig, aiConfig);
+  const client = createWebResearchClient(rwConfig, aiConfig);
 
-  console.log("\n🔬  Trask CLI Q&A verification (ResearchWizard → headless ai-researchwizard)\n");
+  console.log("\n🔬  Trask CLI Q&A verification (WebResearch → Crawl4AI web research)\n");
   console.log(`   Python=${rwConfig.pythonExecutable}`);
   console.log(`   GPTR root=${rwConfig.gptResearcherRoot ?? "(auto)"}`);
   console.log(`   Timeout=${rwConfig.timeoutMs}ms\n`);

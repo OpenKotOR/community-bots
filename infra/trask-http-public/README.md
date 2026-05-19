@@ -8,9 +8,9 @@ app_port: 7860
 pinned: false
 ---
 
-# Holocron Trask HTTP (live research)
+# Holocron Trask HTTP
 
-Public `trask-http-server` with headless **ai-researchwizard** (GPTR), local ingest chunks, and `/api/trask/*` for Holocron.
+Public `trask-http-server` and `/api/trask/*` for Holocron. Docker image includes **Crawl4AI** research venv (`TRASK_WEB_RESEARCH_PYTHON`). Set `OPENAI_API_KEY` or `OPENROUTER_API_KEY` for live synthesis (`docs/trask-research-backends.md`).
 
 - Source: `apps/trask-http-server` in [OpenKotOR/community-bots](https://github.com/OpenKotOR/community-bots)
 - Deployed by `.github/workflows/trask-http-public.yml`
@@ -27,4 +27,4 @@ CI syncs from GitHub repository secrets when they exist. None are required for d
 | `TAVILY_API_KEY` | Optional web retrieval |
 | `FAST_LLM` / `SMART_LLM` / `STRATEGIC_LLM` | Optional GPTR model overrides |
 
-Without paid API keys, Trask uses **vendored `llm_fallbacks` free models** and **bundled local knowledge** (`data/ingest-worker`). Holocron still returns grounded answers for the canonical technical topics.
+Holocron research **requires at least one working LLM** in the provider fallback chain (`llm_fallbacks` free models when no paid keys are set). On startup, `trask-http-server` probes the chain and exposes `researchAvailable` on `GET /api/trask/session`. Set `TRASK_STRICT_LLM_PROBE=1` to refuse boot when every provider fails.

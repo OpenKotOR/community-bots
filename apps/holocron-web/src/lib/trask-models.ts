@@ -10,7 +10,7 @@ export type TraskModelOption = {
 const AUTO_TRASK_MODEL_OPTION: TraskModelOption = {
   id: TRASK_MODEL_AUTO,
   label: 'Auto',
-  provider: 'ResearchWizard fallback',
+  provider: 'Trask web research',
   recommended: true,
 }
 
@@ -28,7 +28,7 @@ export function mergeTraskModelOptions(dynamicOptions: readonly TraskModelOption
     merged.push({
       id,
       label: option.label.trim() || id,
-      provider: option.provider.trim() || 'ResearchWizard',
+      provider: option.provider.trim() || 'Trask web research',
       ...(option.recommended ? { recommended: true } : {}),
     })
   }

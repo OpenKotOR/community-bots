@@ -1,12 +1,10 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { Message as MessageType, AgentResult, SourceWeight, DEFAULT_SOURCE_WEIGHTS, Conversation, QueryType, MessageResearchStep, isMessageArray, mergeSourceWeights } from '@/lib/types'
 import { Message } from '@/components/Message'
-import { AgentPanel } from '@/components/AgentPanel'
 import { ConversationSidebar } from '@/components/ConversationSidebar'
 import { HolocronModelPicker } from '@/components/HolocronModelPicker'
 import { SourceWeightsDialog } from '@/components/SourceWeightsDialog'
 import { KeyboardShortcutsDialog } from '@/components/KeyboardShortcutsDialog'
-import { PromptsDialog } from '@/components/PromptsDialog'
 import { TopNav, type HolocronSessionUi } from '@/components/TopNav'
 import { HolocronGlyph } from '@/components/HolocronGlyph'
 import {
@@ -22,16 +20,10 @@ import { fluxTokensFromQuery, holocronQuerySignature } from '@/lib/holocron-live
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Toaster } from '@/components/ui/sonner'
-import { ArrowRight, Sliders, Keyboard, Code, ArrowDown, List } from '@phosphor-icons/react'
+import { ArrowRight, Sliders, Keyboard, ArrowDown, List } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts'
-import { usePrompts } from '@/lib/prompts'
-import {
-  detectQuestionRelevance,
-  performMultiAgentRetrieval,
-  aggregateAnswer,
-  classifyQueryType,
-} from '@/lib/qa-engine'
+import { classifyQueryType } from '@/lib/qa-engine'
 import { conversationDisplayTitle } from '@/lib/conversation-utils'
 import { usePersistentLocalState } from '@/lib/persistent-local-state'
 import {
@@ -59,7 +51,6 @@ import {
 } from '@/lib/trask-api'
 import { priorUserQuestionsFromOtherThreads } from '@/lib/starter-suggestions'
 
-const legacySparkMode = import.meta.env.VITE_TRASK_LEGACY_SPARK === '1'
 const CONVERSATIONS_KEY = 'qa-conversations-v2'
 const LEGACY_CONVERSATIONS_KEY = 'qa-conversations'
 const HOLOCRON_RESEARCH_JOBS_KEY = 'holocron-research-jobs'
@@ -135,7 +126,7 @@ function createHolocronThreadId(): string {
 
 function traskRetrievingAgent(question: string): AgentResult {
   return {
-    agentName: 'Trask',
+    agentName: 'Holocron',
     source: 'holocron',
     snippet: shortFluxWords(question, 10),
     confidence: 0,
@@ -257,7 +248,7 @@ function createAssistantMessageFromTraskRecord(rec: TraskHistoryRecordDto, query
     isExpanded: false,
     agentResults: [
       {
-        agentName: 'Trask',
+        agentName: 'Holocron',
         source: 'holocron',
         snippet: answer.slice(0, 280),
         confidence: 1,
@@ -272,7 +263,7 @@ function createAssistantMessageFromTraskRecord(rec: TraskHistoryRecordDto, query
 }
 
 function createDegradedMessageFromTraskRecord(rec: TraskHistoryRecordDto, queryType: QueryType): MessageType {
-  const content = 'Trask completed without visible answer text.'
+  const content = 'Holocron completed without visible answer text.'
   return {
     id: `srv-${rec.queryId}-degraded`,
     role: 'assistant',
@@ -282,7 +273,7 @@ function createDegradedMessageFromTraskRecord(rec: TraskHistoryRecordDto, queryT
     isExpanded: false,
     agentResults: [
       {
-        agentName: 'Trask',
+        agentName: 'Holocron',
         source: 'holocron',
         snippet: content,
         confidence: 0,
@@ -309,7 +300,7 @@ function createFailedMessageFromTraskRecord(rec: TraskHistoryRecordDto, queryTyp
     isExpanded: false,
     agentResults: [
       {
-        agentName: 'Trask',
+        agentName: 'Holocron',
         source: 'holocron',
         snippet: error,
         confidence: 0,
@@ -659,13 +650,11 @@ function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = usePersistentLocalState<boolean>('holocron-sidebar-collapsed', false)
   const [input, setInput] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
-  const [activeAgents, setActiveAgents] = useState<AgentResult[]>([])
   const [currentQueryType, setCurrentQueryType] = useState<QueryType>('general')
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false)
-  const [isPromptsOpen, setIsPromptsOpen] = useState(false)
   const [holocronSession, setHolocronSession] = useState<HolocronSessionUi>(() =>
-    !legacySparkMode && traskUsesSameOriginApi() ? { status: 'loading' } : { status: 'anonymous', oauthAvailable: false },
+    traskUsesSameOriginApi() ? { status: 'loading' } : { status: 'anonymous', oauthAvailable: false },
   )
   const [holocronThreadId, setHolocronThreadId] = useState('')
   const [queryFlux, setQueryFlux] = useState<HolocronFluxEvent[]>([])
@@ -685,7 +674,6 @@ function App() {
   const [isMobileViewport, setIsMobileViewport] = useState(false)
   const traceSeenRef = useRef<Set<string>>(new Set())
   const initialHolocronUrlThreadRef = useRef<string | null>(null)
-  const { prompts } = usePrompts()
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -693,19 +681,44 @@ function App() {
   const researchConversationWorkersRef = useRef<Set<string>>(new Set())
   const researchJobsRef = useRef<HolocronResearchJob[]>([])
   const shouldStickToBottomRef = useRef(true)
+  const lastScrollTopRef = useRef(0)
+  const forceScrollToBottomRef = useRef(false)
   const jumpVisibleRef = useRef(false)
   const mobileSidebarRef = useRef<HTMLDivElement>(null)
   const mobileSidebarToggleButtonRef = useRef<HTMLButtonElement>(null)
   const lastFocusedElementRef = useRef<HTMLElement | null>(null)
 
-  const updateScrollStickiness = useCallback(() => {
+  const detachFromBottom = useCallback(() => {
+    shouldStickToBottomRef.current = false
     if (!scrollRef.current) return
     const el = scrollRef.current
     const remaining = el.scrollHeight - el.scrollTop - el.clientHeight
-    const nearBottom = remaining <= 120
     const hasOverflow = el.scrollHeight > el.clientHeight + 1
-    const nextJumpVisible = hasOverflow && !nearBottom
-    shouldStickToBottomRef.current = nearBottom
+    const nextJumpVisible = hasOverflow && remaining > 48
+    if (jumpVisibleRef.current !== nextJumpVisible) {
+      jumpVisibleRef.current = nextJumpVisible
+      setShowJumpToLatest(nextJumpVisible)
+    }
+  }, [])
+
+  const updateScrollStickiness = useCallback(() => {
+    if (!scrollRef.current) return
+    const el = scrollRef.current
+    const scrollTop = el.scrollTop
+    const delta = scrollTop - lastScrollTopRef.current
+    lastScrollTopRef.current = scrollTop
+
+    const remaining = el.scrollHeight - scrollTop - el.clientHeight
+    const atBottom = remaining <= 10
+    const hasOverflow = el.scrollHeight > el.clientHeight + 1
+    const nextJumpVisible = hasOverflow && remaining > 48
+
+    if (delta < -1) {
+      shouldStickToBottomRef.current = false
+    } else if (atBottom) {
+      shouldStickToBottomRef.current = true
+    }
+
     if (jumpVisibleRef.current !== nextJumpVisible) {
       jumpVisibleRef.current = nextJumpVisible
       setShowJumpToLatest(nextJumpVisible)
@@ -717,6 +730,8 @@ function App() {
     const el = scrollRef.current
     el.scrollTop = el.scrollHeight
     shouldStickToBottomRef.current = true
+    forceScrollToBottomRef.current = false
+    lastScrollTopRef.current = el.scrollTop
     jumpVisibleRef.current = false
     setShowJumpToLatest(false)
   }, [])
@@ -726,13 +741,33 @@ function App() {
     () => ensureUniqueMessageIds(activeConversation?.messages || []),
     [activeConversation?.messages],
   )
+
+  const scrollAnchorKey = useMemo(() => {
+    const last = messages[messages.length - 1]
+    if (!last) return 'empty'
+    const stepCount = last.researchSteps?.length ?? 0
+    const contentLen = last.content?.length ?? 0
+    return `${messages.length}:${last.id}:${last.researchStatus ?? 'n'}:${stepCount}:${contentLen}`
+  }, [messages])
+
+  const messageActionContext = useMemo(() => {
+    let lastUserId: string | null = null
+    let lastAssistantId: string | null = null
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const entry = messages[i]
+      if (!lastAssistantId && entry.role === 'assistant') lastAssistantId = entry.id
+      if (!lastUserId && entry.role === 'user') lastUserId = entry.id
+      if (lastUserId && lastAssistantId) break
+    }
+    return { lastUserId, lastAssistantId }
+  }, [messages])
   const activeConversationResearchJobs = useMemo(
     () => activeConversationId
       ? normalizeResearchJobs(researchJobs).filter((job) => job.conversationId === activeConversationId)
       : [],
     [activeConversationId, researchJobs],
   )
-  const hasRunningResearch = !legacySparkMode && activeConversationResearchJobs.length > 0
+  const hasRunningResearch = activeConversationResearchJobs.length > 0
   const queryInputLocked = isProcessing
   const effectiveTraskModelOptions = traskModelOptions.length ? traskModelOptions : TRASK_MODEL_OPTIONS
 
@@ -741,7 +776,7 @@ function App() {
   }, [researchJobs])
 
   useEffect(() => {
-    if (legacySparkMode || !traskUsesSameOriginApi()) return
+    if (!traskUsesSameOriginApi()) return
     let cancelled = false
     void traskListModels(traskApiKey || undefined)
       .then((models) => {
@@ -849,7 +884,7 @@ function App() {
         }
       }
 
-      if (!legacySparkMode && traskUsesSameOriginApi() && animateTrace) {
+      if (traskUsesSameOriginApi() && animateTrace) {
         const seen = traceSeenRef.current
         const pulses: HolocronRetrievalPulse[] = []
         const zonesRank = new Map<HolocronSourceZone, number>()
@@ -916,7 +951,7 @@ function App() {
         const raw = firstUser?.content?.trim() ?? ''
         const title = raw
           ? raw.substring(0, 50) + (raw.length > 50 ? '...' : '')
-          : 'Trask · Holocron'
+          : 'Holocron Archive'
         const updatedAt = conversationUpdatedAtFromMessages(merged, prev?.updatedAt ?? Date.now())
         const conv: Conversation = {
           id: convId,
@@ -932,11 +967,11 @@ function App() {
       })
       setActiveConversationId((current) => current ?? convId)
     },
-    [holocronThreadId, legacySparkMode],
+    [holocronThreadId],
   )
 
   useEffect(() => {
-    if (legacySparkMode || !traskUsesSameOriginApi() || !holocronThreadId) {
+    if (!traskUsesSameOriginApi() || !holocronThreadId) {
       traceSeenRef.current = new Set()
       return
     }
@@ -957,7 +992,7 @@ function App() {
       cancelled = true
       window.clearInterval(id)
     }
-  }, [holocronThreadId, legacySparkMode, syncThreadFromRemote, traskApiKey])
+  }, [holocronThreadId, syncThreadFromRemote, traskApiKey])
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -968,7 +1003,7 @@ function App() {
   }, [])
 
   const handleCreateConversation = () => {
-    if (!legacySparkMode && traskUsesSameOriginApi()) {
+    if (traskUsesSameOriginApi()) {
       const tid = crypto.randomUUID()
       const params = new URLSearchParams(window.location.search)
       params.set('thread', tid)
@@ -1074,24 +1109,10 @@ function App() {
       handler: () => setIsShortcutsOpen(true),
       description: 'Show shortcuts',
     },
-    {
-      key: 'p',
-      ctrlKey: true,
-      shiftKey: true,
-      handler: () => setIsPromptsOpen(true),
-      description: 'Edit AI prompts',
-    },
-    {
-      key: 'p',
-      metaKey: true,
-      shiftKey: true,
-      handler: () => setIsPromptsOpen(true),
-      description: 'Edit AI prompts',
-    },
-  ], !isSettingsOpen && !isShortcutsOpen && !isPromptsOpen)
+  ], !isSettingsOpen && !isShortcutsOpen)
 
   useEffect(() => {
-    if (!legacySparkMode && traskUsesSameOriginApi()) {
+    if (traskUsesSameOriginApi()) {
       return
     }
     if (!activeConversationId && (conversations || []).length === 0) {
@@ -1100,7 +1121,7 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (legacySparkMode || !traskUsesSameOriginApi()) {
+    if (!traskUsesSameOriginApi()) {
       return
     }
     const params = new URLSearchParams(window.location.search)
@@ -1113,7 +1134,7 @@ function App() {
     }
     initialHolocronUrlThreadRef.current = tid
     setHolocronThreadId(tid)
-  }, [legacySparkMode])
+  }, [])
 
   /**
    * Sync activeConversationId → holocronThreadId & URL to prevent swapping.
@@ -1121,7 +1142,7 @@ function App() {
    * and the URL parameter must update together, so polling/routing stays consistent.
    */
   useEffect(() => {
-    if (legacySparkMode || !traskUsesSameOriginApi() || !activeConversationId) {
+    if (!traskUsesSameOriginApi() || !activeConversationId) {
       return
     }
     const initialThreadId = initialHolocronUrlThreadRef.current
@@ -1151,13 +1172,13 @@ function App() {
       const qs = params.toString()
       window.history.replaceState({}, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`)
     }
-  }, [activeConversationId, legacySparkMode]) // Intentionally exclude holocronThreadId to avoid re-triggering
+  }, [activeConversationId]) // Intentionally exclude holocronThreadId to avoid re-triggering
 
 
 
   /** Holocron: create shell + select thread immediately so the composer is never blocked on session/history fetch. */
   useEffect(() => {
-    if (legacySparkMode || !traskUsesSameOriginApi() || !holocronThreadId) {
+    if (!traskUsesSameOriginApi() || !holocronThreadId) {
       return
     }
     const convId = holocronConversationId(holocronThreadId)
@@ -1176,10 +1197,10 @@ function App() {
       return [shell, ...list.filter((c) => c.id !== convId)]
     })
     setActiveConversationId(convId)
-  }, [holocronThreadId, legacySparkMode])
+  }, [holocronThreadId])
 
   useEffect(() => {
-    if (legacySparkMode || !traskUsesSameOriginApi() || !holocronThreadId) {
+    if (!traskUsesSameOriginApi() || !holocronThreadId) {
       return
     }
 
@@ -1255,10 +1276,10 @@ function App() {
     return () => {
       cancelled = true
     }
-  }, [holocronThreadId, legacySparkMode, syncThreadFromRemote, traskApiKey])
+  }, [holocronThreadId, syncThreadFromRemote, traskApiKey])
 
   useEffect(() => {
-    if (legacySparkMode || !traskUsesSameOriginApi() || !holocronThreadId) {
+    if (!traskUsesSameOriginApi() || !holocronThreadId) {
       return
     }
     if (holocronSession.status !== 'anonymous') {
@@ -1274,18 +1295,24 @@ function App() {
     } catch {
       /* ignore */
     }
-  }, [conversations, holocronSession.status, holocronThreadId, legacySparkMode])
+  }, [conversations, holocronSession.status, holocronThreadId])
 
   useEffect(() => {
-    if (!scrollRef.current || !shouldStickToBottomRef.current) {
-      return
-    }
-    scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-  }, [messages, activeAgents])
+    if (!scrollRef.current) return
+    if (!shouldStickToBottomRef.current && !forceScrollToBottomRef.current) return
+
+    requestAnimationFrame(() => {
+      if (!scrollRef.current) return
+      if (!shouldStickToBottomRef.current && !forceScrollToBottomRef.current) return
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+      lastScrollTopRef.current = scrollRef.current.scrollTop
+      forceScrollToBottomRef.current = false
+    })
+  }, [scrollAnchorKey])
 
   useEffect(() => {
     updateScrollStickiness()
-  }, [messages.length, activeAgents.length, updateScrollStickiness])
+  }, [scrollAnchorKey, updateScrollStickiness])
 
   useEffect(() => {
     const id = window.setTimeout(() => setHolocronLiveQuery(input.trim()), 120)
@@ -1506,9 +1533,6 @@ function App() {
     (job: HolocronResearchJob, record: TraskHistoryRecordDto) => {
       replaceResearchAssistantMessage(job, createFailedMessageFromTraskRecord(record, job.queryType))
       setResearchJobs((current) => normalizeResearchJobs(current).filter((candidate) => candidate.clientId !== job.clientId))
-      if (job.conversationId === activeConversationId) {
-        setActiveAgents([])
-      }
     },
     [activeConversationId, replaceResearchAssistantMessage, setResearchJobs],
   )
@@ -1520,7 +1544,6 @@ function App() {
       replaceResearchAssistantMessage(job, assistantMessage)
       setResearchJobs((current) => normalizeResearchJobs(current).filter((candidate) => candidate.clientId !== job.clientId))
       if (job.conversationId === activeConversationId) {
-        setActiveAgents([])
         setCurrentQueryType(job.queryType)
       }
       setHolocronAnswerBondTicks((n) => n + 1)
@@ -1540,19 +1563,8 @@ function App() {
     [activeConversationId, appendAnswerFlux, replaceResearchAssistantMessage, setResearchJobs],
   )
 
-  useEffect(() => {
-    if (legacySparkMode) return
-    const activeJob = normalizeResearchJobs(researchJobs).find((job) => job.conversationId === activeConversationId)
-    if (!activeJob) {
-      setActiveAgents([])
-      return
-    }
-    setCurrentQueryType(activeJob.queryType)
-    setActiveAgents([traskRetrievingAgent(activeJob.question)])
-  }, [activeConversationId, researchJobs])
 
   useEffect(() => {
-    if (legacySparkMode) return
     let cancelled = false
 
     const patchResearchJob = (
@@ -1611,13 +1623,12 @@ function App() {
             job.queryType,
             [
               localResearchStep('queued', 'Persisted locally; continuing in the background.'),
-              localResearchStep('dispatch', 'Dispatching query to Trask research backend.'),
+              localResearchStep('dispatch', 'Dispatching query to the Holocron research backend.'),
             ],
           ))
         }
         if (job.conversationId === activeConversationId) {
           setCurrentQueryType(job.queryType)
-          setActiveAgents([traskRetrievingAgent(job.question)])
         }
 
         if (job.serverQueryId) {
@@ -1787,142 +1798,149 @@ function App() {
         }
       })
     )
-    if (conversationId === activeConversationId) {
-      setActiveAgents([])
-    }
     return jobs
   }, [activeConversationId, setConversations, setResearchJobs, traskApiKey])
 
-  const submitQuestion = async (rawQuestion: string) => {
+  const truncateActiveConversation = useCallback(
+    (keepMessageCount: number): MessageType[] => {
+      if (!activeConversationId) return messages
+      const truncated = messages.slice(0, keepMessageCount)
+      cancelConversationResearch(activeConversationId)
+      updateConversation(activeConversationId, truncated)
+      return truncated
+    },
+    [activeConversationId, cancelConversationResearch, messages],
+  )
+
+  const beginEditUserMessage = useCallback(
+    (messageId: string) => {
+      if (!activeConversationId || queryInputLocked) return
+      const index = messages.findIndex((entry) => entry.id === messageId)
+      const target = messages[index]
+      if (index < 0 || target?.role !== 'user') return
+
+      const downstreamCount = messages.length - index
+      if (downstreamCount > 1) {
+        const confirmed = window.confirm(
+          `Edit this message? ${downstreamCount - 1} later message${downstreamCount === 2 ? '' : 's'} will be removed.`,
+        )
+        if (!confirmed) return
+      }
+
+      truncateActiveConversation(index)
+      setInput(target.content)
+      forceScrollToBottomRef.current = false
+      shouldStickToBottomRef.current = false
+      window.setTimeout(() => inputRef.current?.focus(), 0)
+      toast.message('Edit your message below, then send to continue from here.')
+    },
+    [activeConversationId, messages, queryInputLocked, truncateActiveConversation],
+  )
+
+  useKeyboardShortcuts(
+    [
+      {
+        key: 'ArrowUp',
+        handler: () => {
+          if (input.trim() || !messageActionContext.lastUserId) return
+          beginEditUserMessage(messageActionContext.lastUserId)
+        },
+        description: 'Edit last message (empty input)',
+      },
+    ],
+    !isSettingsOpen && !isShortcutsOpen,
+  )
+
+  const submitQuestion = async (
+    rawQuestion: string,
+    options?: { skipUserMessage?: boolean; baseMessages?: MessageType[] },
+  ) => {
     const trimmed = rawQuestion.trim()
     if (!trimmed || queryInputLocked || !activeConversationId) return
     const conversationId = activeConversationId
-    const replacementJobs = !legacySparkMode ? cancelConversationResearch(conversationId) : []
-    const baseMessages = replacementJobs.length ? prunePendingResearchTurns(messages, replacementJobs) : messages
+    const replacementJobs = cancelConversationResearch(conversationId)
+    const seedMessages = options?.baseMessages ?? messages
+    const baseMessages = replacementJobs.length ? prunePendingResearchTurns(seedMessages, replacementJobs) : seedMessages
 
-    const userMessage: MessageType = {
-      id: `msg-${Date.now()}-user`,
-      role: 'user',
-      content: trimmed,
-      timestamp: Date.now(),
+    const userMessage: MessageType | null = options?.skipUserMessage
+      ? null
+      : {
+          id: `msg-${Date.now()}-user`,
+          role: 'user',
+          content: trimmed,
+          timestamp: Date.now(),
+        }
+
+    const newMessages = userMessage ? [...baseMessages, userMessage] : baseMessages
+    if (newMessages === baseMessages && options?.skipUserMessage) {
+      const lastUser = [...baseMessages].reverse().find((entry) => entry.role === 'user')
+      if (!lastUser?.content.trim()) {
+        toast.error('No user question found to resubmit.')
+        return
+      }
     }
 
-    const newMessages = [...baseMessages, userMessage]
     updateConversation(conversationId, newMessages)
     setInput('')
+    forceScrollToBottomRef.current = true
+    shouldStickToBottomRef.current = true
     setIsProcessing(true)
-    scheduleQueryFluxShards(userMessage.content, appendQueryFlux)
+    const questionForFlux = userMessage?.content ?? trimmed
+    scheduleQueryFluxShards(questionForFlux, appendQueryFlux)
     setHolocronInteractionCount((n) => n + 1)
 
     try {
-      const queryType = await classifyQueryType(userMessage.content)
+      const questionText = userMessage?.content ?? trimmed
+      const queryType = await classifyQueryType(questionText)
       setCurrentQueryType(queryType)
 
-      const relevance = legacySparkMode ? await detectQuestionRelevance(userMessage.content) : { isRelevant: true as const }
-
-      if (legacySparkMode && !relevance.isRelevant) {
-        const systemMessage: MessageType = {
-          id: `msg-${Date.now()}-sys`,
-          role: 'system',
-          content:
-            relevance.reason === 'too_short'
-              ? 'Could you provide more details?'
-              : 'I respond best to clear questions. Could you rephrase?',
-          timestamp: Date.now(),
-        }
-        updateConversation(conversationId, [...newMessages, systemMessage])
-        setIsProcessing(false)
-        return
+      const clientId = `research-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+      const candidateThreadId = conversationId.startsWith('holocron-')
+        ? conversationId.replace('holocron-', '')
+        : holocronThreadId
+      const threadId = isHolocronThreadId(candidateThreadId)
+        ? candidateThreadId
+        : createHolocronThreadId()
+      const assistantMessageId = `pending-${clientId}-a`
+      const selectedModelId = normalizeTraskModelSelection(selectedTraskModel, effectiveTraskModelOptions)
+      const pendingMessage = createResearchLoadingMessage(
+        assistantMessageId,
+        questionText,
+        Date.now(),
+        queryType,
+        [
+          localResearchStep('queued', 'Queued in local background worker.'),
+          localResearchStep('dispatch', `Preparing research request with ${traskModelLabel(selectedModelId, effectiveTraskModelOptions)}.`),
+        ],
+      )
+      const researchJob: HolocronResearchJob = {
+        clientId,
+        conversationId,
+        threadId,
+        question: questionText,
+        assistantMessageId,
+        modelId: selectedModelId,
+        sourceWeights: effectiveSourceWeights,
+        queryType,
+        state: 'queued',
+        attemptCount: 0,
+        pollFailures: 0,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        nextAttemptAt: Date.now(),
       }
-
-      if (!legacySparkMode) {
-        const retrieving: AgentResult[] = [traskRetrievingAgent(userMessage.content)]
-        setActiveAgents(retrieving)
-        const clientId = `research-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-        const candidateThreadId = conversationId.startsWith('holocron-')
-          ? conversationId.replace('holocron-', '')
-          : holocronThreadId
-        const threadId = isHolocronThreadId(candidateThreadId)
-          ? candidateThreadId
-          : createHolocronThreadId()
-        const assistantMessageId = `pending-${clientId}-a`
-        const selectedModelId = normalizeTraskModelSelection(selectedTraskModel, effectiveTraskModelOptions)
-        const pendingMessage = createResearchLoadingMessage(
-          assistantMessageId,
-          userMessage.content,
-          Date.now(),
-          queryType,
-          [
-            localResearchStep('queued', 'Queued in local background worker.'),
-            localResearchStep('dispatch', `Preparing research request with ${traskModelLabel(selectedModelId, effectiveTraskModelOptions)}.`),
-          ],
+      updateConversation(conversationId, [...newMessages, pendingMessage])
+      if (holocronThreadId !== threadId && isHolocronThreadId(threadId)) {
+        setHolocronThreadId(threadId)
+      }
+      setResearchJobs((current) => {
+        const jobs = normalizeResearchJobs(current)
+        const alreadyQueued = jobs.some((job) =>
+          job.conversationId === researchJob.conversationId,
         )
-        const researchJob: HolocronResearchJob = {
-          clientId,
-          conversationId,
-          threadId,
-          question: userMessage.content,
-          assistantMessageId,
-          modelId: selectedModelId,
-          sourceWeights: effectiveSourceWeights,
-          queryType,
-          state: 'queued',
-          attemptCount: 0,
-          pollFailures: 0,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-          nextAttemptAt: Date.now(),
-        }
-        updateConversation(conversationId, [...newMessages, pendingMessage])
-        if (holocronThreadId !== threadId && isHolocronThreadId(threadId)) {
-          setHolocronThreadId(threadId)
-        }
-        setResearchJobs((current) => {
-          const jobs = normalizeResearchJobs(current)
-          const alreadyQueued = jobs.some((job) =>
-            job.conversationId === researchJob.conversationId
-          )
-          return alreadyQueued ? jobs : [...jobs, researchJob]
-        })
-        return
-      }
-
-      const agentResults = await performMultiAgentRetrieval(userMessage.content, effectiveSourceWeights, prompts)
-      setActiveAgents(agentResults)
-
-      await new Promise((resolve) => setTimeout(resolve, 500))
-
-      const answer = await aggregateAnswer(userMessage.content, agentResults, prompts)
-
-      const assistantMessage: MessageType = {
-        id: `msg-${Date.now()}-assistant`,
-        role: 'assistant',
-        content: answer.concise,
-        expandedContent: answer.expanded,
-        sources: answer.sources,
-        timestamp: Date.now(),
-        isExpanded: false,
-        agentResults: agentResults,
-        queryType: queryType,
-      }
-
-      updateConversation(conversationId, [...newMessages, assistantMessage])
-      setHolocronAnswerBondTicks((n) => n + 1)
-      const legacyZones = new Set<HolocronSourceZone>()
-      for (const src of answer.sources) {
-        const zone = zoneFromSourceLabel(`${src.name} ${src.url ?? ''}`)
-        legacyZones.add(zone)
-        setSourceMetrics((current) => ({
-          ...current,
-          [zone]: (current[zone] ?? 0) + 1,
-        }))
-      }
-      if (legacyZones.size === 0) {
-        legacyZones.add('core')
-      }
-      scheduleAnswerFluxShards(answer.concise, Array.from(legacyZones), appendAnswerFlux)
-      setHolocronInteractionCount((n) => n + 1 + legacyZones.size)
-      setActiveAgents([])
+        return alreadyQueued ? jobs : [...jobs, researchJob]
+      })
+      return
     } catch (error) {
       console.error('Error processing question:', error)
       toast.error('Something went wrong. Please try again.')
@@ -1930,6 +1948,46 @@ function App() {
       setIsProcessing(false)
     }
   }
+
+  const regenerateAssistantMessage = useCallback(
+    (messageId: string) => {
+      if (!activeConversationId || queryInputLocked) return
+      const assistantIndex = messages.findIndex((entry) => entry.id === messageId)
+      const assistant = messages[assistantIndex]
+      if (assistantIndex < 0 || assistant?.role !== 'assistant') return
+      if (assistant.researchStatus === 'pending' || isResearchLoadingMessage(assistant)) {
+        toast.error('Wait for the current answer to finish before regenerating.')
+        return
+      }
+
+      let userIndex = -1
+      for (let i = assistantIndex - 1; i >= 0; i--) {
+        if (messages[i]?.role === 'user') {
+          userIndex = i
+          break
+        }
+      }
+      const userMessage = userIndex >= 0 ? messages[userIndex] : undefined
+      if (!userMessage?.content.trim()) {
+        toast.error('Could not find the question for this answer.')
+        return
+      }
+
+      const downstreamCount = messages.length - assistantIndex
+      if (downstreamCount > 1) {
+        const confirmed = window.confirm(
+          `Regenerate this answer? ${downstreamCount - 1} later message${downstreamCount === 2 ? '' : 's'} will be removed.`,
+        )
+        if (!confirmed) return
+      }
+
+      const truncated = truncateActiveConversation(assistantIndex)
+      forceScrollToBottomRef.current = true
+      shouldStickToBottomRef.current = true
+      void submitQuestion(userMessage.content, { skipUserMessage: true, baseMessages: truncated })
+    },
+    [activeConversationId, messages, queryInputLocked, truncateActiveConversation, submitQuestion],
+  )
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -1976,7 +2034,6 @@ function App() {
           onOpenChange={setIsSettingsOpen}
           sourceWeights={effectiveSourceWeights}
           onSourceWeightsChange={(weights) => setSourceWeights(weights)}
-          legacySparkMode={legacySparkMode}
           traskApiKey={traskApiKey || ''}
           onTraskApiKeyChange={(value) => setTraskApiKey(value)}
         />
@@ -1986,10 +2043,6 @@ function App() {
           onOpenChange={setIsShortcutsOpen}
         />
 
-        <PromptsDialog
-          open={isPromptsOpen}
-          onOpenChange={setIsPromptsOpen}
-        />
 
         {(!isMobileViewport || !sidebarCollapsed) && (
           <div
@@ -2049,16 +2102,6 @@ function App() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setIsPromptsOpen(true)}
-                className="text-primary hover:text-accent hover:bg-primary/10 transition-all"
-                aria-label="Edit AI prompts"
-                title="AI Protocols (Ctrl+Shift+P)"
-              >
-                <Code size={20} weight="bold" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
                 onClick={() => setIsShortcutsOpen(true)}
                 className="text-primary hover:text-accent hover:bg-primary/10 transition-all"
                 aria-label="Show keyboard shortcuts"
@@ -2081,20 +2124,23 @@ function App() {
 
           <div className="flex-1 flex flex-col min-h-0">
             <div
-              className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 overscroll-contain"
+              className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 overscroll-contain [overflow-anchor:none]"
               ref={scrollRef}
               onScroll={updateScrollStickiness}
+              onWheel={(event) => {
+                if (event.deltaY < 0) detachFromBottom()
+              }}
               data-ui="chat-scroll-container"
             >
-              <div className="mx-auto w-full max-w-7xl pt-6 pb-32 md:pb-40 px-4 md:px-6 lg:px-8">
+              <div className="mx-auto w-full max-w-7xl pt-5 pb-24 md:pb-28 px-4 md:px-6 lg:px-8">
                 {messages.length === 0 && (
                   <div className="flex flex-col items-center justify-center min-h-[min(52vh,420px)] px-6 py-10 text-center relative z-[1]">
                     <h2 className="text-xl font-semibold text-accent mb-3 font-totj-serif">
                       Access Knowledge Repository
                     </h2>
                     <p className="text-sm text-muted-foreground max-w-md mb-6 leading-relaxed">
-                      Ask a question below. Answers use Trask research when the API is available (run{' '}
-                      <code className="text-xs rounded bg-muted px-1 py-0.5">trask-http-server</code> on port{' '}
+                      Ask a question below. Answers use live archive research when the API is available (run{' '}
+                      <code className="text-xs rounded bg-muted px-1 py-0.5">pnpm dev:trask-http</code> on port{' '}
                       <code className="text-xs rounded bg-muted px-1 py-0.5">4010</code> or open Holocron from the Discord bot link).
                     </p>
                     {starterSuggestions.length > 0 ? (
@@ -2125,7 +2171,7 @@ function App() {
                 )}
 
                 <div
-                  className="space-y-0"
+                  className="space-y-5"
                   role="log"
                   aria-live="polite"
                   aria-relevant="additions text"
@@ -2136,16 +2182,37 @@ function App() {
                       key={message.id}
                       message={message}
                       onToggleExpand={handleToggleExpand}
+                      canEdit={message.role === 'user'}
+                      canRegenerate={
+                        message.role === 'assistant'
+                        && message.researchStatus !== 'pending'
+                        && !isResearchLoadingMessage(message)
+                      }
+                      canRetry={
+                        message.role === 'assistant'
+                        && message.researchStatus === 'failed'
+                      }
+                      onEditUserMessage={
+                        message.role === 'user' ? () => beginEditUserMessage(message.id) : undefined
+                      }
+                      onRegenerateAssistant={
+                        message.role === 'assistant' ? () => regenerateAssistantMessage(message.id) : undefined
+                      }
+                      onRetryAssistant={
+                        message.role === 'assistant' && message.researchStatus === 'failed'
+                          ? () => regenerateAssistantMessage(message.id)
+                          : undefined
+                      }
+                      actionsDisabled={queryInputLocked}
                     />
                   ))}
                 </div>
 
-                {activeAgents.length > 0 && <AgentPanel agents={activeAgents} queryType={currentQueryType} />}
               </div>
             </div>
 
             {showJumpToLatest && (
-              <div className="pointer-events-none absolute bottom-28 right-4 md:bottom-32 md:right-6 z-20" data-ui="jump-latest-container">
+              <div className="pointer-events-none absolute bottom-24 right-4 md:bottom-28 md:right-6 z-20" data-ui="jump-latest-container">
                 <Button
                   type="button"
                   size="sm"
