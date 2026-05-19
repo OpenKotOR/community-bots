@@ -19,6 +19,7 @@ on:
       - "infra/trask-http-public/**"
       - "requirements-trask-research.txt"
       - "scripts/trask_web_research.py"
+      - "scripts/trask_cache.py"
       - "scripts/pack-trask-http-hf-context.sh"
       - "scripts/sync_hf_space_secrets.py"
       - "pnpm-lock.yaml"

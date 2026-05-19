@@ -12,6 +12,7 @@ COPY packages ./packages
 COPY apps/trask-http-server ./apps/trask-http-server
 COPY data/ingest-worker ./data/ingest-worker
 COPY scripts/trask_web_research.py scripts/trask_web_research.py
+COPY scripts/trask_cache.py scripts/trask_cache.py
 COPY requirements-trask-research.txt requirements-trask-research.txt
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @openkotor/trask-http-server build
@@ -25,6 +26,7 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 COPY requirements-trask-research.txt /workspace/requirements-trask-research.txt
 COPY scripts/trask_web_research.py /workspace/scripts/trask_web_research.py
+COPY scripts/trask_cache.py /workspace/scripts/trask_cache.py
 RUN python3 -m venv /workspace/.venv-trask-research \
   && /workspace/.venv-trask-research/bin/pip install --upgrade pip \
   && /workspace/.venv-trask-research/bin/pip install -r /workspace/requirements-trask-research.txt \
@@ -45,5 +47,6 @@ ENV TRASK_HTTP_DATA_DIR=/workspace/data/trask-http-server
 COPY --from=deps /workspace /workspace
 COPY --from=python-research /workspace/.venv-trask-research /workspace/.venv-trask-research
 COPY --from=python-research /workspace/scripts/trask_web_research.py /workspace/scripts/trask_web_research.py
+COPY --from=python-research /workspace/scripts/trask_cache.py /workspace/scripts/trask_cache.py
 EXPOSE 7860
 CMD ["node", "apps/trask-http-server/dist/main.js"]

@@ -23,5 +23,6 @@ cp "$ROOT/docs/trask-research-backends.md" "$OUT/docs/trask-research-backends.md
 # Docker COPY expects these at repo root / scripts/ (see infra/trask-http-public/Dockerfile).
 cp "$ROOT/requirements-trask-research.txt" "$OUT/requirements-trask-research.txt"
 cp "$ROOT/scripts/trask_web_research.py" "$OUT/scripts/trask_web_research.py"
+cp "$ROOT/scripts/trask_cache.py" "$OUT/scripts/trask_cache.py"
 
 echo "$OUT"
