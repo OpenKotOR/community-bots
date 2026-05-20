@@ -39,15 +39,52 @@ export const splitResearchAnswer = (value: string): { body: string; sourceLines:
   return { body, sourceLines };
 };
 
-const stripTrailingUrlPunctuation = (url: string): string => url.replace(/[.,;:!?)]+$/, "");
+const stripTrailingUrlPunctuation = (url: string): string => {
+  let end = url.length;
+  while (end > 0 && ",.;:!?)".includes(url[end - 1]!)) {
+    end -= 1;
+  }
+  return url.slice(0, end);
+};
+
+/** Linear scan for first http(s) URL (CodeQL-safe; no backtracking regex on user text). */
+const findHttpUrlInText = (text: string, fromIndex = 0): string | null => {
+  const httpAt = text.indexOf("http://", fromIndex);
+  const httpsAt = text.indexOf("https://", fromIndex);
+  const start =
+    httpAt < 0 ? httpsAt : httpsAt < 0 ? httpAt : Math.min(httpAt, httpsAt);
+  if (start < 0) return null;
+  let end = start;
+  while (end < text.length) {
+    const ch = text[end]!;
+    if (ch <= " " || ch === ")" || ch === "]") break;
+    end += 1;
+  }
+  const raw = text.slice(start, end);
+  return raw ? stripTrailingUrlPunctuation(raw) : null;
+};
+
+const parseNumberedSourceLine = (line: string): { index: number; url: string } | null => {
+  let i = 0;
+  while (i < line.length && line[i] === " ") i += 1;
+  let digits = "";
+  while (i < line.length) {
+    const ch = line[i]!;
+    if (ch < "0" || ch > "9") break;
+    digits += ch;
+    i += 1;
+  }
+  if (!digits || line[i] !== ".") return null;
+  i += 1;
+  const url = findHttpUrlInText(line, i);
+  if (!url) return null;
+  return { index: Number(digits), url };
+};
 
 const extractUrlFromSourceLine = (line: string): string | null => {
-  const numbered = line.match(/^\s*\d+\.\s*.+?\s-\s*(https?:\/\/\S+)/i);
-  if (numbered?.[1]) {
-    return stripTrailingUrlPunctuation(numbered[1]);
-  }
-  const bare = line.match(/https?:\/\/[^\s)]+/);
-  return bare ? stripTrailingUrlPunctuation(bare[0]) : null;
+  const numbered = parseNumberedSourceLine(line);
+  if (numbered) return numbered.url;
+  return findHttpUrlInText(line);
 };
 
 /** Map citation index [1] → URL from the Sources block or approved catalog order. */
@@ -58,9 +95,9 @@ export const buildCitationUrlMap = (
   const map = new Map<number, string>();
 
   for (const line of sourceLines) {
-    const numbered = line.match(/^\s*(\d+)\.\s*.+?\s-\s*(https?:\/\/\S+)/i);
+    const numbered = parseNumberedSourceLine(line);
     if (numbered) {
-      map.set(Number(numbered[1]), stripTrailingUrlPunctuation(numbered[2]!));
+      map.set(numbered.index, numbered.url);
       continue;
     }
     const url = extractUrlFromSourceLine(line);

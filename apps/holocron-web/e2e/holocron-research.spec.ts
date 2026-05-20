@@ -193,9 +193,14 @@ for (const [index, querySpec] of RESEARCH_QUERIES.entries()) {
     expect(hasCitationLink || hasSourcesPanel, 'expected clickable citation or Sources panel').toBeTruthy()
     expect(bodyHasHttps || httpsCount > 0, 'expected https URLs in answer or Sources panel').toBeTruthy()
 
-    const citedUrls = extractHttpsUrls(`${bodyText}\n${sourcesText}`).filter(
-      (url) => !url.includes('openkotor.github.io'),
-    )
+    const citedUrls = extractHttpsUrls(`${bodyText}\n${sourcesText}`).filter((url) => {
+      try {
+        const host = new URL(url).hostname.replace(/^www\./i, '')
+        return host !== 'openkotor.github.io'
+      } catch {
+        return true
+      }
+    })
     await assertAllUrlsReachable(citedUrls, `query ${index + 1}`)
   })
 }
