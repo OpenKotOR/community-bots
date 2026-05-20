@@ -62,7 +62,7 @@ const resolveFromRoot = (p: string) => (path.isAbsolute(p) ? p : path.resolve(re
 
 const queryRepository = new JsonTraskQueryRepository(resolveDataFile(resolveFromRoot(config.dataDir), "trask-queries.json"));
 const searchProvider = createChunkSearchProvider(resolveFromRoot(config.chunkDir));
-const researchWizard = createResearchWizardClient(config.researchWizard, config.ai);
+const webResearch = createResearchWizardClient(config.researchWizard, config.ai);
 
 const researchLogVerbose = (process.env.TRASK_RESEARCH_LOG_VERBOSE ?? "").trim().toLowerCase();
 if (researchLogVerbose === "1" || researchLogVerbose === "true" || researchLogVerbose === "yes") {
@@ -77,7 +77,7 @@ if (researchLogVerbose === "1" || researchLogVerbose === "true" || researchLogVe
 
 const runtime = {
   searchProvider,
-  researchWizard,
+  webResearch,
   queryRepository,
 };
 

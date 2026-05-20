@@ -76,7 +76,7 @@ const queryRepository = new JsonTraskQueryRepository(resolveDataFile(config.quer
 
 const traskHttpRuntime = {
   searchProvider,
-  researchWizard,
+  webResearch: researchWizard,
   queryRepository,
 };
 

@@ -228,6 +228,31 @@ export const loadResearchWizardRuntimeConfig = (env: NodeJS.ProcessEnv = process
   };
 };
 
+/** Legacy headless runner config used by `WebResearchClient` (pazaak embedded Trask). */
+export interface WebResearchRuntimeConfig {
+  repoRoot: string;
+  pythonExecutable: string;
+  headlessScriptPath: string | undefined;
+  backendUrl: string | undefined;
+  timeoutMs: number;
+}
+
+export const loadWebResearchRuntimeConfig = (env: NodeJS.ProcessEnv = process.env): WebResearchRuntimeConfig => {
+  const wizard = loadResearchWizardRuntimeConfig(env);
+  const repoRoot = resolveMonorepoRoot(env);
+  const scriptRaw =
+    readOptionalEnv("TRASK_WEB_RESEARCH_SCRIPT", env)?.trim()
+    ?? readOptionalEnv("TRASK_GPT_RESEARCHER_SCRIPT", env)?.trim();
+  const backendUrl = readOptionalEnv("TRASK_RESEARCH_BACKEND_URL", env)?.trim() || undefined;
+  return {
+    repoRoot,
+    pythonExecutable: wizard.pythonExecutable,
+    headlessScriptPath: wizard.researchScriptPath ?? (scriptRaw ? resolve(scriptRaw) : undefined),
+    backendUrl,
+    timeoutMs: wizard.timeoutMs,
+  };
+};
+
 export interface TraskProactiveConfig {
   /** When true, reads channel messages (privileged intents) and may reply without `/ask`. */
   enabled: boolean;

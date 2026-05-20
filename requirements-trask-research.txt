@@ -1,0 +1,6 @@
+# Holocron / Trask web research runner (scripts/trask_web_research.py)
+crawl4ai>=0.8.6,<0.9
+duckduckgo-search>=7.0.0,<8
+trafilatura>=2.0.0,<3
+lxml_html_clean>=0.4.0
+redis>=5.0.0,<6

@@ -28,7 +28,7 @@ export interface TraskHttpRuntime {
 
   searchProvider: SearchProvider;
 
-  researchWizard: ResearchWizardQueryHandler;
+  webResearch: ResearchWizardQueryHandler;
 
   queryRepository: JsonTraskQueryRepository;
 
@@ -67,6 +67,12 @@ export interface TraskHttpSessionDto {
   loggedIn: boolean;
 
   oauthAvailable?: boolean;
+
+  /** False when startup LLM probe found no working provider in the fallback chain. */
+
+  researchAvailable?: boolean;
+
+  researchUnavailableReason?: string;
 
   discord?: { id: string; username: string; displayName: string };
 
@@ -218,7 +224,7 @@ const appendLiveTrace = async (
 const CANCELED_QUERY_ERROR = "Canceled by newer request.";
 
 const DEFAULT_TRASK_MODEL_OPTIONS: readonly ResearchWizardModelOption[] = [
-  { id: "auto", label: "Auto", provider: "ResearchWizard fallback", recommended: true },
+  { id: "auto", label: "Auto", provider: "Trask web research", recommended: true },
 ];
 
 const mapModelOption = (option: ResearchWizardModelOption): ResearchWizardModelOption => ({
@@ -234,9 +240,9 @@ const isFreeModelId = (id: string): boolean => {
 };
 
 const resolveTraskModelOptions = async (
-  researchWizard: ResearchWizardQueryHandler,
+  webResearch: ResearchWizardQueryHandler,
 ): Promise<readonly ResearchWizardModelOption[]> => {
-  const dynamicModels = researchWizard.listModels ? await researchWizard.listModels() : [];
+  const dynamicModels = webResearch.listModels ? await webResearch.listModels() : [];
   const seen = new Set<string>();
   const models: ResearchWizardModelOption[] = [];
   for (const option of [...DEFAULT_TRASK_MODEL_OPTIONS, ...dynamicModels]) {
@@ -396,7 +402,7 @@ export const createTraskHttpRouter = <TUser extends TraskHttpUser = TraskHttpUse
     options.auth.requireAuth(async (_req, res, _user) => {
       try {
         const trask = requireRuntime();
-        const models = await resolveTraskModelOptions(trask.researchWizard);
+        const models = await resolveTraskModelOptions(trask.webResearch);
         res.json({ models: models.map(mapModelOption) });
       } catch (err) {
         handleTraskError(res, err as AuthHandlerThrown);
@@ -626,9 +632,9 @@ export const createTraskHttpRouter = <TUser extends TraskHttpUser = TraskHttpUse
         sourcePreferences = normalizeSourcePreferencesFromBody(body.sourceWeights);
 
         if (model) {
-          const allowedModels = await resolveTraskModelOptions(trask.researchWizard);
+          const allowedModels = await resolveTraskModelOptions(trask.webResearch);
           if (!allowedModels.some((option) => option.id === model)) {
-            throw Object.assign(new Error("model is not available in the current ResearchWizard fallback list."), { status: 422 });
+            throw Object.assign(new Error("model is not available in the current web research model list."), { status: 422 });
           }
         }
 
@@ -654,7 +660,7 @@ export const createTraskHttpRouter = <TUser extends TraskHttpUser = TraskHttpUse
 
       if (!persist) {
         try {
-          const result = await trask.researchWizard.answerQuestion(query, undefined, {
+          const result = await trask.webResearch.answerQuestion(query, undefined, {
             ...(model ? { model } : {}),
             ...(sourcePreferences ? { sourcePreferences } : {}),
           });
@@ -742,7 +748,7 @@ export const createTraskHttpRouter = <TUser extends TraskHttpUser = TraskHttpUse
 
       void (async () => {
         try {
-          const result = await trask.researchWizard.answerQuestion(query, async (ev) => {
+          const result = await trask.webResearch.answerQuestion(query, async (ev) => {
             await appendLiveTrace(trask.queryRepository, queryId, {
               phase: ev.phase,
               ...(ev.detail !== undefined ? { detail: ev.detail } : {}),

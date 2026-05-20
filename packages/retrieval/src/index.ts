@@ -880,3 +880,10 @@ export const createChunkSearchProvider = (stateDir: string): ChunkSearchProvider
     new StaticCatalogSearchProvider(defaultSourceCatalog, new FileReindexQueueStore(stateDir)),
   );
 };
+
+export {
+  buildDiscordMessagePermalink,
+  parseDiscordChunkUrl,
+  resolveDiscordChunkCitationUrl,
+  isDiscordCitationUrl,
+} from "./discord-permalink.js";

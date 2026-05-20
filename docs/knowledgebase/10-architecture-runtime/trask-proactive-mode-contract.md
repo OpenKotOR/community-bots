@@ -2,7 +2,7 @@
 title: Trask Proactive Mode Contract
 owner: trask-bot
 status: active
-lastUpdated: 2026-05-15
+lastUpdated: 2026-05-18
 ---
 
 # Enablement
@@ -32,7 +32,7 @@ lastUpdated: 2026-05-15
 # Classifier and semantic gate
 
 - [REPO] `classifyTraskProactiveMessage` with **`TRASK_PROACTIVE_CLASSIFIER_MODEL`**; requires `isQuestion` and `kotorRelevant` and `confidence ≥ TRASK_PROACTIVE_CLASSIFIER_MIN_CONFIDENCE`.
-- [REPO] `researchWizard.answerQuestionBrief` then `scoreResearchAlignment` using **`TRASK_PROACTIVE_SIMILARITY_THRESHOLD`** vs embedding model from shared AI config.
+- [REPO] `webResearch.answerQuestionBrief` then `scoreResearchAlignment` using **`TRASK_PROACTIVE_SIMILARITY_THRESHOLD`** vs embedding model from shared AI config.
 
 # Reply shape
 

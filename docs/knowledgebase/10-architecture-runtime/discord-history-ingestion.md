@@ -2,7 +2,7 @@
 title: Discord History Ingestion Architecture
 owner: ingest-worker
 status: active
-lastUpdated: 2026-05-15
+lastUpdated: 2026-05-18
 ---
 
 # Inputs
@@ -15,7 +15,7 @@ lastUpdated: 2026-05-15
 # Normalization Contract
 
 - [SYNTH] Required fields per imported message: guild id, channel/thread id, message id, timestamp, sanitized author, content, optional reference id.
-- [REPO] Chunk citation URLs use `discord://approved-channels/<channelId>/<firstMessageId>-<lastMessageId>` (window bounds).
+- [REPO] Chunks store `discord://approved-channels/<channelId>/<firstMessageId>-<lastMessageId>` internally; when `guildId` is supplied (export `guild.json` or `--guild-id`), `chunk.url` is `https://discord.com/channels/{guild}/{channel}/{anchorMessage}` with tags `guild:`, `channel:`, `anchorMessage:`.
 - [SYNTH] Drop non-text-only payloads in this pass except minimal metadata references.
 - [SYNTH] Redact mention storms, emails, obvious secrets, and invite links before chunking.
 
@@ -29,7 +29,8 @@ lastUpdated: 2026-05-15
 # Integration
 
 - [SYNTH] Importer writes chunks and source index manifest for `approved-discord-knowledge`.
-- [SYNTH] Trask answer synthesis can then include imported chunks as lower-authority context than repo/docs/web citations.
+- [REPO] Trask Discord bot `/ask` searches imported chunks **and** live approved-channel history (bounded pagination) in parallel, then merges hits into `webResearch.answerQuestion(query, undefined, { localHits })`.
+- [SYNTH] Deep history still depends on periodic export/import; live fetch covers recent messages within per-request budgets.
 
 # Related
 

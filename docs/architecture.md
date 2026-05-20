@@ -18,18 +18,15 @@ Purpose: guild-first KOTOR q&a and troubleshooting.
 
 Commands: `/ask`, `/sources`, `/queue-reindex`.
 
-Current implementation: `/ask` runs **`scripts/trask_web_research.py`**
-(`trask_headless_research.py`, same library as upstream `cli.py`), pins the request to this repo's
-hardcoded approved source list, and renders the returned report into a Discord-native briefing with
-inline numeric citations plus a compact `Sources` block. `/sources` remains as an admin-facing policy
-inspection command. `/queue-reindex` remains an operational ingest hook.
+Current implementation: `/ask` runs **`scripts/trask_web_research.py`** (Crawl4AI + DuckDuckGo), pins
+discovery to this repo's hardcoded approved source list, merges optional imported/live Discord context,
+and renders the returned report into a Discord-native briefing with inline numeric citations plus a
+compact `Sources` block. `/sources` remains an admin-facing policy inspection command. `/queue-reindex`
+remains an operational ingest hook.
 
 Config prefix: `TRASK_*`. Reads `TRASK_ALLOWED_GUILD_IDS` and `TRASK_APPROVED_CHANNEL_IDS` for scope
-restrictions, plus `TRASK_WEB_RESEARCH_PYTHON`, optional `TRASK_WEB_RESEARCH_SCRIPT`,
-`TRASK_INDEXER_BASE_URL`, and `TRASK_RESEARCH_TIMEOUT_MS` for the research subprocess.
-
-Next phase: tighten the vendor adapter contract, normalize source metadata further, and decide
-whether ingest-worker remains a secondary indexing path or becomes maintainer-only infrastructure.
+restrictions, plus `TRASK_WEB_RESEARCH_PYTHON`, optional `TRASK_WEB_RESEARCH_SCRIPT`, and
+`TRASK_WEB_RESEARCH_TIMEOUT_MS` (legacy alias `TRASK_RESEARCHWIZARD_TIMEOUT_MS`) for the research subprocess.
 
 ---
 

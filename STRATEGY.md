@@ -1,42 +1,61 @@
 ---
-title: OpenKOTOR Community Bots Strategy
-last_updated: 2026-05-19
+name: Holocron & Trask
+last_updated: 2026-05-18
 ---
 
-# OpenKOTOR Community Bots Strategy
+# Holocron & Trask Strategy
 
 ## Target problem
 
-KOTOR modding communities need trustworthy, source-grounded answers and lightweight game/social tooling in Discord and the browser — without sending users through stale wikis, broken links, or opaque AI hallucinations.
+KotOR modding knowledge is scattered across Discord threads, wikis, and archives. People need answers they can trust with clear citations, without running a heavy vendored research stack or unbounded web scraping on every question.
 
 ## Our approach
 
-Ship a small monorepo of focused surfaces (Trask Q&A, PazaakWorld, HK-86) that share retrieval, config, and deployment patterns. Trask answers only from an allowlisted corpus (web, GitHub, Discord index) with explicit citations; gameplay and roles stay in their own bots. Prefer local verification (Playwright, CLI smoke, Node tests) before claiming a path works.
+Holocron and Trask combine allowlisted web research (Crawl4AI + DuckDuckGo) with lower-authority imported and live Discord context in one Node synthesis path. Ship a deployable HTTP surface for the web UI and Discord bots, with explicit source authority and approved-domain guardrails.
 
 ## Who it's for
 
-- **Discord members** asking modding/tooling questions via `/ask` and reading cited briefings.
-- **Holocron users** doing deeper research in the browser with the same backend.
-- **Operators/maintainers** running bots, indexer, and ingest on a single repo with documented env maps.
+**Primary:** Modders and lore seekers — they use Holocron to get cited, on-topic answers from approved KotOR sources.
+
+**Secondary:** Discord server members — they ask Trask in-channel and get the same research pipeline with community context when configured.
+
+**Operators:** Maintainers who ingest Discord history, configure env, and deploy the public Trask HTTP Space.
 
 ## Key metrics
 
-| Metric | Where measured |
-|--------|----------------|
-| `/ask` acknowledges within Discord SLA (defer visible) | Manual Discord smoke + handler unit tests |
-| Holocron golden-query pass rate | `pnpm holocron:e2e` (5 canonical queries) |
-| CLI faithfulness on golden set | `pnpm verify:trask-cli` |
-| Index retrieve health | `trask-indexer` `/health`, `scripts/smoke_trask_indexed_stack.py` |
+- **Holocron e2e pass rate** — all five canonical research queries complete with substantive answers and ≥2 `https://` citations; measured by `pnpm holocron:e2e`
+- **Research latency (p95)** — time from submit to final answer on `/api/trask/*`; observed in server logs and Playwright runs
+- **Citations per answer** — count of distinct approved sources in the Sources panel; spot-checked in e2e and manual QA
+- **HF deploy health** — Trask HTTP Space builds and serves research after `trask-http-public` workflow; GitHub Actions + Space uptime
 
 ## Tracks
 
-1. **Trask RAG + compose** — Chroma indexer, Crawl4AI runner, grounded compose, index-miss abstention (active).
-2. **Discord reliability** — Always-on bot process, early interaction defer, channel allowlist verification (active).
-3. **PazaakWorld** — Nakama-first gameplay; legacy HTTP bot for OAuth where needed.
-4. **Holocron UX** — GitHub Pages static client; `trask-http-server` for local/ops.
+### Live web research
+
+Crawl4AI + DDG discovery with Node LLM rewrite for final Holocron answers.
+
+_Why it serves the approach:_ Replaces the removed GPT-Researcher vendor tree with a maintainable, documented default stack.
+
+### Community Discord retrieval
+
+Imported chunks and optional live channel search feed `localHits` before web research.
+
+_Why it serves the approach:_ Surfaces community knowledge without treating Discord as equal to approved web archives.
+
+### Holocron UX
+
+Server-backed Q&A only; source weighting and keyboard shortcuts; no client-side scraper or agent panel.
+
+_Why it serves the approach:_ Keeps one authoritative API path and reduces drift between UI and runtime.
+
+### Deploy and ops
+
+Docker/HF pack, bootstrap scripts, env maps, and ingest runbooks aligned with runtime.
+
+_Why it serves the approach:_ Operators can reproduce local and public behavior from the same contracts.
 
 ## Not working on
 
-- General-purpose chatbot without citations or allowlist.
-- Replacing Discord itself or building a full forum product.
-- Non-KOTOR game support in this repo.
+- Vendored GPT-Researcher / `vendor/ai-researchwizard` as the default research path
+- browser-use, llm-scraper, or Firecrawl as the Holocron/Discord answer pipeline
+- SearXNG/Khoj sidecars or `TRASK_RESEARCH_BACKEND_URL` HTTP replacements for `trask_web_research.py`

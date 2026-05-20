@@ -72,7 +72,9 @@ npx tsx apps/ingest-worker/src/main.ts show-indexed
 # Validate
 
 - [SYNTH] Confirm `approved-discord-knowledge` has chunk records and a source index.
-- [SYNTH] Ask known fixture questions in Trask and verify source citations include imported Discord chunks when relevant.
+- [SYNTH] Ensure export includes `guild.json` (or pass `--guild-id`) so chunks store `https://discord.com/channels/...` permalinks.
+- [SYNTH] In an approved channel, run Trask `/ask` on a phrase from a recent message and from an imported chunk; **Sources** should include `https://discord.com/channels/{guild}/{channel}/{message}` plus approved web URLs.
+- [SYNTH] Live channel search complements import (recent history within bot budgets); it does not replace full export for deep history.
 - [SYNTH] If noisy results appear, narrow the export channel list or tighten synthesis weighting; window size is fixed in code (see **Importer chunking** above).
 
 # Rollback

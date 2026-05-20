@@ -78,13 +78,13 @@ FIRECRAWL_API_KEY=         # optional — used by future ingest pipeline
 DATABASE_URL=              # optional — defaults to local file storage
 ```
 
-For Trask live research (`/ask` and Holocron Q&A), bootstrap the research venv — see
-**`scripts/bootstrap_trask_research.sh`** and [docs/trask.md](trask.md) — then set:
+For Trask web research (`/ask` and Holocron Q&A), bootstrap Crawl4AI + DDG — see
+**`scripts/bootstrap_trask_research.sh`** and [docs/trask-research-backends.md](trask-research-backends.md) — then set:
 
 ```
 TRASK_WEB_RESEARCH_PYTHON=.venv-trask-research/bin/python
-TRASK_INDEXER_BASE_URL=http://127.0.0.1:8790
-TRASK_RESEARCH_TIMEOUT_MS=900000
+TRASK_WEB_RESEARCH_TIMEOUT_MS=900000
+OPENAI_API_KEY=                    # or OPENROUTER_API_KEY
 ```
 
 ## 4. Build

@@ -37,7 +37,7 @@ Package manager is **pnpm**; root `package-lock.json` is legacy—ignore it.
 
 **Workflow:** `pnpm install` → `pnpm rebuild esbuild` → `pnpm build` → `pnpm check` → `node --test …`. For TS-only edits, `pnpm check` may suffice before a focused test run.
 
-**Scope note:** repo-wide tightening of `any` / `unknown` should exclude vendored trees under `./vendor/` unless the task explicitly includes them.
+**Holocron research:** `bash scripts/bootstrap_trask_research.sh` then `TRASK_WEB_RESEARCH_PYTHON` + `OPENAI_API_KEY` or `OPENROUTER_API_KEY` (see `docs/trask-research-backends.md`).
 
 ---
 
@@ -76,11 +76,9 @@ Package manager is **pnpm**; root `package-lock.json` is legacy—ignore it.
 
 - **`VITE_TRASK_API_BASE`** — Trask HTTP API origin (e.g. `http://127.0.0.1:4010` when `trask-http-server` is up).
 - **`VITE_TRASK_API_KEY`** — must match server `TRASK_WEB_API_KEY` when the server requires a key.
-- **`VITE_TRASK_LEGACY_SPARK=1`** — legacy Spark mode toggle used in `App.tsx`.
-
 **Workflow (browser + API):** terminal A: `TRASK_WEB_ALLOW_ANONYMOUS=1 pnpm dev:trask-http` (or set `TRASK_WEB_API_KEY` and matching `VITE_TRASK_API_KEY`). Build or dev Holocron with `VITE_TRASK_API_BASE` pointing at that origin. Exercise Q&A flows in the browser.
 
-**Public deploy responsibility:** if the task is about public Holocron availability, do not stop after local `:4010` passes. Verify `https://openkotor.github.io/community-bots/qa-webui/?thread=<fresh-uuid>` in a real browser after deploy. Keep `TRASK_API_BASE` on the Trask worker with **`TRASK_BUILTIN_API=0`** and a live **`TRASK_RESEARCHWIZARD_BASE_URL`** (e.g. `OpenKotOR/holocron-trask-http`). Bundled `holocron-trask-api` reference answers were removed. If the public API is broken, fix worker/Pages variables, redeploy worker + Trask HTTP upstream + Pages yourself, and confirm **multiple `https://` sources** per query before reporting success.
+**Public deploy responsibility:** if the task is about public Holocron availability, do not stop after local `:4010` passes. Verify `https://openkotor.github.io/community-bots/qa-webui/?thread=<fresh-uuid>` in a real browser after deploy. Keep `TRASK_API_BASE` on the Trask worker with **`TRASK_BUILTIN_API=0`** and a live **`TRASK_RESEARCHWIZARD_BASE_URL`** (GPTR, e.g. `OpenKotOR/holocron-trask-http`). Bundled `holocron-trask-api` reference answers were removed. If the public API is broken, fix worker/Pages variables, redeploy worker + GPTR upstream + Pages yourself, and confirm **multiple `https://` sources** per query before reporting success.
 
 ---
 
@@ -155,7 +153,8 @@ Uses `dotenv` and `@openkotor/config`—check package README or `src/main.ts` fo
 | Script | Purpose |
 |--------|---------|
 | `pnpm check:pazaak-oauth` | OAuth readiness check for Pazaak |
-| `pnpm smoke:trask-research` | Trask indexer + retrieve smoke |
+| `pnpm smoke:trask-gptr-dry` | Headless Trask/GPTR smoke (**dry-run**) |
+| `pnpm smoke:trask-gptr` | Same without dry-run (needs Python + credentials) |
 
 ---
 

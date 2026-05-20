@@ -118,18 +118,18 @@ function mergeAbortSignals(a: AbortSignal, b: AbortSignal): AbortSignal {
 export function traskErrorMessageFromUnknown(error: unknown): string {
   const abortish = (name: string | undefined) => name === 'AbortError' || name === 'TimeoutError'
   if (error instanceof Error && abortish(error.name)) {
-    return 'Trask request timed out. Run trask-http-server on port 4010, or set VITE_TRASK_API_BASE to a reachable host.'
+    return 'Holocron request timed out. Run the research server on port 4010 (`pnpm dev:trask-http`), or set VITE_TRASK_API_BASE to a reachable host.'
   }
   if (typeof error === 'object' && error !== null && 'name' in error) {
     const name = String((error as { name: unknown }).name)
     if (abortish(name)) {
-      return 'Trask request timed out. Run trask-http-server on port 4010, or set VITE_TRASK_API_BASE to a reachable host.'
+      return 'Holocron request timed out. Run the research server on port 4010 (`pnpm dev:trask-http`), or set VITE_TRASK_API_BASE to a reachable host.'
     }
   }
   if (error instanceof Error && typeof error.message === 'string' && error.message) {
     return error.message
   }
-  return 'Trask request failed.'
+  return 'Holocron request failed.'
 }
 
 function traskRequestInit(apiKey?: string, init?: RequestInit, timeoutMs?: number): RequestInit {
@@ -271,7 +271,7 @@ export async function traskAsk(
     throw new Error(data.error ?? record.error ?? `ask failed: ${res.status}`)
   }
   if (record.status === 'failed') {
-    throw new Error(record.error ?? 'Trask research failed.')
+    throw new Error(record.error ?? 'Holocron research failed.')
   }
   return record
 }

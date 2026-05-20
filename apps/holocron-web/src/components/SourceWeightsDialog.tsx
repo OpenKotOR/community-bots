@@ -17,8 +17,6 @@ interface SourceWeightsDialogProps {
   onOpenChange: (open: boolean) => void
   sourceWeights: SourceWeight[]
   onSourceWeightsChange: (weights: SourceWeight[]) => void
-  /** When false (default Trask API mode), show optional API key for secured servers. */
-  legacySparkMode?: boolean
   traskApiKey?: string
   onTraskApiKeyChange?: (value: string) => void
 }
@@ -28,7 +26,6 @@ export function SourceWeightsDialog({
   onOpenChange,
   sourceWeights,
   onSourceWeightsChange,
-  legacySparkMode = false,
   traskApiKey = '',
   onTraskApiKeyChange,
 }: SourceWeightsDialogProps) {
@@ -50,7 +47,7 @@ export function SourceWeightsDialog({
         <DialogHeader>
           <DialogTitle className="text-xl">Source Prioritization</DialogTitle>
           <DialogDescription>
-            Adjust which approved source families Trask may use and how strongly each family is prioritized.
+            Adjust which approved source families Holocron may use and how strongly each family is prioritized.
           </DialogDescription>
         </DialogHeader>
 
@@ -96,10 +93,10 @@ export function SourceWeightsDialog({
           ))}
         </div>
 
-        {!legacySparkMode && onTraskApiKeyChange && (
+        {onTraskApiKeyChange && (
           <Card className="p-4 mt-4 border-primary/30">
             <div className="space-y-2">
-              <Label className="text-base font-medium">Trask API key</Label>
+              <Label className="text-base font-medium">Archive API key</Label>
               <p className="text-xs text-muted-foreground">
                 Optional. Required when the server sets <code className="text-[10px]">TRASK_WEB_API_KEY</code>.
                 Stored only in this browser.
