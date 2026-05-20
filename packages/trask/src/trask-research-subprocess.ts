@@ -11,6 +11,9 @@ export interface TraskWebResearchPassage {
   readonly host?: string;
   readonly score?: number;
   readonly sourceId?: string;
+  readonly guildId?: string;
+  readonly channelId?: string;
+  readonly firstMessageId?: string;
 }
 
 export interface TraskWebResearchResult {
@@ -35,10 +38,65 @@ export interface TraskWebResearchRequestPayload {
   readonly allowed_url_prefixes?: readonly string[];
 }
 
+export type TraskResearchLogLevel = "info" | "debug";
+
+export type TraskResearchLogSink = (line: string, level: TraskResearchLogLevel) => void;
+
+let researchLogSink: TraskResearchLogSink | undefined;
+
+/** Optional bridge for trask-bot / trask-http to forward Python stderr into app loggers. */
+export const setTraskResearchLogSink = (sink: TraskResearchLogSink | undefined): void => {
+  researchLogSink = sink;
+};
+
 const traskPackageDir = dirname(fileURLToPath(import.meta.url));
 const monorepoRootFromPackage = join(traskPackageDir, "..", "..", "..");
 
 const defaultResearchScript = (): string => join(monorepoRootFromPackage, "scripts", "trask_web_research.py");
+
+const researchLoggingVerbose = (): boolean => {
+  const level = process.env.TRASK_RESEARCH_LOG_LEVEL?.trim().toUpperCase();
+  return process.env.TRASK_RESEARCH_LOG_VERBOSE === "1" || level === "DEBUG";
+};
+
+const forwardResearchStderrLine = (line: string): void => {
+  const trimmed = line.trim();
+  if (!trimmed) return;
+
+  const level: TraskResearchLogLevel =
+    /\bDEBUG\b/.test(trimmed) && researchLoggingVerbose() ? "debug" : "info";
+  const prefixed = `[trask-research] ${trimmed}`;
+
+  if (researchLogSink) {
+    researchLogSink(prefixed, level);
+    return;
+  }
+
+  if (level === "debug") {
+    console.debug(prefixed);
+  } else {
+    console.error(prefixed);
+  }
+};
+
+const attachStderrLineForwarder = (stderr: NodeJS.ReadableStream | null): void => {
+  if (!stderr) return;
+
+  let pending = "";
+  stderr.on("data", (chunk: Buffer | string) => {
+    pending += Buffer.isBuffer(chunk) ? chunk.toString("utf8") : String(chunk);
+    const lines = pending.split(/\r?\n/u);
+    pending = lines.pop() ?? "";
+    for (const line of lines) {
+      forwardResearchStderrLine(line);
+    }
+  });
+  stderr.on("end", () => {
+    if (pending.trim()) {
+      forwardResearchStderrLine(pending);
+    }
+  });
+};
 
 const spawnResearchRunner = (
   config: ResearchWizardRuntimeConfig,
@@ -48,7 +106,8 @@ const spawnResearchRunner = (
   payload: TraskWebResearchRequestPayload,
 ): Promise<{ stdout: string; stderr: string; code: number | null }> => {
   return new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn(python, [script], {
+    const pythonArgs = researchLoggingVerbose() ? [script, "-v"] : [script];
+    const child = spawn(python, pythonArgs, {
       cwd,
       stdio: ["pipe", "pipe", "pipe"],
       env: {
@@ -65,6 +124,8 @@ const spawnResearchRunner = (
     const chunksErr: Buffer[] = [];
     let settled = false;
 
+    attachStderrLineForwarder(child.stderr);
+
     child.stdout?.on("data", (chunk: Buffer | string) => {
       chunksOut.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
     });
@@ -79,8 +140,9 @@ const spawnResearchRunner = (
 
       settled = true;
       child.kill("SIGTERM");
-      rejectPromise(new Error(`Trask web research runner timed out after ${config.timeoutMs}ms`));
-    }, config.timeoutMs);
+      const gatherMs = config.gatherTimeoutMs;
+      rejectPromise(new Error(`Trask web research runner timed out after ${gatherMs}ms (gather)`));
+    }, config.gatherTimeoutMs);
 
     child.on("error", (error) => {
       if (settled) {

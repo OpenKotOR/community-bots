@@ -2,42 +2,35 @@ import { randomUUID } from 'node:crypto'
 
 import { expect, test, type Page } from '@playwright/test'
 
+import { loadTraskPolicy } from '../../../packages/trask-config/dist/policy.js'
+import { verificationQueriesForSurface } from '../../../packages/trask-config/dist/verification-queries.js'
+import { assertAllUrlsReachable } from '../../../scripts/lib/url-verify.mjs'
+
 /**
  * Holocron functional e2e: real browser against trask-http-server + built Holocron.
- * Exercises POST /ask → 202 → GET /thread poll → rendered answer + Sources (no API mocks).
+ * Uses expert verification queries (not golden indexer fixtures). Exercises POST /ask → 202 →
+ * GET /thread poll → rendered answer + reachable https citations (no API mocks).
  */
 
 test.describe.configure({ mode: 'serial', timeout: 240_000 })
 
-const RESEARCH_QUERIES = [
-  {
-    question: 'What is TSLPatcher used for in KOTOR modding?',
-    expectPattern: /TSLPatcher|2DA|GFF|TLK|patch/i,
-    sourcePattern: /tslpatcher|technical reference|deadlystream|lucasforums|kotor\.neocities|github/i,
-  },
-  {
-    question: 'How do I troubleshoot KOTOR widescreen resolution issues on PC?',
-    expectPattern: /widescreen|resolution|HUD|aspect/i,
-    sourcePattern: /widescreen|resolution|technical reference|deadlystream|lucasforums|pcgamingwiki|kotor\.neocities/i,
-  },
-  {
-    question: 'What is MDLOps used for in the KOTOR toolchain?',
-    expectPattern: /MDLOps|MDL|model/i,
-    sourcePattern: /mdlops|technical reference|mdledit|kotormax|kotorblender|github|kotor\.neocities/i,
-  },
-  {
-    question: 'Where are Knights of the Old Republic save files stored on Windows?',
-    expectPattern: /save|Saves|Windows|profile|KOTOR/i,
-    sourcePattern: /save|windows|technical reference|deadlystream|lucasforums|pcgamingwiki|kotor\.neocities/i,
-  },
-  {
-    question: 'What does the reone project provide for Odyssey engine work?',
-    expectPattern: /reone|Odyssey|engine|open.?source/i,
-    sourcePattern: /reone|technical reference|github|xoreos|engine/i,
-  },
-] as const
+const RESEARCH_QUERIES = verificationQueriesForSurface('holocron').map((entry) => ({
+  question: entry.question,
+  expectPattern: entry.expectRe,
+  sourcePattern: entry.sourceRe,
+  forbidPattern: entry.forbidRe,
+}))
 
-const MIN_HTTPS_SOURCES = 2
+const MIN_HTTPS_SOURCES = loadTraskPolicy().holocron.minHttpsSources
+
+const EXPECTED_INDEXER_HOST = (() => {
+  const raw = process.env.TRASK_INDEXER_BASE_URL ?? 'http://127.0.0.1:8787'
+  try {
+    return new URL(raw).host
+  } catch {
+    return '127.0.0.1:8787'
+  }
+})()
 
 async function waitForHolocronReady(page: Page, threadId = randomUUID()) {
   await page.goto(`/?thread=${threadId}`, { waitUntil: 'domcontentloaded' })
@@ -48,6 +41,51 @@ async function waitForHolocronReady(page: Page, threadId = randomUUID()) {
   await expect(input).toBeEnabled({ timeout: 60_000 })
   await expect(input).not.toHaveAttribute('placeholder', /Preparing thread/i)
   return threadId
+}
+
+async function assertLiveTraceHasIndexerDiagnostics(
+  request: import('@playwright/test').APIRequestContext,
+  baseURL: string,
+  threadId: string,
+) {
+  const res = await request.get(`${baseURL}/api/trask/thread/${encodeURIComponent(threadId)}`)
+  expect(res.ok(), `thread poll failed: ${res.status()}`).toBeTruthy()
+  const body = (await res.json()) as {
+    history?: Array<{
+      status?: string
+      groundingStatus?: string
+      liveTrace?: Array<{
+        phase?: string
+        detail?: string
+        diag?: Record<string, unknown>
+        urls?: string[]
+      }>
+    }>
+  }
+  const completed = (body.history ?? []).filter((row) => row.status === 'complete').pop()
+  expect(completed, 'expected a completed query on thread').toBeTruthy()
+  expect(
+    completed?.groundingStatus,
+    'completed query should record groundingStatus',
+  ).toMatch(/^(grounded|failed|partial)$/)
+  const trace = completed?.liveTrace ?? []
+  expect(trace.length, 'liveTrace should include multiple steps').toBeGreaterThanOrEqual(4)
+  const hasIndexer =
+    trace.some((step) => {
+      const indexer = step.diag?.indexer
+      return typeof indexer === 'string' && indexer.includes(EXPECTED_INDEXER_HOST)
+    })
+    || trace.some((step) => step.detail?.includes(EXPECTED_INDEXER_HOST))
+  expect(
+    hasIndexer,
+    `liveTrace should record indexer URL host (${EXPECTED_INDEXER_HOST})`,
+  ).toBeTruthy()
+  const hasPassageSignal = trace.some(
+    (step) =>
+      (typeof step.diag?.passages === 'number' && (step.diag.passages as number) > 0)
+      || (step.urls?.length ?? 0) > 0,
+  )
+  expect(hasPassageSignal, 'liveTrace should record passage or URL retrieve detail').toBeTruthy()
 }
 
 async function submitQueryAndAwaitAnswer(page: Page, question: string) {
@@ -65,8 +103,16 @@ async function submitQueryAndAwaitAnswer(page: Page, question: string) {
   await expect(assistantArticle).toBeVisible({ timeout: 30_000 })
   await expect(assistantArticle.getByText(/^Thinking$/i)).toHaveCount(0, { timeout: 200_000 })
 
-  const bodyText = (await assistantArticle.innerText()).trim()
-  return { assistantArticle, bodyText }
+  const answerRegion = assistantArticle.getByLabel('Answer')
+  await expect(answerRegion).toBeVisible({ timeout: 30_000 })
+  const bodyText = (await answerRegion.innerText()).trim()
+  const rawText = (await assistantArticle.innerText()).trim()
+  return { assistantArticle, bodyText, rawText }
+}
+
+function extractHttpsUrls(text: string): string[] {
+  const matches = text.match(/https:\/\/[^\s)\]]+/gu)
+  return matches ? [...new Set(matches.map((url) => url.replace(/[.,;]+$/u, '')))] : []
 }
 
 function assertSubstantiveAnswer(
@@ -75,20 +121,25 @@ function assertSubstantiveAnswer(
   {
     expectPattern,
     sourcePattern,
+    forbidPattern,
   }: (typeof RESEARCH_QUERIES)[number],
 ) {
   expect(bodyText.length, 'answer body should be substantive').toBeGreaterThan(60)
   expect(bodyText, 'answer should match topic').toMatch(expectPattern)
+  const bodyForTopicCheck = bodyText.replace(/https:\/\/[^\s)\]]+/gu, '')
+  if (forbidPattern) {
+    expect(bodyForTopicCheck, 'answer should not bleed unrelated topics').not.toMatch(forbidPattern)
+  }
   expect(bodyText, 'should not be bare synthesis failure stub').not.toMatch(
     /^i could not complete live archive synthesis[^.]*\.\s*$/iu,
   )
+  expect(bodyText, 'should use grammatical prose, not stub headings').not.toMatch(/^Answer for:/im)
   expect(sourcesText, 'sources should stay aligned with the question').toMatch(sourcePattern)
   expect(sourcesText, 'must not cite repo-local technical-reference URLs').not.toMatch(/local:\/\/technical-reference/i)
 }
 
 function countHttpsUrls(text: string): number {
-  const matches = text.match(/https:\/\/[^\s)\]]+/g)
-  return matches ? new Set(matches).size : 0
+  return extractHttpsUrls(text).length
 }
 
 test.beforeAll(async ({ request, baseURL }) => {
@@ -107,10 +158,15 @@ test.beforeEach(async ({ context }) => {
 })
 
 for (const [index, querySpec] of RESEARCH_QUERIES.entries()) {
-  test(`research ${index + 1}: ${querySpec.question.slice(0, 48)}…`, async ({ page }) => {
+  test(`research ${index + 1}: ${querySpec.question.slice(0, 48)}…`, async ({ page, request, baseURL }) => {
     const { question } = querySpec
-    await waitForHolocronReady(page)
+    const threadId = await waitForHolocronReady(page)
     const { assistantArticle, bodyText } = await submitQueryAndAwaitAnswer(page, question)
+    await assertLiveTraceHasIndexerDiagnostics(request, baseURL!, threadId)
+
+    const thoughtProcess = page.getByRole('button', { name: /thought process/i })
+    await expect(thoughtProcess).toBeVisible()
+    await expect(thoughtProcess).toContainText(/\d+\s+steps?/i)
 
     const citationLink = assistantArticle.getByRole('link').filter({ hasText: /^[1-9]\d*$/ }).first()
     const sourcesRegion = assistantArticle.locator('[aria-label="Sources"]')
@@ -119,6 +175,10 @@ for (const [index, querySpec] of RESEARCH_QUERIES.entries()) {
     const hasSourcesPanel = (await sourcesRegion.count()) > 0
     const bodyHasHttps = /https:\/\/[^\s)]+/.test(bodyText)
     const sourcesText = hasSourcesPanel ? (await sourcesRegion.innerText()).trim() : bodyText
+
+    expect(bodyText, 'answer region must not include thought-process trace copy').not.toMatch(
+      /Holocron retrieval queued|^\s*QUEUED\s*$/im,
+    )
 
     assertSubstantiveAnswer(bodyText, sourcesText, querySpec)
 
@@ -132,16 +192,22 @@ for (const [index, querySpec] of RESEARCH_QUERIES.entries()) {
     )
     expect(hasCitationLink || hasSourcesPanel, 'expected clickable citation or Sources panel').toBeTruthy()
     expect(bodyHasHttps || httpsCount > 0, 'expected https URLs in answer or Sources panel').toBeTruthy()
+
+    const citedUrls = extractHttpsUrls(`${bodyText}\n${sourcesText}`).filter(
+      (url) => !url.includes('openkotor.github.io'),
+    )
+    await assertAllUrlsReachable(citedUrls, `query ${index + 1}`)
   })
 }
 
 test('completed remote thread clears stale persisted research job on reload', async ({ page }) => {
   const threadId = randomUUID()
-  const question = 'What is MDLOps used for in the KOTOR toolchain?'
+  const question =
+    'For a custom MDL exported from Blender, which MDLOps workflow step turns it back into game-ready KotOR models?'
 
   await waitForHolocronReady(page, threadId)
   const { assistantArticle, bodyText } = await submitQueryAndAwaitAnswer(page, question)
-  await expect(assistantArticle).toContainText(/MDLOps|model conversion/i)
+  await expect(assistantArticle).toContainText(/MDLOps|model|export/i)
 
   const staleJob = {
     clientId: 'stale-job-mdlops',
@@ -164,7 +230,7 @@ test('completed remote thread clears stale persisted research job on reload', as
 
   await page.reload({ waitUntil: 'domcontentloaded' })
   const reloadedAssistant = page.getByRole('article', { name: /assistant message/i }).last()
-  await expect(reloadedAssistant).toContainText(/MDLOps|model conversion/i, { timeout: 30_000 })
+  await expect(reloadedAssistant).toContainText(/MDLOps|model|export/i, { timeout: 30_000 })
   await expect(reloadedAssistant.getByText(/^Thinking$/i)).toHaveCount(0, { timeout: 30_000 })
   await expect(page.getByText(/Querying Archives\.\.\./i)).toHaveCount(0, { timeout: 30_000 })
 

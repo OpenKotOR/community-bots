@@ -116,7 +116,12 @@ export interface ResearchWizardRuntimeConfig {
   pythonExecutable: string;
   /** Optional absolute path to the research runner; default `<repo>/scripts/trask_web_research.py`. */
   researchScriptPath: string | undefined;
+  /** Legacy overall budget; subprocess gather uses {@link gatherTimeoutMs}. */
   timeoutMs: number;
+  /** Python `trask_web_research.py` subprocess wall clock (Holocron ~2m default). */
+  gatherTimeoutMs: number;
+  /** Node rewrite / LLM compose ceiling per query. */
+  composeTimeoutMs: number;
   /** When true (default), use question-last grounded compose when passages exist. */
   groundedComposeEnabled: boolean;
   /** `rewrite` enables legacy digest rewrite; default `grounded`. */
@@ -190,6 +195,14 @@ export const loadResearchWizardRuntimeConfig = (env: NodeJS.ProcessEnv = process
     readOptionalEnv("TRASK_WEB_RESEARCH_TIMEOUT_MS", env) ??
     readOptionalEnv("TRASK_RESEARCHWIZARD_TIMEOUT_MS", env) ??
     "900000";
+  const gatherTimeoutRaw =
+    readOptionalEnv("TRASK_RESEARCH_GATHER_MS", env) ??
+    readOptionalEnv("TRASK_WEB_RESEARCH_GATHER_MS", env) ??
+    "120000";
+  const composeTimeoutRaw =
+    readOptionalEnv("TRASK_RESEARCH_COMPOSE_MS", env) ??
+    readOptionalEnv("TRASK_WEB_RESEARCH_COMPOSE_MS", env) ??
+    "60000";
 
   const composeModeRaw = readOptionalEnv("TRASK_RESEARCH_COMPOSE_MODE", env)?.trim().toLowerCase();
   const composeMode: ResearchComposeMode = composeModeRaw === "rewrite" ? "rewrite" : "grounded";
@@ -203,10 +216,12 @@ export const loadResearchWizardRuntimeConfig = (env: NodeJS.ProcessEnv = process
   const syncTimeoutRaw = readOptionalEnv("TRASK_DISCORD_SYNC_TIMEOUT_MS", env) ?? "600000";
 
   return {
-    indexerBaseUrl: (readOptionalEnv("TRASK_INDEXER_BASE_URL", env) ?? "http://127.0.0.1:8790").trim(),
+    indexerBaseUrl: (readOptionalEnv("TRASK_INDEXER_BASE_URL", env) ?? "http://127.0.0.1:8787").trim(),
     pythonExecutable: resolveTraskResearchPythonExecutable(repoRoot, env),
     researchScriptPath: scriptRaw ? resolve(scriptRaw.trim()) : undefined,
     timeoutMs: integerish.parse(timeoutRaw),
+    gatherTimeoutMs: integerish.parse(gatherTimeoutRaw),
+    composeTimeoutMs: integerish.parse(composeTimeoutRaw),
     groundedComposeEnabled,
     composeMode,
     discordSyncTimeoutMs: integerish.parse(syncTimeoutRaw),

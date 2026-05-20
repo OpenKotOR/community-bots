@@ -4,7 +4,6 @@ import {
   PermissionFlagsBits,
   SlashCommandBuilder,
   type ChatInputCommandInteraction,
-  type APIEmbedField,
   type RESTPostAPIApplicationCommandsJSONBody,
 } from "discord.js";
 
@@ -26,7 +25,12 @@ import {
   type SourceDescriptor,
   type SourceKind,
 } from "@openkotor/retrieval";
-import { createResearchWizardClient } from "@openkotor/trask";
+import {
+  createResearchWizardClient,
+  formatDiscordAskDisplay,
+  setTraskResearchLogSink,
+  type ResearchWizardBriefAnswer,
+} from "@openkotor/trask";
 import { isTraskThreadId } from "@openkotor/trask-http";
 
 import {
@@ -44,17 +48,30 @@ const config = loadTraskBotConfig();
 const searchProvider = createChunkSearchProvider(config.chunkDir);
 const DISCORD_ASK_RESPONSE_SLA_MS = 90_000;
 const DISCORD_ASK_SYNTHESIS_FAILURE_MESSAGE = "I could not complete live archive synthesis for this question right now.";
-const researchWizardTimeoutMs = Math.min(config.researchWizard.timeoutMs, DISCORD_ASK_RESPONSE_SLA_MS);
-if (researchWizardTimeoutMs !== config.researchWizard.timeoutMs) {
-  logger.warn("TRASK_RESEARCHWIZARD_TIMEOUT_MS exceeds Discord /ask SLA; clamping at runtime.", {
-    configuredTimeoutMs: config.researchWizard.timeoutMs,
-    effectiveTimeoutMs: researchWizardTimeoutMs,
+const researchGatherTimeoutMs = Math.min(config.researchWizard.gatherTimeoutMs, DISCORD_ASK_RESPONSE_SLA_MS);
+if (researchGatherTimeoutMs !== config.researchWizard.gatherTimeoutMs) {
+  logger.warn("TRASK_RESEARCH_GATHER_MS exceeds Discord /ask SLA; clamping gather at runtime.", {
+    configuredGatherMs: config.researchWizard.gatherTimeoutMs,
+    effectiveGatherMs: researchGatherTimeoutMs,
   });
 }
-const researchWizard = createResearchWizardClient({
-  ...config.researchWizard,
-  timeoutMs: researchWizardTimeoutMs,
-}, config.ai, searchProvider);
+const researchWizard = createResearchWizardClient(
+  {
+    ...config.researchWizard,
+    gatherTimeoutMs: researchGatherTimeoutMs,
+    timeoutMs: researchGatherTimeoutMs,
+  },
+  config.ai,
+);
+
+setTraskResearchLogSink((line, level) => {
+  if (level === "debug") {
+    logger.debug(line);
+  } else {
+    logger.info(line);
+  }
+});
+
 const queryRepository = new JsonTraskQueryRepository(resolveDataFile(config.queryDataDir, "trask-queries.json"));
 
 const traskHttpRuntime = {
@@ -177,88 +194,20 @@ const truncateForDiscord = (value: string, limit: number): string => {
   return `${value.slice(0, Math.max(0, limit - 1)).trimEnd()}…`;
 };
 
-const normalizeWhitespace = (value: string): string => value.replace(/\n{3,}/g, "\n\n").trim();
-
-const splitResearchAnswer = (value: string): { body: string; sourceLines: string[] } => {
-  const match = /\nSources\s*\n/i.exec(value);
-
-  if (!match) {
-    return {
-      body: normalizeWhitespace(value),
-      sourceLines: [],
-    };
-  }
-
-  const body = normalizeWhitespace(value.slice(0, match.index));
-  const sourceLines = value
-    .slice(match.index + match[0].length)
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  return { body, sourceLines };
-};
-
-const chunkSourceLines = (sourceLines: readonly string[]): APIEmbedField[] => {
-  if (sourceLines.length === 0) {
-    return [];
-  }
-
-  const fields: APIEmbedField[] = [];
-  let currentLines: string[] = [];
-
-  for (const rawLine of sourceLines) {
-    // Discord embed field values must be <= 1024 chars.
-    const line = truncateForDiscord(rawLine, 1000);
-    const candidate = [...currentLines, line].join("\n");
-
-    if (candidate.length > 1024 && currentLines.length > 0) {
-      fields.push({
-        name: fields.length === 0 ? "Sources" : `Sources ${fields.length + 1}`,
-        value: currentLines.join("\n"),
-        inline: false,
-      });
-      currentLines = [line];
-      continue;
-    }
-
-    currentLines.push(line);
-  }
-
-  if (currentLines.length > 0) {
-    fields.push({
-      name: fields.length === 0 ? "Sources" : `Sources ${fields.length + 1}`,
-      value: currentLines.join("\n"),
-      inline: false,
-    });
-  }
-
-  return fields;
-};
-
-const buildFallbackSources = (sources: readonly SourceDescriptor[]): APIEmbedField[] => {
-  return chunkSourceLines(sources.map((source, index) => `${index + 1}. ${source.name} - ${source.homeUrl}`));
-};
-
-const buildResearchEmbed = (rawAnswer: string, approvedSources: readonly SourceDescriptor[]) => {
-  const { body, sourceLines } = splitResearchAnswer(rawAnswer);
-  const sourceFields = body === DISCORD_ASK_SYNTHESIS_FAILURE_MESSAGE
-    ? []
-    : sourceLines.length > 0
-      ? chunkSourceLines(sourceLines)
-      : buildFallbackSources(approvedSources);
-
+const buildResearchEmbed = (
+  rawAnswer: string,
+  approvedSources: readonly SourceDescriptor[],
+  query: string,
+) => {
   const title = `${personaProfiles.trask.displayName} Briefing`;
-  const limitedSourceFields = sourceFields.slice(0, 3);
-  const sourceFieldChars = limitedSourceFields.reduce((total, field) => total + field.name.length + field.value.length, 0);
-  // Keep a margin under Discord's 6000-char embed cap (title + description + fields).
-  const descriptionLimit = Math.max(500, Math.min(4000, 5900 - title.length - sourceFieldChars));
-  const description = truncateForDiscord(body, descriptionLimit);
+  const description =
+    rawAnswer === DISCORD_ASK_SYNTHESIS_FAILURE_MESSAGE
+      ? rawAnswer
+      : formatDiscordAskDisplay(rawAnswer, approvedSources, { query });
 
   return buildInfoEmbed({
     title,
-    description,
-    fields: limitedSourceFields,
+    description: truncateForDiscord(description, 4000),
   });
 };
 
@@ -279,10 +228,17 @@ const handleAskCommand = async (interaction: ChatInputCommandInteraction): Promi
   const createdAt = new Date().toISOString();
 
   try {
-    const answerPromise = researchWizard.answerQuestion(query);
+    logger.info("Trask /ask research_start", {
+      queryId,
+      threadId,
+      guildId: interaction.guildId,
+      channelId: interaction.channelId,
+      queryPreview: query.slice(0, 120),
+    });
+
+    const answerPromise = researchWizard.answerForSurface(query, "discord") as Promise<ResearchWizardBriefAnswer>;
     const timedResult = await Promise.race<
-      { kind: "result"; value: Awaited<ReturnType<typeof researchWizard.answerQuestion>> }
-      | { kind: "timeout" }
+      { kind: "result"; value: ResearchWizardBriefAnswer } | { kind: "timeout" }
     >([
       answerPromise.then((value) => ({ kind: "result", value })),
       new Promise((resolve) => {
@@ -329,6 +285,13 @@ const handleAskCommand = async (interaction: ChatInputCommandInteraction): Promi
     }
 
     const result = timedResult.value;
+    logger.info("Trask /ask research_done", {
+      queryId,
+      approvedSources: result.approvedSources.length,
+      retrievedSources: result.retrievedSources.length,
+      visitedUrls: result.visitedUrls.length,
+      groundingStatus: result.groundingStatus ?? "unknown",
+    });
     const completedAt = new Date().toISOString();
     await queryRepository.append({
       queryId,
@@ -352,7 +315,7 @@ const handleAskCommand = async (interaction: ChatInputCommandInteraction): Promi
       createdAt,
       completedAt,
     });
-    let embed = buildResearchEmbed(result.answer, result.approvedSources);
+    let embed = buildResearchEmbed(result.answer, result.approvedSources, query);
     const holocronBase = config.holocronPublicUrl?.trim();
     if (holocronBase) {
       const url = `${trimTrailingSlashes(holocronBase)}?thread=${encodeURIComponent(threadId)}`;

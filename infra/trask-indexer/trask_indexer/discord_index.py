@@ -72,6 +72,9 @@ def index_discord_export(
 ) -> int:
     """Upsert all container JSON files under `export_dir/containers` into Chroma."""
     exclude = {value.strip() for value in (exclude_channel_ids or set()) if value.strip()}
+    guild_id = export_dir.name.strip()
+    if not guild_id.isdigit():
+        guild_id = ""
     extra_metadata = {"indexed_at": indexed_at} if indexed_at else None
     manifest = export_dir / "manifest.json"
     containers_dir = export_dir / "containers"
@@ -105,13 +108,20 @@ def index_discord_export(
             host = f"discord:{channel_name}"
             markdown = _chunk_text(channel_name, scope, window)
             chunks = chunk_markdown(markdown, url=url)
+            chunk_meta = {
+                **(extra_metadata or {}),
+                "guild_id": guild_id,
+                "channel_id": channel_id,
+                "first_message_id": first_id,
+                "last_message_id": last_id,
+            }
             total += upsert_chunks(
                 collection,
                 url=url,
                 host=host,
                 source_id=DISCORD_SOURCE_ID,
                 chunks=chunks,
-                extra_metadata=extra_metadata,
+                extra_metadata=chunk_meta,
             )
             window = []
             word_count = 0

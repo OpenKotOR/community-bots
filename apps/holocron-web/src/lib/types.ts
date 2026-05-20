@@ -2,12 +2,16 @@ export type MessageRole = 'user' | 'assistant' | 'system'
 
 export type QueryType = 'modding' | 'technical' | 'lore' | 'general'
 
+export type MessageResearchDiagValue = string | number | boolean
+
 export interface MessageResearchStep {
   id: string
   at: number
   phase: string
   detail: string
   sources?: Array<{ id: string; name: string; url: string }>
+  diag?: Record<string, MessageResearchDiagValue>
+  urls?: string[]
 }
 
 export interface Message {

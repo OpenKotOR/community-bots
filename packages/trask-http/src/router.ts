@@ -206,6 +206,8 @@ const appendLiveTrace = async (
     phase: event.phase,
     ...(event.detail !== undefined ? { detail: event.detail } : {}),
     ...(event.sources?.length ? { sources: event.sources.map((s) => ({ ...s })) } : {}),
+    ...(event.diag ? { diag: { ...event.diag } } : {}),
+    ...(event.urls?.length ? { urls: [...event.urls] } : {}),
   };
   await repository.upsert({
     ...prev,
@@ -725,7 +727,11 @@ export const createTraskHttpRouter = <TUser extends TraskHttpUser = TraskHttpUse
           {
             at: createdAt,
             phase: "queued",
-              detail: model ? `Holocron retrieval queued with ${model}…` : "Holocron retrieval queued…",
+            detail: model ? `Holocron retrieval queued with ${model}…` : "Holocron retrieval queued…",
+            diag: {
+              indexer: process.env.TRASK_INDEXER_BASE_URL ?? "http://127.0.0.1:8787",
+              ...(model ? { model } : {}),
+            },
           },
         ],
       };
@@ -741,6 +747,8 @@ export const createTraskHttpRouter = <TUser extends TraskHttpUser = TraskHttpUse
               phase: ev.phase,
               ...(ev.detail !== undefined ? { detail: ev.detail } : {}),
               ...(ev.sources?.length ? { sources: mapDescriptorsToSourceRecords(ev.sources) } : {}),
+              ...(ev.diag ? { diag: ev.diag } : {}),
+              ...(ev.urls?.length ? { urls: [...ev.urls] } : {}),
             });
           }, {
             ...(model ? { model } : {}),

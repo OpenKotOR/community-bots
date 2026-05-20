@@ -78,6 +78,8 @@ export const startDiscordIndexSync = (
       running = false;
       if (code !== 0) {
         logger.warn("Discord index sync exited with error.", { code });
+      } else {
+        logger.info("Discord index sync completed.", { code });
       }
     });
   };

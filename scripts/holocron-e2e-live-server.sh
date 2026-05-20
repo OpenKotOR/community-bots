@@ -30,10 +30,10 @@ if [[ "$has_llm" -eq 0 ]]; then
   echo "  Holocron answers may be slower or lower quality without OPENROUTER_API_KEY or OPENAI_API_KEY." >&2
 fi
 
-INDEXER_URL="${TRASK_INDEXER_BASE_URL:-http://127.0.0.1:8790}"
+INDEXER_URL="${TRASK_INDEXER_BASE_URL:-http://127.0.0.1:8787}"
 if ! curl -sf "${INDEXER_URL%/}/health" >/dev/null 2>&1; then
-  echo "holocron-e2e-live-server: warning — indexer not reachable at $INDEXER_URL." >&2
-  echo "  Run: bash scripts/trask_index_seed_for_qa.sh && trask-indexer serve" >&2
+  echo "holocron-e2e-live-server: warning — retrieve API not reachable at $INDEXER_URL." >&2
+  echo "  Run: bash scripts/trask_live_stack.sh (indexer + trask-retrieve Worker + trask-http)" >&2
 fi
 
 DIST="$ROOT/apps/holocron-web/dist"

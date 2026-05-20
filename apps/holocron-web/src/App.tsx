@@ -195,6 +195,8 @@ function mapResearchStepsFromRecord(rec: TraskHistoryRecordDto): MessageResearch
       phase: ev.phase,
       detail,
       sources: ev.sources,
+      ...(ev.diag ? { diag: { ...ev.diag } } : {}),
+      ...(ev.urls?.length ? { urls: [...ev.urls] } : {}),
     }
   })
 }

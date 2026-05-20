@@ -8,6 +8,7 @@ trask_indexer/chroma_store.py
 trask_indexer/chunk.py
 trask_indexer/cli.py
 trask_indexer/crawl.py
+trask_indexer/discord_index.py
 trask_indexer/embed.py
 trask_indexer/retrieve_api.py
 trask_indexer.egg-info/PKG-INFO

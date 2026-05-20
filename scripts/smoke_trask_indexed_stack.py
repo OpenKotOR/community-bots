@@ -9,6 +9,7 @@ Usage (after bootstrap_trask_indexer.sh + export allowlist):
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
@@ -28,71 +29,45 @@ from trask_indexer.chroma_store import (
 )
 from trask_indexer.crawl import crawl_url
 
-DEFAULT_QUERY = "What is TSLPatcher used for in KOTOR modding?"
-DEFAULT_URL = "https://kotor.neocities.org/modding/tslpatcher/"
+DEFAULT_URL = "https://deadlystream.com/files/file/1982-tslpatcher/"
 
-# Minimal passages for Holocron e2e + verify_trask_cli_qa (two distinct https hosts each).
-GOLDEN_FIXTURES: list[dict[str, str]] = [
-    {
-        "query": "What is TSLPatcher used for in KOTOR modding?",
-        "url": "https://kotor.neocities.org/modding/tslpatcher/",
-        "host": "kotor.neocities.org",
-        "source_id": "kotor-neocities",
-        "markdown": (
-            "# TSLPatcher\n\n"
-            "TSLPatcher is a mod installation tool for Knights of the Old Republic and TSL. "
-            "It applies 2DA, GFF, and TLK patches via list files without manual copying."
-        ),
-        "must_contain": "tslpatcher",
-    },
-    {
-        "query": "What is MDLOps used for in the KotOR toolchain?",
-        "url": "https://deadlystream.com/topic/mdlops-reference/",
-        "host": "deadlystream.com",
-        "source_id": "deadly-stream",
-        "markdown": (
-            "# MDLOps\n\n"
-            "MDLOps converts KotOR MDL/MDX models for editing in Max/Blender pipelines and back to game formats."
-        ),
-        "must_contain": "mdlops",
-    },
-    {
-        "query": "How do I troubleshoot KOTOR widescreen resolution issues on PC?",
-        "url": "https://kotor.neocities.org/modding/widescreen/",
-        "host": "kotor.neocities.org",
-        "source_id": "kotor-neocities",
-        "markdown": (
-            "# Widescreen\n\n"
-            "Widescreen mods adjust aspect ratio and HUD scaling; resolution issues often need "
-            "correct aspect patch and graphics ini settings on Windows."
-        ),
-        "must_contain": "widescreen",
-    },
-    {
-        "query": "Where are Knights of the Old Republic save files stored on Windows?",
-        "url": "https://deadlystream.com/topic/kotor-save-locations/",
-        "host": "deadlystream.com",
-        "source_id": "deadly-stream",
-        "markdown": (
-            "# Save files\n\n"
-            "KOTOR save games on Windows are typically under Documents in a KOTOR or Saves folder "
-            "for the active profile."
-        ),
-        "must_contain": "save",
-    },
-    {
-        "query": "What does the reone project provide for Odyssey engine work?",
-        "url": "https://github.com/reone/reone",
-        "host": "github.com",
-        "source_id": "github-reone",
-        "markdown": (
-            "# reone Odyssey engine\n\n"
-            "The reone project is an open-source reimplementation of the Odyssey engine for KotOR and TSL. "
-            "reone provides runtime, rendering, and scripting research tools for engine modding experiments."
-        ),
-        "must_contain": "reone",
-    },
-]
+
+def _load_golden_fixtures() -> list[dict[str, str]]:
+    golden_path = REPO_ROOT / "data" / "trask" / "eval" / "golden-queries.json"
+    with golden_path.open(encoding="utf-8") as handle:
+        payload = json.load(handle)
+    fixtures: list[dict[str, str]] = []
+    for entry in payload.get("queries", []):
+        fixture = entry.get("fixture")
+        if not fixture:
+            continue
+        fixtures.append(
+            {
+                "query": entry["question"],
+                "url": fixture["url"],
+                "host": fixture["host"],
+                "source_id": fixture["sourceId"],
+                "markdown": fixture["markdown"],
+                "must_contain": fixture["mustContain"],
+            }
+        )
+        companion = entry.get("companionFixture")
+        if companion:
+            fixtures.append(
+                {
+                    "query": entry["question"],
+                    "url": companion["url"],
+                    "host": companion["host"],
+                    "source_id": companion["sourceId"],
+                    "markdown": companion["markdown"],
+                    "must_contain": companion["mustContain"],
+                }
+            )
+    return fixtures
+
+
+GOLDEN_FIXTURES: list[dict[str, str]] = _load_golden_fixtures()
+DEFAULT_QUERY = GOLDEN_FIXTURES[0]["query"] if GOLDEN_FIXTURES else ""
 
 
 def pick_seed_url(catalog) -> str:

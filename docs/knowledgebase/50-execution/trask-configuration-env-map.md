@@ -7,6 +7,18 @@ lastUpdated: 2026-05-19
 
 [SYNTH] Quick map of **Trask-related** process env vars to loaders in `packages/config/src/index.ts`. For narrative setup, see [docs/trask.md](../../trask.md).
 
+# Dynamic product config (`@openkotor/trask-config`)
+
+| Variable | Notes |
+|----------|--------|
+| `TRASK_GOLDEN_QUERIES_PATH` | [REPO] Override `data/trask/eval/golden-queries.json` (e2e, CLI, smoke, faithfulness). |
+| `TRASK_POLICY_PATH` | [REPO] Override `data/trask/policy.json` (min citations, Discord caps, degraded patterns). |
+| `TRASK_SURFACE_PROFILES_PATH` | [REPO] Override `data/trask/profiles/surfaces.json`. |
+| `TRASK_LINGUISTICS_PATH` | [REPO] Override `data/trask/linguistics.json` (intent terms, anchor tokens). |
+| `TRASK_RETRIEVAL_DEFAULTS_PATH` | [REPO] Override `data/trask/retrieval.defaults.json` (Node + `trask_web_research.py`). |
+| `TRASK_PROMPT_DIR` | [REPO] Override `data/trask/prompts/` compose templates. |
+| `TRASK_MIN_WEB_CITATIONS` | [REPO] Overrides `policy.json` `minWebCitations` at load time. |
+
 # Shared
 
 | Variable | Consumed by | Notes |
@@ -25,8 +37,11 @@ lastUpdated: 2026-05-19
 | `TRASK_INDEXER_BASE_URL` | [REPO] Trask indexer retrieve API (default `http://127.0.0.1:8790`). |
 | `TRASK_WEB_RESEARCH_PYTHON` | [REPO] Override Python; else `.venv-trask-research` from `scripts/bootstrap_trask_research.sh`. |
 | `TRASK_WEB_RESEARCH_SCRIPT` | [REPO] Optional explicit path to `scripts/trask_web_research.py`. |
-| `TRASK_RESEARCH_TIMEOUT_MS` | [REPO] Research subprocess timeout (aliases `TRASK_RESEARCHWIZARD_TIMEOUT_MS`, default **900000**). |
-| `TRASK_RESEARCHWIZARD_TIMEOUT_MS` | [REPO] Default **90000** ms in config loader; Discord clamps to **90s** SLA at runtime. |
+| `TRASK_RESEARCH_TIMEOUT_MS` | [REPO] Legacy overall budget (aliases `TRASK_RESEARCHWIZARD_TIMEOUT_MS`, default **900000**). |
+| `TRASK_RESEARCH_GATHER_MS` | [REPO] Python gather subprocess wall clock (default **120000**). Discord clamps to **90s** SLA. |
+| `TRASK_RESEARCH_COMPOSE_MS` | [REPO] Node LLM rewrite compose ceiling (default **60000**). |
+| `TRASK_RESEARCHWIZARD_TIMEOUT_MS` | [REPO] Alias for `TRASK_RESEARCH_TIMEOUT_MS`. |
+| `TRASK_FORCE_URL_VERIFY` | [REPO] When `1`, Node re-HEADs passages even if Python set `verified: true`. |
 | `TRASK_GROUNDED_COMPOSE` | [REPO] When `0` / `false` / `no`, disables grounded compose. Default **on** (`groundedComposeEnabled` in `loadResearchWizardRuntimeConfig`). |
 | `TRASK_RESEARCH_COMPOSE_MODE` | [REPO] `rewrite` enables legacy digest rewrite fallbacks; default `grounded`. |
 | `TRASK_WEB_RESEARCH_DDG_FALLBACK` | [REPO] When `1` / `true`, Python runner may use DuckDuckGo only after empty Chroma retrieve (operator bootstrap; not used for compose when index miss). |

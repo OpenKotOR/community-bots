@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { Message as MessageType, MessageResearchStep, Source } from '@/lib/types'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -49,8 +49,110 @@ function researchPhaseLabel(phaseRaw: string): string {
   }
 }
 
+function formatDiagValue(value: string | number | boolean): string {
+  if (typeof value === 'boolean') return value ? 'yes' : 'no'
+  return String(value)
+}
+
+function ResearchStepDiagnostics({ step }: { step: MessageResearchStep }) {
+  const diagEntries = step.diag ? Object.entries(step.diag) : []
+  const urls = step.urls ?? []
+  if (diagEntries.length === 0 && urls.length === 0 && (!step.sources || step.sources.length === 0)) {
+    return null
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: 'auto' }}
+      transition={{ duration: 0.2 }}
+      className="mt-1 space-y-1"
+    >
+      {diagEntries.length > 0 && (
+        <dl className="grid grid-cols-[minmax(5.5rem,auto)_1fr] gap-x-2 gap-y-0.5 rounded border border-border/40 bg-muted/30 px-1.5 py-1 font-mono text-xs leading-snug text-muted-foreground">
+          {diagEntries.map(([key, value]) => (
+            <div key={key} className="contents">
+              <dt className="truncate text-foreground/70" title={key}>
+                {key}
+              </dt>
+              <dd className="break-all text-foreground/85">{formatDiagValue(value)}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {urls.length > 0 && (
+        <ul className="max-h-36 space-y-0.5 overflow-y-auto overscroll-contain rounded border border-border/40 bg-background/40 px-1.5 py-1">
+          {urls.map((url) => (
+            <li key={url} className="truncate font-mono text-xs leading-snug">
+              {url.startsWith('http') ? (
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:text-accent hover:underline"
+                  title={url}
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  {url}
+                </a>
+              ) : (
+                <span title={url}>{url}</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {step.sources && step.sources.length > 0 && (
+        <ul className="space-y-0.5 font-mono text-xs text-muted-foreground">
+          {step.sources.map((source) => (
+            <li key={`${source.id}:${source.url}`} className="truncate" title={source.url}>
+              <span className="text-foreground/75">{source.name}</span>
+              <span className="text-muted-foreground/80"> · </span>
+              <a
+                href={source.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+                onClick={(event) => event.stopPropagation()}
+              >
+                {source.url}
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </motion.div>
+  )
+}
+
 function timelineStepKey(step: MessageResearchStep, idx: number): string {
   return step.id || `${step.phase}:${step.at}:${idx}`
+}
+
+function failureReasonFromResearchSteps(steps: readonly MessageResearchStep[]): string | null {
+  const lastCompose = [...steps].reverse().find((step) => step.phase === 'compose')
+  const detail = lastCompose?.detail?.trim()
+  if (detail && !/^done ·/i.test(detail)) {
+    if (/timed out|failed|gather timed out/i.test(detail)) {
+      return detail.slice(0, 240)
+    }
+  }
+  const diag = lastCompose?.diag
+  if (diag) {
+    const error = diag.error
+    if (typeof error === 'string' && error.trim()) {
+      return error.trim().slice(0, 240)
+    }
+    const grounding = diag.grounding_status
+    if (typeof grounding === 'string' && grounding === 'failed') {
+      const cited = diag.cited_sources
+      if (typeof cited === 'number') {
+        return `Insufficient grounded citations (${cited} cited).`
+      }
+      return 'Grounding failed — not enough on-topic citations.'
+    }
+  }
+  return null
 }
 
 interface DisplaySource extends Source {
@@ -347,14 +449,42 @@ function MessageView({ message, onToggleExpand }: MessageProps) {
     })
   }
 
+  const researchTraceOutcome = useMemo(() => {
+    if (message.researchStatus === 'pending') return 'pending'
+    if (message.researchStatus === 'failed' || message.groundingStatus === 'failed') return 'failed'
+    if (message.groundingStatus === 'partial') return 'partial'
+    return 'complete'
+  }, [message.groundingStatus, message.researchStatus])
+
+  const traceFailureReason = useMemo(
+    () => failureReasonFromResearchSteps(sortedResearchSteps),
+    [sortedResearchSteps],
+  )
+
+  const openedTraceAfterCompleteRef = useRef(false)
+
+  const answerRegionA11y =
+    message.researchStatus === 'pending'
+      ? { 'aria-busy': true as const, 'aria-live': 'polite' as const }
+      : !isUser && message.researchStatus !== 'pending'
+        ? { 'aria-live': 'polite' as const }
+        : {}
+
   useEffect(() => {
-    if (message.researchStatus === 'pending' && hasResearchTimeline) {
+    if (!hasResearchTimeline) return
+    if (message.researchStatus === 'pending') {
+      setIsResearchPanelOpen(true)
+      return
+    }
+    if (
+      !openedTraceAfterCompleteRef.current
+      && message.researchStatus !== 'pending'
+      && sortedResearchSteps.length > 0
+    ) {
+      openedTraceAfterCompleteRef.current = true
       setIsResearchPanelOpen(true)
     }
-    if (message.researchStatus && message.researchStatus !== 'pending') {
-      setIsResearchPanelOpen(false)
-    }
-  }, [hasResearchTimeline, message.researchStatus])
+  }, [hasResearchTimeline, message.researchStatus, sortedResearchSteps.length])
 
   if (isSystem) {
     return (
@@ -379,15 +509,25 @@ function MessageView({ message, onToggleExpand }: MessageProps) {
     }
 
     return (
-      <Card className="w-full max-w-4xl mx-auto border-border/60 bg-muted/20 backdrop-blur-sm shadow-[0_8px_30px_-18px_rgba(0,0,0,0.55)]">
-        <div className="px-4 py-3">
+      <Card className="w-full max-w-4xl mx-auto gap-0 border-border/60 bg-muted/20 py-0 shadow-[0_8px_30px_-18px_rgba(0,0,0,0.55)] backdrop-blur-sm">
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="px-2 py-1.5"
+          aria-label="Thought process"
+          role="region"
+        >
           <Collapsible
             open={isResearchPanelOpen}
             onOpenChange={setIsResearchPanelOpen}
           >
-            <CollapsibleTrigger className="flex min-h-8 items-center justify-between w-full group/trigger -mx-2 rounded px-2 py-1 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45">
+            <CollapsibleTrigger
+              className="flex min-h-7 w-full items-center justify-between rounded px-1 py-0.5 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45 group/trigger"
+              aria-live={researchTraceOutcome === 'pending' ? 'polite' : undefined}
+            >
               <div className="flex items-center gap-2 min-w-0">
-                {message.researchStatus === 'pending' ? (
+                {researchTraceOutcome === 'pending' ? (
                   <motion.div
                     animate={{ rotate: 360 }}
                     transition={{ duration: 1.4, repeat: Infinity, ease: 'linear' }}
@@ -395,13 +535,17 @@ function MessageView({ message, onToggleExpand }: MessageProps) {
                   >
                     <MagnifyingGlass size={14} weight="bold" />
                   </motion.div>
+                ) : researchTraceOutcome === 'failed' ? (
+                  <XCircle size={14} weight="fill" className="text-destructive" />
+                ) : researchTraceOutcome === 'partial' ? (
+                  <ListDashes size={14} weight="bold" className="text-yellow-500" />
                 ) : (
                   <CheckCircle size={14} weight="fill" className="text-accent" />
                 )}
                 <span className="text-xs font-medium">
-                  {message.researchStatus === 'pending' ? 'Thinking' : 'Thought process'}
+                  {researchTraceOutcome === 'pending' ? 'Thinking' : 'Thought process'}
                 </span>
-                <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+                <Badge variant="secondary" className="h-5 px-1.5 text-xs">
                   {sortedResearchSteps.length} step{sortedResearchSteps.length === 1 ? '' : 's'}
                 </Badge>
               </div>
@@ -417,12 +561,12 @@ function MessageView({ message, onToggleExpand }: MessageProps) {
                 initial={prefersReducedMotion ? false : { opacity: 0, height: 0 }}
                 animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, height: 'auto' }}
                 exit={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, height: 0 }}
-                className="mt-2 max-h-72 space-y-2 overflow-y-auto overscroll-contain pr-1.5"
+                className="mt-1 max-h-[min(28rem,55vh)] space-y-1 overflow-y-auto overscroll-contain pr-0.5"
               >
                 {sortedResearchSteps.map((step, idx) => {
                   const isLast = idx === sortedResearchSteps.length - 1
                   return (
-                    <div key={timelineStepKey(step, idx)} className="relative pl-4">
+                    <div key={timelineStepKey(step, idx)} className="relative pl-3.5">
                       {!isLast && (
                         <span className="absolute left-[5px] top-4 h-[calc(100%-2px)] w-px bg-border/70" aria-hidden />
                       )}
@@ -432,19 +576,17 @@ function MessageView({ message, onToggleExpand }: MessageProps) {
                         }`}
                         aria-hidden
                       />
-                      <div className="rounded-md bg-background/50 px-2.5 py-2 border border-border/50">
+                      <div className="rounded border border-border/50 bg-background/50 px-1.5 py-1">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-[11px] font-semibold text-foreground/90 uppercase tracking-wide">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-foreground/90">
                             {researchPhaseLabel(step.phase)}
                           </p>
-                          <span className="text-[10px] text-muted-foreground">{formatTime(step.at)}</span>
+                          <span className="text-xs text-muted-foreground">{formatTime(step.at)}</span>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{step.detail}</p>
-                        {step.sources && step.sources.length > 0 && (
-                          <p className="text-[10px] text-muted-foreground/80 mt-1">
-                            {step.sources.length} source{step.sources.length === 1 ? '' : 's'} touched
-                          </p>
-                        )}
+                        <p className="mt-0.5 break-words font-mono text-xs leading-snug text-muted-foreground">
+                          {step.detail}
+                        </p>
+                        <ResearchStepDiagnostics step={step} />
                       </div>
                     </div>
                   )
@@ -452,7 +594,7 @@ function MessageView({ message, onToggleExpand }: MessageProps) {
               </motion.div>
             </CollapsibleContent>
           </Collapsible>
-        </div>
+        </motion.div>
       </Card>
     )
   }
@@ -511,7 +653,13 @@ function MessageView({ message, onToggleExpand }: MessageProps) {
     if (isUser || message.researchStatus === 'pending') return null
     const cited = answerPresentation.sources.length
     const consulted = message.consultedSourceCount ?? (cited + relatedSources.length)
-    const status = message.groundingStatus ?? (message.researchStatus === 'failed' ? 'failed' : 'partial')
+    const status =
+      message.groundingStatus
+      ?? (message.researchStatus === 'failed'
+        ? 'failed'
+        : cited >= 2
+          ? 'grounded'
+          : 'failed')
     return (
       <p
         className="mb-3 text-xs text-muted-foreground"
@@ -524,9 +672,27 @@ function MessageView({ message, onToggleExpand }: MessageProps) {
 
   const renderFailedBanner = () => {
     if (message.researchStatus !== 'failed' && message.groundingStatus !== 'failed') return null
+    const reason = traceFailureReason
     return (
-      <p className="mb-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-        Research could not produce a fully grounded answer. Review sources or rephrase your question.
+      <p
+        className="mb-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        role="alert"
+      >
+        {reason
+          ? reason
+          : 'Research could not produce a fully grounded answer. Review sources or rephrase your question.'}
+      </p>
+    )
+  }
+
+  const renderPartialBanner = () => {
+    if (message.groundingStatus !== 'partial') return null
+    return (
+      <p
+        className="mb-3 rounded-md border border-yellow-500/50 bg-yellow-500/15 px-3 py-2 text-sm text-yellow-100"
+        role="status"
+      >
+        Answer used limited grounded citations. Expand Thought process or rephrase for stronger sources.
       </p>
     )
   }
@@ -534,8 +700,13 @@ function MessageView({ message, onToggleExpand }: MessageProps) {
   const renderAnswerBody = () => {
     if (!answerPresentation.hasAnswerText) {
       return (
-        <div className="min-w-0 flex-1 text-[15px] leading-7 text-foreground/95">
+        <div
+          className="min-w-0 flex-1 text-[15px] leading-7 text-foreground/95"
+          aria-label="Answer"
+          {...answerRegionA11y}
+        >
           {renderFailedBanner()}
+          {renderPartialBanner()}
           {renderProvenanceStrip()}
           <p className="rounded-md border border-primary/25 bg-background/55 px-3 py-2 text-sm leading-6 text-muted-foreground">
             {fallbackVisibleText}
@@ -550,8 +721,13 @@ function MessageView({ message, onToggleExpand }: MessageProps) {
       .filter(Boolean)
 
     return (
-      <div className="min-w-0 flex-1 space-y-4 text-[15px] leading-7 text-foreground/95">
+      <div
+        className="min-w-0 flex-1 space-y-4 text-[15px] leading-7 text-foreground/95"
+        aria-label="Answer"
+        {...answerRegionA11y}
+      >
         {renderFailedBanner()}
+        {renderPartialBanner()}
         {renderProvenanceStrip()}
         {blocks.length > 0 ? blocks.map((block, idx) => (
           <p key={`${idx}:${block.slice(0, 24)}`} className="whitespace-pre-wrap">
@@ -719,7 +895,7 @@ function MessageView({ message, onToggleExpand }: MessageProps) {
                   className={`h-6 w-6 transition-opacity ${
                     isUser
                       ? 'text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10'
-                      : 'text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100'
+                      : 'text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
                   }`}
                   aria-label="Copy message"
                   title="Copy message"
@@ -973,7 +1149,7 @@ function MessageView({ message, onToggleExpand }: MessageProps) {
                     className={`h-6 w-6 transition-opacity ${
                       isUser
                         ? 'text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10'
-                        : 'text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100'
+                        : 'text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
                     }`}
                     aria-label="Copy message"
                     title="Copy message"

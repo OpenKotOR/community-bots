@@ -38,6 +38,32 @@ node scripts/trask_ops.mjs setup-venv
 This creates `.venv-trask-research/` at the repo root (`scripts/bootstrap_trask_research.sh`).
 **The venv path is auto-discovered by `loadResearchWizardRuntimeConfig` — no path configuration needed when bootstrap ran.**
 
+### Product config (`data/trask/`)
+
+Versioned Trask policy lives under `data/trask/` and loads via `@openkotor/trask-config`:
+
+| Path | Purpose |
+|------|---------|
+| `data/trask/eval/golden-queries.json` | Canonical five eval questions (e2e, CLI, smoke fixtures, faithfulness) |
+| `data/trask/profiles/surfaces.json` | Holocron / Discord / CLI compose profiles |
+| `data/trask/policy.json` | Min citations, Discord line caps, degraded-answer patterns |
+| `data/trask/linguistics.json` | Intent terms + anchor tokens (wizard + retrieval) |
+| `data/trask/retrieval.defaults.json` | Shared retrieve limits (Node + `trask_web_research.py`) |
+| `data/trask/prompts/*.md` | Compose / grounded LLM templates |
+
+After editing golden questions or fixtures, run `pnpm trask:config-drift`. Env overrides: `docs/knowledgebase/50-execution/trask-configuration-env-map.md`.
+
+**Discord `/ask` research logging**
+
+| Variable | Purpose |
+|----------|---------|
+| `TRASK_RESEARCH_LOG_LEVEL` | Python `trask.research` logger level (`INFO` default, `DEBUG` for full retrieve/verify trail) |
+| `TRASK_RESEARCH_LOG_VERBOSE=1` | Node forwards DEBUG stderr lines into `trask-bot` logs |
+| `TRASK_RESEARCH_TRACE_LOG=0` | Disable Node JSON `trask_research_trace` lines on stderr (enabled by default; mirrors Holocron `liveTrace`) |
+| `TRASK_DISCORD_SYNC_INTERVAL_MS` | When &gt; 0, `trask-bot` runs `scripts/trask_discord_sync.py` on startup and on interval (recommended 15–60 min in production) |
+
+Gate: `pnpm verify:trask-discord` (requires indexer + LLM; use `--skip-url-check` only offline).
+
 ### 3. Configure Discord credentials
 
 Run the interactive wizard (opens discord.com/developers/applications in your browser):
@@ -176,7 +202,7 @@ Calls the Discord REST API to confirm all slash commands are registered for each
 
 | Bot | Command to test |
 |-----|----------------|
-| Trask | `/ask query:<your question>` — should return briefing with sources |
+| Trask | `/ask query:<your question>` — compact **Trask Ulgo Briefing** (≤5 lines, inline linked `[1]`/`[2]` on the numbers; no separate Sources embed field). Deep page URLs preferred over bare forum homepages. |
 | HK-86 | `/designations reactions status` — check reaction-role panel |
 | HK-86 | Click a reaction emoji → role should be added/removed |
 | Pazaak | `/pazaak rules` then `/pazaak lobby action:create` |

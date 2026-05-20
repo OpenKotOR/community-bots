@@ -1,7 +1,15 @@
 import { mkdir, open, readFile, readdir, rename, rm, stat, utimes, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import {
+  classifyQueryIntent as classifyQueryIntentFromConfig,
+  intentScoreDelta as intentScoreDeltaFromConfig,
+  type QueryIntent,
+} from "@openkotor/trask-config";
+
 export type SourceKind = "website" | "github" | "discord";
+
+export type SourceIntentBias = QueryIntent;
 
 export interface SourceDescriptor {
   id: string;
@@ -12,6 +20,10 @@ export interface SourceDescriptor {
   freshnessPolicy: string;
   approvalScope: string;
   tags: readonly string[];
+  /** Optional ranking hint for query-intent routing (see data/trask/linguistics.json). */
+  intentBias?: SourceIntentBias;
+  /** Optional host authority override (0–10); catalog default used when unset. */
+  authorityWeight?: number;
 }
 
 const normalizeHost = (host: string): string => host.trim().toLowerCase().replace(/^www\./, "");
@@ -233,72 +245,7 @@ const RETRIEVAL_STOPWORDS = new Set([
   "pc",
 ]);
 
-type RetrievalQueryIntent = "tooling" | "technical" | "lore" | "general";
-
-const TOOLING_QUERY_TERMS = [
-  "mdlops",
-  "mdledit",
-  "kotormax",
-  "kotorblender",
-  "pykotor",
-  "tslpatcher",
-  "toolchain",
-  "modding",
-  "mod",
-  "convert",
-  "conversion",
-  "texture",
-  "tpc",
-  "tga",
-  "mdl",
-  "mdx",
-  "gff",
-  "2da",
-  "tlk",
-  "nss",
-  "script",
-  "engine",
-  "reone",
-  "xoreos",
-];
-
-const TECHNICAL_QUERY_TERMS = [
-  "widescreen",
-  "resolution",
-  "hud",
-  "aspect",
-  "compatibility",
-  "save",
-  "windows",
-  "linux",
-  "mac",
-  "crash",
-  "install",
-  "driver",
-  "cutscene",
-  "movies",
-  "graphics",
-  "display",
-];
-
-const LORE_QUERY_TERMS = [
-  "bastila",
-  "revan",
-  "malak",
-  "kreia",
-  "exile",
-  "canderous",
-  "hk-47",
-  "rakata",
-  "star",
-  "forge",
-  "temple",
-  "summit",
-  "companion",
-  "romance",
-  "story",
-  "lore",
-];
+type RetrievalQueryIntent = QueryIntent;
 
 const normalizeToken = (token: string): string => {
   const lowered = token.toLowerCase();
@@ -316,32 +263,14 @@ const tokenize = (value: string): string[] => {
   )];
 };
 
-const queryIncludesAny = (query: string, terms: readonly string[]): boolean => {
-  const lowered = query.toLowerCase();
-  return terms.some((term) => lowered.includes(term));
-};
+const classifyQueryIntent = (query: string): RetrievalQueryIntent => classifyQueryIntentFromConfig(query);
 
-const classifyQueryIntent = (query: string): RetrievalQueryIntent => {
-  if (queryIncludesAny(query, TOOLING_QUERY_TERMS)) return "tooling";
-  if (queryIncludesAny(query, TECHNICAL_QUERY_TERMS)) return "technical";
-  if (queryIncludesAny(query, LORE_QUERY_TERMS)) return "lore";
-  return "general";
-};
+const intentScoreDelta = (intent: RetrievalQueryIntent, tags: readonly string[]): number =>
+  intentScoreDeltaFromConfig(intent, tags);
 
-const intentScoreDelta = (intent: RetrievalQueryIntent, tags: readonly string[]): number => {
-  const tagSet = new Set(tags.map((tag) => tag.toLowerCase()));
-  const hasLore = ["lore", "story", "characters", "companions", "quests", "walkthrough", "gameplay"].some((tag) => tagSet.has(tag));
-  const hasTooling = ["tooling", "formats", "reference", "automation", "python", "engine", "conversion", "assets", "textures", "mods", "forum", "support", "fixes", "troubleshooting", "compatibility"].some((tag) => tagSet.has(tag));
-
-  if (intent === "tooling" || intent === "technical") {
-    if (hasLore && !hasTooling) return -12;
-    if (hasTooling) return 6;
-  }
-  if (intent === "lore") {
-    if (hasLore) return 6;
-    if (hasTooling && !hasLore) return -4;
-  }
-  return 0;
+export const loreSourceIdsFromCatalog = (sources: readonly SourceDescriptor[]): readonly string[] => {
+  const fromCatalog = sources.filter((source) => source.intentBias === "lore").map((source) => source.id);
+  return fromCatalog.length > 0 ? fromCatalog : [];
 };
 
 export const defaultSourceCatalog: readonly SourceDescriptor[] = [
@@ -514,6 +443,7 @@ export const defaultSourceCatalog: readonly SourceDescriptor[] = [
     freshnessPolicy: "on-demand scrape for cited articles; weekly refresh of KOTOR-era pages",
     approvalScope: "public encyclopedia articles",
     tags: ["lore", "characters", "story", "wiki", "history"],
+    intentBias: "lore",
   },
   {
     id: "strategywiki-kotor",
@@ -524,6 +454,7 @@ export const defaultSourceCatalog: readonly SourceDescriptor[] = [
     freshnessPolicy: "weekly crawl for walkthrough and strategy pages",
     approvalScope: "public wiki articles",
     tags: ["walkthrough", "gameplay", "strategy", "guides", "companions", "quests"],
+    intentBias: "lore",
   },
   {
     id: "approved-discord-knowledge",
@@ -550,6 +481,7 @@ export const traskApprovedResearchBaseHosts: readonly string[] = [
   "deadlystream.com",
   "github.com",
   "kotor.neocities.org",
+  "steamcommunity.com",
   // pcgamingwiki.com excluded: Cloudflare-protected, returns JS challenge on automated requests.
   "en.wikipedia.org",
   "strategywiki.org",

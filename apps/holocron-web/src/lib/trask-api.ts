@@ -19,6 +19,8 @@ export interface TraskHistoryLiveEventDto {
   phase: string
   detail?: string
   sources?: Array<{ id: string; name: string; url: string }>
+  diag?: Record<string, string | number | boolean>
+  urls?: string[]
 }
 
 export interface TraskHistoryRecordDto {

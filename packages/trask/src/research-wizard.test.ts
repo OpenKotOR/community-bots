@@ -19,6 +19,12 @@ import {
   _classifyQueryIntent,
   _routeSourcesForQuery,
   _alignCitedSourcesToAnswer,
+  _materializeSourcesFromUrls,
+  emitResearchTraceLog,
+  wrapResearchProgress,
+  _diagFromResearchPayload,
+  _emitRetrieveSummary,
+  _isGatherTimeoutResearchError,
 } from "./research-wizard.js";
 import type { SourceDescriptor } from "../../retrieval/src/index.js";
 
@@ -378,4 +384,131 @@ test("_alignCitedSourcesToAnswer returns empty when body has no citations", () =
   const sources = [fakeSource("Deadly Stream", "https://deadlystream.com/topic/1")];
   const answer = "I found pages but cannot cite them yet.\n\nSources\n1. Deadly Stream - https://deadlystream.com/topic/1";
   assert.deepEqual(_alignCitedSourcesToAnswer(answer, sources), []);
+});
+
+test("_materializeSourcesFromUrls prefers deep pages over shallow catalog roots", () => {
+  const pool = [
+    fakeSource("Deadly Stream", "https://deadlystream.com"),
+    fakeSource("Neocities", "https://kotor.neocities.org"),
+  ];
+  const matched = _materializeSourcesFromUrls(
+    [
+      "https://deadlystream.com/",
+      "https://kotor.neocities.org/modding/tslpatcher/",
+    ],
+    pool,
+  );
+  assert.equal(matched.length, 1);
+  assert.equal(matched[0]?.homeUrl, "https://kotor.neocities.org/modding/tslpatcher");
+});
+
+test("wrapResearchProgress awaits async onProgress before returning", async () => {
+  const order: string[] = [];
+  let releaseFirst: (() => void) | undefined;
+  const firstGate = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+  const report = wrapResearchProgress(async (event) => {
+    order.push(`start:${event.phase}`);
+    if (event.phase === "gather") {
+      await firstGate;
+    }
+    order.push(`end:${event.phase}`);
+  });
+  const gatherDone = report({ phase: "gather", detail: "a" });
+  const composeDone = report({ phase: "compose", detail: "b" });
+  await Promise.resolve();
+  assert.deepEqual(order, ["start:gather"]);
+  releaseFirst?.();
+  await gatherDone;
+  await composeDone;
+  assert.deepEqual(order, ["start:gather", "end:gather", "start:compose", "end:compose"]);
+});
+
+test("_diagFromResearchPayload maps indexer and passage counts", () => {
+  const diag = _diagFromResearchPayload(
+    {
+      passages: [{ url: "https://example.com/a", quote: "a" }],
+      research_information: {
+        indexer_url: "http://127.0.0.1:8787",
+        passages_count: 1,
+        retrieve_limit: 12,
+        index_miss: false,
+        local_chroma_enabled: true,
+        ddg_fallback_enabled: false,
+      },
+      report: "short report",
+    },
+    "http://127.0.0.1:8790",
+  );
+  assert.equal(diag.indexer, "http://127.0.0.1:8787");
+  assert.equal(diag.passages, 1);
+  assert.equal(diag.retrieve_limit, 12);
+  assert.equal(diag.local_chroma, true);
+  assert.equal(diag.report_chars, "short report".length);
+});
+
+test("_emitRetrieveSummary emits gather detail and urls", async () => {
+  const events: Array<{ phase?: string; detail?: string; urls?: readonly string[]; diag?: Record<string, unknown> }> = [];
+  await _emitRetrieveSummary(
+    {
+      passages: [
+        { url: "https://deadlystream.com/tslpatcher", quote: "patch" },
+        { url: "discord://channel/1", quote: "discord" },
+      ],
+      research_information: { indexer_url: "http://127.0.0.1:8787", passages_count: 2 },
+    },
+    "http://127.0.0.1:8787",
+    async (event) => {
+      events.push(event);
+    },
+  );
+  assert.equal(events.length, 1);
+  assert.equal(events[0]?.phase, "gather");
+  assert.match(String(events[0]?.detail), /2 passage\(s\)/);
+  assert.deepEqual(events[0]?.urls, [
+    "https://deadlystream.com/tslpatcher",
+    "discord://channel/1",
+  ]);
+  assert.equal(events[0]?.diag?.indexer, "http://127.0.0.1:8787");
+});
+
+test("_isGatherTimeoutResearchError matches subprocess gather budget message", () => {
+  assert.equal(
+    _isGatherTimeoutResearchError("Trask web research runner timed out after 90000ms (gather)"),
+    true,
+  );
+  assert.equal(_isGatherTimeoutResearchError("rewrite timed out after 120000ms"), false);
+});
+
+test("_emitRetrieveSummary no-ops without onProgress", async () => {
+  await _emitRetrieveSummary(
+    { passages: [], research_information: { indexer_url: "http://127.0.0.1:8787" } },
+    "http://127.0.0.1:8787",
+  );
+});
+
+test("emitResearchTraceLog is disabled when TRASK_RESEARCH_TRACE_LOG=0", () => {
+  const original = process.env.TRASK_RESEARCH_TRACE_LOG;
+  const errors: string[] = [];
+  const originalError = console.error;
+  console.error = (...args: unknown[]) => {
+    errors.push(String(args[0]));
+  };
+  try {
+    process.env.TRASK_RESEARCH_TRACE_LOG = "0";
+    emitResearchTraceLog({ phase: "gather", detail: "quiet" });
+    assert.equal(errors.length, 0);
+    delete process.env.TRASK_RESEARCH_TRACE_LOG;
+    emitResearchTraceLog({ phase: "gather", detail: "loud" });
+    assert.equal(errors.length, 1);
+    assert.match(errors[0]!, /"type":"trask_research_trace"/);
+  } finally {
+    console.error = originalError;
+    if (original === undefined) {
+      delete process.env.TRASK_RESEARCH_TRACE_LOG;
+    } else {
+      process.env.TRASK_RESEARCH_TRACE_LOG = original;
+    }
+  }
 });

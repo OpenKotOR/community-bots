@@ -11,7 +11,7 @@ import {
   resolveCorsHeaders,
 } from "@openkotor/platform";
 import { createChunkSearchProvider } from "@openkotor/retrieval";
-import { createResearchWizardClient } from "@openkotor/trask";
+import { createResearchWizardClient, setTraskResearchLogSink } from "@openkotor/trask";
 import { createTraskHttpRouter, type TraskHttpAuth } from "@openkotor/trask-http";
 import express, { type Request, type Response } from "express";
 
@@ -62,7 +62,18 @@ const resolveFromRoot = (p: string) => (path.isAbsolute(p) ? p : path.resolve(re
 
 const queryRepository = new JsonTraskQueryRepository(resolveDataFile(resolveFromRoot(config.dataDir), "trask-queries.json"));
 const searchProvider = createChunkSearchProvider(resolveFromRoot(config.chunkDir));
-const researchWizard = createResearchWizardClient(config.researchWizard, config.ai, searchProvider);
+const researchWizard = createResearchWizardClient(config.researchWizard, config.ai);
+
+const researchLogVerbose = (process.env.TRASK_RESEARCH_LOG_VERBOSE ?? "").trim().toLowerCase();
+if (researchLogVerbose === "1" || researchLogVerbose === "true" || researchLogVerbose === "yes") {
+  setTraskResearchLogSink((line, level) => {
+    if (level === "debug") {
+      logger.debug(line);
+    } else {
+      logger.info(line);
+    }
+  });
+}
 
 const runtime = {
   searchProvider,

@@ -94,6 +94,19 @@ test("loadResearchWizardRuntimeConfig respects TRASK_RESEARCHWIZARD_TIMEOUT_MS o
   assert.equal(cfg.timeoutMs, 120000);
 });
 
+test("loadResearchWizardRuntimeConfig tiered gather and compose timeouts", () => {
+  const defaults = loadResearchWizardRuntimeConfig({});
+  assert.equal(defaults.gatherTimeoutMs, 120_000);
+  assert.equal(defaults.composeTimeoutMs, 60_000);
+
+  const cfg = loadResearchWizardRuntimeConfig({
+    TRASK_RESEARCH_GATHER_MS: "85000",
+    TRASK_RESEARCH_COMPOSE_MS: "45000",
+  });
+  assert.equal(cfg.gatherTimeoutMs, 85_000);
+  assert.equal(cfg.composeTimeoutMs, 45_000);
+});
+
 test("loadResearchWizardRuntimeConfig sets researchScriptPath to undefined when TRASK_WEB_RESEARCH_SCRIPT is absent", () => {
   const cfg = loadResearchWizardRuntimeConfig({});
   assert.equal(cfg.researchScriptPath, undefined);
@@ -106,7 +119,7 @@ test("loadResearchWizardRuntimeConfig resolves an explicit research script path"
 
 test("loadResearchWizardRuntimeConfig defaults indexer base URL", () => {
   const cfg = loadResearchWizardRuntimeConfig({});
-  assert.equal(cfg.indexerBaseUrl, "http://127.0.0.1:8790");
+  assert.equal(cfg.indexerBaseUrl, "http://127.0.0.1:8787");
 });
 
 test("loadResearchWizardRuntimeConfig respects TRASK_INDEXER_BASE_URL", () => {

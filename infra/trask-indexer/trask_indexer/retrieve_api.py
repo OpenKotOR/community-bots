@@ -20,7 +20,7 @@ PERSIST_DIR = DATA_DIR / "chroma"
 
 class RetrieveRequest(BaseModel):
     query: str = Field(min_length=1)
-    limit: int = Field(default=8, ge=1, le=30)
+    limit: int = Field(default=12, ge=1, le=30)
     host: str | None = None
 
 
@@ -31,6 +31,9 @@ class PassageDto(BaseModel):
     quote: str
     score: float
     sourceId: str
+    guildId: str = ""
+    channelId: str = ""
+    firstMessageId: str = ""
 
 
 class RetrieveResponse(BaseModel):
@@ -75,6 +78,9 @@ def create_app() -> FastAPI:
                     quote=h.quote,
                     score=h.score,
                     sourceId=h.source_id,
+                    guildId=h.guild_id,
+                    channelId=h.channel_id,
+                    firstMessageId=h.first_message_id,
                 )
                 for h in hits
             ]

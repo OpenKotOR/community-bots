@@ -6,6 +6,11 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/.tsbuildinfo"
   },
+  "references": [
+    {
+      "path": "../trask-config"
+    }
+  ],
   "include": [
     "src/**/*.ts"
   ]

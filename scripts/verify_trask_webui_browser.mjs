@@ -12,13 +12,9 @@
  *   node scripts/verify_trask_webui_browser.mjs [--url=http://127.0.0.1:4010] [--headful]
  */
 
-const defaultQueries = [
-  "What is TSLPatcher used for in KOTOR modding?",
-  "How do I troubleshoot KOTOR widescreen resolution issues on PC?",
-  "What is MDLOps used for in the KOTOR toolchain?",
-  "Where are Knights of the Old Republic save files stored on Windows?",
-  "What does the reone project provide for Odyssey engine work?",
-];
+import { verificationQueriesForSurface } from "../packages/trask-config/dist/verification-queries.js";
+
+const defaultQueries = verificationQueriesForSurface("holocron").map((entry) => entry.question);
 
 const argValue = (name, fallback) => {
   const prefix = `--${name}=`;

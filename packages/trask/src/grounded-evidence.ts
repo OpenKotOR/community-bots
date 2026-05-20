@@ -1,10 +1,26 @@
 import type OpenAI from "openai";
 
 import type { SourceDescriptor } from "@openkotor/retrieval";
+import {
+  classifyQueryIntent,
+  genericQueryTokenSet,
+  loadLinguistics,
+  loadPromptTemplate,
+  loadTraskPolicy,
+} from "@openkotor/trask-config";
 
 import { splitResearchAnswer } from "./discord-reply-format.js";
+import {
+  isDiscordJumpUrl,
+  resolvePublicCitationUrl,
+  type DiscordPassageLocator,
+} from "./discord-citation-url.js";
 
-const MIN_WEB_CITATIONS = 2;
+const MIN_WEB_CITATIONS = loadTraskPolicy().minWebCitations;
+export const BRIEF_DISCORD_MIN_CITATIONS = 2;
+export const BRIEF_MAX_CLAIM_LINES = 2;
+/** Full Holocron answers: up to five bullets, at least `MIN_WEB_CITATIONS` distinct https URLs when available. */
+export const HOLOCRON_FULL_MAX_CLAIM_LINES = 5;
 
 export type EvidenceAuthority = "web" | "local" | "discord";
 export type GroundingStatus = "grounded" | "partial" | "failed";
@@ -14,24 +30,24 @@ export interface EvidencePassage {
   url: string;
   host: string;
   authority: EvidenceAuthority;
+  guildId?: string;
+  channelId?: string;
+  firstMessageId?: string;
+  /** Set when Python gather verified reachability at retrieve time. */
+  verified?: boolean;
 }
 
 export interface EvidenceClaim {
   claim: string;
   quote: string;
   url: string;
+  /** Public URL used in Sources / Discord embed (https or discord.com jump). */
+  citationUrl: string;
   sourceIndex: number;
   authority: EvidenceAuthority;
 }
 
-const HOST_AUTHORITY_SCORE: Readonly<Record<string, number>> = {
-  "deadlystream.com": 5,
-  "lucasforumsarchive.org": 5,
-  "kotor.neocities.org": 4,
-  "github.com": 4,
-  "strategywiki.org": 3,
-  "en.wikipedia.org": 2,
-};
+const HOST_AUTHORITY_SCORE: Readonly<Record<string, number>> = loadLinguistics().hostAuthorityScores;
 
 const CITATION_INDEX_RE = /\[(\d{1,3})\]/g;
 
@@ -46,7 +62,22 @@ export interface RetrievePassageRow {
   readonly quote: string;
   readonly url: string;
   readonly host?: string;
+  readonly guildId?: string;
+  readonly channelId?: string;
+  readonly firstMessageId?: string;
+  readonly verified?: boolean;
 }
+
+const passageLocator = (passage: EvidencePassage | RetrievePassageRow): DiscordPassageLocator => {
+  const guildId = "guildId" in passage ? passage.guildId?.trim() : "";
+  const channelId = "channelId" in passage ? passage.channelId?.trim() : "";
+  const firstMessageId = "firstMessageId" in passage ? passage.firstMessageId?.trim() : "";
+  return {
+    ...(guildId ? { guildId } : {}),
+    ...(channelId ? { channelId } : {}),
+    ...(firstMessageId ? { firstMessageId } : {}),
+  };
+};
 
 export const passagesFromRetrieveRows = (rows: readonly RetrievePassageRow[]): EvidencePassage[] => {
   const passages: EvidencePassage[] = [];
@@ -55,15 +86,27 @@ export const passagesFromRetrieveRows = (rows: readonly RetrievePassageRow[]): E
     const url = row.url.trim();
     if (!text || !url) continue;
     const host = (row.host?.trim() || hostFromUrl(url) || "source").toLowerCase();
+    const guildId = row.guildId?.trim();
+    const channelId = row.channelId?.trim();
+    const firstMessageId = row.firstMessageId?.trim();
     passages.push({
       text,
       url,
       host,
       authority: passageAuthority(url),
+      ...(row.verified === true ? { verified: true } : {}),
+      ...(guildId ? { guildId } : {}),
+      ...(channelId ? { channelId } : {}),
+      ...(firstMessageId ? { firstMessageId } : {}),
     });
   }
   return passages;
 };
+
+export const publicCitationUrlForPassage = (passage: EvidencePassage): string =>
+  resolvePublicCitationUrl(passage.url, passageLocator(passage));
+
+export const publicCitationUrlForClaim = (claim: EvidenceClaim): string => claim.citationUrl;
 
 const hostFromUrl = (url: string): string => {
   try {
@@ -144,6 +187,7 @@ export const extractClaimsHeuristic = (
           claim: sentence.replace(/\[\d+\]/g, "").trim(),
           quote: sentence.length > 240 ? `${sentence.slice(0, 237)}…` : sentence,
           url: passage.url,
+          citationUrl: publicCitationUrlForPassage(passage),
           sourceIndex: 0,
           authority: "discord",
         });
@@ -159,13 +203,14 @@ export const extractClaimsHeuristic = (
       if (hits < Math.min(2, tokens.length)) continue;
       if (!sentence.includes('"') && sentence.length < 40) continue;
 
-      claims.push({
-        claim: sentence.replace(/\[\d+\]/g, "").trim(),
-        quote: sentence,
-        url: passage.url,
-        sourceIndex: 0,
-        authority: passage.authority,
-      });
+        claims.push({
+          claim: sentence.replace(/\[\d+\]/g, "").trim(),
+          quote: sentence,
+          url: passage.url,
+          citationUrl: publicCitationUrlForPassage(passage),
+          sourceIndex: 0,
+          authority: passage.authority,
+        });
       if (claims.length >= maxClaims) break;
     }
     if (claims.length >= maxClaims) break;
@@ -178,10 +223,11 @@ const assignSourceIndices = (claims: EvidenceClaim[]): EvidenceClaim[] => {
   const urlToIndex = new Map<string, number>();
   let next = 1;
   return claims.map((claim) => {
-    let index = urlToIndex.get(claim.url);
+    const key = claim.citationUrl || claim.url;
+    let index = urlToIndex.get(key);
     if (!index) {
       index = next;
-      urlToIndex.set(claim.url, index);
+      urlToIndex.set(key, index);
       next += 1;
     }
     return { ...claim, sourceIndex: index };
@@ -235,10 +281,13 @@ export const extractClaimsWithLlm = async (
       .filter((row) => row.claim && row.quote && row.url)
       .map((row) => {
         const url = row.url!.trim();
+        const passage = evidencePassages.find((p) => p.url === url);
+        const citationUrl = passage ? publicCitationUrlForPassage(passage) : url;
         return {
           claim: row.claim!.trim(),
           quote: row.quote!.trim(),
           url,
+          citationUrl,
           sourceIndex: 0,
           authority: passageAuthority(url),
         };
@@ -252,12 +301,155 @@ export const extractClaimsWithLlm = async (
   }
 };
 
+export type GroundedComposeProfile = "full" | "brief";
+
+const queryTokens = (query: string): string[] =>
+  query
+    .toLowerCase()
+    .split(/[^a-z0-9]+/u)
+    .filter((token) => token.length > 2);
+
+const haystackIncludesToken = (haystack: string, token: string): boolean => {
+  const escaped = token.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  return new RegExp(`\\b${escaped}\\b`, "iu").test(haystack);
+};
+
+const anchorTokensForQuery = (query: string): string[] => {
+  const tokens = queryTokens(query).filter((token) => !genericQueryTokenSet().has(token));
+  if (tokens.length === 0) return queryTokens(query);
+  return [...tokens].sort((left, right) => right.length - left.length);
+};
+
+/** Distinctive tokens for anchoring (intent vocabulary + long non-generic query tokens). */
+export const distinctiveAnchorTokens = (query: string): string[] => {
+  const intent = classifyQueryIntent(query);
+  const linguistics = loadLinguistics();
+  const intentVocabulary =
+    intent === "general" ? [] : [...linguistics.intentTerms[intent]];
+  const fromQuery = anchorTokensForQuery(query);
+  const generic = genericQueryTokenSet();
+
+  const distinctive = fromQuery.filter(
+    (token) =>
+      intentVocabulary.some((term: string) => term.includes(token) || token.includes(term))
+      || (token.length >= 5 && !generic.has(token)),
+  );
+
+  if (distinctive.length > 0) {
+    return [...new Set(distinctive)];
+  }
+  return fromQuery.length > 0 ? [fromQuery[0]!] : [];
+};
+
+/** Brief compose: prefer claims that mention the query's distinctive token(s). */
+export const claimMatchesQueryAnchor = (claim: EvidenceClaim, query: string): boolean => {
+  const haystack = `${claim.claim} ${claim.quote}`.toLowerCase();
+  const anchors = distinctiveAnchorTokens(query);
+  return anchors.some((token) => haystackIncludesToken(haystack, token));
+};
+
+export const passageMatchesQueryAnchor = (passage: EvidencePassage, query: string): boolean => {
+  const haystack = passage.text.toLowerCase();
+  return distinctiveAnchorTokens(query).some((token) => haystackIncludesToken(haystack, token));
+};
+
+export const rankClaimsForQuery = (
+  claims: readonly EvidenceClaim[],
+  query: string,
+): EvidenceClaim[] => {
+  const tokens = queryTokens(query);
+  if (tokens.length === 0) return [...claims];
+
+  const scoreClaim = (claim: EvidenceClaim): number => {
+    const haystack = `${claim.claim} ${claim.quote}`.toLowerCase();
+    let hits = 0;
+    for (const token of tokens) {
+      if (haystackIncludesToken(haystack, token)) hits += 1;
+    }
+    const anchorBonus = claimMatchesQueryAnchor(claim, query) ? 12 : 0;
+    return hits * 5 + anchorBonus + authorityScore(claim.url);
+  };
+
+  return [...claims].sort((left, right) => scoreClaim(right) - scoreClaim(left));
+};
+
+export const selectQueryAnchoredClaims = (
+  claims: readonly EvidenceClaim[],
+  query: string,
+  maxClaims: number,
+): EvidenceClaim[] => {
+  const ranked = rankClaimsForQuery(assignSourceIndices([...claims]), query);
+  const anchored = ranked.filter((claim) => claimMatchesQueryAnchor(claim, query));
+  const pool = anchored.length >= 2 ? anchored : anchored.length > 0 ? anchored : ranked;
+  return pool.slice(0, maxClaims);
+};
+
+export const passagesAnchoredForQuery = (
+  passages: readonly EvidencePassage[],
+  query: string,
+): EvidencePassage[] => {
+  const anchored = passages.filter((passage) => passageMatchesQueryAnchor(passage, query));
+  return anchored.length > 0 ? [...anchored] : [...passages].slice(0, 3);
+};
+
+/** Up to N brief lines with distinct public citation URLs (https or discord jump). */
+export const selectDistinctBriefClaims = (
+  claims: readonly EvidenceClaim[],
+  query: string,
+  maxLines: number,
+): EvidenceClaim[] => {
+  const ranked = rankClaimsForQuery(assignSourceIndices([...claims]), query);
+  const anchored = ranked.filter((claim) => claimMatchesQueryAnchor(claim, query));
+  const pool = anchored.length >= maxLines ? anchored : ranked;
+  const picked: EvidenceClaim[] = [];
+  const seen = new Set<string>();
+  const tryPick = (claims: readonly EvidenceClaim[], requireAnchor: boolean): void => {
+    for (const claim of claims) {
+      if (requireAnchor && !claimMatchesQueryAnchor(claim, query)) continue;
+      const pub = publicCitationUrlForClaim(claim);
+      if (!pub.startsWith("http")) continue;
+      if (seen.has(pub)) continue;
+      seen.add(pub);
+      picked.push(claim);
+      if (picked.length >= maxLines) break;
+    }
+  };
+
+  tryPick(pool, anchored.length > 0);
+  if (picked.length < MIN_WEB_CITATIONS && maxLines >= MIN_WEB_CITATIONS) {
+    const tokens = queryTokens(query);
+    const tokenMatched = ranked.filter((claim) => {
+      if (tokens.length === 0) return true;
+      const haystack = `${claim.claim} ${claim.quote}`.toLowerCase();
+      return tokens.some((token) => haystackIncludesToken(haystack, token));
+    });
+    tryPick(tokenMatched.length > 0 ? tokenMatched : ranked, false);
+  }
+  return picked;
+};
+
+const selectBriefClaims = (claims: readonly EvidenceClaim[], query: string): EvidenceClaim[] =>
+  selectDistinctBriefClaims(claims, query, BRIEF_MAX_CLAIM_LINES);
+
+export const selectHolocronFullClaims = (
+  claims: readonly EvidenceClaim[],
+  query: string,
+): EvidenceClaim[] => {
+  const distinct = selectDistinctBriefClaims(claims, query, HOLOCRON_FULL_MAX_CLAIM_LINES);
+  if (distinct.length >= MIN_WEB_CITATIONS) return distinct;
+  return selectQueryAnchoredClaims(claims, query, HOLOCRON_FULL_MAX_CLAIM_LINES);
+};
+
 export const composeGroundedAnswerFromClaims = (
   query: string,
   claims: readonly EvidenceClaim[],
   sources: readonly SourceDescriptor[],
+  profile: GroundedComposeProfile = "full",
 ): string => {
-  const indexed = assignSourceIndices([...claims]);
+  const indexed =
+    profile === "brief"
+      ? selectBriefClaims(claims, query)
+      : selectHolocronFullClaims(claims, query);
   const byIndex = new Map<number, EvidenceClaim[]>();
   for (const claim of indexed) {
     const bucket = byIndex.get(claim.sourceIndex) ?? [];
@@ -278,24 +470,45 @@ export const composeGroundedAnswerFromClaims = (
     }
   }
 
-  const bullets = indexed.map((claim) => `- ${claim.claim} [${claim.sourceIndex}]`);
+  const stripClaimTitle = (claim: string): string => {
+    const flattened = claim
+      .replace(/^#{1,6}\s+/u, "")
+      .replace(/\s+#+\s+/u, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    const duplicateLead = flattened.match(/^(\S+)\s+\1\b/iu);
+    return duplicateLead ? flattened.slice(duplicateLead[1]!.length).trimStart() : flattened;
+  };
+
+  const composeClaims = indexed;
+  const bullets =
+    profile === "brief"
+      ? composeClaims.map((claim) => `${stripClaimTitle(claim.claim)} [${claim.sourceIndex}]`)
+      : composeClaims.map((claim) => `- ${claim.claim} [${claim.sourceIndex}]`);
   const caveat =
-    conflictHosts.size > 0
-      ? "\n\nCaveats: Sources disagree on details; compare the cited pages before installing."
-      : "";
+    profile === "brief" || conflictHosts.size === 0
+      ? ""
+      : "\n\nCaveats: Sources disagree on details; compare the cited pages before installing.";
 
   const orderedSources: SourceDescriptor[] = [];
   const normalize = (url: string): string => url.trim().replace(/\/+$/u, "");
-  for (const claim of indexed) {
+  for (const claim of composeClaims) {
     const match = sources.find(
-      (source) => normalize(source.homeUrl) === normalize(claim.url),
+      (source) => normalize(source.homeUrl) === normalize(publicCitationUrlForClaim(claim)),
     );
     if (match && !orderedSources.some((entry) => normalize(entry.homeUrl) === normalize(match.homeUrl))) {
       orderedSources.push(match);
     }
   }
 
-  const body = [`Answer for: ${query.trim()}`, "", ...bullets, caveat].join("\n").trim();
+  const summaryLead =
+    profile === "brief" || composeClaims.length === 0
+      ? ""
+      : `${stripClaimTitle(composeClaims[0]!.claim).replace(/\s+\[\d+\]\s*$/u, "").trim()} [${composeClaims[0]!.sourceIndex}]`;
+  const body =
+    profile === "brief"
+      ? [...bullets, caveat].filter(Boolean).join("\n").trim()
+      : [summaryLead, summaryLead ? "" : "", ...bullets, caveat].filter(Boolean).join("\n").trim();
   const sourcesSection = [
     "Sources",
     ...orderedSources.map((source, index) => `${index + 1}. ${source.name} - ${source.homeUrl}`),
@@ -310,8 +523,10 @@ export const composeGroundedAnswerWithLlm = async (
   query: string,
   claims: readonly EvidenceClaim[],
   sources: readonly SourceDescriptor[],
+  profile: GroundedComposeProfile = "full",
 ): Promise<string | null> => {
-  const indexed = assignSourceIndices([...claims]);
+  const indexed =
+    profile === "brief" ? selectBriefClaims(claims, query) : assignSourceIndices([...claims]);
   const allowed = sources
     .slice(0, 8)
     .map((source, index) => `${index + 1}. ${source.name} - ${source.homeUrl}`)
@@ -329,7 +544,9 @@ export const composeGroundedAnswerWithLlm = async (
       {
         role: "system",
         content:
-          "Write a concise KOTOR modding answer using ONLY the evidence claims below. Every factual bullet needs an inline [n] citation tied to Allowed sources. Do not invent steps, paths, or tools not supported by a quote. End with a Sources heading listing only cited https sources (omit discord:// URLs from Sources). If evidence conflicts, add a short Caveats section.",
+          profile === "brief"
+            ? loadPromptTemplate("grounded-brief")
+            : loadPromptTemplate("grounded-full"),
       },
       {
         role: "user",
@@ -366,9 +583,10 @@ export const rankPassagesForQuery = (
     const haystack = passage.text.toLowerCase();
     let hits = 0;
     for (const token of tokens) {
-      if (haystack.includes(token)) hits += 1;
+      if (haystackIncludesToken(haystack, token)) hits += 1;
     }
-    return hits * 4 + authorityScore(passage.url);
+    const anchorBonus = passageMatchesQueryAnchor(passage, query) ? 12 : 0;
+    return hits * 4 + anchorBonus + authorityScore(passage.url);
   };
 
   return [...passages].sort((left, right) => scorePassage(right) - scorePassage(left));
@@ -378,12 +596,45 @@ export const rankPassagesForQuery = (
 export const claimsFromDistinctPassages = (
   passages: readonly EvidencePassage[],
   maxClaims = 6,
+  query?: string,
 ): EvidenceClaim[] => {
+  let pool = [...passages];
+  if (query) {
+    const ranked = rankPassagesForQuery(pool, query);
+    const anchored = ranked.filter((passage) => passageMatchesQueryAnchor(passage, query));
+    if (anchored.length >= MIN_WEB_CITATIONS) {
+      pool = anchored;
+    } else if (anchored.length > 0) {
+      const anchoredUrls = new Set(anchored.map((passage) => publicCitationUrlForPassage(passage)));
+      const extraAnchored = ranked.filter(
+        (passage) =>
+          !anchoredUrls.has(publicCitationUrlForPassage(passage))
+          && passageMatchesQueryAnchor(passage, query),
+      );
+      pool = [...anchored, ...extraAnchored];
+      if (pool.length < MIN_WEB_CITATIONS) {
+        const tokens = queryTokens(query);
+        const tokenMatched = ranked.filter((passage) => {
+          if (anchoredUrls.has(publicCitationUrlForPassage(passage))) return false;
+          if (extraAnchored.some((extra) => publicCitationUrlForPassage(extra) === publicCitationUrlForPassage(passage))) {
+            return false;
+          }
+          if (tokens.length === 0) return true;
+          return tokens.some((token) => haystackIncludesToken(passage.text.toLowerCase(), token));
+        });
+        pool = [...pool, ...tokenMatched];
+      }
+    } else {
+      pool = ranked;
+    }
+  }
+
   const claims: EvidenceClaim[] = [];
   const seenUrls = new Set<string>();
-  for (const passage of passages) {
-    if (!passage.url.startsWith("http")) continue;
-    if (seenUrls.has(passage.url)) continue;
+  for (const passage of pool) {
+    const citationUrl = publicCitationUrlForPassage(passage);
+    if (!citationUrl.startsWith("http")) continue;
+    if (seenUrls.has(citationUrl)) continue;
     const text = passage.text.replace(/\s+/g, " ").trim();
     if (text.length < 24) continue;
     const claimText = text.length > 280 ? `${text.slice(0, 277)}…` : text;
@@ -391,10 +642,11 @@ export const claimsFromDistinctPassages = (
       claim: claimText,
       quote: text.length > 500 ? `${text.slice(0, 497)}…` : text,
       url: passage.url,
+      citationUrl,
       sourceIndex: 0,
       authority: passage.authority,
     });
-    seenUrls.add(passage.url);
+    seenUrls.add(citationUrl);
     if (claims.length >= maxClaims) break;
   }
   return assignSourceIndices(claims);
@@ -412,6 +664,41 @@ export const hasMinimumGroundedSupport = (claims: readonly EvidenceClaim[]): boo
   if (webUrls >= MIN_WEB_CITATIONS) return true;
   if (webUrls >= 1 && countDistinctDiscordClaims(claims) >= 1) return true;
   return false;
+};
+
+/** Holocron: standard 2-URL bar, or one strong on-topic anchored web claim (small QA index). */
+export const hasMinimumHolocronGroundedSupport = (
+  claims: readonly EvidenceClaim[],
+  query: string,
+): boolean => {
+  if (hasMinimumGroundedSupport(claims)) return true;
+  return hasMinimumBriefGroundedSupport(claims, query);
+};
+
+export const countDistinctPublicCitationUrls = (claims: readonly EvidenceClaim[]): number =>
+  new Set(
+    claims
+      .map(publicCitationUrlForClaim)
+      .filter((url) => url.startsWith("http") || isDiscordJumpUrl(url)),
+  ).size;
+
+/** Discord brief: ≥2 distinct public citation URLs and at least one query-anchored claim. */
+export const hasMinimumDiscordBriefGroundedSupport = (
+  claims: readonly EvidenceClaim[],
+  query: string,
+): boolean => {
+  if (countDistinctPublicCitationUrls(claims) < BRIEF_DISCORD_MIN_CITATIONS) return false;
+  return claims.some((claim) => claimMatchesQueryAnchor(claim, query));
+};
+
+/** Legacy Holocron small-index escape hatch (not used for Discord /ask). */
+export const hasMinimumBriefGroundedSupport = (
+  claims: readonly EvidenceClaim[],
+  query: string,
+): boolean => {
+  const webClaims = claims.filter((claim) => claim.citationUrl.startsWith("https://"));
+  if (webClaims.length < 1) return false;
+  return webClaims.some((claim) => claimMatchesQueryAnchor(claim, query));
 };
 
 export const collectCitationIndicesFromAnswer = (answer: string): number[] => {
@@ -447,6 +734,23 @@ export const collectCitedSourcesFromAnswer = (
   return aligned;
 };
 
+/** Whether retrieved passages can support a multi-source grounded answer (2026 sufficiency bar). */
+export const hasSufficientPassagesForGrounding = (
+  passages: readonly EvidencePassage[],
+  query: string,
+  minDistinctUrls: number = MIN_WEB_CITATIONS,
+): boolean => {
+  const web = passages.filter((p) => p.url.startsWith("https://"));
+  const hosts = new Set(web.map((p) => p.url));
+  if (hosts.size < minDistinctUrls) return false;
+  const tokens = distinctiveAnchorTokens(query);
+  if (tokens.length === 0) return hosts.size >= minDistinctUrls;
+  const anchored = web.filter((p) =>
+    tokens.some((token) => haystackIncludesToken(`${p.url} ${p.text}`.toLowerCase(), token)),
+  );
+  return anchored.length >= 1 && hosts.size >= minDistinctUrls;
+};
+
 export const inferGroundingStatus = (
   answer: string,
   citedSourceCount: number,
@@ -461,8 +765,9 @@ export const inferGroundingStatus = (
   if (indices.length >= MIN_WEB_CITATIONS && citedSourceCount >= MIN_WEB_CITATIONS) {
     return "grounded";
   }
+  // Insufficient citations: failed (not partial) so UI does not imply a complete answer.
   if (indices.length > 0 || citedSourceCount > 0) {
-    return "partial";
+    return "failed";
   }
   return "failed";
 };

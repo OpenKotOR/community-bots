@@ -9,6 +9,7 @@ import {
   classifyTraskProactiveMessage,
   createOpenAiClient,
   formatProactivePlainReply,
+  type ResearchWizardBriefAnswer,
   type ResearchWizardClient,
   scoreResearchAlignment,
 } from "@openkotor/trask";
@@ -170,7 +171,10 @@ export const registerTraskProactiveHandlers = (
         return;
       }
 
-      const brief = await researchWizard.answerQuestionBrief(pending.content);
+      const brief = (await researchWizard.answerForSurface(
+        pending.content,
+        "discord",
+      )) as ResearchWizardBriefAnswer;
 
       const similarity = await scoreResearchAlignment(openAi, config.ai.embeddingModel, {
         question: pending.content,

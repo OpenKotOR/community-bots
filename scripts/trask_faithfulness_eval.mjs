@@ -12,9 +12,9 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { splitResearchAnswer } from "../packages/trask/dist/discord-reply-format.js";
+import { loadGoldenQueries } from "../packages/trask-config/dist/golden-queries.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const goldenPath = join(repoRoot, "data/trask-eval/golden-queries.json");
 
 const collectCitationIndices = (answer) => {
   const { body } = splitResearchAnswer(answer);
@@ -90,7 +90,7 @@ const main = () => {
   let failures = 0;
 
   if (fixturesMode) {
-    const golden = JSON.parse(readFileSync(goldenPath, "utf8"));
+    const golden = { queries: loadGoldenQueries() };
     const fixtureDir = join(repoRoot, "data/trask-eval/fixtures");
     for (const spec of golden.queries) {
       const fixturePath = join(fixtureDir, `${spec.id}.json`);
