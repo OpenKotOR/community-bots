@@ -1,6 +1,6 @@
 # Trask Cloudflare Worker
 
-Edge proxy for public Holocron (`qa-webui`) → live GPTR `trask-http-server`.
+Edge proxy for public Holocron (`qa-webui`) → live `trask-http-server`.
 
 ## Modes
 
@@ -13,7 +13,7 @@ There is **no** bundled fallback when upstream fails (`TRASK_BUILTIN_FALLBACK=0`
 
 - Worker entry: `src/worker.ts`
 - Deprecated stub: `src/builtin-trask-api.ts`
-- Live GPTR deploy: `infra/trask-http-public/`
+- Live Trask HTTP deploy: `infra/trask-http-public/`
 
 ## Local dev
 
@@ -29,9 +29,9 @@ pnpm dlx wrangler@4.92.0 dev --config infra/trask-worker/wrangler.toml \
 | Variable | Purpose |
 |----------|---------|
 | `TRASK_WEB_ALLOW_ANONYMOUS` | `1` for public Holocron without API key |
-| `TRASK_BUILTIN_API` | `0` (required) to proxy live GPTR |
+| `TRASK_BUILTIN_API` | `0` (required) to proxy live Trask HTTP |
 | `TRASK_RESEARCHWIZARD_BASE_URL` | Full `trask-http-server` origin when `TRASK_BUILTIN_API=0` |
 | `TRASK_BUILTIN_FALLBACK` | `0` — do not serve offline reference answers on upstream errors |
 | `TRASK_WEB_API_KEY` | Optional API key for locked-down deployments |
 
-Public Holocron: point `TRASK_API_BASE` at this worker with `TRASK_BUILTIN_API=0` and a working GPTR upstream.
+Public Holocron: point `TRASK_API_BASE` at this worker with `TRASK_BUILTIN_API=0` and a working Trask HTTP upstream.

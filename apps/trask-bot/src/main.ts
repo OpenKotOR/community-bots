@@ -4,7 +4,6 @@ import {
   PermissionFlagsBits,
   SlashCommandBuilder,
   type ChatInputCommandInteraction,
-  type APIEmbedField,
   type RESTPostAPIApplicationCommandsJSONBody,
 } from "discord.js";
 
@@ -26,41 +25,58 @@ import {
   type SourceDescriptor,
   type SourceKind,
 } from "@openkotor/retrieval";
-import { createWebResearchClient } from "@openkotor/trask";
+import {
+  createResearchWizardClient,
+  formatDiscordAskDisplay,
+  setTraskResearchLogSink,
+  type ResearchWizardBriefAnswer,
+} from "@openkotor/trask";
 import { isTraskThreadId } from "@openkotor/trask-http";
 
-import { mergeDiscordSearchHits, searchLiveDiscordHistory } from "./discord-channel-search.js";
+import {
+  ensureAskDeferred,
+  safeEditReply,
+  safeReply,
+} from "./discord-ask-interaction.js";
+import { startDiscordIndexSync } from "./discord-index-sync.js";
 import { registerTraskProactiveHandlers } from "./proactive-handler.js";
 import { registerTraskWelcomeHandler } from "./welcome-handler.js";
 import { startEmbeddedTraskWebUi } from "./web-server.js";
 
 const logger = createLogger("trask-bot");
 const config = loadTraskBotConfig();
-const discordGuildId = config.discord.guildId;
-const searchProvider = createChunkSearchProvider(config.chunkDir, {
-  ...(discordGuildId ? { discordGuildId } : {}),
-});
+const searchProvider = createChunkSearchProvider(config.chunkDir);
 const DISCORD_ASK_RESPONSE_SLA_MS = 90_000;
 const DISCORD_ASK_SYNTHESIS_FAILURE_MESSAGE = "I could not complete live archive synthesis for this question right now.";
-const discordWebResearchTimeoutMs = Math.min(config.webResearch.timeoutMs, DISCORD_ASK_RESPONSE_SLA_MS);
-if (discordWebResearchTimeoutMs !== config.webResearch.timeoutMs) {
-  logger.warn("TRASK_WEB_RESEARCH_TIMEOUT_MS exceeds Discord /ask SLA; clamping subprocess timeout for /ask only.", {
-    configuredTimeoutMs: config.webResearch.timeoutMs,
-    effectiveTimeoutMs: discordWebResearchTimeoutMs,
+const researchGatherTimeoutMs = Math.min(config.researchWizard.gatherTimeoutMs, DISCORD_ASK_RESPONSE_SLA_MS);
+if (researchGatherTimeoutMs !== config.researchWizard.gatherTimeoutMs) {
+  logger.warn("TRASK_RESEARCH_GATHER_MS exceeds Discord /ask SLA; clamping gather at runtime.", {
+    configuredGatherMs: config.researchWizard.gatherTimeoutMs,
+    effectiveGatherMs: researchGatherTimeoutMs,
   });
 }
-const webResearchFactoryOptions = { localSearchProvider: searchProvider };
-const webResearch = createWebResearchClient(config.webResearch, config.ai, webResearchFactoryOptions);
-const discordWebResearch = createWebResearchClient(
-  { ...config.webResearch, timeoutMs: discordWebResearchTimeoutMs },
+const researchWizard = createResearchWizardClient(
+  {
+    ...config.researchWizard,
+    gatherTimeoutMs: researchGatherTimeoutMs,
+    timeoutMs: researchGatherTimeoutMs,
+  },
   config.ai,
-  webResearchFactoryOptions,
 );
+
+setTraskResearchLogSink((line, level) => {
+  if (level === "debug") {
+    logger.debug(line);
+  } else {
+    logger.info(line);
+  }
+});
+
 const queryRepository = new JsonTraskQueryRepository(resolveDataFile(config.queryDataDir, "trask-queries.json"));
 
 const traskHttpRuntime = {
   searchProvider,
-  webResearch,
+  webResearch: researchWizard,
   queryRepository,
 };
 
@@ -84,11 +100,11 @@ const sourceChoices = defaultSourceCatalog.map((source) => ({
 
 const askCommand = new SlashCommandBuilder()
   .setName("ask")
-  .setDescription("Ask the Trask Q&A Assistant to search approved archives and this server's history.")
+  .setDescription("Ask Trask to search the approved KOTOR source registry.")
   .addStringOption((option) => {
     return option
       .setName("query")
-      .setDescription("What should the assistant look up?")
+      .setDescription("What should Trask look up?")
       .setRequired(true)
       .setMaxLength(200)
       .setAutocomplete(true);
@@ -103,7 +119,7 @@ const askCommand = new SlashCommandBuilder()
 
 const sourcesCommand = new SlashCommandBuilder()
   .setName("sources")
-  .setDescription("Inspect the Trask Q&A Assistant approved source policy.")
+  .setDescription("Inspect Trask's approved source policy.")
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
   .addStringOption((option) => {
     return option
@@ -178,215 +194,51 @@ const truncateForDiscord = (value: string, limit: number): string => {
   return `${value.slice(0, Math.max(0, limit - 1)).trimEnd()}…`;
 };
 
-const normalizeWhitespace = (value: string): string => value.replace(/\n{3,}/g, "\n\n").trim();
-
-const splitResearchAnswer = (value: string): { body: string; sourceLines: string[] } => {
-  const match = /\nSources\s*\n/i.exec(value);
-
-  if (!match) {
-    return {
-      body: normalizeWhitespace(value),
-      sourceLines: [],
-    };
-  }
-
-  const body = normalizeWhitespace(value.slice(0, match.index));
-  const sourceLines = value
-    .slice(match.index + match[0].length)
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  return { body, sourceLines };
-};
-
-const chunkSourceLines = (sourceLines: readonly string[]): APIEmbedField[] => {
-  if (sourceLines.length === 0) {
-    return [];
-  }
-
-  const fields: APIEmbedField[] = [];
-  let currentLines: string[] = [];
-
-  for (const rawLine of sourceLines) {
-    // Discord embed field values must be <= 1024 chars.
-    const line = truncateForDiscord(rawLine, 1000);
-    const candidate = [...currentLines, line].join("\n");
-
-    if (candidate.length > 1024 && currentLines.length > 0) {
-      fields.push({
-        name: fields.length === 0 ? "Sources" : `Sources ${fields.length + 1}`,
-        value: currentLines.join("\n"),
-        inline: false,
-      });
-      currentLines = [line];
-      continue;
-    }
-
-    currentLines.push(line);
-  }
-
-  if (currentLines.length > 0) {
-    fields.push({
-      name: fields.length === 0 ? "Sources" : `Sources ${fields.length + 1}`,
-      value: currentLines.join("\n"),
-      inline: false,
-    });
-  }
-
-  return fields;
-};
-
-const buildFallbackSources = (sources: readonly SourceDescriptor[]): APIEmbedField[] => {
-  return chunkSourceLines(sources.map((source, index) => `${index + 1}. ${source.name} - ${source.homeUrl}`));
-};
-
-const buildResearchEmbed = (rawAnswer: string, approvedSources: readonly SourceDescriptor[]) => {
-  const { body, sourceLines } = splitResearchAnswer(rawAnswer);
-  const sourceFields = body === DISCORD_ASK_SYNTHESIS_FAILURE_MESSAGE
-    ? []
-    : sourceLines.length > 0
-      ? chunkSourceLines(sourceLines)
-      : buildFallbackSources(approvedSources);
-
+const buildResearchEmbed = (
+  rawAnswer: string,
+  approvedSources: readonly SourceDescriptor[],
+  query: string,
+) => {
   const title = `${personaProfiles.trask.displayName} Briefing`;
-  const limitedSourceFields = sourceFields.slice(0, 3);
-  const sourceFieldChars = limitedSourceFields.reduce((total, field) => total + field.name.length + field.value.length, 0);
-  // Keep a margin under Discord's 6000-char embed cap (title + description + fields).
-  const descriptionLimit = Math.max(500, Math.min(4000, 5900 - title.length - sourceFieldChars));
-  const description = truncateForDiscord(body, descriptionLimit);
+  const description =
+    rawAnswer === DISCORD_ASK_SYNTHESIS_FAILURE_MESSAGE
+      ? rawAnswer
+      : formatDiscordAskDisplay(rawAnswer, approvedSources, { query });
 
   return buildInfoEmbed({
     title,
-    description,
-    fields: limitedSourceFields,
+    description: truncateForDiscord(description, 4000),
   });
 };
 
-type ChatReplyPayload = Parameters<ChatInputCommandInteraction["reply"]>[0];
-
-const isUnknownInteractionError = (error: unknown): boolean => {
-  if (!error || typeof error !== "object") {
-    return false;
-  }
-
-  const candidate = error as { code?: unknown };
-  return candidate.code === 10062;
-};
-
-const safeReply = async (interaction: ChatInputCommandInteraction, payload: ChatReplyPayload): Promise<void> => {
-  try {
-    if (interaction.deferred || interaction.replied) {
-      await interaction.followUp(payload);
-      return;
-    }
-
-    await interaction.reply(payload);
-  } catch (error) {
-    if (isUnknownInteractionError(error)) {
-      logger.warn("Skipping reply for stale Discord interaction.", {
-        guildId: interaction.guildId,
-        channelId: interaction.channelId,
-      });
-      return;
-    }
-    throw error;
-  }
-};
-
-const ensureAskDeferred = async (interaction: ChatInputCommandInteraction): Promise<boolean> => {
-  if (interaction.deferred || interaction.replied) {
-    return true;
-  }
-
-  try {
-    await interaction.deferReply();
-    return true;
-  } catch (error) {
-    if (isUnknownInteractionError(error)) {
-      logger.warn("Discord reported stale interaction before deferReply; skipping command execution.", {
-        guildId: interaction.guildId,
-        channelId: interaction.channelId,
-      });
-      return false;
-    }
-
-    logger.warn("Trask /ask deferReply failed; retrying with ephemeral response.", {
-      error: toErrorMessage(error),
-      guildId: interaction.guildId,
-      channelId: interaction.channelId,
-    });
-  }
-
-  if (interaction.deferred || interaction.replied) {
-    return true;
-  }
-
-  try {
-    await interaction.deferReply({ ephemeral: true });
-    return true;
-  } catch (error) {
-    if (isUnknownInteractionError(error)) {
-      logger.warn("Discord reported stale interaction during deferReply fallback; skipping command execution.", {
-        guildId: interaction.guildId,
-        channelId: interaction.channelId,
-      });
-      return false;
-    }
-    throw error;
-  }
-};
-
 const handleAskCommand = async (interaction: ChatInputCommandInteraction): Promise<void> => {
-  const deferred = await ensureAskDeferred(interaction);
-  if (!deferred) {
-    return;
-  }
-
   const query = interaction.options.getString("query", true);
   rememberRecentQuery(interaction.user.id, query);
   const threadOpt = interaction.options.getString("thread")?.trim();
   const threadId = threadOpt && isTraskThreadId(threadOpt) ? threadOpt : randomUUID();
 
-  try {
-    await interaction.editReply({
-      embeds: [
-        buildInfoEmbed({
-          title: `${personaProfiles.trask.displayName}`,
-          description: "Searching the archive…",
-        }),
-      ],
-      allowedMentions: { parse: [] },
-    });
-  } catch {
-    /* non-fatal — main pipeline still runs */
+  if (!interaction.deferred && !interaction.replied) {
+    const deferred = await ensureAskDeferred(interaction, logger);
+    if (!deferred) {
+      return;
+    }
   }
 
   const queryId = randomUUID();
   const createdAt = new Date().toISOString();
 
   try {
-    const liveSearchBudgetMs = Math.max(5_000, DISCORD_ASK_RESPONSE_SLA_MS - 15_000);
-    const localSearchPromise = Promise.all([
-      searchProvider.search(query, 6),
-      discordGuildId && config.approvedChannelIds.length > 0
-        ? searchLiveDiscordHistory({
-            client: interaction.client,
-            guildId: discordGuildId,
-            channelIds: config.approvedChannelIds,
-            query,
-            limit: 6,
-            deadlineMs: liveSearchBudgetMs,
-          })
-        : Promise.resolve([]),
-    ]).then(([chunkHits, liveHits]) => mergeDiscordSearchHits(chunkHits, liveHits));
+    logger.info("Trask /ask research_start", {
+      queryId,
+      threadId,
+      guildId: interaction.guildId,
+      channelId: interaction.channelId,
+      queryPreview: query.slice(0, 120),
+    });
 
-    const answerPromise = localSearchPromise.then((localHits) =>
-      discordWebResearch.answerQuestion(query, undefined, { localHits }),
-    );
+    const answerPromise = researchWizard.answerForSurface(query, "discord") as Promise<ResearchWizardBriefAnswer>;
     const timedResult = await Promise.race<
-      { kind: "result"; value: Awaited<ReturnType<typeof discordWebResearch.answerQuestion>> }
-      | { kind: "timeout" }
+      { kind: "result"; value: ResearchWizardBriefAnswer } | { kind: "timeout" }
     >([
       answerPromise.then((value) => ({ kind: "result", value })),
       new Promise((resolve) => {
@@ -433,6 +285,13 @@ const handleAskCommand = async (interaction: ChatInputCommandInteraction): Promi
     }
 
     const result = timedResult.value;
+    logger.info("Trask /ask research_done", {
+      queryId,
+      approvedSources: result.approvedSources.length,
+      retrievedSources: result.retrievedSources.length,
+      visitedUrls: result.visitedUrls.length,
+      groundingStatus: result.groundingStatus ?? "unknown",
+    });
     const completedAt = new Date().toISOString();
     await queryRepository.append({
       queryId,
@@ -456,7 +315,7 @@ const handleAskCommand = async (interaction: ChatInputCommandInteraction): Promi
       createdAt,
       completedAt,
     });
-    let embed = buildResearchEmbed(result.answer, result.approvedSources);
+    let embed = buildResearchEmbed(result.answer, result.approvedSources, query);
     const holocronBase = config.holocronPublicUrl?.trim();
     if (holocronBase) {
       const url = `${trimTrailingSlashes(holocronBase)}?thread=${encodeURIComponent(threadId)}`;
@@ -556,15 +415,19 @@ const dispatchChatCommand = async (interaction: ChatInputCommandInteraction): Pr
       await handleReindexCommand(interaction);
       break;
     default:
-      await safeReply(interaction, {
-        embeds: [
-          buildErrorEmbed({
-            title: "Unknown Command",
-            description: `Trask does not recognize /${interaction.commandName}.`,
-          }),
-        ],
-        ephemeral: true,
-      });
+      await safeReply(
+        interaction,
+        {
+          embeds: [
+            buildErrorEmbed({
+              title: "Unknown Command",
+              description: `Trask does not recognize /${interaction.commandName}.`,
+            }),
+          ],
+          ephemeral: true,
+        },
+        logger,
+      );
   }
 };
 
@@ -591,7 +454,7 @@ if (config.proactive.enabled && !proactiveRuntimeReady) {
 }
 
 if (proactiveRuntimeReady) {
-  registerTraskProactiveHandlers(client, config, webResearch, logger, queryRepository);
+  registerTraskProactiveHandlers(client, config, researchWizard, logger, queryRepository);
 }
 
 if (welcomeRuntimeReady) {
@@ -604,11 +467,31 @@ client.on("error", (error) => {
   });
 });
 
+const stopDiscordIndexSync = startDiscordIndexSync(config, logger);
+
 client.once("ready", (readyClient) => {
   logger.info("Trask is online.", {
     user: readyClient.user.tag,
     approvedGuildCount: config.allowedGuildIds.length,
     approvedChannelCount: config.approvedChannelIds.length,
+    discordIndexSyncMs: config.discordSyncIntervalMs,
+    discordChannelBlacklistCount: config.discordChannelBlacklist.length,
+  });
+});
+
+process.on("beforeExit", () => {
+  stopDiscordIndexSync?.();
+});
+
+process.on("unhandledRejection", (reason) => {
+  logger.error("Unhandled promise rejection in Trask bot.", {
+    error: reason instanceof Error ? reason.message : String(reason),
+  });
+});
+
+process.on("uncaughtException", (error) => {
+  logger.error("Uncaught exception in Trask bot.", {
+    error: toErrorMessage(error),
   });
 });
 
@@ -645,30 +528,46 @@ client.on("interactionCreate", async (interaction) => {
     return;
   }
 
+  const isAsk = interaction.commandName === "ask";
+  if (isAsk) {
+    const deferred = await ensureAskDeferred(interaction, logger);
+    if (!deferred) {
+      return;
+    }
+  }
+
   if (!isAllowedGuild(interaction.guildId)) {
-    await safeReply(interaction, {
+    const payload = {
       embeds: [
         buildErrorEmbed({
           title: "Not Available Here",
           description: "Trask is not authorized to operate in this guild.",
         }),
       ],
-      ephemeral: true,
-    });
+      allowedMentions: { parse: [] as const },
+    };
+
+    if (interaction.deferred || interaction.replied) {
+      await safeEditReply(interaction, payload, logger);
+    } else {
+      await safeReply(interaction, { ...payload, ephemeral: true }, logger);
+    }
     return;
   }
 
   // Channel restriction only applies to /ask (the content-producing command).
-  if (interaction.commandName === "ask" && !isAllowedChannel(interaction.channelId)) {
-    await safeReply(interaction, {
+  if (isAsk && !isAllowedChannel(interaction.channelId)) {
+    const payload = {
       embeds: [
         buildErrorEmbed({
           title: "Wrong Channel",
           description: "Trask can only answer questions in approved channels on this server.",
         }),
       ],
-      ephemeral: true,
-    });
+      allowedMentions: { parse: [] as const },
+    };
+
+    await safeEditReply(interaction, payload, logger);
     return;
   }
 
@@ -692,7 +591,7 @@ client.on("interactionCreate", async (interaction) => {
       return;
     }
 
-    await safeReply(interaction, payload);
+    await safeReply(interaction, payload, logger);
   }
 });
 

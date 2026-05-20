@@ -56,11 +56,11 @@ const help = () => {
 
 Usage:
   node scripts/trask_ops.mjs setup          # pnpm install + init submodules + type-check
-  node scripts/trask_ops.mjs setup-venv     # create .venv-trask-research (Crawl4AI) and install Python deps
+  node scripts/trask_ops.mjs setup-venv     # create .venv-trask-research (trask_web_research.py)
   node scripts/trask_ops.mjs update         # git pull + pnpm install + build
   node scripts/trask_ops.mjs build-web      # build holocron-web (required before dev-http)
   node scripts/trask_ops.mjs dev-http       # build web + start Trask HTTP server on port 4010
-  node scripts/trask_ops.mjs verify-cli     # CLI Trask Q&A via Crawl4AI web research (5 queries)
+  node scripts/trask_ops.mjs verify-cli     # CLI Trask Q&A smoke (5 queries)
   node scripts/trask_ops.mjs verify-web     # Playwright browser test: 5 KOTOR queries (optional)
   node scripts/trask_ops.mjs smoke-discord  # verify Discord bot slash command registration
 
@@ -77,7 +77,7 @@ Quick start:
 
 Notes:
   - Falls back to npx pnpm@${pnpmVersion} when pnpm is not on PATH.
-  - Run setup-venv and set TRASK_WEB_RESEARCH_PYTHON + OPENAI_API_KEY (or OPENROUTER_API_KEY) for live research.
+  - Run setup-venv and set TRASK_WEB_RESEARCH_PYTHON / TRASK_INDEXER_BASE_URL for live research.
   - Without an LLM API key (OPENAI_API_KEY or OPENROUTER_API_KEY) results are citation-only.
 `);
 };
@@ -96,15 +96,15 @@ try {
       break;
     }
     case "setup-venv": {
-      const bootstrap =
+      await run("bash", ["scripts/bootstrap_trask_research.sh"]);
+      const py =
         process.platform === "win32"
-          ? resolve(repoRoot, "scripts", "bootstrap_trask_research.ps1")
-          : resolve(repoRoot, "scripts", "bootstrap_trask_research.sh");
-      if (process.platform === "win32") {
-        await run("powershell", ["-ExecutionPolicy", "Bypass", "-File", bootstrap]);
-      } else {
-        await run("bash", [bootstrap]);
-      }
+          ? resolve(repoRoot, ".venv-trask-research", "Scripts", "python.exe")
+          : resolve(repoRoot, ".venv-trask-research", "bin", "python");
+      console.log("✅  .venv-trask-research ready.");
+      console.log("   Add to your .env:");
+      console.log(`   TRASK_WEB_RESEARCH_PYTHON=${py}`);
+      console.log("   TRASK_INDEXER_BASE_URL=http://127.0.0.1:8790");
       break;
     }
     case "update": {

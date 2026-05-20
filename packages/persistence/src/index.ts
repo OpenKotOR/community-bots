@@ -1998,12 +1998,19 @@ export interface TraskSourceRecord {
   url: string;
 }
 
+/** Scalar diagnostics attached to a live-trace row (Holocron debug panel). */
+export type TraskLiveEventDiagValue = string | number | boolean;
+
 /** Append-only timeline for Holocron / clients polling `GET /thread/:id`. */
 export interface TraskQueryLiveEvent {
   at: string;
   phase: string;
   detail?: string;
   sources?: readonly TraskSourceRecord[];
+  /** Structured key/value facts (indexer URL, passage counts, flags). */
+  diag?: Readonly<Record<string, TraskLiveEventDiagValue>>;
+  /** Absolute https URLs touched during this step (retrieve, verify, cite). */
+  urls?: readonly string[];
 }
 
 export interface TraskQueryRecord {
@@ -2025,6 +2032,8 @@ export interface TraskQueryRecord {
   completedAt: string | null;
   /** Server-written progression while status is pending (and frozen at completion). */
   liveTrace?: readonly TraskQueryLiveEvent[];
+  /** Grounding quality for Holocron provenance (grounded | partial | failed). */
+  groundingStatus?: "grounded" | "partial" | "failed";
 }
 
 interface PazaakMatchHistoryFileShape {
@@ -2042,6 +2051,8 @@ const cloneTraskSource = (source: TraskSourceRecord): TraskSourceRecord => ({ ..
 const cloneTraskLiveEvent = (ev: TraskQueryLiveEvent): TraskQueryLiveEvent => ({
   ...ev,
   ...(ev.sources ? { sources: ev.sources.map(cloneTraskSource) } : {}),
+  ...(ev.diag ? { diag: { ...ev.diag } } : {}),
+  ...(ev.urls ? { urls: [...ev.urls] } : {}),
 });
 
 const cloneTraskQueryRecord = (record: TraskQueryRecord): TraskQueryRecord => ({

@@ -1,3 +1,7 @@
+# Trask indexer (Crawl4AI + Chroma)
+.venv-trask-indexer/
+data/trask-indexer/chroma/
+
 # Logs
 logs
 *.log

@@ -14,10 +14,10 @@ import { normalizeAuthHandlerError, type AuthHandlerThrown } from "@openkotor/pl
 import type { SearchProvider } from "@openkotor/retrieval";
 
 import type {
-  WebResearchModelOption,
-  WebResearchProgressEvent,
-  WebResearchQueryHandler,
-  WebResearchSourcePreference,
+  ResearchWizardModelOption,
+  ResearchWizardProgressEvent,
+  ResearchWizardQueryHandler,
+  ResearchWizardSourcePreference,
 } from "@openkotor/trask";
 
 import { Router, type Request, type Response, type RequestHandler } from "express";
@@ -28,7 +28,7 @@ export interface TraskHttpRuntime {
 
   searchProvider: SearchProvider;
 
-  webResearch: WebResearchQueryHandler;
+  webResearch: ResearchWizardQueryHandler;
 
   queryRepository: JsonTraskQueryRepository;
 
@@ -190,7 +190,7 @@ const mapTraskQueryRecord = (record: TraskQueryRecord): TraskQueryRecord => ({
 });
 
 const mapDescriptorsToSourceRecords = (
-  sources: WebResearchProgressEvent["sources"],
+  sources: ResearchWizardProgressEvent["sources"],
 ): readonly TraskSourceRecord[] => {
   if (!sources?.length) return [];
   return sources.map((s) => ({
@@ -212,6 +212,8 @@ const appendLiveTrace = async (
     phase: event.phase,
     ...(event.detail !== undefined ? { detail: event.detail } : {}),
     ...(event.sources?.length ? { sources: event.sources.map((s) => ({ ...s })) } : {}),
+    ...(event.diag ? { diag: { ...event.diag } } : {}),
+    ...(event.urls?.length ? { urls: [...event.urls] } : {}),
   };
   await repository.upsert({
     ...prev,
@@ -221,11 +223,11 @@ const appendLiveTrace = async (
 
 const CANCELED_QUERY_ERROR = "Canceled by newer request.";
 
-const DEFAULT_TRASK_MODEL_OPTIONS: readonly WebResearchModelOption[] = [
+const DEFAULT_TRASK_MODEL_OPTIONS: readonly ResearchWizardModelOption[] = [
   { id: "auto", label: "Auto", provider: "Trask web research", recommended: true },
 ];
 
-const mapModelOption = (option: WebResearchModelOption): WebResearchModelOption => ({
+const mapModelOption = (option: ResearchWizardModelOption): ResearchWizardModelOption => ({
   id: option.id,
   label: option.label,
   provider: option.provider,
@@ -238,11 +240,11 @@ const isFreeModelId = (id: string): boolean => {
 };
 
 const resolveTraskModelOptions = async (
-  webResearch: WebResearchQueryHandler,
-): Promise<readonly WebResearchModelOption[]> => {
+  webResearch: ResearchWizardQueryHandler,
+): Promise<readonly ResearchWizardModelOption[]> => {
   const dynamicModels = webResearch.listModels ? await webResearch.listModels() : [];
   const seen = new Set<string>();
-  const models: WebResearchModelOption[] = [];
+  const models: ResearchWizardModelOption[] = [];
   for (const option of [...DEFAULT_TRASK_MODEL_OPTIONS, ...dynamicModels]) {
     const id = option.id.trim();
     if (!id || seen.has(id) || !isFreeModelId(id)) continue;
@@ -250,7 +252,7 @@ const resolveTraskModelOptions = async (
     models.push(mapModelOption({
       id,
       label: option.label.trim() || id,
-      provider: option.provider.trim() || "WebResearch",
+      provider: option.provider.trim() || "ResearchWizard",
       ...(option.recommended ? { recommended: true } : {}),
     }));
   }
@@ -315,14 +317,14 @@ const normalizeTraskModelFromBody = (raw: ScalarOrObject | undefined): string | 
   return model;
 };
 
-const normalizeSourcePreferencesFromBody = (raw: ScalarOrObject | undefined): WebResearchSourcePreference[] | undefined => {
+const normalizeSourcePreferencesFromBody = (raw: ScalarOrObject | undefined): ResearchWizardSourcePreference[] | undefined => {
   if (raw === undefined || raw === null) return undefined;
   if (!Array.isArray(raw)) {
     throw Object.assign(new Error("sourceWeights must be an array when provided."), { status: 422 });
   }
 
   return raw
-    .map((entry): WebResearchSourcePreference | undefined => {
+    .map((entry): ResearchWizardSourcePreference | undefined => {
       if (!entry || typeof entry !== "object" || Array.isArray(entry)) return undefined;
       const value = entry as Record<string, unknown>;
       const url = typeof value.url === "string" ? value.url.trim() : "";
@@ -336,7 +338,7 @@ const normalizeSourcePreferencesFromBody = (raw: ScalarOrObject | undefined): We
         enabled: value.enabled !== false,
       };
     })
-    .filter((entry): entry is WebResearchSourcePreference => entry !== undefined);
+    .filter((entry): entry is ResearchWizardSourcePreference => entry !== undefined);
 };
 
 
@@ -611,7 +613,7 @@ export const createTraskHttpRouter = <TUser extends TraskHttpUser = TraskHttpUse
       let threadId: string;
 
       let model: string | undefined;
-      let sourcePreferences: WebResearchSourcePreference[] | undefined;
+      let sourcePreferences: ResearchWizardSourcePreference[] | undefined;
 
       const persist = shouldPersistForUser(user);
 
@@ -681,6 +683,7 @@ export const createTraskHttpRouter = <TUser extends TraskHttpUser = TraskHttpUse
               url: source.homeUrl,
             })),
             visitedUrls: [...result.visitedUrls],
+            ...(result.groundingStatus ? { groundingStatus: result.groundingStatus } : {}),
             error: null,
             createdAt,
             completedAt: new Date().toISOString(),
@@ -730,7 +733,11 @@ export const createTraskHttpRouter = <TUser extends TraskHttpUser = TraskHttpUse
           {
             at: createdAt,
             phase: "queued",
-              detail: model ? `Holocron retrieval queued with ${model}…` : "Holocron retrieval queued…",
+            detail: model ? `Holocron retrieval queued with ${model}…` : "Holocron retrieval queued…",
+            diag: {
+              indexer: process.env.TRASK_INDEXER_BASE_URL ?? "http://127.0.0.1:8787",
+              ...(model ? { model } : {}),
+            },
           },
         ],
       };
@@ -746,6 +753,8 @@ export const createTraskHttpRouter = <TUser extends TraskHttpUser = TraskHttpUse
               phase: ev.phase,
               ...(ev.detail !== undefined ? { detail: ev.detail } : {}),
               ...(ev.sources?.length ? { sources: mapDescriptorsToSourceRecords(ev.sources) } : {}),
+              ...(ev.diag ? { diag: ev.diag } : {}),
+              ...(ev.urls?.length ? { urls: [...ev.urls] } : {}),
             });
           }, {
             ...(model ? { model } : {}),
@@ -771,6 +780,7 @@ export const createTraskHttpRouter = <TUser extends TraskHttpUser = TraskHttpUse
               url: source.homeUrl,
             })),
             visitedUrls: [...result.visitedUrls],
+            ...(result.groundingStatus ? { groundingStatus: result.groundingStatus } : {}),
             error: null,
             completedAt: new Date().toISOString(),
           };

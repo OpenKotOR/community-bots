@@ -19,6 +19,8 @@ export interface TraskHistoryLiveEventDto {
   phase: string
   detail?: string
   sources?: Array<{ id: string; name: string; url: string }>
+  diag?: Record<string, string | number | boolean>
+  urls?: string[]
 }
 
 export interface TraskHistoryRecordDto {
@@ -36,6 +38,7 @@ export interface TraskHistoryRecordDto {
   completedAt: string | null
   /** Progress timeline while pending (and retained after completion for replay/debug). */
   liveTrace?: TraskHistoryLiveEventDto[]
+  groundingStatus?: 'grounded' | 'partial' | 'failed'
 }
 
 export interface TraskSessionDto {

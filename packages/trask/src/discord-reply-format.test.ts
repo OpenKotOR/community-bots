@@ -1,7 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { splitResearchAnswer, formatProactivePlainReply } from "./discord-reply-format.js";
+import {
+  splitResearchAnswer,
+  formatProactivePlainReply,
+  formatDiscordAskDisplay,
+  syncSourcesSectionToApproved,
+  embedInlineCitationLinks,
+  buildCitationUrlMap,
+  clampDiscordBodyLines,
+  dedupeLeadingTopicLabel,
+  normalizeBodyCitationIndices,
+} from "./discord-reply-format.js";
 
 // ---------------------------------------------------------------------------
 // splitResearchAnswer
@@ -111,4 +121,96 @@ test("formatProactivePlainReply uses ' · ' as URL separator", () => {
   const raw = "Answer.\n\nSources\nhttps://a.com\nhttps://b.com";
   const result = formatProactivePlainReply(raw, { maxBodyChars: 500, maxSources: 5 });
   assert.ok(result.includes("https://a.com · https://b.com"));
+});
+
+// ---------------------------------------------------------------------------
+// formatDiscordAskDisplay
+// ---------------------------------------------------------------------------
+
+test("formatDiscordAskDisplay clamps to five lines and hides Sources block", () => {
+  const raw = [
+    "Line one [1].",
+    "Line two [2].",
+    "Line three.",
+    "Line four.",
+    "Line five.",
+    "Line six should drop.",
+    "",
+    "Sources",
+    "1. Neocities - https://kotor.neocities.org/modding/tslpatcher/",
+    "2. Deadly Stream - https://deadlystream.com/topic/1",
+  ].join("\n");
+  const result = formatDiscordAskDisplay(raw);
+  assert.equal(result.split("\n").length, 5);
+  assert.ok(!/^\s*Sources\b/im.test(result));
+  assert.ok(!result.includes("Neocities -"));
+});
+
+test("syncSourcesSectionToApproved rewrites Sources lines from approvedSources", () => {
+  const raw =
+    "Fact [1].\n\nSources\n1. Old - https://deadlystream.com/";
+  const synced = syncSourcesSectionToApproved(raw, [
+    { name: "Neocities", homeUrl: "https://kotor.neocities.org/modding/tslpatcher/" },
+  ]);
+  assert.match(synced, /kotor\.neocities\.org\/modding\/tslpatcher/);
+});
+
+test("formatDiscordAskDisplay embeds citations as linked numbers", () => {
+  const raw =
+    "TSLPatcher edits 2DA and GFF [1].\n\nSources\n1. Neocities - https://kotor.neocities.org/modding/tslpatcher/";
+  const result = formatDiscordAskDisplay(raw);
+  assert.match(result, /\[1\]\(https:\/\/kotor\.neocities\.org\/modding\/tslpatcher\/\)/);
+});
+
+test("embedInlineCitationLinks leaves unknown indices unchanged", () => {
+  const map = buildCitationUrlMap(["1. A - https://example.com/a"], []);
+  const out = embedInlineCitationLinks("Fact [1] and [9].", map);
+  assert.match(out, /\[1\]\(https:\/\/example\.com\/a\)/);
+  assert.ok(out.includes("[9]"));
+});
+
+test("clampDiscordBodyLines splits an overlong single paragraph", () => {
+  const blob = `${"Word. ".repeat(80)}Done.`;
+  const lines = clampDiscordBodyLines(blob, 3).split("\n");
+  assert.ok(lines.length <= 3);
+});
+
+test("normalizeBodyCitationIndices remaps sparse markers to 1..N", () => {
+  assert.equal(
+    normalizeBodyCitationIndices("Fact [4] and more [9] then [4] again."),
+    "Fact [1] and more [2] then [1] again.",
+  );
+});
+
+test("formatDiscordAskDisplay unwraps brief bullet-hash lines and links citations", () => {
+  const raw = [
+    "Answer for: What is TSLPatcher?",
+    "",
+    "- # TSLPatcher TSLPatcher applies 2DA, GFF, and TLK patches for KotOR mods. [1]",
+    "- # reone Odyssey engine Open-source engine reimplementation. [2]",
+    "",
+    "Sources",
+    "1. Neocities - https://kotor.neocities.org/modding/tslpatcher/",
+    "2. reone - https://github.com/reone/reone",
+  ].join("\n");
+  const result = formatDiscordAskDisplay(
+    raw,
+    [
+      { name: "Neocities", homeUrl: "https://kotor.neocities.org/modding/tslpatcher/" },
+      { name: "reone", homeUrl: "https://github.com/reone/reone" },
+    ],
+    { query: "What is TSLPatcher used for in KOTOR modding?" },
+  );
+  assert.match(result, /2DA, GFF, and TLK/);
+  assert.match(result, /\[1\]\(https:\/\/kotor\.neocities\.org\/modding\/tslpatcher\/\)/);
+  assert.ok(!/reone/i.test(result), "off-topic reone line should be filtered");
+  assert.ok(result.split("\n").length <= 5);
+  assert.ok(!/^\s*Sources\b/im.test(result));
+});
+
+test("dedupeLeadingTopicLabel removes repeated topic token", () => {
+  assert.equal(
+    dedupeLeadingTopicLabel("TSLPatcher TSLPatcher is a mod installation tool."),
+    "TSLPatcher is a mod installation tool.",
+  );
 });

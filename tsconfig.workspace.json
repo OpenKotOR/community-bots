@@ -5,6 +5,9 @@
       "path": "packages/config"
     },
     {
+      "path": "packages/trask-config"
+    },
+    {
       "path": "packages/core"
     },
     {

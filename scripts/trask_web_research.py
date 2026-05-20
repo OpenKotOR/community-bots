@@ -1,509 +1,486 @@
 #!/usr/bin/env python3
 """
-Headless web research for Trask / Holocron.
+Trask live web research (stdin JSON → stdout JSON).
 
-stdin: JSON payload (query, allowed_url_prefixes, query_domains, source_urls, …)
-stdout: JSON { report, research_information }
+Replaces the removed vendored headless runner. Retrieval order:
+  1. POST {TRASK_INDEXER_BASE_URL}/retrieve (Chroma passages)
+  2. Local Chroma query via trask_indexer (same repo, no HTTP)
+  3. DuckDuckGo + httpx fetch for allowlisted URLs (when ddgs is installed)
 
-Discovery via DuckDuckGo; scrape via Crawl4AI (markdown); trafilatura fallback.
+Stdout is a single JSON object:
+  { "report": "<markdown>", "research_information": { "visited_urls": [...], ... } }
 """
 
 from __future__ import annotations
 
 import argparse
-import asyncio
-import contextlib
 import json
+import logging
 import os
 import re
 import sys
-from dataclasses import dataclass, field
+import time
+from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 
-MAX_CANDIDATE_URLS = 12
-MAX_SCRAPE_URLS = 8
-MAX_MARKDOWN_CHARS_PER_PAGE = 12_000
-MIN_USABLE_BODY_CHARS = 280
-SEARCH_RESULTS_PER_DOMAIN = 4
-
-FORUM_CHROME_PATTERNS = [
-    re.compile(r"\bsign up\b", re.I),
-    re.compile(r"\ball activity\b", re.I),
-    re.compile(r"\bmark site read\b", re.I),
-    re.compile(r"\bactivity feed\b", re.I),
-    re.compile(r"\bexisting user\? sign in\b", re.I),
-    re.compile(r"\byour content feed\b", re.I),
-]
+REPO_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_INDEXER_URL = "http://127.0.0.1:8790"
+LOG = logging.getLogger("trask.research")
 
 
-def _normalize_prefix(value: str) -> str:
-    return value.strip().rstrip("/")
+def _load_retrieval_defaults() -> dict[str, Any]:
+    path = os.environ.get("TRASK_RETRIEVAL_DEFAULTS_PATH") or str(
+        REPO_ROOT / "data" / "trask" / "retrieval.defaults.json"
+    )
+    try:
+        with open(path, encoding="utf-8") as handle:
+            return json.load(handle)
+    except OSError:
+        return {}
 
 
-def _url_allowed(url: str, prefixes: list[str]) -> bool:
-    candidate = _normalize_prefix(url)
-    for raw in prefixes:
-        prefix = _normalize_prefix(raw)
-        if not prefix:
-            continue
-        if candidate == prefix or candidate.startswith(prefix + "/"):
-            return True
+_RETRIEVAL_DEFAULTS = _load_retrieval_defaults()
+MAX_PASSAGES = int(_RETRIEVAL_DEFAULTS.get("maxPassages", 12))
+MAX_DDG_RESULTS = int(_RETRIEVAL_DEFAULTS.get("maxDdgResults", 6))
+FETCH_TIMEOUT_S = max(1, int(_RETRIEVAL_DEFAULTS.get("fetchTimeoutMs", 20_000) / 1000))
+URL_VERIFY_TIMEOUT_S = max(
+    1,
+    int(_RETRIEVAL_DEFAULTS.get("urlVerifyTimeoutMs", _RETRIEVAL_DEFAULTS.get("fetchTimeoutMs", 8000)) / 1000),
+)
+
+
+def configure_logging(*, verbose: bool = False) -> None:
+    level_name = os.environ.get("TRASK_RESEARCH_LOG_LEVEL", "INFO").strip().upper()
+    if verbose:
+        level_name = "DEBUG"
+    level = getattr(logging, level_name, logging.INFO)
+    logging.basicConfig(
+        level=level,
+        stream=sys.stderr,
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    )
+    LOG.debug("logging configured level=%s verbose=%s", level_name, verbose)
+
+
+def _die(message: str, code: int = 1) -> None:
+    LOG.error(message)
+    raise SystemExit(code)
+
+
+def _payload_string_list(payload: dict[str, Any], field: str) -> list[str]:
+    raw = payload.get(field) or []
+    if not isinstance(raw, list) or not all(isinstance(value, str) for value in raw):
+        _die(f'payload: "{field}" must be a list of strings when set', 1)
+    return [value.strip().rstrip("/") for value in raw if value.strip()]
+
+
+def _hostname_matches(hostname: str, allowed_domain: str) -> bool:
+    host = hostname.lower().removeprefix("www.")
+    domain = allowed_domain.lower().removeprefix("www.")
+    return host == domain or host.endswith(f".{domain}")
+
+
+def _url_allowed(url: str, domains: list[str], prefixes: list[str]) -> bool:
+    if not domains and not prefixes:
+        return True
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return False
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return False
+    normalized = url.strip().rstrip("/")
+    if prefixes and any(normalized == prefix or normalized.startswith(f"{prefix}/") for prefix in prefixes):
+        return True
+    if domains and any(_hostname_matches(parsed.hostname or "", domain) for domain in domains):
+        return True
+    return not prefixes and not domains
+
+
+def _is_discord_jump_url(url: str) -> bool:
+    return bool(re.match(r"^https://discord\.com/channels/\d+/\d+/\d+", url.strip(), re.I))
+
+
+def _verify_https_url(url: str) -> bool:
+    if _is_discord_jump_url(url):
+        LOG.debug("url_verify skip discord jump %s", url)
+        return True
+    if url.startswith("discord://"):
+        return True
+    for method in ("HEAD", "GET"):
+        try:
+            req = Request(url, method=method)
+            with urlopen(req, timeout=URL_VERIFY_TIMEOUT_S) as resp:
+                status = getattr(resp, "status", 200) or 200
+                ok = 200 <= int(status) < 400
+                LOG.info("url_verify %s method=%s status=%s ok=%s", url, method, status, ok)
+                return ok
+        except (HTTPError, URLError, TimeoutError, ValueError) as exc:
+            LOG.warning("url_verify fail %s method=%s error=%s", url, method, exc)
     return False
 
 
-def _unique_urls(urls: list[str]) -> list[str]:
-    seen: set[str] = set()
-    out: list[str] = []
-    for url in urls:
-        u = url.strip()
-        if not u or not u.startswith(("http://", "https://")):
+def _normalize_passage(item: dict[str, Any]) -> dict[str, Any] | None:
+    quote = str(item.get("quote") or "").strip()
+    url = str(item.get("url") or "").strip()
+    if not quote or not url:
+        return None
+    return {
+        "quote": quote,
+        "url": url,
+        "host": str(item.get("host") or urlparse(url).hostname or "source").strip(),
+        "score": float(item.get("score") or 0.0),
+        "sourceId": str(item.get("sourceId") or item.get("source_id") or "").strip(),
+        "guildId": str(item.get("guildId") or item.get("guild_id") or "").strip(),
+        "channelId": str(item.get("channelId") or item.get("channel_id") or "").strip(),
+        "firstMessageId": str(item.get("firstMessageId") or item.get("first_message_id") or "").strip(),
+    }
+
+
+def _indexer_base_url() -> str:
+    return (os.environ.get("TRASK_INDEXER_BASE_URL") or DEFAULT_INDEXER_URL).strip().rstrip("/")
+
+
+def _retrieve_via_http(query: str, limit: int) -> list[dict[str, Any]]:
+    body = json.dumps({"query": query, "limit": limit}).encode("utf-8")
+    req = Request(
+        f"{_indexer_base_url()}/retrieve",
+        data=body,
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        method="POST",
+    )
+    started = time.monotonic()
+    try:
+        with urlopen(req, timeout=FETCH_TIMEOUT_S) as resp:
+            parsed = json.loads(resp.read().decode("utf-8"))
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
+        LOG.warning("retrieve_http failed error=%s", exc)
+        return []
+    elapsed_ms = int((time.monotonic() - started) * 1000)
+    passages = parsed.get("passages")
+    if not isinstance(passages, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for item in passages:
+        if not isinstance(item, dict):
             continue
-        key = u.rstrip("/").lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        out.append(u)
+        normalized = _normalize_passage(item)
+        if normalized:
+            out.append(normalized)
+    LOG.info("retrieve_http passages=%s elapsed_ms=%s", len(out), elapsed_ms)
+    for idx, passage in enumerate(out):
+        LOG.debug(
+            "passage[%s] url=%s host=%s quote_len=%s guild=%s channel=%s msg=%s",
+            idx,
+            passage.get("url"),
+            passage.get("host"),
+            len(str(passage.get("quote") or "")),
+            passage.get("guildId"),
+            passage.get("channelId"),
+            passage.get("firstMessageId"),
+        )
     return out
 
 
-def _host_from_url(url: str) -> str:
-    try:
-        return urlparse(url).netloc.lower().replace("www.", "")
-    except Exception:
-        return ""
-
-
-def _looks_like_forum_chrome(text: str) -> bool:
-    if len(text) < 120:
-        return True
-    hits = sum(1 for pat in FORUM_CHROME_PATTERNS if pat.search(text))
-    return hits >= 2
-
-
-def _extract_follow_up_links(markdown: str, query: str, allowed_prefixes: list[str]) -> list[str]:
-    tokens = _query_tokens(query)
-    if not tokens:
+def _retrieve_via_local_chroma(query: str, limit: int) -> list[dict[str, Any]]:
+    indexer_src = REPO_ROOT / "infra" / "trask-indexer"
+    if not indexer_src.is_dir():
         return []
-    found: list[str] = []
-    for _label, href in re.findall(r"\[([^\]]*)\]\((https?://[^)]+)\)", markdown):
-        lower = f"{_label} {href}".lower()
-        if not any(token in lower for token in tokens):
-            continue
-        if _url_allowed(href, allowed_prefixes):
-            found.append(href)
-    return _unique_urls(found)
-
-
-def _truncate(text: str, limit: int) -> str:
-    if len(text) <= limit:
-        return text
-    return text[: limit - 3].rstrip() + "..."
-
-
-@dataclass
-class PageEvidence:
-    url: str
-    markdown: str
-
-
-@dataclass
-class GatherResult:
-    pages: list[PageEvidence] = field(default_factory=list)
-    visited_urls: list[str] = field(default_factory=list)
-    retrieved_urls: list[str] = field(default_factory=list)
-    rejected_urls: list[str] = field(default_factory=list)
-    candidate_urls: list[str] = field(default_factory=list)
-    cache_stats: dict[str, int] = field(default_factory=dict)
-
-
-def _query_tokens(query: str) -> set[str]:
-    return {t for t in re.findall(r"[a-z0-9]{3,}", query.lower()) if t not in {"what", "where", "when", "does", "the", "for", "and", "how"}}
-
-
-def _rank_source_urls(query: str, source_urls: list[str]) -> list[str]:
-    tokens = _query_tokens(query)
-    scored: list[tuple[int, str]] = []
-    for url in source_urls:
-        lower = url.lower()
-        score = sum(2 for token in tokens if token in lower)
-        if "technical" in lower or "reference" in lower or "neocities" in lower:
-            score += 1
-        scored.append((score, url))
-    scored.sort(key=lambda pair: pair[0], reverse=True)
-    return [url for _, url in scored]
-
-
-def discover_urls(
-    query: str,
-    query_domains: list[str],
-    source_urls: list[str],
-    allowed_prefixes: list[str],
-    cache_client: Any | None = None,
-    cache_stats: dict[str, int] | None = None,
-) -> list[str]:
-    if cache_client is not None:
-        try:
-            from trask_cache import get_search, set_search
-
-            cached = get_search(cache_client, query, query_domains)
-            if cached is not None:
-                if cache_stats is not None:
-                    cache_stats["search_hits"] = cache_stats.get("search_hits", 0) + 1
-                filtered = [u for u in cached if _url_allowed(u, allowed_prefixes)]
-                return filtered[:MAX_CANDIDATE_URLS]
-            if cache_stats is not None:
-                cache_stats["search_misses"] = cache_stats.get("search_misses", 0) + 1
-        except Exception:
-            pass
-
-    allowed_sources = [u for u in _unique_urls(source_urls) if _url_allowed(u, allowed_prefixes)]
-    candidates: list[str] = _rank_source_urls(query, allowed_sources)
-
-    domains = [d.strip() for d in query_domains if d.strip()]
-    if not domains:
-        domains = list({_host_from_url(p) for p in allowed_prefixes if _host_from_url(p)})
-
+    sys.path.insert(0, str(indexer_src))
     try:
-        from duckduckgo_search import DDGS
+        from trask_indexer.chroma_store import (  # type: ignore[import-not-found]
+            DEFAULT_COLLECTION,
+            get_chroma_client,
+            get_or_create_collection,
+            query_passages,
+        )
+    except Exception as exc:
+        LOG.warning("retrieve_chroma import failed error=%s", exc)
+        return []
 
-        with DDGS() as ddgs:
-            for domain in domains[:6]:
-                site_query = f"{query} site:{domain}"
-                try:
-                    for item in ddgs.text(site_query, max_results=SEARCH_RESULTS_PER_DOMAIN, backend="bing"):
-                        href = (item.get("href") or item.get("url") or "").strip()
-                        if href:
-                            candidates.append(href)
-                except Exception:
-                    continue
-            if len(candidates) < 3:
-                try:
-                    for item in ddgs.text(query, max_results=10, backend="bing"):
-                        href = (item.get("href") or item.get("url") or "").strip()
-                        if href:
-                            candidates.append(href)
-                except Exception:
-                    pass
-    except Exception:
-        pass
+    data_dir = Path(os.environ.get("TRASK_INDEXER_DATA_DIR", REPO_ROOT / "data/trask-indexer"))
+    persist_dir = data_dir / "chroma"
+    if not persist_dir.is_dir():
+        LOG.info("retrieve_chroma skipped missing persist_dir=%s", persist_dir)
+        return []
 
-    # DuckDuckGo may rate-limit; always keep ranked catalog homes as crawl seeds.
-    for url in allowed_sources:
-        if url not in candidates:
-            candidates.append(url)
-
-    filtered = [u for u in _unique_urls(candidates) if _url_allowed(u, allowed_prefixes)]
-    result = filtered[:MAX_CANDIDATE_URLS]
-
-    if cache_client is not None and result:
-        try:
-            from trask_cache import set_search
-
-            set_search(cache_client, query, query_domains, result)
-        except Exception:
-            pass
-
-    return result
-
-
-def _trafilatura_fetch(url: str) -> str:
+    started = time.monotonic()
     try:
-        import trafilatura
+        client = get_chroma_client(persist_dir)
+        collection = get_or_create_collection(client, DEFAULT_COLLECTION)
+        hits = query_passages(collection, query, limit=limit)
+    except Exception as exc:
+        LOG.warning("retrieve_chroma query failed error=%s", exc)
+        return []
 
-        downloaded = trafilatura.fetch_url(url)
-        if not downloaded:
-            return ""
-        text = trafilatura.extract(downloaded, include_comments=False, include_tables=True)
-        return (text or "").strip()
-    except Exception:
-        return ""
-
-
-async def _crawl_with_shared_crawler(crawler: Any, url: str) -> str:
-    try:
-        from crawl4ai import CrawlerRunConfig, CacheMode
-
-        run_config = CrawlerRunConfig(cache_mode=CacheMode.BYPASS, word_count_threshold=10)
-        result = await crawler.arun(url=url, config=run_config)
-        if result.success and result.markdown:
-            return result.markdown.strip()
-    except Exception:
-        pass
-    return _trafilatura_fetch(url)
-
-
-@contextlib.contextmanager
-def _redirect_stdout_to_stderr():
-    previous = sys.stdout
-    sys.stdout = sys.stderr
-    try:
-        yield
-    finally:
-        sys.stdout = previous
-
-
-def _page_from_cache(url: str, cached_pages: dict[str, str]) -> str | None:
-    body = cached_pages.get(url)
-    if not body or len(body) < MIN_USABLE_BODY_CHARS or _looks_like_forum_chrome(body):
-        return None
-    return _truncate(body, MAX_MARKDOWN_CHARS_PER_PAGE)
-
-
-async def _resolve_page_body(
-    url: str,
-    crawler: Any | None,
-    cache_client: Any | None,
-    cached_pages: dict[str, str],
-    cache_stats: dict[str, int],
-) -> str:
-    cached = _page_from_cache(url, cached_pages)
-    if cached is not None:
-        cache_stats["page_hits"] = cache_stats.get("page_hits", 0) + 1
-        return cached
-
-    cache_stats["page_misses"] = cache_stats.get("page_misses", 0) + 1
-    if crawler is not None:
-        body = await _crawl_with_shared_crawler(crawler, url)
-    else:
-        body = _trafilatura_fetch(url)
-
-    if body and len(body) >= MIN_USABLE_BODY_CHARS and not _looks_like_forum_chrome(body):
-        trimmed = _truncate(body, MAX_MARKDOWN_CHARS_PER_PAGE)
-        if cache_client is not None:
-            try:
-                from trask_cache import set_page
-
-                set_page(cache_client, url, trimmed)
-            except Exception:
-                pass
-        return trimmed
-    return ""
-
-
-async def gather_evidence(
-    query: str,
-    query_domains: list[str],
-    source_urls: list[str],
-    allowed_prefixes: list[str],
-) -> GatherResult:
-    result = GatherResult()
-    cache_client = None
-    try:
-        from trask_cache import get_client, ping
-
-        candidate = get_client()
-        if candidate is not None and ping(candidate):
-            cache_client = candidate
-    except Exception:
-        cache_client = None
-
-    stats = result.cache_stats
-    result.candidate_urls = discover_urls(
-        query,
-        query_domains,
-        source_urls,
-        allowed_prefixes,
-        cache_client=cache_client,
-        cache_stats=stats,
-    )
-    scrape_targets = list(result.candidate_urls[:MAX_SCRAPE_URLS])
-    seen_targets = set(scrape_targets)
-
-    cached_pages: dict[str, str] = {}
-    if cache_client is not None and scrape_targets:
-        try:
-            from trask_cache import get_pages_bulk
-
-            cached_pages = get_pages_bulk(cache_client, scrape_targets)
-        except Exception:
-            cached_pages = {}
-
-    async def accept_url(url: str, crawler: Any | None) -> str | None:
-        result.visited_urls.append(url)
-        body = await _resolve_page_body(url, crawler, cache_client, cached_pages, stats)
-        if not body:
-            result.rejected_urls.append(url)
-            return None
-        result.pages.append(PageEvidence(url=url, markdown=body))
-        result.retrieved_urls.append(url)
-        return body
-
-    try:
-        from crawl4ai import AsyncWebCrawler, BrowserConfig
-
-        browser_config = BrowserConfig(headless=True, verbose=False)
-        with _redirect_stdout_to_stderr():
-            async with AsyncWebCrawler(config=browser_config) as crawler:
-                for url in list(scrape_targets):
-                    body = await accept_url(url, crawler)
-                    if not body:
-                        continue
-                    for follow_up in _extract_follow_up_links(body, query, allowed_prefixes):
-                        if follow_up in seen_targets or len(scrape_targets) >= MAX_SCRAPE_URLS:
-                            continue
-                        seen_targets.add(follow_up)
-                        scrape_targets.append(follow_up)
-                        if cache_client is not None:
-                            try:
-                                from trask_cache import get_pages_bulk
-
-                                cached_pages.update(get_pages_bulk(cache_client, [follow_up]))
-                            except Exception:
-                                pass
-                        await accept_url(follow_up, crawler)
-    except Exception:
-        for url in scrape_targets:
-            if url in result.retrieved_urls:
-                continue
-            await accept_url(url, None)
-
-    return result
-
-
-def build_report(query: str, gather: GatherResult) -> str:
-    if not gather.pages:
-        return "I could not complete live archive synthesis for this question right now."
-
-    sections: list[str] = [
-        f"# Research evidence for: {query.strip()}",
-        "",
-        "The following excerpts were retrieved from approved archive sources.",
-        "",
+    out = [
+        {
+            "id": h.id,
+            "url": h.url,
+            "host": h.host,
+            "quote": h.quote,
+            "score": h.score,
+            "sourceId": h.source_id,
+            "guildId": h.guild_id,
+            "channelId": h.channel_id,
+            "firstMessageId": h.first_message_id,
+        }
+        for h in hits
     ]
-    for page in gather.pages:
-        sections.append(f"## Evidence from {page.url}")
-        sections.append("")
-        sections.append(page.markdown)
-        sections.append("")
-    return "\n".join(sections).strip()
+    LOG.info(
+        "retrieve_chroma passages=%s elapsed_ms=%s",
+        len(out),
+        int((time.monotonic() - started) * 1000),
+    )
+    return out
 
 
-def run_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    query = str(payload.get("query") or "").strip()
-    if not query:
-        raise ValueError("query is required")
-
-    query_domains = [str(x) for x in (payload.get("query_domains") or []) if str(x).strip()]
-    allowed_prefixes = [str(x) for x in (payload.get("allowed_url_prefixes") or []) if str(x).strip()]
-    source_urls = [str(x) for x in (payload.get("source_urls") or []) if str(x).strip()]
-
-    env_prefixes = os.environ.get("TRASK_ALLOWED_URL_PREFIXES", "")
-    if env_prefixes and not allowed_prefixes:
-        allowed_prefixes = [line.strip() for line in env_prefixes.splitlines() if line.strip()]
-    env_domains = os.environ.get("TRASK_ALLOWED_QUERY_DOMAINS", "")
-    if env_domains and not query_domains:
-        query_domains = [line.strip() for line in env_domains.splitlines() if line.strip()]
-
+def _ddg_snippets(query: str, domains: list[str], prefixes: list[str], limit: int) -> list[dict[str, Any]]:
     try:
-        from trask_cache import (
-            annotate_cache_meta,
-            get_client,
-            get_research,
-            ping,
-            research_key_for_payload,
-            set_research,
+        from ddgs import DDGS  # type: ignore[import-not-found]
+    except ImportError:
+        LOG.info("ddg_fallback skipped ddgs not installed")
+        return []
+
+    scoped = query
+    if domains:
+        scoped = f"{query} ({' OR '.join(f'site:{d}' for d in domains[:4])})"
+
+    passages: list[dict[str, Any]] = []
+    try:
+        results = DDGS().text(scoped, region="wt-wt", max_results=max(limit * 2, 8))
+    except Exception as exc:
+        LOG.warning("ddg_fallback search failed error=%s", exc)
+        return []
+
+    for idx, row in enumerate(results or []):
+        if not isinstance(row, dict):
+            continue
+        url = str(row.get("href") or row.get("url") or "").strip()
+        body = str(row.get("body") or row.get("snippet") or "").strip()
+        if not url or not body or not _url_allowed(url, domains, prefixes):
+            continue
+        host = urlparse(url).hostname or ""
+        passages.append(
+            {
+                "id": f"ddg-{idx}",
+                "url": url,
+                "host": host,
+                "quote": body[:1200],
+                "score": 0.0,
+                "sourceId": "duckduckgo",
+                "guildId": "",
+                "channelId": "",
+                "firstMessageId": "",
+            }
+        )
+        if len(passages) >= limit:
+            break
+    LOG.info("ddg_fallback passages=%s", len(passages))
+    return passages
+
+
+def _build_report(query: str, passages: list[dict[str, Any]]) -> str:
+    if not passages:
+        return (
+            f"# Research digest\n\n"
+            f"No indexed or web passages were retrieved for: **{query.strip()}**.\n\n"
+            f"Start the Trask indexer (`trask-indexer serve` on port 8790) or install `ddgs` in the research venv."
         )
 
-        cache_client = get_client()
-        if cache_client is not None and ping(cache_client):
-            rkey = research_key_for_payload(
-                {
-                    "query": query,
-                    "query_domains": query_domains,
-                    "allowed_url_prefixes": allowed_prefixes,
-                    "source_urls": source_urls,
-                },
-            )
-            cached_result = get_research(cache_client, rkey)
-            if cached_result is not None:
-                stats = dict((cached_result.get("research_information") or {}).get("cache") or {})
-                stats["research_hits"] = stats.get("research_hits", 0) + 1
-                return annotate_cache_meta(cached_result, stats)
-    except Exception:
-        pass
+    lines = [f"# Research digest", "", f"**Query:** {query.strip()}", ""]
+    for idx, passage in enumerate(passages, start=1):
+        url = str(passage.get("url") or "").strip()
+        quote = str(passage.get("quote") or "").strip()
+        host = str(passage.get("host") or urlparse(url).hostname or "source").strip()
+        lines.append(f"## Source {idx} — {host}")
+        if url:
+            lines.append(f"- URL: {url}")
+        lines.append("")
+        lines.append(quote)
+        lines.append("")
+    return "\n".join(lines).strip()
 
-    gather = asyncio.run(
-        gather_evidence(query, query_domains, source_urls, allowed_prefixes),
+
+def _unique_urls(passages: list[dict[str, Any]]) -> list[str]:
+    seen: set[str] = set()
+    urls: list[str] = []
+    for passage in passages:
+        url = str(passage.get("url") or "").strip().rstrip("/")
+        if not url or url in seen:
+            continue
+        seen.add(url)
+        urls.append(url)
+    return urls
+
+
+def _passage_from_ddg(passage: dict[str, Any]) -> bool:
+    source_id = str(passage.get("sourceId") or passage.get("source_id") or "").strip().lower()
+    passage_id = str(passage.get("id") or "").strip().lower()
+    return source_id == "duckduckgo" or passage_id.startswith("ddg-")
+
+
+def _trust_indexer_urls_without_probe() -> bool:
+    return os.environ.get("TRASK_TRUST_INDEXER_CITATION_URLS", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
     )
-    report = build_report(query, gather)
 
-    result = {
+
+def _verify_passages(passages: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[str]]:
+    """Drop any https citation that returns 404 or other non-2xx/3xx (HEAD then GET)."""
+    verified: list[dict[str, Any]] = []
+    rejected: list[str] = []
+    trust_indexer = _trust_indexer_urls_without_probe()
+    for passage in passages:
+        url = str(passage.get("url") or "").strip()
+        if url.startswith("discord://"):
+            passage["verified"] = True
+            verified.append(passage)
+            continue
+        if not url.startswith("http"):
+            rejected.append(url)
+            continue
+        if trust_indexer and not _passage_from_ddg(passage):
+            passage["verified"] = True
+            verified.append(passage)
+            continue
+        if _verify_https_url(url):
+            passage["verified"] = True
+            verified.append(passage)
+        else:
+            rejected.append(url)
+    LOG.info("url_verify summary kept=%s rejected=%s", len(verified), len(rejected))
+    return verified, rejected
+
+
+def run_research(payload: dict[str, Any]) -> dict[str, Any]:
+    query = str(payload.get("query") or "").strip()
+    if not query:
+        _die('payload: "query" is required', 1)
+
+    domains = _payload_string_list(payload, "query_domains")
+    prefixes = _payload_string_list(payload, "allowed_url_prefixes")
+    default_limit = int(_RETRIEVAL_DEFAULTS.get("retrieveLimit", MAX_PASSAGES))
+    limit = min(MAX_PASSAGES, max(4, int(os.environ.get("TRASK_WEB_RESEARCH_MAX_PASSAGES", str(default_limit)))))
+
+    LOG.info(
+        "research_start query=%r domains=%s prefixes=%s limit=%s indexer=%s",
+        query[:120],
+        len(domains),
+        len(prefixes),
+        limit,
+        _indexer_base_url(),
+    )
+
+    passages = _retrieve_via_http(query, limit)
+    allow_local_chroma = os.environ.get("TRASK_WEB_RESEARCH_LOCAL_CHROMA", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+    if not passages and allow_local_chroma:
+        LOG.info("retrieve_http empty; trying local chroma (TRASK_WEB_RESEARCH_LOCAL_CHROMA=1)")
+        passages = _retrieve_via_local_chroma(query, limit)
+    elif not passages:
+        LOG.warning(
+            "retrieve_http returned no passages; local chroma disabled (set TRASK_WEB_RESEARCH_LOCAL_CHROMA=1 to bypass Worker)"
+        )
+
+    vector_miss = len(passages) == 0
+    ddg_fallback = os.environ.get("TRASK_WEB_RESEARCH_DDG_FALLBACK", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+    if vector_miss and ddg_fallback:
+        passages = _ddg_snippets(query, domains, prefixes, limit)
+
+    if domains or prefixes:
+        filtered: list[dict[str, Any]] = []
+        for passage in passages:
+            url = str(passage.get("url") or "")
+            if url.startswith("discord://"):
+                filtered.append(passage)
+                continue
+            if _url_allowed(url, domains, prefixes):
+                filtered.append(passage)
+        LOG.info("allowlist_filter before=%s after=%s", len(passages), len(filtered))
+        passages = filtered
+
+    passages, rejected_urls = _verify_passages(passages)
+    index_miss = vector_miss and len(passages) == 0
+
+    urls = _unique_urls(passages)
+    report = _build_report(query, passages)
+    if not report.strip():
+        _die("empty report after retrieval", 1)
+
+    LOG.info(
+        "research_done passages=%s urls=%s index_miss=%s rejected=%s",
+        len(passages),
+        len(urls),
+        index_miss,
+        len(rejected_urls),
+    )
+
+    return {
         "report": report,
+        "passages": [
+            {
+                "quote": str(p.get("quote") or "").strip(),
+                "url": str(p.get("url") or "").strip(),
+                "host": str(p.get("host") or "").strip(),
+                "score": float(p.get("score") or 0.0),
+                "sourceId": str(p.get("sourceId") or p.get("source_id") or "").strip(),
+                "guildId": str(p.get("guildId") or "").strip(),
+                "channelId": str(p.get("channelId") or "").strip(),
+                "firstMessageId": str(p.get("firstMessageId") or "").strip(),
+            }
+            for p in passages
+            if str(p.get("quote") or "").strip() and str(p.get("url") or "").strip()
+        ],
         "research_information": {
-            "source_urls": gather.retrieved_urls,
-            "cited_urls": gather.retrieved_urls,
-            "retrieved_urls": gather.retrieved_urls,
-            "visited_urls": gather.visited_urls,
-            "query_domains": query_domains,
-            "allowed_url_prefixes": allowed_prefixes,
-            "rejected_source_urls": gather.rejected_urls,
+            "source_urls": urls,
+            "cited_urls": urls,
+            "retrieved_urls": urls,
+            "visited_urls": urls,
+            "query_domains": domains,
+            "allowed_url_prefixes": prefixes,
+            "rejected_source_urls": rejected_urls,
+            "index_miss": index_miss,
+            "indexer_url": _indexer_base_url(),
+            "retrieve_limit": limit,
+            "passages_count": len(passages),
+            "local_chroma_enabled": allow_local_chroma,
+            "ddg_fallback_enabled": ddg_fallback,
         },
     }
 
-    try:
-        from trask_cache import annotate_cache_meta, get_client, ping, research_key_for_payload, set_research
-
-        cache_client = get_client()
-        if cache_client is not None and ping(cache_client) and gather.pages:
-            rkey = research_key_for_payload(
-                {
-                    "query": query,
-                    "query_domains": query_domains,
-                    "allowed_url_prefixes": allowed_prefixes,
-                    "source_urls": source_urls,
-                },
-            )
-            stats = dict(gather.cache_stats)
-            stats["research_misses"] = stats.get("research_misses", 0) + 1
-            to_store = annotate_cache_meta(result, stats)
-            set_research(cache_client, rkey, to_store)
-            return to_store
-    except Exception:
-        pass
-
-    if gather.cache_stats:
-        try:
-            from trask_cache import annotate_cache_meta
-
-            return annotate_cache_meta(result, gather.cache_stats)
-        except Exception:
-            pass
-
-    return result
-
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Trask headless web research (Crawl4AI + DDG)")
-    parser.add_argument("--dry-run", action="store_true", help="Import dependencies and exit 0")
+    parser = argparse.ArgumentParser(description="Trask live web research (stdin JSON → stdout JSON)")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Enable DEBUG logging on stderr")
     args = parser.parse_args()
-
-    if args.dry_run:
-        import crawl4ai  # noqa: F401
-        import duckduckgo_search  # noqa: F401
-        import trafilatura  # noqa: F401
-
-        print(json.dumps({"ok": True, "backend": "crawl4ai"}))
-        return 0
-
-    raw = sys.stdin.read()
-    if not raw.strip():
-        print(json.dumps({"error": "empty stdin"}), file=sys.stderr)
-        return 1
+    configure_logging(verbose=args.verbose)
 
     try:
-        payload = json.loads(raw)
+        payload = json.load(sys.stdin)
     except json.JSONDecodeError as exc:
-        print(json.dumps({"error": f"invalid json: {exc}"}), file=sys.stderr)
-        return 1
+        _die(f"stdin must be one JSON object: {exc}", 1)
 
-    try:
-        result = run_payload(payload)
-    except Exception as exc:
-        print(json.dumps({"error": str(exc)}), file=sys.stderr)
-        return 1
+    if not isinstance(payload, dict):
+        _die("stdin JSON must be an object", 1)
 
-    sys.stdout.write(json.dumps(result, ensure_ascii=False))
+    out = run_research(payload)
+    sys.stdout.write(json.dumps(out, ensure_ascii=False))
     return 0
 
 
