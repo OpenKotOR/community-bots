@@ -6,7 +6,45 @@ import {
   distinctiveAnchorTokens,
 } from "./grounded-evidence.js";
 
-const normalizeWhitespace = (value: string): string => value.replace(/\n{3,}/g, "\n\n").trim();
+const collapseExcessiveNewlines = (value: string): string => {
+  const lines = value.split("\n");
+  const out: string[] = [];
+  let blankRun = 0;
+  for (const line of lines) {
+    if (line.trim() === "") {
+      blankRun += 1;
+      if (blankRun <= 1) out.push("");
+      continue;
+    }
+    blankRun = 0;
+    out.push(line);
+  }
+  return out.join("\n").trim();
+};
+
+const normalizeWhitespace = (value: string): string => collapseExcessiveNewlines(value);
+
+const isSourcesHeadingLine = (line: string): boolean => {
+  let trimmed = line.trim();
+  if (trimmed.startsWith("#")) {
+    while (trimmed.startsWith("#")) trimmed = trimmed.slice(1);
+    trimmed = trimmed.trimStart();
+  }
+  const lower = trimmed.toLowerCase();
+  return lower === "sources" || lower === "references";
+};
+
+const findSourcesSectionIndex = (value: string): number | null => {
+  const normalized = value.replace(/\r\n/g, "\n");
+  let offset = 0;
+  for (const line of normalized.split("\n")) {
+    if (isSourcesHeadingLine(line)) {
+      return offset;
+    }
+    offset += line.length + 1;
+  }
+  return null;
+};
 
 const discordPolicy = loadTraskPolicy().discord;
 
@@ -20,19 +58,23 @@ export type DiscordCitationSource = {
 };
 
 export const splitResearchAnswer = (value: string): { body: string; sourceLines: string[] } => {
-  const match = /\nSources\s*\n/i.exec(value);
+  const sourcesAt = findSourcesSectionIndex(value);
 
-  if (!match) {
+  if (sourcesAt === null) {
     return {
       body: normalizeWhitespace(value),
       sourceLines: [],
     };
   }
 
-  const body = normalizeWhitespace(value.slice(0, match.index));
-  const sourceLines = value
-    .slice(match.index + match[0].length)
-    .split(/\r?\n/)
+  const normalized = value.replace(/\r\n/g, "\n");
+  const headingLine = normalized.slice(sourcesAt).split("\n")[0] ?? "";
+  const sectionStart = sourcesAt + headingLine.length + 1;
+
+  const body = normalizeWhitespace(normalized.slice(0, sourcesAt));
+  const sourceLines = normalized
+    .slice(sectionStart)
+    .split("\n")
     .map((line) => line.trim())
     .filter(Boolean);
 

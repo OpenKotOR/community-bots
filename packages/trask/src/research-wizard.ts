@@ -23,6 +23,15 @@ import {
 } from "@openkotor/trask-config";
 
 import {
+  _collapseExcessiveNewlines,
+  _rewriteMarkdownLinks,
+  _splitAtSourcesHeading,
+  _splitParagraphs,
+  _stripAsteriskRuns,
+  _stripMarkdownHeaders,
+  _stripMarkdownTableRows,
+} from "./web-research.js";
+import {
   BRIEF_DISCORD_MIN_CITATIONS,
   collectCitedSourcesFromAnswer,
   collectCitationIndicesFromAnswer,
@@ -658,23 +667,21 @@ const fallbackDiscordRewrite = (
     sources.map((source, index) => [normalizeUrl(source.homeUrl), index + 1]),
   );
 
-  const [bodyOnlyCandidate = ""] = normalized.split(/\n(?:#{1,6}\s*)?(?:Sources|References)\s*\n/i, 1);
-  const bodyOnly = bodyOnlyCandidate
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, (_match, text: string, url: string) => {
-      const matchedSource = matchApprovedSource(url, sources);
-      const citationIndex = matchedSource ? sourceIndexByUrl.get(normalizeUrl(matchedSource.homeUrl)) : undefined;
-      return citationIndex ? `${text} [${citationIndex}]` : text;
-    })
-    .replace(/^#{1,6}\s+.*$/gm, "")
-    .replace(/^\|.*\|$/gm, "")
-    .replace(/\*+/g, "")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+  const bodyOnly = _collapseExcessiveNewlines(
+    _stripAsteriskRuns(
+      _stripMarkdownTableRows(
+        _stripMarkdownHeaders(
+          _rewriteMarkdownLinks(_splitAtSourcesHeading(normalized), (text, url) => {
+            const matchedSource = matchApprovedSource(url, sources);
+            const citationIndex = matchedSource ? sourceIndexByUrl.get(normalizeUrl(matchedSource.homeUrl)) : undefined;
+            return citationIndex ? `${text} [${citationIndex}]` : text;
+          }),
+        ),
+      ),
+    ),
+  );
 
-  const paragraphs = bodyOnly
-    .split(/\n{2,}/)
-    .map((paragraph) => paragraph.trim())
-    .filter((paragraph) => paragraph.length > 0);
+  const paragraphs = _splitParagraphs(bodyOnly);
 
   const selected: string[] = [];
   let totalLength = 0;
@@ -716,19 +723,19 @@ const fallbackDiscordBrief = (query: string, report: string, sources: readonly S
     sources.map((source, index) => [normalizeUrl(source.homeUrl), index + 1]),
   );
 
-  const [bodyOnlyCandidate = ""] = normalized.split(/\n(?:#{1,6}\s*)?(?:Sources|References)\s*\n/i, 1);
-  const bodyOnly = bodyOnlyCandidate
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, (_match, text: string, url: string) => {
-      const matchedSource = matchApprovedSource(url, sources);
-      const citationIndex = matchedSource ? sourceIndexByUrl.get(normalizeUrl(matchedSource.homeUrl)) : undefined;
-      return citationIndex ? `${text} [${citationIndex}]` : text;
-    })
-    .replace(/^#{1,6}\s+.*$/gm, "")
-    .replace(/\*+/g, "")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+  const bodyOnly = _collapseExcessiveNewlines(
+    _stripAsteriskRuns(
+      _stripMarkdownHeaders(
+        _rewriteMarkdownLinks(_splitAtSourcesHeading(normalized), (text, url) => {
+          const matchedSource = matchApprovedSource(url, sources);
+          const citationIndex = matchedSource ? sourceIndexByUrl.get(normalizeUrl(matchedSource.homeUrl)) : undefined;
+          return citationIndex ? `${text} [${citationIndex}]` : text;
+        }),
+      ),
+    ),
+  );
 
-  const firstChunk = bodyOnly.split(/\n{2,}/)[0]?.trim() ?? bodyOnly;
+  const firstChunk = _splitParagraphs(bodyOnly)[0]?.trim() ?? bodyOnly;
   let summary = firstChunk.slice(0, 420).trim();
 
   if (!summary) {
