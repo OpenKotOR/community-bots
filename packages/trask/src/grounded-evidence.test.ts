@@ -227,6 +227,40 @@ test("selectDistinctBriefClaims requires two distinct citation URLs", () => {
   assert.equal(picked.length, 2);
 });
 
+test("composeGroundedAnswerFromClaims full profile strips markdown headings and avoids duplicate lead", () => {
+  const claims = [
+    {
+      claim: "# TSLPatcher on GitHub\n\nThe TSLPatcher project documents list-driven 2DA, GFF, and TLK changes.",
+      quote: "The TSLPatcher project documents list-driven 2DA, GFF, and TLK changes.",
+      url: sources[0]!.homeUrl,
+      citationUrl: sources[0]!.homeUrl,
+      sourceIndex: 1,
+      authority: "web" as const,
+    },
+    {
+      claim: "# TSLPatcher\n\nTSLPatcher is a mod installation tool for list-driven patches.",
+      quote: "TSLPatcher is a mod installation tool for list-driven patches.",
+      url: sources[1]!.homeUrl,
+      citationUrl: sources[1]!.homeUrl,
+      sourceIndex: 2,
+      authority: "web" as const,
+    },
+  ];
+  const answer = composeGroundedAnswerFromClaims(
+    "When a KotOR mod ships 2DA and TLK changes, what does TSLPatcher automate?",
+    claims,
+    sources,
+    "full",
+  );
+  const { body } = splitResearchAnswer(answer);
+  assert.doesNotMatch(body, /^-\s+#/m);
+  assert.doesNotMatch(body, /-\s+#/);
+  const leadCount = (body.match(/TSLPatcher project documents/gi) ?? []).length;
+  assert.equal(leadCount, 1, "first claim should appear once, not as summary + bullet duplicate");
+  assert.match(body, /\[1\]/);
+  assert.match(body, /\[2\]/);
+});
+
 test("composeGroundedAnswerFromClaims full profile keeps only query-anchored claims", () => {
   const claims = [
     {

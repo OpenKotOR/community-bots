@@ -508,44 +508,39 @@ export const composeGroundedAnswerFromClaims = (
     return url.slice(0, end);
   };
 
-  const stripTrailingBracketCitation = (value: string): string => {
-    let end = value.length;
-    while (end > 0 && value[end - 1] === " ") end -= 1;
-    if (end === 0 || value[end - 1] !== "]") return value.trim();
-    let i = end - 2;
-    while (i >= 0 && value[i]! >= "0" && value[i]! <= "9") i -= 1;
-    if (i < 0 || value[i] !== "[") return value.trim();
-    let start = i;
-    if (start > 0 && value[start - 1] === " ") start -= 1;
-    return value.slice(0, start).trim();
-  };
-
   const stripClaimTitle = (claim: string): string => {
     const lines = claim.split("\n");
     const strippedLines: string[] = [];
     for (let line of lines) {
       line = line.trimStart();
+      line = line.replace(/^[-*+]\s+/u, "");
       while (line.startsWith("#")) {
         line = line.slice(1).trimStart();
       }
       const inlineHash = line.indexOf(" #");
       if (inlineHash >= 0) line = line.slice(0, inlineHash);
-      strippedLines.push(line.trim());
+      const trimmed = line.trim();
+      if (trimmed) strippedLines.push(trimmed);
     }
     const flattened = collapseWhitespace(strippedLines.join(" "));
     const duplicateLead = flattened.match(/^(\S+)\s+\1\b/iu);
     return duplicateLead ? flattened.slice(duplicateLead[1]!.length).trimStart() : flattened;
   };
 
+  const formatClaimLine = (claim: EvidenceClaim): string =>
+    `${stripClaimTitle(claim.claim)} [${claim.sourceIndex}]`;
+
   const composeClaims = indexed;
-  const bullets =
-    profile === "brief"
-      ? composeClaims.map((claim) => `${stripClaimTitle(claim.claim)} [${claim.sourceIndex}]`)
-      : composeClaims.map((claim) => `- ${claim.claim} [${claim.sourceIndex}]`);
+  const claimLines = composeClaims.map(formatClaimLine);
   const caveat =
     profile === "brief" || conflictHosts.size === 0
       ? ""
-      : "\n\nCaveats: Sources disagree on details; compare the cited pages before installing.";
+      : "Caveats: Sources disagree on details; compare the cited pages before installing.";
+
+  const body =
+    profile === "brief"
+      ? [...claimLines, caveat].filter(Boolean).join("\n").trim()
+      : [...claimLines, caveat].filter(Boolean).join("\n\n").trim();
 
   const orderedSources: SourceDescriptor[] = [];
   const normalize = (url: string): string => stripTrailingSlashes(url.trim());
@@ -558,14 +553,6 @@ export const composeGroundedAnswerFromClaims = (
     }
   }
 
-  const summaryLead =
-    profile === "brief" || composeClaims.length === 0
-      ? ""
-      : `${stripTrailingBracketCitation(stripClaimTitle(composeClaims[0]!.claim))} [${composeClaims[0]!.sourceIndex}]`;
-  const body =
-    profile === "brief"
-      ? [...bullets, caveat].filter(Boolean).join("\n").trim()
-      : [summaryLead, summaryLead ? "" : "", ...bullets, caveat].filter(Boolean).join("\n").trim();
   const sourcesSection = [
     "Sources",
     ...orderedSources.map((source, index) => `${index + 1}. ${source.name} - ${source.homeUrl}`),
