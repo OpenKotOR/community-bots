@@ -5,7 +5,7 @@ FROM node:24-bookworm AS base
 WORKDIR /workspace
 ENV NODE_ENV=production
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends python3 python3-venv python3-pip \
+  && apt-get install -y --no-install-recommends python3 python3-venv python3-pip curl \
   && rm -rf /var/lib/apt/lists/*
 RUN corepack enable && corepack prepare pnpm@10.11.0 --activate
 
