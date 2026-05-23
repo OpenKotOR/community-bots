@@ -3,6 +3,12 @@
  * Proxies POST /retrieve to the Chroma indexer (local/VPS) until Vectorize replaces it.
  */
 
+const trimTrailingSlashes = (value: string): string => {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === "/") end -= 1;
+  return value.slice(0, end);
+};
+
 export interface Env {
   TRASK_INDEXER_BASE_URL: string;
 }
@@ -33,7 +39,7 @@ export default {
       return json(200, {
         ok: true,
         service: "trask-retrieve",
-        indexer: env.TRASK_INDEXER_BASE_URL?.replace(/\/+$/, "") ?? "",
+        indexer: env.TRASK_INDEXER_BASE_URL ? trimTrailingSlashes(env.TRASK_INDEXER_BASE_URL) : "",
       });
     }
 
@@ -41,7 +47,7 @@ export default {
       return json(404, { error: "not_found", path: url.pathname });
     }
 
-    const base = (env.TRASK_INDEXER_BASE_URL ?? "").trim().replace(/\/+$/, "");
+    const base = trimTrailingSlashes((env.TRASK_INDEXER_BASE_URL ?? "").trim());
     if (!base) {
       return json(503, { error: "TRASK_INDEXER_BASE_URL is not configured" });
     }

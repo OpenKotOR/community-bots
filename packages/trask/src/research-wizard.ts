@@ -179,22 +179,58 @@ const buildCustomPrompt = (templateId = "holocron-compose"): string => loadPromp
 
 const buildCustomPromptBrief = (templateId = "discord-brief-compose"): string => loadPromptTemplate(templateId);
 
-const normalizeUrl = (value: string): string => value.replace(/\/+$/, "").trim();
+const stripTrailingChars = (value: string, chars: string): string => {
+  let end = value.length;
+  while (end > 0 && chars.includes(value[end - 1]!)) end -= 1;
+  return value.slice(0, end);
+};
+
+const stripTrailingSlashes = (value: string): string => stripTrailingChars(value, "/");
+
+const normalizeUrl = (value: string): string => stripTrailingSlashes(value).trim();
+
+const isSourcesHeadingLine = (line: string): boolean => {
+  let trimmed = line.trim();
+  if (trimmed.startsWith("#")) {
+    while (trimmed.startsWith("#")) trimmed = trimmed.slice(1);
+    trimmed = trimmed.trimStart();
+  }
+  const lower = trimmed.toLowerCase();
+  return lower === "sources" || lower === "references";
+};
+
+const isUrlTerminator = (ch: string): boolean => /\s/u.test(ch) || ch === ")" || ch === ">" || ch === "]";
 
 const extractUrls = (value: string): string[] => {
-  const matches = value.match(/[a-z][a-z0-9+.-]*:\/\/[^\s)>\]]+/giu) ?? [];
-  return [...new Set(matches.map((match) => match.replace(/[.,;:!?]+$/, "")))];
+  const urls: string[] = [];
+  const lower = value.toLowerCase();
+  let i = 0;
+  while (i < value.length) {
+    const httpsIdx = lower.indexOf("https://", i);
+    const httpIdx = lower.indexOf("http://", i);
+    if (httpsIdx === -1 && httpIdx === -1) break;
+    const start = httpsIdx === -1
+      ? httpIdx
+      : httpIdx === -1
+        ? httpsIdx
+        : Math.min(httpsIdx, httpIdx);
+    let end = start;
+    while (end < value.length && !isUrlTerminator(value[end]!)) end += 1;
+    urls.push(stripTrailingChars(value.slice(start, end), ".,;:!?"));
+    i = end;
+  }
+  return [...new Set(urls)];
 };
 
 const extractSourceSectionUrls = (value: string): string[] => {
   const normalized = value.replace(/\r\n/g, "\n");
-  const sourceHeading = /\n(?:#{1,6}\s*)?(?:Sources|References)\s*\n/i;
-  const match = normalized.match(sourceHeading);
-  if (!match || match.index === undefined) {
-    return extractUrls(normalized);
+  const lines = normalized.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    if (isSourcesHeadingLine(lines[i] ?? "")) {
+      return extractUrls(lines.slice(i + 1).join("\n"));
+    }
   }
-  const sourceSection = normalized.slice(match.index + match[0].length);
-  return extractUrls(sourceSection);
+  return extractUrls(normalized);
 };
 
 const hostnameHint = (url: string): string => {
@@ -445,12 +481,64 @@ const collectCitedSourcesFromText = (
   sourcePool: readonly SourceDescriptor[],
 ): readonly SourceDescriptor[] => materializeSourcesFromUrls(extractSourceSectionUrls(text), sourcePool);
 
+const startsWithTableOfContentsHeading = (trimmed: string): boolean => {
+  const lower = trimmed.toLowerCase();
+  if (!lower.startsWith("##")) return false;
+  let i = 2;
+  while (i < lower.length && /\s/u.test(lower[i]!)) i += 1;
+  return lower.startsWith("table of contents", i);
+};
+
+const startsWithH2WithSpace = (trimmed: string): boolean =>
+  trimmed.startsWith("##") && trimmed.length > 2 && /\s/u.test(trimmed[2]!);
+
+const isH1AtxHeadingLine = (trimmed: string): boolean => {
+  if (!trimmed.startsWith("#")) return false;
+  if (trimmed.startsWith("##")) return false;
+  return trimmed.length > 1 && /\s/u.test(trimmed[1]!);
+};
+
+const collapseExcessiveNewlines = (value: string): string => {
+  const lines = value.split("\n");
+  const out: string[] = [];
+  let blankRun = 0;
+  for (const line of lines) {
+    if (line.trim() === "") {
+      blankRun += 1;
+      if (blankRun <= 1) out.push("");
+      continue;
+    }
+    blankRun = 0;
+    out.push(line);
+  }
+  return out.join("\n").trim();
+};
+
 const normalizeReport = (value: string): string => {
-  return value
-    .replace(/^#\s+.*$/m, "")
-    .replace(/^##\s+Table of Contents[\s\S]*?(?=^##\s+|^Sources\s*$|^#\s+|$)/im, "")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+  const lines = value.replace(/\r\n/g, "\n").split("\n");
+  const out: string[] = [];
+  let skippingToc = false;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (startsWithTableOfContentsHeading(trimmed)) {
+      skippingToc = true;
+      continue;
+    }
+    if (skippingToc) {
+      if (
+        startsWithH2WithSpace(trimmed)
+        || isSourcesHeadingLine(line)
+        || isH1AtxHeadingLine(trimmed)
+      ) {
+        skippingToc = false;
+      } else {
+        continue;
+      }
+    }
+    if (isH1AtxHeadingLine(trimmed)) continue;
+    out.push(line);
+  }
+  return collapseExcessiveNewlines(out.join("\n"));
 };
 
 const formatSourcesSection = (sources: readonly SourceDescriptor[]): string => {

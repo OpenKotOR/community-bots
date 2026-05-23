@@ -28,6 +28,7 @@ const ALLOWED_GOLDEN_LITERAL_PATHS = new Set([
   "apps/holocron-web/e2e",
   "packages/trask/src",
   "infra/trask-retrieve-worker",
+  "scripts/smoke_trask_web_research.py",
   ".cursor/plans",
 ]);
 

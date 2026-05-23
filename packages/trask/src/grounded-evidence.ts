@@ -309,9 +309,24 @@ const queryTokens = (query: string): string[] =>
     .split(/[^a-z0-9]+/u)
     .filter((token) => token.length > 2);
 
+const isTokenBoundaryChar = (ch: string | undefined): boolean =>
+  ch === undefined || !/[a-z0-9]/iu.test(ch);
+
+/** Word-boundary token match without dynamic RegExp (CodeQL-safe on user queries). */
 const haystackIncludesToken = (haystack: string, token: string): boolean => {
-  const escaped = token.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
-  return new RegExp(`\\b${escaped}\\b`, "iu").test(haystack);
+  const lowerHaystack = haystack.toLowerCase();
+  const lowerToken = token.toLowerCase();
+  if (!lowerToken) return false;
+  let i = 0;
+  while (i <= lowerHaystack.length - lowerToken.length) {
+    const at = lowerHaystack.indexOf(lowerToken, i);
+    if (at === -1) return false;
+    const before = at === 0 ? undefined : lowerHaystack[at - 1];
+    const after = lowerHaystack[at + lowerToken.length];
+    if (isTokenBoundaryChar(before) && isTokenBoundaryChar(after)) return true;
+    i = at + 1;
+  }
+  return false;
 };
 
 const anchorTokensForQuery = (query: string): string[] => {

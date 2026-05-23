@@ -39,9 +39,39 @@ const DEGRADED_RE = degradedAnswerRegexes()[0] ?? /could not complete live (?:we
 const SOURCE_LINE_RE = /https?:\/\/[^\s)]+/i;
 const MIN_HTTPS_SOURCES = DEFAULT_QUERIES[0]?.minCitations ?? 2;
 
+const stripTrailingUrlPunctuation = (url) => {
+  let end = url.length;
+  while (end > 0 && ",.;:!?)".includes(url[end - 1])) end -= 1;
+  return url.slice(0, end);
+};
+
+const findHttpUrlInText = (text, fromIndex = 0) => {
+  const lower = text.toLowerCase();
+  const httpsAt = lower.indexOf("https://", fromIndex);
+  const httpAt = lower.indexOf("http://", fromIndex);
+  const start =
+    httpsAt < 0 ? httpAt : httpAt < 0 ? httpsAt : Math.min(httpsAt, httpAt);
+  if (start < 0) return null;
+  let end = start;
+  while (end < text.length) {
+    const ch = text[end];
+    if (ch <= " " || ch === ")" || ch === "]") break;
+    end += 1;
+  }
+  const raw = text.slice(start, end);
+  return raw ? stripTrailingUrlPunctuation(raw) : null;
+};
+
 const countDistinctHttps = (text) => {
-  const matches = text.match(/https:\/\/[^\s)\]]+/gi);
-  return matches ? new Set(matches).size : 0;
+  const seen = new Set();
+  let i = 0;
+  while (i < text.length) {
+    const url = findHttpUrlInText(text, i);
+    if (!url) break;
+    seen.add(url);
+    i = text.indexOf(url, i) + url.length;
+  }
+  return seen.size;
 };
 
 const argValue = (name, fallback) => {
@@ -90,7 +120,7 @@ const auditCitationAlignment = (answer, approvedSources) => {
     .map((match) => Number(match[1]))
     .filter((value) => Number.isFinite(value) && value > 0);
   const sourceUrls = sourceLines
-    .map((line) => line.match(/https?:\/\/\S+/i)?.[0])
+    .map((line) => findHttpUrlInText(line))
     .filter(Boolean);
 
   if (citedIndices.length === 0 && sourceUrls.length > 0) {
