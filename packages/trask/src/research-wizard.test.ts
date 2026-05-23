@@ -52,14 +52,12 @@ test("_normalizeUrl preserves URL path when no trailing slash", () => {
 test("_extractUrls extracts HTTP and HTTPS URLs from text", () => {
   const text = "See https://example.com and http://other.org for more.";
   const urls = _extractUrls(text);
-  assert.ok(urls.includes("https://example.com"));
-  assert.ok(urls.includes("http://other.org"));
+  assert.deepEqual([...urls].sort(), ["http://other.org", "https://example.com"].sort());
 });
 
 test("_extractUrls strips trailing punctuation from URLs", () => {
   const urls = _extractUrls("Visit https://example.com. And https://other.com!");
-  assert.ok(urls.includes("https://example.com"));
-  assert.ok(urls.includes("https://other.com"));
+  assert.deepEqual([...urls].sort(), ["https://example.com", "https://other.com"].sort());
   assert.ok(!urls.some((u) => u.endsWith(".")));
 });
 
@@ -222,8 +220,9 @@ test("_formatSourcesSection numbers entries starting at 1", () => {
     fakeSource("Site A", "https://a.com"),
     fakeSource("Site B", "https://b.com"),
   ]);
-  assert.ok(result.includes("1. Site A - https://a.com"));
-  assert.ok(result.includes("2. Site B - https://b.com"));
+  const lines = result.split("\n");
+  assert.equal(lines[1], "1. Site A - https://a.com");
+  assert.equal(lines[2], "2. Site B - https://b.com");
 });
 
 test("_formatSourcesSection returns just 'Sources' for empty sources", () => {
