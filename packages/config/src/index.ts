@@ -13,6 +13,16 @@ import { loadPolicyFromFile } from "@openkotor/pazaak-policy/file-loader";
 import { config as loadDotEnv } from "dotenv";
 import { z } from "zod";
 
+import { resolveTraskLlm } from "./trask-llm-resolve.js";
+
+export {
+  hasTraskLlmProvider,
+  resolveTraskLlm,
+  stripTraskModelPrefix,
+  TRASK_FREE_CHAT_MODELS,
+  TRASK_PAID_CHAT_MODEL_FALLBACKS,
+} from "./trask-llm-resolve.js";
+
 function findDotEnv(): string | undefined {
   let dir = resolve(process.cwd());
   for (;;) {
@@ -403,14 +413,14 @@ const buildOpenAiProviderHeaders = (env: NodeJS.ProcessEnv): Record<string, stri
 };
 
 export const loadSharedAiConfig = (env: NodeJS.ProcessEnv = process.env): SharedAiConfig => {
-  const openAiKey = readOptionalEnv("OPENAI_API_KEY", env) ?? readOptionalEnv("OPENROUTER_API_KEY", env);
+  const llm = resolveTraskLlm(env, { defaultPaidChatModel: defaultChatModel });
   return {
-    openAiApiKey: openAiKey,
-    openAiBaseUrl: readOptionalEnv("OPENAI_BASE_URL", env),
-    openAiDefaultHeaders: buildOpenAiProviderHeaders(env),
+    openAiApiKey: llm.openAiApiKey,
+    openAiBaseUrl: llm.openAiBaseUrl,
+    openAiDefaultHeaders: llm.openAiDefaultHeaders ?? buildOpenAiProviderHeaders(env),
     firecrawlApiKey: readOptionalEnv("FIRECRAWL_API_KEY", env),
-    chatModel: readOptionalEnv("OPENAI_CHAT_MODEL", env) ?? defaultChatModel,
-    chatModelFallbacks: readListEnv("TRASK_REWRITE_MODEL_FALLBACKS", env),
+    chatModel: llm.chatModel,
+    chatModelFallbacks: llm.chatModelFallbacks,
     embeddingModel: readOptionalEnv("OPENAI_EMBEDDING_MODEL", env) ?? defaultEmbeddingModel,
     databaseUrl: readOptionalEnv("DATABASE_URL", env),
   };

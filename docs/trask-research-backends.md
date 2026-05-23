@@ -15,7 +15,7 @@ Holocron’s UI lives in **`apps/holocron-web`**. It talks to **`apps/trask-http
 ```bash
 bash scripts/bootstrap_trask_research.sh   # creates .venv-trask-research
 export TRASK_WEB_RESEARCH_PYTHON="$(pwd)/.venv-trask-research/bin/python"
-# OPENAI_API_KEY or OPENROUTER_API_KEY required for Holocron synthesis
+# LLM: OPENROUTER_API_KEY (free models), LITELLM_PROXY_URL / OPENCODE_LLM_PROXY_URL, or OPENAI_API_KEY
 ```
 
 Fedora/RHEL hosts need `libxml2-devel` and `libxslt-devel` before the first bootstrap (for `lxml`).
@@ -28,7 +28,11 @@ Fedora/RHEL hosts need `libxml2-devel` and `libxslt-devel` before the first boot
 | `TRASK_WEB_RESEARCH_SCRIPT` | Optional override script path |
 | `TRASK_GPT_RESEARCHER_PYTHON` | Deprecated alias for `TRASK_WEB_RESEARCH_PYTHON` |
 | `TRASK_WEB_RESEARCH_TIMEOUT_MS` | Subprocess timeout (default **900000**; legacy alias `TRASK_RESEARCHWIZARD_TIMEOUT_MS`) |
-| `OPENAI_API_KEY` / `OPENROUTER_API_KEY` | LLM rewrite for final Holocron answers |
+| `OPENROUTER_API_KEY` | Recommended: free-tier models via OpenRouter (`openrouter/openrouter/free` default) |
+| `LITELLM_PROXY_URL` / `OPENCODE_LLM_PROXY_URL` / `TRASK_LLM_BASE_URL` | OpenAI-compatible proxy (LiteLLM or OpenCode plugin); key optional (`local`) |
+| `OPENAI_API_KEY` / `GROQ_API_KEY` / … | Direct providers; paid fallbacks when `TRASK_LLM_PROFILE=paid` |
+| `TRASK_LLM_PROFILE` | `free` (default) or `paid` — model ordering in `@openkotor/config` |
+| `FAST_LLM` / `SMART_LLM` / `TRASK_REWRITE_MODEL_FALLBACKS` | Override defaults; see `python scripts/trask_print_fallback_llm.py` + vendored `llm_fallbacks` |
 | `REDIS_URL` / `TRASK_REDIS_URL` | Optional Redis for research cache (`scripts/trask_cache.py`) |
 | `TRASK_CACHE_DISABLED` | Set to `1` to bypass Redis even when `REDIS_URL` is set |
 | `TRASK_CACHE_SEARCH_TTL_SECONDS` | DuckDuckGo URL-list cache TTL (default **21600** = 6h) |
