@@ -415,8 +415,14 @@ const buildOpenAiProviderHeaders = (env: NodeJS.ProcessEnv): Record<string, stri
   return Object.keys(headers).length > 0 ? headers : undefined;
 };
 
+const stripTrailingSlashes = (value: string): string => {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === "/") end -= 1;
+  return value.slice(0, end);
+};
+
 const normalizeOpenAiCompatibleBaseUrl = (raw: string): string => {
-  const trimmed = raw.trim().replace(/\/+$/u, "");
+  const trimmed = stripTrailingSlashes(raw.trim());
   if (trimmed.endsWith("/v1")) return trimmed;
   return `${trimmed}/v1`;
 };

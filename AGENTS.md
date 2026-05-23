@@ -120,7 +120,7 @@ For live research validation, prefer **`trask_live_stack.sh`** so the Worker ret
 | Variable | Purpose |
 |----------|---------|
 | `TRASK_WEB_ALLOW_ANONYMOUS=1` | Anonymous Holocron sessions on standalone `trask-http-server` |
-| `OPENROUTER_API_KEY`, `LITELLM_PROXY_URL`, `OPENCODE_LLM_PROXY_URL`, or `OPENAI_API_KEY` | LLM synthesis — free models first (`openrouter/openrouter/free`); see `.env.local.example` |
+| `OPENROUTER_API_KEY` / `LITELLM_PROXY_URL` / `OPENCODE_LLM_PROXY_URL` | LLM synthesis — **free default** (`TRASK_LLM_PROFILE=free`, `openrouter/free`); paid via `OPENAI_API_KEY` or `TRASK_LLM_PROFILE=paid` (see `docs/trask-research-backends.md`) |
 | `INGEST_STATE_DIR` | Defaults to `data/ingest-worker` for local knowledge chunks |
 | `TRASK_WEB_RESEARCH_PYTHON` | Optional; defaults to `.venv-trask-research/bin/python` when present |
 | `TRASK_INDEXER_BASE_URL` | **Cloudflare retrieve Worker** (`http://127.0.0.1:8787` local dev); proxies to Chroma indexer on **8790**. Do not point clients at Chroma directly. |

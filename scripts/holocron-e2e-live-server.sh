@@ -19,20 +19,22 @@ for envfile in ".env" ".env.local"; do
 done
 
 has_llm=0
-for key in \
-  TRASK_LLM_BASE_URL OPENCODE_LLM_PROXY_URL LITELLM_PROXY_URL \
-  OPENAI_API_KEY OPENROUTER_API_KEY LITELLM_API_KEY LITELLM_MASTER_KEY OPENCODE_LLM_PROXY_TOKEN \
-  GEMINI_API_KEY GOOGLE_API_KEY GROQ_API_KEY ANTHROPIC_API_KEY; do
+for key in OPENAI_API_KEY OPENROUTER_API_KEY GEMINI_API_KEY GOOGLE_API_KEY GROQ_API_KEY ANTHROPIC_API_KEY; do
   if [[ -n "${!key:-}" ]]; then
+    has_llm=1
+    break
+  fi
+done
+for proxy_var in TRASK_LLM_BASE_URL LITELLM_PROXY_URL OPENCODE_LLM_PROXY_URL; do
+  if [[ -n "${!proxy_var:-}" ]]; then
     has_llm=1
     break
   fi
 done
 if [[ "$has_llm" -eq 0 ]]; then
   echo "holocron-e2e-live-server: warning — no LLM provider configured in .env / .env.local." >&2
-  echo "  Use one of: OPENROUTER_API_KEY (free models), LITELLM_PROXY_URL / OPENCODE_LLM_PROXY_URL," >&2
-  echo "  or OPENAI_API_KEY / GROQ_API_KEY. See .env.local.example (TRASK_LLM_*)." >&2
-  echo "  Grounded answers still work without keys; LLM rewrite/compose needs a provider." >&2
+  echo "  Set OPENROUTER_API_KEY (free default), LITELLM_PROXY_URL / OPENCODE_LLM_PROXY_URL, or OPENAI_API_KEY." >&2
+  echo "  See docs/trask-research-backends.md and .env.local.example (TRASK_LLM_PROFILE=free)." >&2
 fi
 
 INDEXER_URL="${TRASK_INDEXER_BASE_URL:-http://127.0.0.1:8787}"
