@@ -8,6 +8,18 @@ origin: user-request-2026-05-19-research-quality
 
 # Trask research agent — 2026 industry standards bar
 
+## Living plan status
+
+**Authority:** This plan is the single active spine for Trask research quality on branch `feat/trask-crawl4ai-rag` ([PR #7](https://github.com/OpenKotOR/community-bots/pull/7)). Supersedes execution tracking in `2026-05-19-001`, `002`, and `006` (006 marked completed as the v1 transparency slice).
+
+### Delta Update (2026-05-23)
+
+- **Landed:** `data/trask/**` committed for CI (policy, prompts, eval registries); config drift + faithfulness gates green; CodeQL-safe linear parsers in `research-wizard`, `grounded-evidence`, QA scripts, retrieve/worker trailing-slash trim; Holocron e2e `getByLabel('Answer', { exact: true })`; **Build & Test CI green** on PR #7 (Holocron e2e + unit tests).
+- **Partial:** GitHub **CodeQL** merge check still red (repo-wide open alerts on `main`, including pre-existing non-Trask paths); local Holocron browser MCP pass not re-run this session; Vectorize / VPS scheduled crawl still deferred.
+- **Next:** Close or dismiss Trask-touched CodeQL alerts on PR (`trask-worker` hostname check, any remaining ReDoS in markdown strippers); merge PR #7 when branch protection allows; post-merge: expert browser pass on :4010 + optional Discord live proof.
+
+---
+
 ## Summary
 
 This plan raises Trask/Holocron/Discord from “RAG that sometimes passes gates” to a **2026 production research-agent bar**: owned crawl → hybrid retrieve at a **versioned Cloudflare Worker** → **structured verified passages** → **sufficiency-gated grounded compose** with **mandatory multi-source citations** when evidence supports them, and a **three-layer eval ladder** (offline faithfulness, Worker contract smoke, live browser). It consolidates overlapping May-19 plans into one execution spine and defers Vectorize migration until Chroma-path quality matches golden and expert queries under Worker-only CI.

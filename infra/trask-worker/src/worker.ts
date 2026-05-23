@@ -68,9 +68,18 @@ function upstreamBaseUrl(env: Env): string {
   return (env.TRASK_RESEARCHWIZARD_BASE_URL ?? "").trim();
 }
 
+function isPlaceholderUpstream(baseUrl: string): boolean {
+  try {
+    const host = new URL(baseUrl).hostname.toLowerCase();
+    return host === "example.com" || host.endsWith(".example.com");
+  } catch {
+    return true;
+  }
+}
+
 function hasRealUpstream(env: Env): boolean {
   const baseUrl = upstreamBaseUrl(env);
-  return Boolean(baseUrl) && !baseUrl.includes("example.com");
+  return Boolean(baseUrl) && !isPlaceholderUpstream(baseUrl);
 }
 
 /** Serve bundled references only (no live Trask HTTP upstream). */
