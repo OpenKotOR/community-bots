@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "profiles": {
+    "holocron": {
+      "composeProfile": "full",
+      "minWebCitations": 2,
+      "minWebCitationsWhenSingleSource": false,
+      "formatterId": null,
+      "promptTemplateId": "holocron-compose"
+    },
+    "discord": {
+      "composeProfile": "brief",
+      "minWebCitations": 2,
+      "minWebCitationsWhenSingleSource": true,
+      "formatterId": "discord-ask",
+      "promptTemplateId": "discord-brief-compose"
+    },
+    "cli": {
+      "composeProfile": "brief",
+      "minWebCitations": 2,
+      "minWebCitationsWhenSingleSource": true,
+      "formatterId": "discord-ask",
+      "promptTemplateId": "discord-brief-compose"
+    },
+    "faithfulness": {
+      "composeProfile": "full",
+      "minWebCitations": 2,
+      "minWebCitationsWhenSingleSource": false,
+      "formatterId": null,
+      "promptTemplateId": "holocron-compose"
+    }
+  }
+}

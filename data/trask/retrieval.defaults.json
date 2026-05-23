@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "retrieveLimit": 12,
+  "maxPassages": 12,
+  "indexerDefaultLimit": 8,
+  "maxDdgResults": 6,
+  "fetchTimeoutMs": 45000,
+  "urlVerifyTimeoutMs": 8000,
+  "researchTimeoutMs": 900000
+}

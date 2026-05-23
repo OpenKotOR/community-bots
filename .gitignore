@@ -162,14 +162,10 @@ infra/matchmaking-inducer/matchmaking-ci.env
 *.log
 *.pyc
 *.tsbuildinfo
-# Local runtime data (tracked Trask eval canon is excepted below)
+# Local runtime data (tracked Trask policy/prompts/eval canon is excepted below)
 data/*
 !data/trask/
-data/trask/*
-!data/trask/eval/
-data/trask/eval/*
-!data/trask/eval/golden-queries.json
-!data/trask/eval/verification-queries.json
+!data/trask/**
 dist/
 exports/
 node_modules/
