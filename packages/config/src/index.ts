@@ -470,7 +470,7 @@ const resolveDefaultChatModel = (
   if (explicit) return explicit;
 
   if (proxyBaseUrl) {
-    return profile === "paid" ? paidDirectChatModel : "trask-research";
+    return profile === "paid" ? "trask-research-paid-only" : "trask-research";
   }
 
   const usesOpenRouter =

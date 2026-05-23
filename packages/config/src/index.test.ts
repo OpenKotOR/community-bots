@@ -103,6 +103,14 @@ test("loadSharedAiConfig prefers explicit OPENAI_BASE_URL over proxy URL", () =>
   assert.equal(cfg.openAiBaseUrl, "https://openrouter.ai/api/v1");
 });
 
+test("loadSharedAiConfig paid profile uses LiteLLM paid alias when proxy is set", () => {
+  const cfg = loadSharedAiConfig({
+    LITELLM_PROXY_URL: "http://127.0.0.1:4000",
+    TRASK_LLM_PROFILE: "paid",
+  });
+  assert.equal(cfg.chatModel, "trask-research-paid-only");
+});
+
 test("loadSharedAiConfig paid profile prefers paid OpenRouter model", () => {
   const cfg = loadSharedAiConfig({
     OPENROUTER_API_KEY: "sk-or-test",

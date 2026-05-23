@@ -277,10 +277,14 @@ const handleAskCommand = async (interaction: ChatInputCommandInteraction): Promi
         description: timeoutMessage,
       });
 
-      await interaction.editReply({
-        embeds: [fallbackEmbed],
-        allowedMentions: { parse: [] },
-      });
+      await safeEditReply(
+        interaction,
+        {
+          embeds: [fallbackEmbed],
+          allowedMentions: { parse: [] },
+        },
+        logger,
+      );
       return;
     }
 
@@ -326,10 +330,14 @@ const handleAskCommand = async (interaction: ChatInputCommandInteraction): Promi
       });
     }
 
-    await interaction.editReply({
-      embeds: [embed],
-      allowedMentions: { parse: [] },
-    });
+    await safeEditReply(
+      interaction,
+      {
+        embeds: [embed],
+        allowedMentions: { parse: [] },
+      },
+      logger,
+    );
   } catch (error) {
     const message = toErrorMessage(error);
     const completedAt = new Date().toISOString();
@@ -360,10 +368,14 @@ const handleAskCommand = async (interaction: ChatInputCommandInteraction): Promi
       });
     }
 
-    await interaction.editReply({
-      embeds: [errorEmbed],
-      allowedMentions: { parse: [] },
-    });
+    await safeEditReply(
+      interaction,
+      {
+        embeds: [errorEmbed],
+        allowedMentions: { parse: [] },
+      },
+      logger,
+    );
   }
 };
 

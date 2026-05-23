@@ -422,7 +422,7 @@ export const selectDistinctBriefClaims = (
     for (const claim of claims) {
       if (requireAnchor && !claimMatchesQueryAnchor(claim, query)) continue;
       const pub = publicCitationUrlForClaim(claim);
-      if (!pub.startsWith("http")) continue;
+      if (!pub.startsWith("http") && !isDiscordJumpUrl(pub)) continue;
       if (seen.has(pub)) continue;
       seen.add(pub);
       picked.push(claim);
