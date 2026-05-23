@@ -623,10 +623,15 @@ const sourceOnlyFallbackAnswer = (query: string, sources: readonly SourceDescrip
   if (sources.length === 0) return "I could not complete live archive synthesis for this question right now.";
   const topic = stripTrailingQuestionMarks(query) || "this question";
   const cited = sources.slice(0, Math.max(BRIEF_DISCORD_MIN_CITATIONS, 2));
-  const lines = cited.map(
-    (source, index) =>
-      `Candidate source ${index + 1}: ${source.name?.trim() || source.homeUrl} [${index + 1}]`,
-  );
+  const lines = cited.map((source, index) => {
+    let label = source.homeUrl;
+    try {
+      label = new URL(source.homeUrl).hostname.replace(/^www\./i, "");
+    } catch {
+      /* keep homeUrl */
+    }
+    return `Candidate source ${index + 1}: ${label} [${index + 1}]`;
+  });
   return [
     `I found candidate sources for ${topic}, but I could not support a grounded answer from the retrieved evidence.`,
     ...lines,
