@@ -29,15 +29,44 @@ Fedora/RHEL hosts need `libxml2-devel` and `libxslt-devel` before the first boot
 | `TRASK_GPT_RESEARCHER_PYTHON` | Deprecated alias for `TRASK_WEB_RESEARCH_PYTHON` |
 | `TRASK_WEB_RESEARCH_TIMEOUT_MS` | Subprocess timeout (default **900000**; legacy alias `TRASK_RESEARCHWIZARD_TIMEOUT_MS`) |
 | `OPENROUTER_API_KEY` | Recommended: free-tier models via OpenRouter (`openrouter/openrouter/free` default) |
-| `LITELLM_PROXY_URL` / `OPENCODE_LLM_PROXY_URL` / `TRASK_LLM_BASE_URL` | OpenAI-compatible proxy (LiteLLM or OpenCode plugin); key optional (`local`) |
+| `LITELLM_PROXY_URL` / `OPENCODE_LLM_PROXY_URL` / `TRASK_LLM_BASE_URL` | OpenAI-compatible proxy (LiteLLM or OpenCode plugin); key `sk-local` for sample proxy |
 | `OPENAI_API_KEY` / `GROQ_API_KEY` / … | Direct providers; paid fallbacks when `TRASK_LLM_PROFILE=paid` |
-| `TRASK_LLM_PROFILE` | `free` (default) or `paid` — model ordering in `@openkotor/config` |
+| `TRASK_LLM_PROFILE` | `free` (default) or `paid` — model + fallback ordering in `@openkotor/config` (`loadSharedAiConfig`) |
+| `TRASK_LLM_MODEL` | LiteLLM/OpenCode proxy alias (default `trask-research` when a proxy URL is set) |
 | `FAST_LLM` / `SMART_LLM` / `TRASK_REWRITE_MODEL_FALLBACKS` | Override defaults; see `python scripts/trask_print_fallback_llm.py` + vendored `llm_fallbacks` |
 | `REDIS_URL` / `TRASK_REDIS_URL` | Optional Redis for research cache (`scripts/trask_cache.py`) |
 | `TRASK_CACHE_DISABLED` | Set to `1` to bypass Redis even when `REDIS_URL` is set |
 | `TRASK_CACHE_SEARCH_TTL_SECONDS` | DuckDuckGo URL-list cache TTL (default **21600** = 6h) |
 | `TRASK_CACHE_PAGE_TTL_SECONDS` | Per-page markdown cache TTL (default **604800** = 7d) |
 | `TRASK_CACHE_RESEARCH_TTL_SECONDS` | Full research JSON cache TTL (default **3600** = 1h) |
+
+### LiteLLM proxy (free → paid fallbacks)
+
+Sample config: **`infra/trask-litellm/litellm_config.yaml`** (alias **`trask-research`**). Start the proxy, then point Holocron at it:
+
+```bash
+pip install 'litellm[proxy]'   # or: uv tool install 'litellm[proxy]'
+bash scripts/trask_litellm_proxy.sh   # :4000, loads .env / .env.local
+
+# In .env.local (provider keys stay in LiteLLM's environment):
+# OPENROUTER_API_KEY=sk-or-...
+# LITELLM_PROXY_URL=http://127.0.0.1:4000
+# LITELLM_API_KEY=sk-local
+# TRASK_LLM_MODEL=trask-research
+# TRASK_LLM_PROFILE=free
+
+pnpm build && bash scripts/trask_live_stack.sh
+```
+
+Fallback chain (proxy-side): `trask-research` (OpenRouter free router) → `trask-research-llama-free` → `trask-research-groq` (if `GROQ_API_KEY`) → `trask-research-paid` → `trask-research-openai`. See **`infra/trask-litellm/README.md`**.
+
+Smoke:
+
+```bash
+curl -sf http://127.0.0.1:4000/health/liveliness
+```
+
+For dozens of OpenRouter `:free` models, use the generated catalog in **`vendor/llm_fallbacks/configs/litellm_config_free.yaml`** instead of the minimal sample.
 
 ### Redis cache (optional, no Pinecone)
 

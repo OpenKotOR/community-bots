@@ -2,14 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  hasTraskLlmProvider,
   loadSharedAiConfig,
   loadResearchWizardRuntimeConfig,
   loadTraskHttpServerConfig,
   loadHkBotConfig,
   loadPazaakBotConfig,
   loadPazaakOpsPolicyForNode,
-  resolveTraskLlm,
 } from "./index.js";
 
 // ---------------------------------------------------------------------------
@@ -62,38 +60,9 @@ test("loadSharedAiConfig parses TRASK_REWRITE_MODEL_FALLBACKS as comma list", ()
   assert.deepEqual([...cfg.chatModelFallbacks], ["model-a", "model-b", "model-c"]);
 });
 
-test("loadSharedAiConfig defaults to free chat models when TRASK_REWRITE_MODEL_FALLBACKS is unset", () => {
+test("loadSharedAiConfig returns empty fallbacks when TRASK_REWRITE_MODEL_FALLBACKS is unset", () => {
   const cfg = loadSharedAiConfig({});
-  assert.equal(cfg.chatModel, "openrouter/openrouter/free");
-  assert.ok(cfg.chatModelFallbacks.length > 0);
-  assert.ok(cfg.chatModelFallbacks.some((id) => id.includes(":free") || id.includes("/free")));
-});
-
-test("loadSharedAiConfig uses LiteLLM proxy URL with local key when no API keys are set", () => {
-  const cfg = loadSharedAiConfig({ LITELLM_PROXY_URL: "http://127.0.0.1:4000" });
-  assert.equal(cfg.openAiBaseUrl, "http://127.0.0.1:4000/v1");
-  assert.equal(cfg.openAiApiKey, "local");
-  assert.equal(cfg.chatModel, "openrouter/openrouter/free");
-});
-
-test("loadSharedAiConfig sets OpenRouter base URL when only OPENROUTER_API_KEY is set", () => {
-  const cfg = loadSharedAiConfig({ OPENROUTER_API_KEY: "sk-or-test" });
-  assert.equal(cfg.openAiApiKey, "sk-or-test");
-  assert.equal(cfg.openAiBaseUrl, "https://openrouter.ai/api/v1");
-  assert.equal(cfg.chatModel, "openrouter/openrouter/free");
-});
-
-test("hasTraskLlmProvider is true when a proxy URL is configured", () => {
-  assert.equal(hasTraskLlmProvider({ OPENCODE_LLM_PROXY_URL: "http://127.0.0.1:4090" }), true);
-  assert.equal(hasTraskLlmProvider({}), false);
-});
-
-test("resolveTraskLlm prefers paid chat model when TRASK_LLM_PROFILE=paid and OPENAI_API_KEY is set", () => {
-  const resolved = resolveTraskLlm(
-    { OPENAI_API_KEY: "sk-test", TRASK_LLM_PROFILE: "paid" },
-    { defaultPaidChatModel: "gpt-5.4-mini" },
-  );
-  assert.equal(resolved.chatModel, "gpt-5.4-mini");
+  assert.deepEqual([...cfg.chatModelFallbacks], []);
 });
 
 test("loadSharedAiConfig injects OPENROUTER headers when present", () => {
@@ -109,6 +78,37 @@ test("loadSharedAiConfig injects OPENROUTER headers when present", () => {
 test("loadSharedAiConfig returns undefined headers when no OpenRouter vars are set", () => {
   const cfg = loadSharedAiConfig({});
   assert.equal(cfg.openAiDefaultHeaders, undefined);
+});
+
+test("loadSharedAiConfig free profile uses OpenRouter free model when only OPENROUTER_API_KEY is set", () => {
+  const cfg = loadSharedAiConfig({ OPENROUTER_API_KEY: "sk-or-test" });
+  assert.equal(cfg.openAiBaseUrl, "https://openrouter.ai/api/v1");
+  assert.equal(cfg.chatModel, "openrouter/openrouter/free");
+  assert.ok(cfg.chatModelFallbacks.includes("openrouter/openrouter/auto"));
+});
+
+test("loadSharedAiConfig wires LiteLLM proxy URL and placeholder key", () => {
+  const cfg = loadSharedAiConfig({ LITELLM_PROXY_URL: "http://127.0.0.1:4000" });
+  assert.equal(cfg.openAiBaseUrl, "http://127.0.0.1:4000/v1");
+  assert.equal(cfg.openAiApiKey, "sk-local");
+  assert.equal(cfg.chatModel, "trask-research");
+});
+
+test("loadSharedAiConfig prefers explicit OPENAI_BASE_URL over proxy URL", () => {
+  const cfg = loadSharedAiConfig({
+    LITELLM_PROXY_URL: "http://127.0.0.1:4000",
+    OPENAI_BASE_URL: "https://openrouter.ai/api/v1",
+    OPENROUTER_API_KEY: "sk-or-test",
+  });
+  assert.equal(cfg.openAiBaseUrl, "https://openrouter.ai/api/v1");
+});
+
+test("loadSharedAiConfig paid profile prefers paid OpenRouter model", () => {
+  const cfg = loadSharedAiConfig({
+    OPENROUTER_API_KEY: "sk-or-test",
+    TRASK_LLM_PROFILE: "paid",
+  });
+  assert.equal(cfg.chatModel, "openrouter/openrouter/auto");
 });
 
 // ---------------------------------------------------------------------------

@@ -13,16 +13,6 @@ import { loadPolicyFromFile } from "@openkotor/pazaak-policy/file-loader";
 import { config as loadDotEnv } from "dotenv";
 import { z } from "zod";
 
-import { resolveTraskLlm } from "./trask-llm-resolve.js";
-
-export {
-  hasTraskLlmProvider,
-  resolveTraskLlm,
-  stripTraskModelPrefix,
-  TRASK_FREE_CHAT_MODELS,
-  TRASK_PAID_CHAT_MODEL_FALLBACKS,
-} from "./trask-llm-resolve.js";
-
 function findDotEnv(): string | undefined {
   let dir = resolve(process.cwd());
   for (;;) {
@@ -44,6 +34,18 @@ if (dotEnvPath) {
 
 const defaultChatModel = "gpt-5.4-mini";
 const defaultEmbeddingModel = "text-embedding-3-large";
+const openRouterApiBase = "https://openrouter.ai/api/v1";
+const freeDefaultChatModel = "openrouter/openrouter/free";
+const paidOpenRouterChatModel = "openrouter/openrouter/auto";
+const paidDirectChatModel = "gpt-4o-mini";
+const defaultFreeModelFallbacks = [
+  "meta-llama/llama-3.3-70b-instruct:free",
+  paidOpenRouterChatModel,
+] as const;
+/** Matches `general_settings.master_key` in `infra/trask-litellm/litellm_config.yaml`. */
+const proxyPlaceholderApiKey = "sk-local";
+
+type TraskLlmProfile = "free" | "paid";
 const defaultPazaakWorldUrl = "https://openkotor.github.io/community-bots/pazaakworld";
 
 const integerish = z.coerce.number().int().nonnegative();
@@ -412,15 +414,110 @@ const buildOpenAiProviderHeaders = (env: NodeJS.ProcessEnv): Record<string, stri
   return Object.keys(headers).length > 0 ? headers : undefined;
 };
 
+const normalizeOpenAiCompatibleBaseUrl = (raw: string): string => {
+  const trimmed = raw.trim().replace(/\/+$/u, "");
+  if (trimmed.endsWith("/v1")) return trimmed;
+  return `${trimmed}/v1`;
+};
+
+const resolveTraskLlmProfile = (env: NodeJS.ProcessEnv): TraskLlmProfile => {
+  const raw = readOptionalEnv("TRASK_LLM_PROFILE", env)?.toLowerCase();
+  return raw === "paid" ? "paid" : "free";
+};
+
+/** LiteLLM (:4000) or OpenCode LLM proxy — OpenAI-compatible; fallbacks live in the proxy config. */
+const resolveLlmProxyBaseUrl = (env: NodeJS.ProcessEnv): string | undefined => {
+  const hit =
+    readOptionalEnv("TRASK_LLM_BASE_URL", env) ??
+    readOptionalEnv("LITELLM_PROXY_URL", env) ??
+    readOptionalEnv("OPENCODE_LLM_PROXY_URL", env);
+  return hit ? normalizeOpenAiCompatibleBaseUrl(hit) : undefined;
+};
+
+const resolveOpenAiApiKey = (env: NodeJS.ProcessEnv, proxyBaseUrl: string | undefined): string | undefined => {
+  const direct =
+    readOptionalEnv("OPENAI_API_KEY", env) ??
+    readOptionalEnv("OPENROUTER_API_KEY", env) ??
+    readOptionalEnv("GROQ_API_KEY", env);
+  if (direct) return direct;
+  if (proxyBaseUrl) {
+    return (
+      readOptionalEnv("LITELLM_API_KEY", env) ??
+      readOptionalEnv("OPENCODE_LLM_PROXY_TOKEN", env) ??
+      readOptionalEnv("LITELLM_MASTER_KEY", env) ??
+      proxyPlaceholderApiKey
+    );
+  }
+  return undefined;
+};
+
+const resolveDefaultChatModel = (
+  env: NodeJS.ProcessEnv,
+  profile: TraskLlmProfile,
+  proxyBaseUrl: string | undefined,
+  openRouterKey: string | undefined,
+  openAiKey: string | undefined,
+  openAiBaseUrl: string | undefined,
+): string => {
+  const explicit = readOptionalEnv("OPENAI_CHAT_MODEL", env) ?? readOptionalEnv("TRASK_LLM_MODEL", env);
+  if (explicit) return explicit;
+
+  if (proxyBaseUrl) {
+    return profile === "paid" ? paidDirectChatModel : "trask-research";
+  }
+
+  const usesOpenRouter =
+    Boolean(openRouterKey) || openAiBaseUrl?.includes("openrouter.ai") === true;
+  if (usesOpenRouter) {
+    return profile === "paid" ? paidOpenRouterChatModel : freeDefaultChatModel;
+  }
+
+  if (profile === "paid" || openAiKey) {
+    return paidDirectChatModel;
+  }
+
+  return defaultChatModel;
+};
+
+const resolveDefaultChatModelFallbacks = (
+  env: NodeJS.ProcessEnv,
+  profile: TraskLlmProfile,
+  proxyBaseUrl: string | undefined,
+  openRouterKey: string | undefined,
+): readonly string[] => {
+  const explicit = readListEnv("TRASK_REWRITE_MODEL_FALLBACKS", env);
+  if (explicit.length > 0) return explicit;
+  if (profile !== "free") return [];
+  if (proxyBaseUrl) return [];
+  if (openRouterKey) return [...defaultFreeModelFallbacks];
+  return [];
+};
+
 export const loadSharedAiConfig = (env: NodeJS.ProcessEnv = process.env): SharedAiConfig => {
-  const llm = resolveTraskLlm(env, { defaultPaidChatModel: defaultChatModel });
+  const profile = resolveTraskLlmProfile(env);
+  const proxyBaseUrl = resolveLlmProxyBaseUrl(env);
+  const openRouterKey = readOptionalEnv("OPENROUTER_API_KEY", env);
+  const openAiKey = readOptionalEnv("OPENAI_API_KEY", env);
+  const explicitBaseUrl = readOptionalEnv("OPENAI_BASE_URL", env);
+
+  let openAiBaseUrl = explicitBaseUrl
+    ? normalizeOpenAiCompatibleBaseUrl(explicitBaseUrl)
+    : proxyBaseUrl;
+  if (!openAiBaseUrl && openRouterKey && !openAiKey) {
+    openAiBaseUrl = openRouterApiBase;
+  }
+
+  const openAiApiKey = resolveOpenAiApiKey(env, proxyBaseUrl);
+  const chatModel = resolveDefaultChatModel(env, profile, proxyBaseUrl, openRouterKey, openAiKey, openAiBaseUrl);
+  const chatModelFallbacks = resolveDefaultChatModelFallbacks(env, profile, proxyBaseUrl, openRouterKey);
+
   return {
-    openAiApiKey: llm.openAiApiKey,
-    openAiBaseUrl: llm.openAiBaseUrl,
-    openAiDefaultHeaders: llm.openAiDefaultHeaders ?? buildOpenAiProviderHeaders(env),
+    openAiApiKey,
+    openAiBaseUrl,
+    openAiDefaultHeaders: buildOpenAiProviderHeaders(env),
     firecrawlApiKey: readOptionalEnv("FIRECRAWL_API_KEY", env),
-    chatModel: llm.chatModel,
-    chatModelFallbacks: llm.chatModelFallbacks,
+    chatModel,
+    chatModelFallbacks,
     embeddingModel: readOptionalEnv("OPENAI_EMBEDDING_MODEL", env) ?? defaultEmbeddingModel,
     databaseUrl: readOptionalEnv("DATABASE_URL", env),
   };
