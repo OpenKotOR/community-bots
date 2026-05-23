@@ -13,6 +13,7 @@ FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json tsconfig.workspace.json ./
 COPY packages ./packages
 COPY apps/trask-http-server ./apps/trask-http-server
+COPY apps/holocron-web ./apps/holocron-web
 COPY infra/trask-indexer ./infra/trask-indexer
 COPY scripts ./scripts
 COPY vendor/llm_fallbacks ./vendor/llm_fallbacks
@@ -21,6 +22,7 @@ COPY data/trask ./data/trask
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @openkotor/retrieval build
 RUN pnpm --filter @openkotor/trask-http-server build
+RUN pnpm --filter @openkotor/holocron-web build
 RUN bash scripts/bootstrap_trask_research.sh
 RUN bash scripts/bootstrap_trask_indexer.sh
 RUN node scripts/export_trask_allowlist_catalog.mjs

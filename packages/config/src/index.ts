@@ -13,21 +13,30 @@ import { loadPolicyFromFile } from "@openkotor/pazaak-policy/file-loader";
 import { config as loadDotEnv } from "dotenv";
 import { z } from "zod";
 
-function findDotEnv(): string | undefined {
-  let dir = resolve(process.cwd());
+function findRepoEnvDir(startDir: string = process.cwd()): string | undefined {
+  let dir = resolve(startDir);
   for (;;) {
-    const candidate = join(dir, ".env");
-    if (existsSync(candidate)) return candidate;
+    if (existsSync(join(dir, ".env")) || existsSync(join(dir, ".env.local"))) {
+      return dir;
+    }
     const parent = dirname(dir);
     if (parent === dir) return undefined;
     dir = parent;
   }
 }
 
-const dotEnvPath = findDotEnv();
-
-if (dotEnvPath) {
-  loadDotEnv({ path: dotEnvPath });
+const envDir = findRepoEnvDir();
+if (envDir) {
+  const dotEnvPath = join(envDir, ".env");
+  const dotEnvLocalPath = join(envDir, ".env.local");
+  if (existsSync(dotEnvPath)) {
+    loadDotEnv({ path: dotEnvPath });
+  } else {
+    loadDotEnv();
+  }
+  if (existsSync(dotEnvLocalPath)) {
+    loadDotEnv({ path: dotEnvLocalPath, override: true });
+  }
 } else {
   loadDotEnv();
 }

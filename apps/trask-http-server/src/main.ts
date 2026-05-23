@@ -170,6 +170,10 @@ app.use(
   }),
 );
 
+app.get("/health", (_req, res) => {
+  res.status(200).json({ ok: true, service: "trask-http-server" });
+});
+
 const distFromEnv = process.env.TRASK_WEBUI_DIST_PATH?.trim();
 const defaultDist = path.join(repoRoot, "apps", "holocron-web", "dist");
 const webUiDist = distFromEnv ? path.resolve(distFromEnv) : defaultDist;
@@ -184,6 +188,12 @@ if (existsSync(webUiDist)) {
   logger.info(`Serving Holocron web static files from ${webUiDist}`);
 } else {
   logger.warn(`Holocron web dist not found at ${webUiDist}; API-only mode (TRASK_WEBUI_DIST_PATH to override).`);
+  app.get("/", (_req, res) => {
+    res
+      .status(200)
+      .type("text/plain")
+      .send("Trask HTTP API is running (API-only). Holocron static UI was not bundled; use /api/trask and /health.");
+  });
 }
 
 const { server, listen } = createNodeApiHost({
