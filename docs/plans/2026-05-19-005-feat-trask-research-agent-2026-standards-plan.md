@@ -1,24 +1,31 @@
 ---
 title: "feat: Trask research agent — 2026 industry standards bar"
 type: feat
-status: completed
+status: superseded
+superseded_by: docs/brainstorms/trask-self-hosted-research-pipeline-requirements.md
 date: 2026-05-19
 origin: user-request-2026-05-19-research-quality
 ---
 
 # Trask research agent — 2026 industry standards bar
 
+> **Superseded for product policy** by `docs/brainstorms/trask-self-hosted-research-pipeline-requirements.md`. This file remains an **execution history** for PR #7 work. Active implementation planning: `docs/plans/2026-05-19-007-feat-trask-rag-incremental-hardening-plan.md`.
+
 ## Living plan status
 
-**Authority:** This plan is the single active spine for Trask research quality on branch `feat/trask-crawl4ai-rag` ([PR #7](https://github.com/OpenKotOR/community-bots/pull/7)). Supersedes execution tracking in `2026-05-19-001`, `002`, and `006` (006 marked completed as the v1 transparency slice).
+**Authority:** Product policy → brainstorm requirements doc. This plan tracks historical execution on branch `feat/trask-crawl4ai-rag` ([PR #7](https://github.com/OpenKotOR/community-bots/pull/7)).
 
-### Delta Update (2026-05-23)
+### Delta Update (2026-05-23 — self-host / best-practice research)
 
-- **Landed:** U1 hybrid RRF in `chroma_store.py`; U2 passages bus + U3 sufficiency/`failed` in `grounded-evidence.ts`; U5 CI Worker **:8787** path in `ci.yml`; U6 tiered `TRASK_RESEARCH_GATHER_MS` / `COMPOSE_MS`; U7 `AGENTS.md` Crawl4AI→Worker contract; `data/trask/**` in git; config drift + faithfulness + **Build & Test green** on PR #7; CodeQL-safe URL/markdown parsing in `research-wizard` fallbacks + `discord-reply-format`.
-- **Partial:** GitHub **CodeQL** merge check (may lag until scan re-runs after latest push); browser expert MCP pass not re-run this session; U1 cross-encoder rerank model TBD; Vectorize / VPS scheduled crawl deferred per plan.
-- **Next:** Confirm CodeQL check after push; merge [PR #7](https://github.com/OpenKotOR/community-bots/pull/7); post-merge expert Holocron on :4010 (`bash scripts/trask_live_stack.sh`).
+- **Landed:** Research consensus — **Crawl4AI→Chroma→Worker→grounded compose** matches 2026 OSS best practice; live crawl on miss; OpenRouter free + `llm_fallbacks` as LLM policy (not local Ollama); `STRATEGY.md` + brainstorm requirements doc.
+- **Partial (moved to plan 007):** Passage sufficiency gate wiring; BM25/heading chunking; batch catalog crawl CLI; HF deploy without baked Chroma supervisor.
+- **Next:** See plan **007** for incremental hardening slices.
 
----
+### Delta Update (2026-05-23 — execution)
+
+- **Landed:** U1 hybrid RRF in `chroma_store.py`; U2 passages bus; U5 CI Worker **:8787**; U6 tiered gather/compose timeouts; U7 AGENTS Crawl4AI→Worker contract; config drift + faithfulness scripts; CodeQL-safe URL parsing.
+- **Partial:** U3 sufficiency — helpers in `grounded-evidence.ts`; **compose path gating completed in plan 007** (`passagesSupportGroundedCompose`). Browser expert MCP pass; cross-encoder rerank TBD.
+- **Next:** Plan 007 verification + merge PR #7 when green.
 
 ## Summary
 

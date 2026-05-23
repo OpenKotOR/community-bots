@@ -1,0 +1,2701 @@
+{
+  "version": 1,
+  "queries": {
+    "712276aa-34c4-4527-9a88-69c09aa12799": {
+      "queryId": "712276aa-34c4-4527-9a88-69c09aa12799",
+      "threadId": "3fc7e35c-c19f-4205-93a4-bc53facfd109",
+      "userId": "qa-webui",
+      "query": "What is TSLPatcher used for in KOTOR modding?",
+      "status": "complete",
+      "answer": "I could not complete live archive synthesis for this question right now.",
+      "sources": [],
+      "error": null,
+      "createdAt": "2026-05-16T11:23:23.335Z",
+      "completedAt": "2026-05-16T11:23:23.355Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T11:23:23.335Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        }
+      ]
+    },
+    "3489f391-6cc4-4f2f-9471-eac2d8681d68": {
+      "queryId": "3489f391-6cc4-4f2f-9471-eac2d8681d68",
+      "threadId": "d383aa01-40f6-466b-8fea-3d2d003a9082",
+      "userId": "qa-webui",
+      "query": "tell me about the holocron",
+      "status": "complete",
+      "answer": "I could not complete live archive synthesis for this question right now.",
+      "sources": [],
+      "error": null,
+      "createdAt": "2026-05-16T11:26:26.765Z",
+      "completedAt": "2026-05-16T11:26:26.773Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T11:26:26.765Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        }
+      ]
+    },
+    "9b8ddd04-d33c-4caf-bb59-0e3b62b2a7c1": {
+      "queryId": "9b8ddd04-d33c-4caf-bb59-0e3b62b2a7c1",
+      "threadId": "d00b1e75-3cd2-4792-a4f0-8d214f78f5be",
+      "userId": "qa-webui",
+      "query": "What is TSLPatcher used for in KOTOR modding?",
+      "status": "complete",
+      "answer": "I could not complete live archive synthesis for this question right now.",
+      "sources": [],
+      "error": null,
+      "createdAt": "2026-05-16T11:37:17.588Z",
+      "completedAt": "2026-05-16T11:37:17.594Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T11:37:17.588Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        }
+      ]
+    },
+    "362cf8a6-4820-44a2-bc47-f026e0909732": {
+      "queryId": "362cf8a6-4820-44a2-bc47-f026e0909732",
+      "threadId": "d00b1e75-3cd2-4792-a4f0-8d214f78f5be",
+      "userId": "qa-webui",
+      "query": "How do I troubleshoot KOTOR widescreen resolution issues on PC?",
+      "status": "complete",
+      "answer": "I could not complete live archive synthesis for this question right now.",
+      "sources": [],
+      "error": null,
+      "createdAt": "2026-05-16T11:37:18.511Z",
+      "completedAt": "2026-05-16T11:37:18.517Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T11:37:18.511Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        }
+      ]
+    },
+    "e67816ab-b178-42cb-81ed-18084fb766c7": {
+      "queryId": "e67816ab-b178-42cb-81ed-18084fb766c7",
+      "threadId": "d00b1e75-3cd2-4792-a4f0-8d214f78f5be",
+      "userId": "qa-webui",
+      "query": "What is MDLOps used for in the KOTOR toolchain?",
+      "status": "complete",
+      "answer": "I could not complete live archive synthesis for this question right now.",
+      "sources": [],
+      "error": null,
+      "createdAt": "2026-05-16T11:37:19.440Z",
+      "completedAt": "2026-05-16T11:37:19.448Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T11:37:19.440Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        }
+      ]
+    },
+    "6f428a8b-bafd-45d0-94ef-8f374b1d740c": {
+      "queryId": "6f428a8b-bafd-45d0-94ef-8f374b1d740c",
+      "threadId": "d00b1e75-3cd2-4792-a4f0-8d214f78f5be",
+      "userId": "qa-webui",
+      "query": "Where are Knights of the Old Republic save files stored on Windows?",
+      "status": "complete",
+      "answer": "I could not complete live archive synthesis for this question right now.",
+      "sources": [],
+      "error": null,
+      "createdAt": "2026-05-16T11:37:20.376Z",
+      "completedAt": "2026-05-16T11:37:20.389Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T11:37:20.376Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        }
+      ]
+    },
+    "5147e7ed-7e3a-4a09-b821-23406f25b85a": {
+      "queryId": "5147e7ed-7e3a-4a09-b821-23406f25b85a",
+      "threadId": "d00b1e75-3cd2-4792-a4f0-8d214f78f5be",
+      "userId": "qa-webui",
+      "query": "What does the reone project provide for Odyssey engine work?",
+      "status": "complete",
+      "answer": "I could not complete live archive synthesis for this question right now.",
+      "sources": [],
+      "error": null,
+      "createdAt": "2026-05-16T11:37:21.422Z",
+      "completedAt": "2026-05-16T11:37:21.426Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T11:37:21.422Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        }
+      ]
+    },
+    "66bfa530-cdbc-44d3-bbf4-00f7bacca7a3": {
+      "queryId": "66bfa530-cdbc-44d3-bbf4-00f7bacca7a3",
+      "threadId": "67293b71-d3a2-4a46-86fb-b6e12e9504be",
+      "userId": "qa-webui",
+      "query": "What is the Ebon Hawk in KOTOR?",
+      "status": "complete",
+      "answer": "I could not complete live archive synthesis for this question right now.",
+      "sources": [],
+      "error": null,
+      "createdAt": "2026-05-16T11:38:40.048Z",
+      "completedAt": "2026-05-16T11:38:40.056Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T11:38:40.048Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        }
+      ]
+    },
+    "f1aa37ed-4b20-4aa0-b32d-b116dd2cd72f": {
+      "queryId": "f1aa37ed-4b20-4aa0-b32d-b116dd2cd72f",
+      "threadId": "5fede39c-97df-40d0-86c7-8a695f575c0d",
+      "userId": "qa-webui",
+      "query": "What is TSLPatcher used for in KOTOR modding?",
+      "status": "complete",
+      "answer": "Commonly referenced KotOR model-modding tools in the approved archive sources include:\n- Installing Tslpatcher Mods Without The Exe [1]\n- Tsl Patcher Not Installing [2]\n- Using Tsl Patcher Without Kotor On Desktop [3]\n- General [4]\n- Faq [5]\n\nSources\n1. Deadly Stream: topic/8928 installing tslpatcher mods without the exe - https://deadlystream.com/topic/8928-installing-tslpatcher-mods-without-the-exe\n2. Deadly Stream: topic/8307 tsl patcher not installing - https://deadlystream.com/topic/8307-tsl-patcher-not-installing\n3. Deadly Stream: topic/4098 using tsl patcher without kotor on desktop - https://deadlystream.com/topic/4098-using-tsl-patcher-without-kotor-on-desktop\n4. KOTOR Neocities: faq/general - https://kotor.neocities.org/faq/general\n5. KOTOR Neocities: mod builds/faq - https://kotor.neocities.org/modding/mod_builds/faq",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/8928-installing-tslpatcher-mods-without-the-exe",
+          "name": "Deadly Stream: topic/8928 installing tslpatcher mods without the exe",
+          "url": "https://deadlystream.com/topic/8928-installing-tslpatcher-mods-without-the-exe"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/8307-tsl-patcher-not-installing",
+          "name": "Deadly Stream: topic/8307 tsl patcher not installing",
+          "url": "https://deadlystream.com/topic/8307-tsl-patcher-not-installing"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/4098-using-tsl-patcher-without-kotor-on-desktop",
+          "name": "Deadly Stream: topic/4098 using tsl patcher without kotor on desktop",
+          "url": "https://deadlystream.com/topic/4098-using-tsl-patcher-without-kotor-on-desktop"
+        },
+        {
+          "id": "kotor-neocities:https://kotor.neocities.org/faq/general",
+          "name": "KOTOR Neocities: faq/general",
+          "url": "https://kotor.neocities.org/faq/general"
+        },
+        {
+          "id": "kotor-neocities:https://kotor.neocities.org/modding/mod_builds/faq",
+          "name": "KOTOR Neocities: mod builds/faq",
+          "url": "https://kotor.neocities.org/modding/mod_builds/faq"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T11:51:01.792Z",
+      "completedAt": "2026-05-16T11:51:10.466Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T11:51:01.792Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T11:51:01.814Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T11:51:09.827Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        }
+      ]
+    },
+    "df10a76d-0c63-4227-a31a-eab7994bf2c1": {
+      "queryId": "df10a76d-0c63-4227-a31a-eab7994bf2c1",
+      "threadId": "a8f160b7-492f-478c-8100-90f41a2cfef4",
+      "userId": "qa-webui",
+      "query": "What is TSLPatcher used for in KOTOR modding?",
+      "status": "complete",
+      "answer": "Commonly referenced KotOR model-modding tools in the approved archive sources include:\n- Tls Modding [1]\n- Tsl Patcher Tlked And Accessories [2]\n- Ysk Tslpatcher Has Been Rewritten In Python And Made Open Source [3]\n- Tsl Patcher Confusion [4]\n\nSources\n1. Deadly Stream: topic/11708 tls modding - https://deadlystream.com/topic/11708-tls-modding\n2. Deadly Stream: file/1039 tsl patcher tlked and accessories - https://deadlystream.com/files/file/1039-tsl-patcher-tlked-and-accessories\n3. Deadly Stream: topic/10885 ysk tslpatcher has been rewritten in python and made open source - https://deadlystream.com/topic/10885-ysk-tslpatcher-has-been-rewritten-in-python-and-made-open-source\n4. Deadly Stream: topic/9858 tsl patcher confusion - https://deadlystream.com/topic/9858-tsl-patcher-confusion",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/11708-tls-modding",
+          "name": "Deadly Stream: topic/11708 tls modding",
+          "url": "https://deadlystream.com/topic/11708-tls-modding"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/files/file/1039-tsl-patcher-tlked-and-accessories",
+          "name": "Deadly Stream: file/1039 tsl patcher tlked and accessories",
+          "url": "https://deadlystream.com/files/file/1039-tsl-patcher-tlked-and-accessories"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/10885-ysk-tslpatcher-has-been-rewritten-in-python-and-made-open-source",
+          "name": "Deadly Stream: topic/10885 ysk tslpatcher has been rewritten in python and made open source",
+          "url": "https://deadlystream.com/topic/10885-ysk-tslpatcher-has-been-rewritten-in-python-and-made-open-source"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/9858-tsl-patcher-confusion",
+          "name": "Deadly Stream: topic/9858 tsl patcher confusion",
+          "url": "https://deadlystream.com/topic/9858-tsl-patcher-confusion"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T11:51:57.674Z",
+      "completedAt": "2026-05-16T11:52:06.782Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T11:51:57.674Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T11:51:57.690Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T11:52:05.681Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        }
+      ]
+    },
+    "c5a2db91-e458-495a-9b7a-fa96a4553fe3": {
+      "queryId": "c5a2db91-e458-495a-9b7a-fa96a4553fe3",
+      "threadId": "a8f160b7-492f-478c-8100-90f41a2cfef4",
+      "userId": "qa-webui",
+      "query": "How do I troubleshoot KOTOR widescreen resolution issues on PC?",
+      "status": "complete",
+      "answer": "Commonly referenced KotOR model-modding tools in the approved archive sources include:\n- Widescreen Help Requested [1]\n- Kotor Widescreen Fade Fix [2]\n- Star Wars: Knights Of The Old Republic [3]\n\nSources\n1. Deadly Stream: topic/5348 widescreen help requested - https://deadlystream.com/topic/5348-widescreen-help-requested\n2. Deadly Stream: file/1792 kotor widescreen fade fix - https://deadlystream.com/files/file/1792-kotor-widescreen-fade-fix\n3. PCGamingWiki: Star Wars: Knights of the Old Republic - https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/5348-widescreen-help-requested",
+          "name": "Deadly Stream: topic/5348 widescreen help requested",
+          "url": "https://deadlystream.com/topic/5348-widescreen-help-requested"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/files/file/1792-kotor-widescreen-fade-fix",
+          "name": "Deadly Stream: file/1792 kotor widescreen fade fix",
+          "url": "https://deadlystream.com/files/file/1792-kotor-widescreen-fade-fix"
+        },
+        {
+          "id": "pcgamingwiki-kotor:https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic",
+          "name": "PCGamingWiki: Star Wars: Knights of the Old Republic",
+          "url": "https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T11:52:08.149Z",
+      "completedAt": "2026-05-16T11:52:16.550Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T11:52:08.149Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T11:52:08.167Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T11:52:16.157Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        }
+      ]
+    },
+    "3b5d3841-9e23-4700-ba46-1e4ec06ffe39": {
+      "queryId": "3b5d3841-9e23-4700-ba46-1e4ec06ffe39",
+      "threadId": "a8f160b7-492f-478c-8100-90f41a2cfef4",
+      "userId": "qa-webui",
+      "query": "What is MDLOps used for in the KOTOR toolchain?",
+      "status": "complete",
+      "answer": "Commonly referenced KotOR model-modding tools in the approved archive sources include:\n- Kotor Tool [1]\n- Mdlops [2]\n- What Am I Doing Wrong With Mdlops [3]\n- Kotortsl Model Format Mdlmdx Technical Details [4]\n\nSources\n1. Deadly Stream: file/280 kotor tool - https://deadlystream.com/files/file/280-kotor-tool\n2. Deadly Stream: file/779 mdlops - https://deadlystream.com/files/file/779-mdlops\n3. Deadly Stream: topic/6822 what am i doing wrong with mdlops - https://deadlystream.com/topic/6822-what-am-i-doing-wrong-with-mdlops\n4. Deadly Stream: topic/4501 kotortsl model format mdlmdx technical details - https://deadlystream.com/topic/4501-kotortsl-model-format-mdlmdx-technical-details",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/files/file/280-kotor-tool",
+          "name": "Deadly Stream: file/280 kotor tool",
+          "url": "https://deadlystream.com/files/file/280-kotor-tool"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/files/file/779-mdlops",
+          "name": "Deadly Stream: file/779 mdlops",
+          "url": "https://deadlystream.com/files/file/779-mdlops"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/6822-what-am-i-doing-wrong-with-mdlops",
+          "name": "Deadly Stream: topic/6822 what am i doing wrong with mdlops",
+          "url": "https://deadlystream.com/topic/6822-what-am-i-doing-wrong-with-mdlops"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/4501-kotortsl-model-format-mdlmdx-technical-details",
+          "name": "Deadly Stream: topic/4501 kotortsl model format mdlmdx technical details",
+          "url": "https://deadlystream.com/topic/4501-kotortsl-model-format-mdlmdx-technical-details"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T11:52:17.881Z",
+      "completedAt": "2026-05-16T11:52:28.702Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T11:52:17.881Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T11:52:17.898Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T11:52:25.892Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        }
+      ]
+    },
+    "a18b0527-686e-415f-a93d-de649854d21e": {
+      "queryId": "a18b0527-686e-415f-a93d-de649854d21e",
+      "threadId": "a8f160b7-492f-478c-8100-90f41a2cfef4",
+      "userId": "qa-webui",
+      "query": "Where are Knights of the Old Republic save files stored on Windows?",
+      "status": "complete",
+      "answer": "Commonly referenced KotOR model-modding tools in the approved archive sources include:\n- Star Wars: Knights Of The Old Republic [1]\n- Kotor2 Kse No Save Files [2]\n- Deadly Stream: page/2 [3]\n- Kse Kotor Tool On Steamdvd [4]\n\nSources\n1. PCGamingWiki: Star Wars: Knights of the Old Republic - https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic\n2. Deadly Stream: topic/5628 kotor2 kse no save files - https://deadlystream.com/topic/5628-kotor2-kse-no-save-files\n3. Deadly Stream: page/2 - https://deadlystream.com/topic/3437-toolkotor-savegame-editor/page/2\n4. Deadly Stream: topic/3393 kse kotor tool on steamdvd - https://deadlystream.com/topic/3393-kse-kotor-tool-on-steamdvd",
+      "sources": [
+        {
+          "id": "pcgamingwiki-kotor:https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic",
+          "name": "PCGamingWiki: Star Wars: Knights of the Old Republic",
+          "url": "https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/5628-kotor2-kse-no-save-files",
+          "name": "Deadly Stream: topic/5628 kotor2 kse no save files",
+          "url": "https://deadlystream.com/topic/5628-kotor2-kse-no-save-files"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/3437-toolkotor-savegame-editor/page/2",
+          "name": "Deadly Stream: page/2",
+          "url": "https://deadlystream.com/topic/3437-toolkotor-savegame-editor/page/2"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/3393-kse-kotor-tool-on-steamdvd",
+          "name": "Deadly Stream: topic/3393 kse kotor tool on steamdvd",
+          "url": "https://deadlystream.com/topic/3393-kse-kotor-tool-on-steamdvd"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T11:52:29.359Z",
+      "completedAt": "2026-05-16T11:52:37.262Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T11:52:29.359Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T11:52:29.374Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        }
+      ]
+    },
+    "8ea3dc9f-da1c-4981-b61d-9529ddba3e9e": {
+      "queryId": "8ea3dc9f-da1c-4981-b61d-9529ddba3e9e",
+      "threadId": "a8f160b7-492f-478c-8100-90f41a2cfef4",
+      "userId": "qa-webui",
+      "query": "What does the reone project provide for Odyssey engine work?",
+      "status": "complete",
+      "answer": "Commonly referenced KotOR model-modding tools in the approved archive sources include:\n- Reone Kotor Engine Recreation [1]\n\nSources\n1. Deadly Stream: topic/8542 reone kotor engine recreation - https://deadlystream.com/topic/8542-reone-kotor-engine-recreation",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/8542-reone-kotor-engine-recreation",
+          "name": "Deadly Stream: topic/8542 reone kotor engine recreation",
+          "url": "https://deadlystream.com/topic/8542-reone-kotor-engine-recreation"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T11:52:38.193Z",
+      "completedAt": "2026-05-16T11:52:46.044Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T11:52:38.193Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T11:52:38.216Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        }
+      ]
+    },
+    "ba92f81c-d664-4dd3-a62d-f08df28887ea": {
+      "queryId": "ba92f81c-d664-4dd3-a62d-f08df28887ea",
+      "threadId": "bae481dc-3ac3-4ef8-bebf-763971ecb4ba",
+      "userId": "qa-webui",
+      "query": "What KOTOR mods are commonly recommended for a first playthrough?",
+      "status": "complete",
+      "answer": "Commonly referenced KotOR model-modding tools in the approved archive sources include:\n- Kotor 1 Community Patch [1]\n- Full Mobile [2]\n- Modding Kotor 2 On Macbook Pro [3]\n- Full [4]\n- Mod Builds [5]\n\nSources\n1. Deadly Stream: file/1258 kotor 1 community patch - https://deadlystream.com/files/file/1258-kotor-1-community-patch\n2. KOTOR Neocities: k1/full mobile - https://kotor.neocities.org/modding/mod_builds/k1/full_mobile\n3. Deadly Stream: topic/5726 modding kotor 2 on macbook pro - https://deadlystream.com/topic/5726-modding-kotor-2-on-macbook-pro\n4. KOTOR Neocities: k1/full - https://kotor.neocities.org/modding/mod_builds/k1/full\n5. KOTOR Neocities: modding/mod builds - https://kotor.neocities.org/modding/mod_builds",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/files/file/1258-kotor-1-community-patch",
+          "name": "Deadly Stream: file/1258 kotor 1 community patch",
+          "url": "https://deadlystream.com/files/file/1258-kotor-1-community-patch"
+        },
+        {
+          "id": "kotor-neocities:https://kotor.neocities.org/modding/mod_builds/k1/full_mobile",
+          "name": "KOTOR Neocities: k1/full mobile",
+          "url": "https://kotor.neocities.org/modding/mod_builds/k1/full_mobile"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/5726-modding-kotor-2-on-macbook-pro",
+          "name": "Deadly Stream: topic/5726 modding kotor 2 on macbook pro",
+          "url": "https://deadlystream.com/topic/5726-modding-kotor-2-on-macbook-pro"
+        },
+        {
+          "id": "kotor-neocities:https://kotor.neocities.org/modding/mod_builds/k1/full",
+          "name": "KOTOR Neocities: k1/full",
+          "url": "https://kotor.neocities.org/modding/mod_builds/k1/full"
+        },
+        {
+          "id": "kotor-neocities:https://kotor.neocities.org/modding/mod_builds",
+          "name": "KOTOR Neocities: modding/mod builds",
+          "url": "https://kotor.neocities.org/modding/mod_builds"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T12:09:02.226Z",
+      "completedAt": "2026-05-16T12:09:10.108Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T12:09:02.226Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T12:09:02.241Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        }
+      ]
+    },
+    "3c065bc4-c4e6-4808-9d07-26ae10a0a5d2": {
+      "queryId": "3c065bc4-c4e6-4808-9d07-26ae10a0a5d2",
+      "threadId": "988fbaea-25be-4a3a-bdf1-e69c15d349ca",
+      "userId": "qa-webui",
+      "query": "What is TSLPatcher used for in KOTOR modding?",
+      "status": "complete",
+      "answer": "Commonly referenced KotOR model-modding tools in the approved archive sources include:\n- Tsl Patcher Tlked And Accessories [1]\n- Ysk Tslpatcher Has Been Rewritten In Python And Made Open Source [2]\n- Installing Tslpatcher Mods Without The Exe [3]\n- Tls Modding [4]\n\nSources\n1. Deadly Stream: file/1039 tsl patcher tlked and accessories - https://deadlystream.com/files/file/1039-tsl-patcher-tlked-and-accessories\n2. Deadly Stream: topic/10885 ysk tslpatcher has been rewritten in python and made open source - https://deadlystream.com/topic/10885-ysk-tslpatcher-has-been-rewritten-in-python-and-made-open-source\n3. Deadly Stream: topic/8928 installing tslpatcher mods without the exe - https://deadlystream.com/topic/8928-installing-tslpatcher-mods-without-the-exe\n4. Deadly Stream: topic/11708 tls modding - https://deadlystream.com/topic/11708-tls-modding",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/files/file/1039-tsl-patcher-tlked-and-accessories",
+          "name": "Deadly Stream: file/1039 tsl patcher tlked and accessories",
+          "url": "https://deadlystream.com/files/file/1039-tsl-patcher-tlked-and-accessories"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/10885-ysk-tslpatcher-has-been-rewritten-in-python-and-made-open-source",
+          "name": "Deadly Stream: topic/10885 ysk tslpatcher has been rewritten in python and made open source",
+          "url": "https://deadlystream.com/topic/10885-ysk-tslpatcher-has-been-rewritten-in-python-and-made-open-source"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/8928-installing-tslpatcher-mods-without-the-exe",
+          "name": "Deadly Stream: topic/8928 installing tslpatcher mods without the exe",
+          "url": "https://deadlystream.com/topic/8928-installing-tslpatcher-mods-without-the-exe"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/11708-tls-modding",
+          "name": "Deadly Stream: topic/11708 tls modding",
+          "url": "https://deadlystream.com/topic/11708-tls-modding"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T12:09:28.090Z",
+      "completedAt": "2026-05-16T12:09:38.111Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T12:09:28.090Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T12:09:28.124Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T12:09:36.112Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        }
+      ]
+    },
+    "0b65fa32-dd37-4d8e-931a-e49dbe392432": {
+      "queryId": "0b65fa32-dd37-4d8e-931a-e49dbe392432",
+      "threadId": "988fbaea-25be-4a3a-bdf1-e69c15d349ca",
+      "userId": "qa-webui",
+      "query": "How do I troubleshoot KOTOR widescreen resolution issues on PC?",
+      "status": "complete",
+      "answer": "Commonly referenced KotOR model-modding tools in the approved archive sources include:\n- Kotor 1 25601440 Res [1]\n- Kotor Widescreen 169 Ui 800x600 [2]\n- 5760x1080 Hud Fix For Kotor 1 Solution [3]\n- Unable To Play Movies And Resolution Issue [4]\n\nSources\n1. Deadly Stream: topic/9122 kotor 1 25601440 res - https://deadlystream.com/topic/9122-kotor-1-25601440-res\n2. Deadly Stream: topic/3801 kotor widescreen 169 ui 800x600 - https://deadlystream.com/topic/3801-kotor-widescreen-169-ui-800x600\n3. Deadly Stream: topic/6848 5760x1080 hud fix for kotor 1 solution - https://deadlystream.com/topic/6848-5760x1080-hud-fix-for-kotor-1-solution\n4. Deadly Stream: topic/2908 unable to play movies and resolution issue - https://deadlystream.com/topic/2908-unable-to-play-movies-and-resolution-issue",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/9122-kotor-1-25601440-res",
+          "name": "Deadly Stream: topic/9122 kotor 1 25601440 res",
+          "url": "https://deadlystream.com/topic/9122-kotor-1-25601440-res"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/3801-kotor-widescreen-169-ui-800x600",
+          "name": "Deadly Stream: topic/3801 kotor widescreen 169 ui 800x600",
+          "url": "https://deadlystream.com/topic/3801-kotor-widescreen-169-ui-800x600"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/6848-5760x1080-hud-fix-for-kotor-1-solution",
+          "name": "Deadly Stream: topic/6848 5760x1080 hud fix for kotor 1 solution",
+          "url": "https://deadlystream.com/topic/6848-5760x1080-hud-fix-for-kotor-1-solution"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/2908-unable-to-play-movies-and-resolution-issue",
+          "name": "Deadly Stream: topic/2908 unable to play movies and resolution issue",
+          "url": "https://deadlystream.com/topic/2908-unable-to-play-movies-and-resolution-issue"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T12:09:38.784Z",
+      "completedAt": "2026-05-16T12:09:45.901Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T12:09:38.784Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T12:09:38.800Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        }
+      ]
+    },
+    "f214cc5d-0a0a-413f-849f-974a324b4a63": {
+      "queryId": "f214cc5d-0a0a-413f-849f-974a324b4a63",
+      "threadId": "988fbaea-25be-4a3a-bdf1-e69c15d349ca",
+      "userId": "qa-webui",
+      "query": "What is MDLOps used for in the KOTOR toolchain?",
+      "status": "complete",
+      "answer": "Commonly referenced KotOR model-modding tools in the approved archive sources include:\n- Kotortsl Model Format Mdlmdx Technical Details [1]\n- Mdlops [2]\n- Kotor Tool [3]\n- What Am I Doing Wrong With Mdlops [4]\n\nSources\n1. Deadly Stream: topic/4501 kotortsl model format mdlmdx technical details - https://deadlystream.com/topic/4501-kotortsl-model-format-mdlmdx-technical-details\n2. Deadly Stream: file/779 mdlops - https://deadlystream.com/files/file/779-mdlops\n3. Deadly Stream: file/280 kotor tool - https://deadlystream.com/files/file/280-kotor-tool\n4. Deadly Stream: topic/6822 what am i doing wrong with mdlops - https://deadlystream.com/topic/6822-what-am-i-doing-wrong-with-mdlops",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/4501-kotortsl-model-format-mdlmdx-technical-details",
+          "name": "Deadly Stream: topic/4501 kotortsl model format mdlmdx technical details",
+          "url": "https://deadlystream.com/topic/4501-kotortsl-model-format-mdlmdx-technical-details"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/files/file/779-mdlops",
+          "name": "Deadly Stream: file/779 mdlops",
+          "url": "https://deadlystream.com/files/file/779-mdlops"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/files/file/280-kotor-tool",
+          "name": "Deadly Stream: file/280 kotor tool",
+          "url": "https://deadlystream.com/files/file/280-kotor-tool"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/6822-what-am-i-doing-wrong-with-mdlops",
+          "name": "Deadly Stream: topic/6822 what am i doing wrong with mdlops",
+          "url": "https://deadlystream.com/topic/6822-what-am-i-doing-wrong-with-mdlops"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T12:09:46.776Z",
+      "completedAt": "2026-05-16T12:09:54.231Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T12:09:46.776Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T12:09:46.787Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        }
+      ]
+    },
+    "f3ae4c49-2b5b-4c59-8d21-bfe32cf06400": {
+      "queryId": "f3ae4c49-2b5b-4c59-8d21-bfe32cf06400",
+      "threadId": "988fbaea-25be-4a3a-bdf1-e69c15d349ca",
+      "userId": "qa-webui",
+      "query": "Where are Knights of the Old Republic save files stored on Windows?",
+      "status": "complete",
+      "answer": "Commonly referenced KotOR model-modding tools in the approved archive sources include:\n- Kotor2 Kse No Save Files [1]\n- Star Wars: Knights Of The Old Republic II The Sith Lords [2]\n- Kotor Savegame Editor [3]\n- Star Wars: Knights Of The Old Republic [4]\n- Star Wars: The Old Republic [5]\n\nSources\n1. Deadly Stream: topic/5628 kotor2 kse no save files - https://deadlystream.com/topic/5628-kotor2-kse-no-save-files\n2. PCGamingWiki: Star Wars: Knights of the Old Republic II The Sith Lords - https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic_II_-_The_Sith_Lords\n3. Deadly Stream: file/503 kotor savegame editor - https://deadlystream.com/files/file/503-kotor-savegame-editor\n4. PCGamingWiki: Star Wars: Knights of the Old Republic - https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic\n5. PCGamingWiki: Star Wars: The Old Republic - https://www.pcgamingwiki.com/wiki/Star_Wars:_The_Old_Republic",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/5628-kotor2-kse-no-save-files",
+          "name": "Deadly Stream: topic/5628 kotor2 kse no save files",
+          "url": "https://deadlystream.com/topic/5628-kotor2-kse-no-save-files"
+        },
+        {
+          "id": "pcgamingwiki-kotor:https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic_II_-_The_Sith_Lords",
+          "name": "PCGamingWiki: Star Wars: Knights of the Old Republic II The Sith Lords",
+          "url": "https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic_II_-_The_Sith_Lords"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/files/file/503-kotor-savegame-editor",
+          "name": "Deadly Stream: file/503 kotor savegame editor",
+          "url": "https://deadlystream.com/files/file/503-kotor-savegame-editor"
+        },
+        {
+          "id": "pcgamingwiki-kotor:https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic",
+          "name": "PCGamingWiki: Star Wars: Knights of the Old Republic",
+          "url": "https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic"
+        },
+        {
+          "id": "pcgamingwiki-kotor:https://www.pcgamingwiki.com/wiki/Star_Wars:_The_Old_Republic",
+          "name": "PCGamingWiki: Star Wars: The Old Republic",
+          "url": "https://www.pcgamingwiki.com/wiki/Star_Wars:_The_Old_Republic"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T12:09:54.921Z",
+      "completedAt": "2026-05-16T12:10:02.739Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T12:09:54.921Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T12:09:54.936Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        }
+      ]
+    },
+    "7c478a66-c391-4992-b885-aac83ae40cd8": {
+      "queryId": "7c478a66-c391-4992-b885-aac83ae40cd8",
+      "threadId": "988fbaea-25be-4a3a-bdf1-e69c15d349ca",
+      "userId": "qa-webui",
+      "query": "What does the reone project provide for Odyssey engine work?",
+      "status": "complete",
+      "answer": "Commonly referenced KotOR model-modding tools in the approved archive sources include:\n- Reone Kotor Engine Recreation [1]\n- Wip Kotor Js A Game Engine For K1 K2 Written In Javascript [2]\n\nSources\n1. Deadly Stream: topic/8542 reone kotor engine recreation - https://deadlystream.com/topic/8542-reone-kotor-engine-recreation\n2. Deadly Stream: topic/6608 wip kotor js a game engine for k1 k2 written in javascript - https://deadlystream.com/topic/6608-wip-kotor-js-a-game-engine-for-k1-k2-written-in-javascript",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/8542-reone-kotor-engine-recreation",
+          "name": "Deadly Stream: topic/8542 reone kotor engine recreation",
+          "url": "https://deadlystream.com/topic/8542-reone-kotor-engine-recreation"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/6608-wip-kotor-js-a-game-engine-for-k1-k2-written-in-javascript",
+          "name": "Deadly Stream: topic/6608 wip kotor js a game engine for k1 k2 written in javascript",
+          "url": "https://deadlystream.com/topic/6608-wip-kotor-js-a-game-engine-for-k1-k2-written-in-javascript"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T12:10:04.096Z",
+      "completedAt": "2026-05-16T12:10:12.525Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T12:10:04.096Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T12:10:04.118Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T12:10:12.109Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        }
+      ]
+    },
+    "0dc395f5-ada1-44c5-af59-cbdd121edd7b": {
+      "queryId": "0dc395f5-ada1-44c5-af59-cbdd121edd7b",
+      "threadId": "2c974b8b-0bbf-465e-9a99-fd4535d72acf",
+      "userId": "qa-webui",
+      "query": "What is Pazaak?",
+      "status": "complete",
+      "answer": "I could not complete live archive synthesis for this question right now.\n\nLocal Knowledge Context (lower authority than approved web/repo sources)\n1. Approved Discord Knowledge (discord): Opt-in channel archive for project discussion, troubleshooting, and staff-approved historical answers. (discord://approved-channels) [1]\n\nSources\n1. Approved Discord Knowledge: Approved Discord Knowledge (discord) - discord://approved-channels",
+      "sources": [
+        {
+          "id": "approved-discord-knowledge:discord://approved-channels",
+          "name": "Approved Discord Knowledge: Approved Discord Knowledge (discord)",
+          "url": "discord://approved-channels"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T12:53:10.087Z",
+      "completedAt": "2026-05-16T12:53:19.608Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T12:53:10.087Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T12:53:10.152Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T12:53:18.102Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        }
+      ]
+    },
+    "f94bfbf9-924f-419d-9c57-dad09a25a94c": {
+      "queryId": "f94bfbf9-924f-419d-9c57-dad09a25a94c",
+      "threadId": "6a80bf39-d396-43bf-97aa-0c55eafb8591",
+      "userId": "qa-webui",
+      "query": "What is Pazaak?",
+      "status": "complete",
+      "answer": "I could not complete live archive synthesis for this question right now.\n\nLocal Knowledge Context (lower authority than approved web/repo sources)\n1. Approved Discord Knowledge (discord): Opt-in channel archive for project discussion, troubleshooting, and staff-approved historical answers. (discord://approved-channels) [1]\n\nSources\n1. Deadly Stream: topic/4142 atton teaches exile pazaak - https://deadlystream.com/topic/4142-atton-teaches-exile-pazaak\n2. Deadly Stream: topic/4321 gelrood the pazaak player - https://deadlystream.com/topic/4321-gelrood-the-pazaak-player\n3. Deadly Stream: file/2965 auto pazaak simulate pazaak without playing - https://deadlystream.com/files/file/2965-auto-pazaak-simulate-pazaak-without-playing\n4. Deadly Stream: file/1270 balanced pazaak - https://deadlystream.com/files/file/1270-balanced-pazaak\n5. Approved Discord Knowledge: Approved Discord Knowledge (discord) - discord://approved-channels",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/4142-atton-teaches-exile-pazaak",
+          "name": "Deadly Stream: topic/4142 atton teaches exile pazaak",
+          "url": "https://deadlystream.com/topic/4142-atton-teaches-exile-pazaak"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/4321-gelrood-the-pazaak-player",
+          "name": "Deadly Stream: topic/4321 gelrood the pazaak player",
+          "url": "https://deadlystream.com/topic/4321-gelrood-the-pazaak-player"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/files/file/2965-auto-pazaak-simulate-pazaak-without-playing",
+          "name": "Deadly Stream: file/2965 auto pazaak simulate pazaak without playing",
+          "url": "https://deadlystream.com/files/file/2965-auto-pazaak-simulate-pazaak-without-playing"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/files/file/1270-balanced-pazaak",
+          "name": "Deadly Stream: file/1270 balanced pazaak",
+          "url": "https://deadlystream.com/files/file/1270-balanced-pazaak"
+        },
+        {
+          "id": "approved-discord-knowledge:discord://approved-channels",
+          "name": "Approved Discord Knowledge: Approved Discord Knowledge (discord)",
+          "url": "discord://approved-channels"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T12:53:17.414Z",
+      "completedAt": "2026-05-16T12:53:25.174Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T12:53:17.414Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T12:53:17.431Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        }
+      ]
+    },
+    "b1d678fe-9f73-418f-aea3-2425d867ac09": {
+      "queryId": "b1d678fe-9f73-418f-aea3-2425d867ac09",
+      "threadId": "d8593e89-58a8-4e5d-8096-b8eeb919ca18",
+      "userId": "qa-webui",
+      "query": "Who is HK-47 in KOTOR?",
+      "status": "complete",
+      "answer": "Commonly referenced KotOR model-modding tools in the approved archive sources include:\n- Modrecruit Hk 47 Early For Kotor 2 Unofficial Patch [1]\n- Recruit Hk 47 Early [2]\n- KOTOR Neocities: faq/k1 [3]\n- Visually Repair Hk 47 [4]\n- Almost Every Droid Merchant Has All Hk 47 Parts For Kotor 2 Unofficial Patch [5]\n\nSources\n1. Deadly Stream: topic/11770 modrecruit hk 47 early for kotor 2 unofficial patch - https://deadlystream.com/topic/11770-modrecruit-hk-47-early-for-kotor-2-unofficial-patch\n2. Deadly Stream: file/1872 recruit hk 47 early - https://deadlystream.com/files/file/1872-recruit-hk-47-early\n3. KOTOR Neocities: faq/k1 - https://kotor.neocities.org/faq/k1\n4. Deadly Stream: file/1434 visually repair hk 47 - https://deadlystream.com/files/file/1434-visually-repair-hk-47\n5. Deadly Stream: file/2713 almost every droid merchant has all hk 47 parts for kotor 2 unofficial patch - https://deadlystream.com/files/file/2713-almost-every-droid-merchant-has-all-hk-47-parts-for-kotor-2-unofficial-patch",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/11770-modrecruit-hk-47-early-for-kotor-2-unofficial-patch",
+          "name": "Deadly Stream: topic/11770 modrecruit hk 47 early for kotor 2 unofficial patch",
+          "url": "https://deadlystream.com/topic/11770-modrecruit-hk-47-early-for-kotor-2-unofficial-patch"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/files/file/1872-recruit-hk-47-early",
+          "name": "Deadly Stream: file/1872 recruit hk 47 early",
+          "url": "https://deadlystream.com/files/file/1872-recruit-hk-47-early"
+        },
+        {
+          "id": "kotor-neocities:https://kotor.neocities.org/faq/k1",
+          "name": "KOTOR Neocities: faq/k1",
+          "url": "https://kotor.neocities.org/faq/k1"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/files/file/1434-visually-repair-hk-47",
+          "name": "Deadly Stream: file/1434 visually repair hk 47",
+          "url": "https://deadlystream.com/files/file/1434-visually-repair-hk-47"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/files/file/2713-almost-every-droid-merchant-has-all-hk-47-parts-for-kotor-2-unofficial-patch",
+          "name": "Deadly Stream: file/2713 almost every droid merchant has all hk 47 parts for kotor 2 unofficial patch",
+          "url": "https://deadlystream.com/files/file/2713-almost-every-droid-merchant-has-all-hk-47-parts-for-kotor-2-unofficial-patch"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T12:53:27.546Z",
+      "completedAt": "2026-05-16T12:53:34.971Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T12:53:27.546Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T12:53:27.564Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        }
+      ]
+    },
+    "78b1d9f1-33dd-4a94-b23d-53b59236c1f6": {
+      "queryId": "78b1d9f1-33dd-4a94-b23d-53b59236c1f6",
+      "threadId": "23f92445-ca1c-4b97-a230-f5ced7a298e5",
+      "userId": "qa-webui",
+      "query": "What year was KOTOR released?",
+      "status": "complete",
+      "answer": "Commonly referenced KotOR model-modding tools in the approved archive sources include:\n- Full Mobile [1]\n- Kotor Or Kotor 2 [2]\n- Faq [3]\n- General [4]\n- Kotor Comes To Xbox One X [5]\n\nSources\n1. KOTOR Neocities: k1/full mobile - https://kotor.neocities.org/modding/mod_builds/k1/full_mobile\n2. Deadly Stream: topic/325 kotor or kotor 2 - https://deadlystream.com/topic/325-kotor-or-kotor-2\n3. KOTOR Neocities: mod builds/faq - https://kotor.neocities.org/modding/mod_builds/faq\n4. KOTOR Neocities: faq/general - https://kotor.neocities.org/faq/general\n5. Deadly Stream: topic/5762 kotor comes to xbox one x - https://deadlystream.com/topic/5762-kotor-comes-to-xbox-one-x",
+      "sources": [
+        {
+          "id": "kotor-neocities:https://kotor.neocities.org/modding/mod_builds/k1/full_mobile",
+          "name": "KOTOR Neocities: k1/full mobile",
+          "url": "https://kotor.neocities.org/modding/mod_builds/k1/full_mobile"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/325-kotor-or-kotor-2",
+          "name": "Deadly Stream: topic/325 kotor or kotor 2",
+          "url": "https://deadlystream.com/topic/325-kotor-or-kotor-2"
+        },
+        {
+          "id": "kotor-neocities:https://kotor.neocities.org/modding/mod_builds/faq",
+          "name": "KOTOR Neocities: mod builds/faq",
+          "url": "https://kotor.neocities.org/modding/mod_builds/faq"
+        },
+        {
+          "id": "kotor-neocities:https://kotor.neocities.org/faq/general",
+          "name": "KOTOR Neocities: faq/general",
+          "url": "https://kotor.neocities.org/faq/general"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/5762-kotor-comes-to-xbox-one-x",
+          "name": "Deadly Stream: topic/5762 kotor comes to xbox one x",
+          "url": "https://deadlystream.com/topic/5762-kotor-comes-to-xbox-one-x"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T12:55:46.875Z",
+      "completedAt": "2026-05-16T12:55:55.361Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T12:55:46.875Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T12:55:46.891Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T12:55:54.883Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        }
+      ]
+    },
+    "bd8a3b5e-3e17-47ad-bef3-71296b27542d": {
+      "queryId": "bd8a3b5e-3e17-47ad-bef3-71296b27542d",
+      "threadId": "a524bf0f-acca-41ce-97f9-b5c8956ffcc4",
+      "userId": "qa-webui",
+      "query": "What is TSLPatcher used for in KOTOR modding?",
+      "status": "complete",
+      "answer": "Commonly referenced KotOR model-modding tools in the approved archive sources include:\n- Tslpatcher Only Modify File If Its Present [1]\n- Installing Tslpatcher Mods Without The Exe [2]\n- Using Tsl Patcher Without Kotor On Desktop [3]\n- Tsl Patcher Tlked And Accessories [4]\n- Tls Modding [5]\n\nSources\n1. Deadly Stream: topic/5343 tslpatcher only modify file if its present - https://deadlystream.com/topic/5343-tslpatcher-only-modify-file-if-its-present\n2. Deadly Stream: topic/8928 installing tslpatcher mods without the exe - https://deadlystream.com/topic/8928-installing-tslpatcher-mods-without-the-exe\n3. Deadly Stream: topic/4098 using tsl patcher without kotor on desktop - https://deadlystream.com/topic/4098-using-tsl-patcher-without-kotor-on-desktop\n4. Deadly Stream: file/1039 tsl patcher tlked and accessories - https://deadlystream.com/files/file/1039-tsl-patcher-tlked-and-accessories\n5. Deadly Stream: topic/11708 tls modding - https://deadlystream.com/topic/11708-tls-modding",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/5343-tslpatcher-only-modify-file-if-its-present",
+          "name": "Deadly Stream: topic/5343 tslpatcher only modify file if its present",
+          "url": "https://deadlystream.com/topic/5343-tslpatcher-only-modify-file-if-its-present"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/8928-installing-tslpatcher-mods-without-the-exe",
+          "name": "Deadly Stream: topic/8928 installing tslpatcher mods without the exe",
+          "url": "https://deadlystream.com/topic/8928-installing-tslpatcher-mods-without-the-exe"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/4098-using-tsl-patcher-without-kotor-on-desktop",
+          "name": "Deadly Stream: topic/4098 using tsl patcher without kotor on desktop",
+          "url": "https://deadlystream.com/topic/4098-using-tsl-patcher-without-kotor-on-desktop"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/files/file/1039-tsl-patcher-tlked-and-accessories",
+          "name": "Deadly Stream: file/1039 tsl patcher tlked and accessories",
+          "url": "https://deadlystream.com/files/file/1039-tsl-patcher-tlked-and-accessories"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/11708-tls-modding",
+          "name": "Deadly Stream: topic/11708 tls modding",
+          "url": "https://deadlystream.com/topic/11708-tls-modding"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T12:59:22.875Z",
+      "completedAt": "2026-05-16T12:59:29.892Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T12:59:22.875Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T12:59:22.888Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        }
+      ]
+    },
+    "c979e6b0-123b-4bca-9e67-e15d4aa40b65": {
+      "queryId": "c979e6b0-123b-4bca-9e67-e15d4aa40b65",
+      "threadId": "a524bf0f-acca-41ce-97f9-b5c8956ffcc4",
+      "userId": "qa-webui",
+      "query": "How do I troubleshoot KOTOR widescreen resolution issues on PC?",
+      "status": "complete",
+      "answer": "Commonly referenced KotOR model-modding tools in the approved archive sources include:\n- 5760x1080 Hud Fix For Kotor 1 Solution [1]\n- K1 Main Menu Widescreen Fix [2]\n- Kotor Widescreen 169 Ui 800x600 [3]\n- Kotor 1 25601440 Res [4]\n\nSources\n1. Deadly Stream: topic/6848 5760x1080 hud fix for kotor 1 solution - https://deadlystream.com/topic/6848-5760x1080-hud-fix-for-kotor-1-solution\n2. Deadly Stream: file/1173 k1 main menu widescreen fix - https://deadlystream.com/files/file/1173-k1-main-menu-widescreen-fix\n3. Deadly Stream: topic/3801 kotor widescreen 169 ui 800x600 - https://deadlystream.com/topic/3801-kotor-widescreen-169-ui-800x600\n4. Deadly Stream: topic/9122 kotor 1 25601440 res - https://deadlystream.com/topic/9122-kotor-1-25601440-res",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/6848-5760x1080-hud-fix-for-kotor-1-solution",
+          "name": "Deadly Stream: topic/6848 5760x1080 hud fix for kotor 1 solution",
+          "url": "https://deadlystream.com/topic/6848-5760x1080-hud-fix-for-kotor-1-solution"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/files/file/1173-k1-main-menu-widescreen-fix",
+          "name": "Deadly Stream: file/1173 k1 main menu widescreen fix",
+          "url": "https://deadlystream.com/files/file/1173-k1-main-menu-widescreen-fix"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/3801-kotor-widescreen-169-ui-800x600",
+          "name": "Deadly Stream: topic/3801 kotor widescreen 169 ui 800x600",
+          "url": "https://deadlystream.com/topic/3801-kotor-widescreen-169-ui-800x600"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/9122-kotor-1-25601440-res",
+          "name": "Deadly Stream: topic/9122 kotor 1 25601440 res",
+          "url": "https://deadlystream.com/topic/9122-kotor-1-25601440-res"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T12:59:30.458Z",
+      "completedAt": "2026-05-16T12:59:36.370Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T12:59:30.458Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T12:59:30.471Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        }
+      ]
+    },
+    "681b14e2-17d9-4d42-adfb-34651c529abe": {
+      "queryId": "681b14e2-17d9-4d42-adfb-34651c529abe",
+      "threadId": "a524bf0f-acca-41ce-97f9-b5c8956ffcc4",
+      "userId": "qa-webui",
+      "query": "What is MDLOps used for in the KOTOR toolchain?",
+      "status": "complete",
+      "answer": "Commonly referenced KotOR model-modding tools in the approved archive sources include:\n- Kotortsl Model Format Mdlmdx Technical Details [1]\n- Kotor Tool [2]\n- Mdlops [3]\n- What Am I Doing Wrong With Mdlops [4]\n\nSources\n1. Deadly Stream: topic/4501 kotortsl model format mdlmdx technical details - https://deadlystream.com/topic/4501-kotortsl-model-format-mdlmdx-technical-details\n2. Deadly Stream: file/280 kotor tool - https://deadlystream.com/files/file/280-kotor-tool\n3. Deadly Stream: file/779 mdlops - https://deadlystream.com/files/file/779-mdlops\n4. Deadly Stream: topic/6822 what am i doing wrong with mdlops - https://deadlystream.com/topic/6822-what-am-i-doing-wrong-with-mdlops",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/4501-kotortsl-model-format-mdlmdx-technical-details",
+          "name": "Deadly Stream: topic/4501 kotortsl model format mdlmdx technical details",
+          "url": "https://deadlystream.com/topic/4501-kotortsl-model-format-mdlmdx-technical-details"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/files/file/280-kotor-tool",
+          "name": "Deadly Stream: file/280 kotor tool",
+          "url": "https://deadlystream.com/files/file/280-kotor-tool"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/files/file/779-mdlops",
+          "name": "Deadly Stream: file/779 mdlops",
+          "url": "https://deadlystream.com/files/file/779-mdlops"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/6822-what-am-i-doing-wrong-with-mdlops",
+          "name": "Deadly Stream: topic/6822 what am i doing wrong with mdlops",
+          "url": "https://deadlystream.com/topic/6822-what-am-i-doing-wrong-with-mdlops"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T12:59:36.925Z",
+      "completedAt": "2026-05-16T12:59:45.280Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T12:59:36.925Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T12:59:36.954Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T12:59:44.936Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        }
+      ]
+    },
+    "bbeed513-1b57-4d72-a994-2a1746c12270": {
+      "queryId": "bbeed513-1b57-4d72-a994-2a1746c12270",
+      "threadId": "a524bf0f-acca-41ce-97f9-b5c8956ffcc4",
+      "userId": "qa-webui",
+      "query": "Where are Knights of the Old Republic save files stored on Windows?",
+      "status": "complete",
+      "answer": "Commonly referenced KotOR model-modding tools in the approved archive sources include:\n- Deadly Stream: page/2 [1]\n- Kotor2 Kse No Save Files [2]\n- Kse Kotor Tool On Steamdvd [3]\n- Star Wars: Knights Of The Old Republic [4]\n\nSources\n1. Deadly Stream: page/2 - https://deadlystream.com/topic/3437-toolkotor-savegame-editor/page/2\n2. Deadly Stream: topic/5628 kotor2 kse no save files - https://deadlystream.com/topic/5628-kotor2-kse-no-save-files\n3. Deadly Stream: topic/3393 kse kotor tool on steamdvd - https://deadlystream.com/topic/3393-kse-kotor-tool-on-steamdvd\n4. PCGamingWiki: Star Wars: Knights of the Old Republic - https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/3437-toolkotor-savegame-editor/page/2",
+          "name": "Deadly Stream: page/2",
+          "url": "https://deadlystream.com/topic/3437-toolkotor-savegame-editor/page/2"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/5628-kotor2-kse-no-save-files",
+          "name": "Deadly Stream: topic/5628 kotor2 kse no save files",
+          "url": "https://deadlystream.com/topic/5628-kotor2-kse-no-save-files"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/3393-kse-kotor-tool-on-steamdvd",
+          "name": "Deadly Stream: topic/3393 kse kotor tool on steamdvd",
+          "url": "https://deadlystream.com/topic/3393-kse-kotor-tool-on-steamdvd"
+        },
+        {
+          "id": "pcgamingwiki-kotor:https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic",
+          "name": "PCGamingWiki: Star Wars: Knights of the Old Republic",
+          "url": "https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T12:59:45.905Z",
+      "completedAt": "2026-05-16T12:59:51.934Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T12:59:45.905Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T12:59:45.914Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        }
+      ]
+    },
+    "7094eeca-5bca-4961-ae53-72f44d3deac7": {
+      "queryId": "7094eeca-5bca-4961-ae53-72f44d3deac7",
+      "threadId": "a524bf0f-acca-41ce-97f9-b5c8956ffcc4",
+      "userId": "qa-webui",
+      "query": "What does the reone project provide for Odyssey engine work?",
+      "status": "complete",
+      "answer": "Commonly referenced KotOR model-modding tools in the approved archive sources include:\n- Reone Kotor Engine Recreation [1]\n\nSources\n1. Deadly Stream: topic/8542 reone kotor engine recreation - https://deadlystream.com/topic/8542-reone-kotor-engine-recreation",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/8542-reone-kotor-engine-recreation",
+          "name": "Deadly Stream: topic/8542 reone kotor engine recreation",
+          "url": "https://deadlystream.com/topic/8542-reone-kotor-engine-recreation"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T12:59:53.288Z",
+      "completedAt": "2026-05-16T12:59:59.158Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T12:59:53.288Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T12:59:53.298Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        }
+      ]
+    },
+    "8e5fdbb6-83cb-411d-b27c-a22e4f0358d4": {
+      "queryId": "8e5fdbb6-83cb-411d-b27c-a22e4f0358d4",
+      "threadId": "0e80cbb2-0c59-41d3-8f5c-195ccc806dc2",
+      "userId": "qa-webui",
+      "query": "Who is Darth Revan and what is his role in KOTOR?",
+      "status": "complete",
+      "answer": "Commonly referenced KotOR model-modding tools in the approved archive sources include:\n- Revan [1]\n- The Old Republic: Revan [2]\n- Legends [3]\n- Wookieepedia: r/3344233352138235705 [4]\n\nSources\n1. Wookieepedia: Revan - https://starwars.fandom.com/wiki/Revan?file=RevanIsBorn-KotOR42.jpg\n2. Wookieepedia: Revan - https://starwars.fandom.com/wiki/Revan\n3. Wookieepedia: The Old Republic: Revan - https://starwars.fandom.com/wiki/The_Old_Republic:_Revan\n4. Wookieepedia: Revan/Legends - https://starwars.fandom.com/wiki/Wookieepedia:Featured_article_nominations/Revan/Legends\n5. Wookieepedia: r/3344233352138235705 - https://starwars.fandom.com/f/p/3343172654596398718/r/3344233352138235705",
+      "sources": [
+        {
+          "id": "wookieepedia:https://starwars.fandom.com/wiki/Revan?file=RevanIsBorn-KotOR42.jpg",
+          "name": "Wookieepedia: Revan",
+          "url": "https://starwars.fandom.com/wiki/Revan?file=RevanIsBorn-KotOR42.jpg"
+        },
+        {
+          "id": "wookieepedia:https://starwars.fandom.com/wiki/Revan",
+          "name": "Wookieepedia: Revan",
+          "url": "https://starwars.fandom.com/wiki/Revan"
+        },
+        {
+          "id": "wookieepedia:https://starwars.fandom.com/wiki/The_Old_Republic:_Revan",
+          "name": "Wookieepedia: The Old Republic: Revan",
+          "url": "https://starwars.fandom.com/wiki/The_Old_Republic:_Revan"
+        },
+        {
+          "id": "wookieepedia:https://starwars.fandom.com/wiki/Wookieepedia:Featured_article_nominations/Revan/Legends",
+          "name": "Wookieepedia: Revan/Legends",
+          "url": "https://starwars.fandom.com/wiki/Wookieepedia:Featured_article_nominations/Revan/Legends"
+        },
+        {
+          "id": "wookieepedia:https://starwars.fandom.com/f/p/3343172654596398718/r/3344233352138235705",
+          "name": "Wookieepedia: r/3344233352138235705",
+          "url": "https://starwars.fandom.com/f/p/3343172654596398718/r/3344233352138235705"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T13:06:17.764Z",
+      "completedAt": "2026-05-16T13:06:24.336Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:06:17.764Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:06:17.786Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        }
+      ]
+    },
+    "b8a725ba-7481-4c12-98f8-906346c32892": {
+      "queryId": "b8a725ba-7481-4c12-98f8-906346c32892",
+      "threadId": "fc887e29-e4fc-4f73-8572-50c96c62003e",
+      "userId": "qa-webui",
+      "query": "Who is Bastila Shan and what is her role in KOTOR?",
+      "status": "complete",
+      "answer": "- Enable JavaScript and cookies to continue Enable JavaScript and cookies to continue Enable JavaScript and cookies to continue Enable JavaScript and cookies to continue [1]\n- Enable JavaScript and cookies to continue Enable JavaScript and cookies to continue Enable JavaScript and cookies to continue Enable JavaScript and cookies to continue [1]\n- Enable JavaScript and cookies to continue Enable JavaScript and cookies to continue Enable JavaScript and cookies to continue Enable JavaScript and cookies to continue [1]\n- Enable JavaScript and cookies to continue Enable JavaScript and cookies to continue Enable JavaScript and cookies to continue Enable JavaScript and cookies to continue [1]\n- Enable JavaScript and cookies to continue Enable JavaScript and cookies to continue Enable JavaScript and cookies to continue Enable JavaScript and cookies to continue [1]\n\nSources\n1. Wookieepedia: Shan family - https://starwars.fandom.com/wiki/Shan_family\n2. Wookieepedia: p/4400000000003647117 - https://starwars.fandom.com/f/p/4400000000003647117\n3. Wookieepedia: t/Bastila+Shan - https://starwars.fandom.com/f/t/Bastila+Shan\n4. Wookieepedia: Bastila Shan - https://starwars.fandom.com/wiki/Bastila_Shan\n5. Wookieepedia: Jennifer Hale - https://starwars.fandom.com/wiki/Jennifer_Hale",
+      "sources": [
+        {
+          "id": "wookieepedia:https://starwars.fandom.com/wiki/Shan_family",
+          "name": "Wookieepedia: Shan family",
+          "url": "https://starwars.fandom.com/wiki/Shan_family"
+        },
+        {
+          "id": "wookieepedia:https://starwars.fandom.com/f/p/4400000000003647117",
+          "name": "Wookieepedia: p/4400000000003647117",
+          "url": "https://starwars.fandom.com/f/p/4400000000003647117"
+        },
+        {
+          "id": "wookieepedia:https://starwars.fandom.com/f/t/Bastila+Shan",
+          "name": "Wookieepedia: t/Bastila+Shan",
+          "url": "https://starwars.fandom.com/f/t/Bastila+Shan"
+        },
+        {
+          "id": "wookieepedia:https://starwars.fandom.com/wiki/Bastila_Shan",
+          "name": "Wookieepedia: Bastila Shan",
+          "url": "https://starwars.fandom.com/wiki/Bastila_Shan"
+        },
+        {
+          "id": "wookieepedia:https://starwars.fandom.com/wiki/Jennifer_Hale",
+          "name": "Wookieepedia: Jennifer Hale",
+          "url": "https://starwars.fandom.com/wiki/Jennifer_Hale"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T13:12:04.693Z",
+      "completedAt": "2026-05-16T13:12:13.495Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:12:04.693Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:12:04.721Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T13:12:12.709Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        }
+      ]
+    },
+    "41c94f39-0961-431b-b23b-31aae3ab957b": {
+      "queryId": "41c94f39-0961-431b-b23b-31aae3ab957b",
+      "threadId": "9a569672-4669-42b3-8d6c-b791864cc97c",
+      "userId": "qa-webui",
+      "query": "How do I install mods for KOTOR on Steam Deck?",
+      "status": "complete",
+      "answer": "Here are the most relevant pages I found in the approved KOTOR knowledge sources:\n- Full [1]\n- Why Not To Use The Steam Workshop [2]\n- Jcs Vision Enhancement For K1 [3]\n\nSources\n1. KOTOR Neocities: k1/full - https://kotor.neocities.org/modding/mod_builds/k1/full\n2. Deadly Stream: topic/7321 why not to use the steam workshop - https://deadlystream.com/topic/7321-why-not-to-use-the-steam-workshop\n3. Deadly Stream: file/1402 jcs vision enhancement for k1 - https://deadlystream.com/files/file/1402-jcs-vision-enhancement-for-k1",
+      "sources": [
+        {
+          "id": "kotor-neocities:https://kotor.neocities.org/modding/mod_builds/k1/full",
+          "name": "KOTOR Neocities: k1/full",
+          "url": "https://kotor.neocities.org/modding/mod_builds/k1/full"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/7321-why-not-to-use-the-steam-workshop",
+          "name": "Deadly Stream: topic/7321 why not to use the steam workshop",
+          "url": "https://deadlystream.com/topic/7321-why-not-to-use-the-steam-workshop"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/files/file/1402-jcs-vision-enhancement-for-k1",
+          "name": "Deadly Stream: file/1402 jcs vision enhancement for k1",
+          "url": "https://deadlystream.com/files/file/1402-jcs-vision-enhancement-for-k1"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T13:12:05.061Z",
+      "completedAt": "2026-05-16T13:12:14.881Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:12:05.061Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:12:05.159Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T13:12:13.151Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        }
+      ]
+    },
+    "f8fa5262-c264-4ddb-8258-52bea05d70cf": {
+      "queryId": "f8fa5262-c264-4ddb-8258-52bea05d70cf",
+      "threadId": "fcca2492-9723-40af-8904-401975ef841a",
+      "userId": "qa-webui",
+      "query": "What is the Pazaak card game and how do you play it?",
+      "status": "complete",
+      "answer": "Here are the most relevant pages I found in the approved KOTOR knowledge sources:\n- Pazaak [1]\n- Atton Teaches Exile Pazaak [2]\n- Legends [3]\n\nSources\n1. StrategyWiki KOTOR: Pazaak - https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Pazaak\n2. Deadly Stream: topic/4142 atton teaches exile pazaak - https://deadlystream.com/topic/4142-atton-teaches-exile-pazaak\n3. Wookieepedia: Pazaak/Legends - https://starwars.fandom.com/wiki/Pazaak/Legends",
+      "sources": [
+        {
+          "id": "strategywiki-kotor:https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Pazaak",
+          "name": "StrategyWiki KOTOR: Pazaak",
+          "url": "https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Pazaak"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/4142-atton-teaches-exile-pazaak",
+          "name": "Deadly Stream: topic/4142 atton teaches exile pazaak",
+          "url": "https://deadlystream.com/topic/4142-atton-teaches-exile-pazaak"
+        },
+        {
+          "id": "wookieepedia:https://starwars.fandom.com/wiki/Pazaak/Legends",
+          "name": "Wookieepedia: Pazaak/Legends",
+          "url": "https://starwars.fandom.com/wiki/Pazaak/Legends"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T13:12:05.399Z",
+      "completedAt": "2026-05-16T13:12:13.783Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:12:05.399Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:12:05.424Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T13:12:13.417Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        }
+      ]
+    },
+    "59bb0cb8-55df-4579-b391-3267c79f6f71": {
+      "queryId": "59bb0cb8-55df-4579-b391-3267c79f6f71",
+      "threadId": "51c0073b-0d6b-4d85-8f55-7b18e66a5f5d",
+      "userId": "qa-webui",
+      "query": "Who is Bastila Shan and what is her role in KOTOR?",
+      "status": "complete",
+      "answer": "Here are the most relevant pages I found in the approved KOTOR knowledge sources:\n- Archive1 [1]\n- Wookieepedia: p/4400000000003647117 [2]\n- Talk:Bastila Shan [3]\n- Jennifer Hale [4]\n- Bastila Shan [5]\n\nSources\n1. Wookieepedia: Talk:Bastila Shan/Archive1 - https://starwars.fandom.com/wiki/Talk:Bastila_Shan/Archive1\n2. Wookieepedia: p/4400000000003647117 - https://starwars.fandom.com/f/p/4400000000003647117\n3. Wookieepedia: Talk:Bastila Shan - https://starwars.fandom.com/wiki/Talk:Bastila_Shan\n4. Wookieepedia: Jennifer Hale - https://starwars.fandom.com/wiki/Jennifer_Hale\n5. Wookieepedia: Bastila Shan - https://starwars.fandom.com/wiki/Bastila_Shan",
+      "sources": [
+        {
+          "id": "wookieepedia:https://starwars.fandom.com/wiki/Talk:Bastila_Shan/Archive1",
+          "name": "Wookieepedia: Talk:Bastila Shan/Archive1",
+          "url": "https://starwars.fandom.com/wiki/Talk:Bastila_Shan/Archive1"
+        },
+        {
+          "id": "wookieepedia:https://starwars.fandom.com/f/p/4400000000003647117",
+          "name": "Wookieepedia: p/4400000000003647117",
+          "url": "https://starwars.fandom.com/f/p/4400000000003647117"
+        },
+        {
+          "id": "wookieepedia:https://starwars.fandom.com/wiki/Talk:Bastila_Shan",
+          "name": "Wookieepedia: Talk:Bastila Shan",
+          "url": "https://starwars.fandom.com/wiki/Talk:Bastila_Shan"
+        },
+        {
+          "id": "wookieepedia:https://starwars.fandom.com/wiki/Jennifer_Hale",
+          "name": "Wookieepedia: Jennifer Hale",
+          "url": "https://starwars.fandom.com/wiki/Jennifer_Hale"
+        },
+        {
+          "id": "wookieepedia:https://starwars.fandom.com/wiki/Bastila_Shan",
+          "name": "Wookieepedia: Bastila Shan",
+          "url": "https://starwars.fandom.com/wiki/Bastila_Shan"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T13:14:23.625Z",
+      "completedAt": "2026-05-16T13:14:31.053Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:14:23.625Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:14:23.650Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        }
+      ]
+    },
+    "2767f32a-c244-46bf-b7c5-19ddae090fe7": {
+      "queryId": "2767f32a-c244-46bf-b7c5-19ddae090fe7",
+      "threadId": "805d9abe-5795-481b-bcc7-064dc26efb25",
+      "userId": "qa-webui",
+      "query": "Who is Bastila Shan and what is her role in KOTOR?",
+      "status": "complete",
+      "answer": "Here are the most relevant pages I found in the approved KOTOR knowledge sources:\n- Star Wars: Knights Of The Old Republic [1]\n\nSources\n1. Wikipedia — Star Wars KOTOR: wiki/Star Wars: Knights of the Old Republic - https://en.wikipedia.org/wiki/Star_Wars:_Knights_of_the_Old_Republic",
+      "sources": [
+        {
+          "id": "wikipedia-kotor",
+          "name": "Wikipedia — Star Wars KOTOR: wiki/Star Wars: Knights of the Old Republic",
+          "url": "https://en.wikipedia.org/wiki/Star_Wars:_Knights_of_the_Old_Republic"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T13:15:44.564Z",
+      "completedAt": "2026-05-16T13:15:52.795Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:15:44.564Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:15:44.596Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T13:15:52.583Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        }
+      ]
+    },
+    "4cefb973-37a5-4f6e-ad9b-12891196d5e1": {
+      "queryId": "4cefb973-37a5-4f6e-ad9b-12891196d5e1",
+      "threadId": "ce84eda2-077d-48d5-8df9-4e6df85835ac",
+      "userId": "qa-webui",
+      "query": "Who is HK-47 and why is he famous?",
+      "status": "complete",
+      "answer": "I could not complete live archive synthesis for this question right now.\n\nLocal Knowledge Context (lower authority than approved web/repo sources)\n1. Approved Discord Knowledge (discord): Opt-in channel archive for project discussion, troubleshooting, and staff-approved historical answers. (discord://approved-channels) [1]\n\nSources\n1. Deadly Stream: topic/7029 why do most people dislike g0 t0 - https://deadlystream.com/topic/7029-why-do-most-people-dislike-g0-t0\n2. Approved Discord Knowledge: Approved Discord Knowledge (discord) - discord://approved-channels",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/7029-why-do-most-people-dislike-g0-t0",
+          "name": "Deadly Stream: topic/7029 why do most people dislike g0 t0",
+          "url": "https://deadlystream.com/topic/7029-why-do-most-people-dislike-g0-t0"
+        },
+        {
+          "id": "approved-discord-knowledge:discord://approved-channels",
+          "name": "Approved Discord Knowledge: Approved Discord Knowledge (discord)",
+          "url": "discord://approved-channels"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T13:20:02.437Z",
+      "completedAt": "2026-05-16T13:20:12.883Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:20:02.437Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:20:02.475Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T13:20:10.458Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        }
+      ]
+    },
+    "cf181c3f-ec68-4207-8e0e-941db275add4": {
+      "queryId": "cf181c3f-ec68-4207-8e0e-941db275add4",
+      "threadId": "1ba011da-fff0-4455-82f5-7455d67497af",
+      "userId": "qa-webui",
+      "query": "How do I fix KOTOR crashing on Windows 11?",
+      "status": "complete",
+      "answer": "Here are the most relevant pages I found in the approved KOTOR knowledge sources:\n- Kotor 1 Community Patch [1]\n- Full [2]\n- Kotor 2 Runtime Error On Windows 11 Laptop [3]\n- Star Wars: Knights Of The Old Republic [4]\n\nSources\n1. Deadly Stream: file/1258 kotor 1 community patch - https://deadlystream.com/files/file/1258-kotor-1-community-patch\n2. KOTOR Neocities: k1/full - https://kotor.neocities.org/modding/mod_builds/k1/full\n3. Deadly Stream: topic/11084 kotor 2 runtime error on windows 11 laptop - https://deadlystream.com/topic/11084-kotor-2-runtime-error-on-windows-11-laptop\n4. PCGamingWiki: Star Wars: Knights of the Old Republic - https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/files/file/1258-kotor-1-community-patch",
+          "name": "Deadly Stream: file/1258 kotor 1 community patch",
+          "url": "https://deadlystream.com/files/file/1258-kotor-1-community-patch"
+        },
+        {
+          "id": "kotor-neocities:https://kotor.neocities.org/modding/mod_builds/k1/full",
+          "name": "KOTOR Neocities: k1/full",
+          "url": "https://kotor.neocities.org/modding/mod_builds/k1/full"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/11084-kotor-2-runtime-error-on-windows-11-laptop",
+          "name": "Deadly Stream: topic/11084 kotor 2 runtime error on windows 11 laptop",
+          "url": "https://deadlystream.com/topic/11084-kotor-2-runtime-error-on-windows-11-laptop"
+        },
+        {
+          "id": "pcgamingwiki-kotor:https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic",
+          "name": "PCGamingWiki: Star Wars: Knights of the Old Republic",
+          "url": "https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T13:20:02.527Z",
+      "completedAt": "2026-05-16T13:20:17.457Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:20:02.527Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:20:02.568Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T13:20:10.556Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        }
+      ]
+    },
+    "05cf2e09-3284-4c70-b8cd-7012cbe382c1": {
+      "queryId": "05cf2e09-3284-4c70-b8cd-7012cbe382c1",
+      "threadId": "17fc2d30-c694-450d-a317-317dda55d067",
+      "userId": "qa-webui",
+      "query": "What are the best mods for KOTOR 2 in 2024?",
+      "status": "complete",
+      "answer": "Here are the most relevant pages I found in the approved KOTOR knowledge sources:\n- Full [1]\n- Mods [2]\n- Mod Builds [3]\n\nSources\n1. KOTOR Neocities: k2/full - https://kotor.neocities.org/modding/mod_builds/k2/full\n2. Deadly Stream: category/5 mods - https://deadlystream.com/files/category/5-mods\n3. Deadly Stream: category/6 mods - https://deadlystream.com/files/category/6-mods\n4. KOTOR Neocities: modding/mod builds - https://kotor.neocities.org/modding/mod_builds",
+      "sources": [
+        {
+          "id": "kotor-neocities:https://kotor.neocities.org/modding/mod_builds/k2/full",
+          "name": "KOTOR Neocities: k2/full",
+          "url": "https://kotor.neocities.org/modding/mod_builds/k2/full"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/files/category/5-mods",
+          "name": "Deadly Stream: category/5 mods",
+          "url": "https://deadlystream.com/files/category/5-mods"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/files/category/6-mods",
+          "name": "Deadly Stream: category/6 mods",
+          "url": "https://deadlystream.com/files/category/6-mods"
+        },
+        {
+          "id": "kotor-neocities:https://kotor.neocities.org/modding/mod_builds",
+          "name": "KOTOR Neocities: modding/mod builds",
+          "url": "https://kotor.neocities.org/modding/mod_builds"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T13:20:02.633Z",
+      "completedAt": "2026-05-16T13:20:15.430Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:20:02.633Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:20:02.666Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T13:20:10.660Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        }
+      ]
+    },
+    "efbb1d50-db32-4a47-abd0-72f47a08a49b": {
+      "queryId": "efbb1d50-db32-4a47-abd0-72f47a08a49b",
+      "threadId": "9d438bd2-b0a1-4c87-bd6c-7da0e40118b3",
+      "userId": "qa-webui",
+      "query": "How does the dark side/light side alignment system work in KOTOR?",
+      "status": "complete",
+      "answer": "Here are the most relevant pages I found in the approved KOTOR knowledge sources:\n- How Do The Dark Side And Light Point Values Work [1]\n- Alignment [2]\n\nSources\n1. Deadly Stream: topic/5037 how do the dark side and light point values work - https://deadlystream.com/topic/5037-how-do-the-dark-side-and-light-point-values-work\n2. StrategyWiki KOTOR: Alignment - https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Alignment",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/5037-how-do-the-dark-side-and-light-point-values-work",
+          "name": "Deadly Stream: topic/5037 how do the dark side and light point values work",
+          "url": "https://deadlystream.com/topic/5037-how-do-the-dark-side-and-light-point-values-work"
+        },
+        {
+          "id": "strategywiki-kotor:https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Alignment",
+          "name": "StrategyWiki KOTOR: Alignment",
+          "url": "https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Alignment"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T13:20:02.740Z",
+      "completedAt": "2026-05-16T13:20:15.646Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:20:02.740Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:20:02.777Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T13:20:10.748Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        }
+      ]
+    },
+    "86e5305b-6686-431c-afc8-afe75b1c0689": {
+      "queryId": "86e5305b-6686-431c-afc8-afe75b1c0689",
+      "threadId": "7d4b2669-473d-4278-a650-3035f52bf375",
+      "userId": "qa-webui",
+      "query": "What is the difference between KOTOR 1 and KOTOR 2?",
+      "status": "complete",
+      "answer": "Here are the most relevant pages I found in the approved KOTOR knowledge sources:\n- Kotor 2 Head To Kotor 1 [1]\n- Your Favorite Planet From The Kotor Games [2]\n- Kotor Or Kotor 2 [3]\n- General [4]\n\nSources\n1. Deadly Stream: topic/8173 kotor 2 head to kotor 1 - https://deadlystream.com/topic/8173-kotor-2-head-to-kotor-1\n2. Deadly Stream: topic/7243 your favorite planet from the kotor games - https://deadlystream.com/topic/7243-your-favorite-planet-from-the-kotor-games\n3. Deadly Stream: topic/325 kotor or kotor 2 - https://deadlystream.com/topic/325-kotor-or-kotor-2\n4. KOTOR Neocities: faq/general - https://kotor.neocities.org/faq/general",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/8173-kotor-2-head-to-kotor-1",
+          "name": "Deadly Stream: topic/8173 kotor 2 head to kotor 1",
+          "url": "https://deadlystream.com/topic/8173-kotor-2-head-to-kotor-1"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/7243-your-favorite-planet-from-the-kotor-games",
+          "name": "Deadly Stream: topic/7243 your favorite planet from the kotor games",
+          "url": "https://deadlystream.com/topic/7243-your-favorite-planet-from-the-kotor-games"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/325-kotor-or-kotor-2",
+          "name": "Deadly Stream: topic/325 kotor or kotor 2",
+          "url": "https://deadlystream.com/topic/325-kotor-or-kotor-2"
+        },
+        {
+          "id": "kotor-neocities:https://kotor.neocities.org/faq/general",
+          "name": "KOTOR Neocities: faq/general",
+          "url": "https://kotor.neocities.org/faq/general"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T13:20:02.938Z",
+      "completedAt": "2026-05-16T13:20:17.509Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:20:02.938Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:20:03.071Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T13:20:10.970Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        }
+      ]
+    },
+    "79b01a8a-0f62-4dc7-a0e4-7354b033a5b5": {
+      "queryId": "79b01a8a-0f62-4dc7-a0e4-7354b033a5b5",
+      "threadId": "57e42186-1438-4165-a617-8579dfbd9c1e",
+      "userId": "qa-webui",
+      "query": "What is TSLPatcher used for in KOTOR modding?",
+      "status": "complete",
+      "answer": "Here are the most relevant pages I found in the approved KOTOR knowledge sources:\n- Installing Tslpatcher Mods Without The Exe [1]\n- Mac Exe Launcher [2]\n- Using Tsl Patcher Without Kotor On Desktop [3]\n- Tsl Patcher Not Installing [4]\n- Android Modding Installation Pseudo Guide [5]\n\nSources\n1. Deadly Stream: topic/8928 installing tslpatcher mods without the exe - https://deadlystream.com/topic/8928-installing-tslpatcher-mods-without-the-exe\n2. Deadly Stream: topic/10993 mac exe launcher - https://deadlystream.com/topic/10993-mac-exe-launcher\n3. Deadly Stream: topic/4098 using tsl patcher without kotor on desktop - https://deadlystream.com/topic/4098-using-tsl-patcher-without-kotor-on-desktop\n4. Deadly Stream: topic/8307 tsl patcher not installing - https://deadlystream.com/topic/8307-tsl-patcher-not-installing\n5. Deadly Stream: entry/342 android modding installation pseudo guide - https://deadlystream.com/blogs/entry/342-android-modding-installation-pseudo-guide",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/8928-installing-tslpatcher-mods-without-the-exe",
+          "name": "Deadly Stream: topic/8928 installing tslpatcher mods without the exe",
+          "url": "https://deadlystream.com/topic/8928-installing-tslpatcher-mods-without-the-exe"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/10993-mac-exe-launcher",
+          "name": "Deadly Stream: topic/10993 mac exe launcher",
+          "url": "https://deadlystream.com/topic/10993-mac-exe-launcher"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/4098-using-tsl-patcher-without-kotor-on-desktop",
+          "name": "Deadly Stream: topic/4098 using tsl patcher without kotor on desktop",
+          "url": "https://deadlystream.com/topic/4098-using-tsl-patcher-without-kotor-on-desktop"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/8307-tsl-patcher-not-installing",
+          "name": "Deadly Stream: topic/8307 tsl patcher not installing",
+          "url": "https://deadlystream.com/topic/8307-tsl-patcher-not-installing"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/blogs/entry/342-android-modding-installation-pseudo-guide",
+          "name": "Deadly Stream: entry/342 android modding installation pseudo guide",
+          "url": "https://deadlystream.com/blogs/entry/342-android-modding-installation-pseudo-guide"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T13:23:15.946Z",
+      "completedAt": "2026-05-16T13:23:29.592Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:23:15.946Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:23:15.971Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T13:23:23.960Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        }
+      ]
+    },
+    "4da98ac8-97a1-4781-82ea-bb01da5a32a6": {
+      "queryId": "4da98ac8-97a1-4781-82ea-bb01da5a32a6",
+      "threadId": "bbc42ca3-2cb5-4ea2-bc67-848f7f50b9c9",
+      "userId": "qa-webui",
+      "query": "What is TSLPatcher used for in KOTOR modding?",
+      "status": "complete",
+      "answer": "Here are the most relevant pages I found in the approved KOTOR knowledge sources:\n- Installing Tslpatcher Mods Without The Exe [1]\n- Tls Modding [2]\n- Using Tsl Patcher Without Kotor On Desktop [3]\n- Tsl Patcher Tlked And Accessories [4]\n- Tslpatcher Only Modify File If Its Present [5]\n\nSources\n1. Deadly Stream: topic/8928 installing tslpatcher mods without the exe - https://deadlystream.com/topic/8928-installing-tslpatcher-mods-without-the-exe\n2. Deadly Stream: topic/11708 tls modding - https://deadlystream.com/topic/11708-tls-modding\n3. Deadly Stream: topic/4098 using tsl patcher without kotor on desktop - https://deadlystream.com/topic/4098-using-tsl-patcher-without-kotor-on-desktop\n4. Deadly Stream: file/1039 tsl patcher tlked and accessories - https://deadlystream.com/files/file/1039-tsl-patcher-tlked-and-accessories\n5. Deadly Stream: topic/5343 tslpatcher only modify file if its present - https://deadlystream.com/topic/5343-tslpatcher-only-modify-file-if-its-present",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/8928-installing-tslpatcher-mods-without-the-exe",
+          "name": "Deadly Stream: topic/8928 installing tslpatcher mods without the exe",
+          "url": "https://deadlystream.com/topic/8928-installing-tslpatcher-mods-without-the-exe"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/11708-tls-modding",
+          "name": "Deadly Stream: topic/11708 tls modding",
+          "url": "https://deadlystream.com/topic/11708-tls-modding"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/4098-using-tsl-patcher-without-kotor-on-desktop",
+          "name": "Deadly Stream: topic/4098 using tsl patcher without kotor on desktop",
+          "url": "https://deadlystream.com/topic/4098-using-tsl-patcher-without-kotor-on-desktop"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/files/file/1039-tsl-patcher-tlked-and-accessories",
+          "name": "Deadly Stream: file/1039 tsl patcher tlked and accessories",
+          "url": "https://deadlystream.com/files/file/1039-tsl-patcher-tlked-and-accessories"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/5343-tslpatcher-only-modify-file-if-its-present",
+          "name": "Deadly Stream: topic/5343 tslpatcher only modify file if its present",
+          "url": "https://deadlystream.com/topic/5343-tslpatcher-only-modify-file-if-its-present"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T13:26:36.962Z",
+      "completedAt": "2026-05-16T13:27:02.393Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:26:36.962Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:26:37.173Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T13:26:45.132Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        },
+        {
+          "at": "2026-05-16T13:26:53.180Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (16s)"
+        },
+        {
+          "at": "2026-05-16T13:27:01.367Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (24s)"
+        }
+      ]
+    },
+    "3d09c271-49c7-44aa-8096-c5e28ed0fee9": {
+      "queryId": "3d09c271-49c7-44aa-8096-c5e28ed0fee9",
+      "threadId": "bbc42ca3-2cb5-4ea2-bc67-848f7f50b9c9",
+      "userId": "qa-webui",
+      "query": "How do I troubleshoot KOTOR widescreen resolution issues on PC?",
+      "status": "complete",
+      "answer": "Here are the most relevant pages I found in the approved KOTOR knowledge sources:\n- Kotor 1 25601440 Res [1]\n- Star Wars: Knights Of The Old Republic [2]\n- Attachment.php [3]\n- KOTOR Neocities: faq/k1 [4]\n\nSources\n1. Deadly Stream: topic/9122 kotor 1 25601440 res - https://deadlystream.com/topic/9122-kotor-1-25601440-res\n2. PCGamingWiki: Star Wars: Knights of the Old Republic - https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic\n3. Deadly Stream: file/attachment.php - https://deadlystream.com/applications/core/interface/file/attachment.php?id=12198\n4. KOTOR Neocities: faq/k1 - https://kotor.neocities.org/faq/k1",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/9122-kotor-1-25601440-res",
+          "name": "Deadly Stream: topic/9122 kotor 1 25601440 res",
+          "url": "https://deadlystream.com/topic/9122-kotor-1-25601440-res"
+        },
+        {
+          "id": "pcgamingwiki-kotor:https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic",
+          "name": "PCGamingWiki: Star Wars: Knights of the Old Republic",
+          "url": "https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/applications/core/interface/file/attachment.php?id=12198",
+          "name": "Deadly Stream: file/attachment.php",
+          "url": "https://deadlystream.com/applications/core/interface/file/attachment.php?id=12198"
+        },
+        {
+          "id": "kotor-neocities:https://kotor.neocities.org/faq/k1",
+          "name": "KOTOR Neocities: faq/k1",
+          "url": "https://kotor.neocities.org/faq/k1"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T13:27:05.594Z",
+      "completedAt": "2026-05-16T13:27:29.102Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:27:05.594Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:27:05.632Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T13:27:13.607Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        },
+        {
+          "at": "2026-05-16T13:27:21.617Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (16s)"
+        }
+      ]
+    },
+    "8869e9c6-4dc1-4f59-8471-df8e28809fc7": {
+      "queryId": "8869e9c6-4dc1-4f59-8471-df8e28809fc7",
+      "threadId": "bbc42ca3-2cb5-4ea2-bc67-848f7f50b9c9",
+      "userId": "qa-webui",
+      "query": "What is MDLOps used for in the KOTOR toolchain?",
+      "status": "complete",
+      "answer": "Here are the most relevant pages I found in the approved KOTOR knowledge sources:\n- Modweequay Player Race With Soundset [1]\n\nSources\n1. Deadly Stream: topic/11924 modweequay player race with soundset - https://deadlystream.com/topic/11924-modweequay-player-race-with-soundset",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/11924-modweequay-player-race-with-soundset",
+          "name": "Deadly Stream: topic/11924 modweequay player race with soundset",
+          "url": "https://deadlystream.com/topic/11924-modweequay-player-race-with-soundset"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T13:27:32.080Z",
+      "completedAt": "2026-05-16T13:27:50.571Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:27:32.080Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:27:32.113Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T13:27:40.099Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        },
+        {
+          "at": "2026-05-16T13:27:48.123Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (16s)"
+        }
+      ]
+    },
+    "050b970b-b875-4a70-b196-c3e9dde84340": {
+      "queryId": "050b970b-b875-4a70-b196-c3e9dde84340",
+      "threadId": "bbc42ca3-2cb5-4ea2-bc67-848f7f50b9c9",
+      "userId": "qa-webui",
+      "query": "Where are Knights of the Old Republic save files stored on Windows?",
+      "status": "complete",
+      "answer": "I could not complete live archive synthesis for this question right now.",
+      "sources": [],
+      "error": null,
+      "createdAt": "2026-05-16T13:27:53.100Z",
+      "completedAt": "2026-05-16T13:28:11.223Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:27:53.100Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:27:53.133Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T13:28:01.153Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        },
+        {
+          "at": "2026-05-16T13:28:09.138Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (16s)"
+        }
+      ]
+    },
+    "367e1b7a-eb33-4160-b362-4dd7cedba458": {
+      "queryId": "367e1b7a-eb33-4160-b362-4dd7cedba458",
+      "threadId": "bbc42ca3-2cb5-4ea2-bc67-848f7f50b9c9",
+      "userId": "qa-webui",
+      "query": "What does the reone project provide for Odyssey engine work?",
+      "status": "complete",
+      "answer": "Here are the most relevant pages I found in the approved KOTOR knowledge sources:\n- Reone Kotor Engine Recreation [1]\n\nSources\n1. Deadly Stream: topic/8542 reone kotor engine recreation - https://deadlystream.com/topic/8542-reone-kotor-engine-recreation",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/8542-reone-kotor-engine-recreation",
+          "name": "Deadly Stream: topic/8542 reone kotor engine recreation",
+          "url": "https://deadlystream.com/topic/8542-reone-kotor-engine-recreation"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T13:28:16.311Z",
+      "completedAt": "2026-05-16T13:28:29.763Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:28:16.311Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:28:17.474Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T13:28:24.356Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        }
+      ]
+    },
+    "fc89973b-b1cc-4de5-97d8-bc4b6faa25df": {
+      "queryId": "fc89973b-b1cc-4de5-97d8-bc4b6faa25df",
+      "threadId": "53dc36b6-8999-48a8-81ee-743593a2ebdd",
+      "userId": "qa-webui",
+      "query": "What is TSLPatcher used for in KOTOR modding?",
+      "status": "complete",
+      "answer": "Here are the most relevant pages I found in the approved KOTOR knowledge sources:\n- Ysk Tslpatcher Has Been Rewritten In Python And Made Open Source [1]\n- Tsl Patcher Tlked And Accessories [2]\n- Tls Modding [3]\n\nSources\n1. Deadly Stream: topic/10885 ysk tslpatcher has been rewritten in python and made open source - https://deadlystream.com/topic/10885-ysk-tslpatcher-has-been-rewritten-in-python-and-made-open-source\n2. Deadly Stream: file/1039 tsl patcher tlked and accessories - https://deadlystream.com/files/file/1039-tsl-patcher-tlked-and-accessories\n3. Deadly Stream: topic/11708 tls modding - https://deadlystream.com/topic/11708-tls-modding",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/10885-ysk-tslpatcher-has-been-rewritten-in-python-and-made-open-source",
+          "name": "Deadly Stream: topic/10885 ysk tslpatcher has been rewritten in python and made open source",
+          "url": "https://deadlystream.com/topic/10885-ysk-tslpatcher-has-been-rewritten-in-python-and-made-open-source"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/files/file/1039-tsl-patcher-tlked-and-accessories",
+          "name": "Deadly Stream: file/1039 tsl patcher tlked and accessories",
+          "url": "https://deadlystream.com/files/file/1039-tsl-patcher-tlked-and-accessories"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/11708-tls-modding",
+          "name": "Deadly Stream: topic/11708 tls modding",
+          "url": "https://deadlystream.com/topic/11708-tls-modding"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T13:31:52.941Z",
+      "completedAt": "2026-05-16T13:32:22.833Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:31:52.941Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:31:53.093Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T13:32:01.201Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        },
+        {
+          "at": "2026-05-16T13:32:09.013Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (16s)"
+        },
+        {
+          "at": "2026-05-16T13:32:17.307Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (24s)"
+        }
+      ]
+    },
+    "7a4a026a-973d-4ddd-8784-c49a1d3f5eb3": {
+      "queryId": "7a4a026a-973d-4ddd-8784-c49a1d3f5eb3",
+      "threadId": "53dc36b6-8999-48a8-81ee-743593a2ebdd",
+      "userId": "qa-webui",
+      "query": "How do I troubleshoot KOTOR widescreen resolution issues on PC?",
+      "status": "complete",
+      "answer": "Here are the most relevant pages I found in the approved KOTOR knowledge sources:\n- Star Wars: Knights Of The Old Republic [1]\n- Unable To Play Movies And Resolution Issue [2]\n- Kotor 1 25601440 Res [3]\n- Kotor Widescreen 169 Ui 800x600 [4]\n\nSources\n1. PCGamingWiki: Star Wars: Knights of the Old Republic - https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic\n2. Deadly Stream: topic/2908 unable to play movies and resolution issue - https://deadlystream.com/topic/2908-unable-to-play-movies-and-resolution-issue\n3. Deadly Stream: topic/9122 kotor 1 25601440 res - https://deadlystream.com/topic/9122-kotor-1-25601440-res\n4. Deadly Stream: topic/3801 kotor widescreen 169 ui 800x600 - https://deadlystream.com/topic/3801-kotor-widescreen-169-ui-800x600",
+      "sources": [
+        {
+          "id": "pcgamingwiki-kotor:https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic",
+          "name": "PCGamingWiki: Star Wars: Knights of the Old Republic",
+          "url": "https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/2908-unable-to-play-movies-and-resolution-issue",
+          "name": "Deadly Stream: topic/2908 unable to play movies and resolution issue",
+          "url": "https://deadlystream.com/topic/2908-unable-to-play-movies-and-resolution-issue"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/9122-kotor-1-25601440-res",
+          "name": "Deadly Stream: topic/9122 kotor 1 25601440 res",
+          "url": "https://deadlystream.com/topic/9122-kotor-1-25601440-res"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/3801-kotor-widescreen-169-ui-800x600",
+          "name": "Deadly Stream: topic/3801 kotor widescreen 169 ui 800x600",
+          "url": "https://deadlystream.com/topic/3801-kotor-widescreen-169-ui-800x600"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T13:32:26.387Z",
+      "completedAt": "2026-05-16T13:32:44.662Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:32:26.387Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:32:26.496Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T13:32:34.460Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        },
+        {
+          "at": "2026-05-16T13:32:42.467Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (16s)"
+        }
+      ]
+    },
+    "b35e078b-0109-47aa-a03c-c90ac9c572eb": {
+      "queryId": "b35e078b-0109-47aa-a03c-c90ac9c572eb",
+      "threadId": "53dc36b6-8999-48a8-81ee-743593a2ebdd",
+      "userId": "qa-webui",
+      "query": "What is MDLOps used for in the KOTOR toolchain?",
+      "status": "complete",
+      "answer": "Here are the most relevant pages I found in the approved KOTOR knowledge sources:\n- Modweequay Player Race With Soundset [1]\n\nSources\n1. Deadly Stream: topic/11924 modweequay player race with soundset - https://deadlystream.com/topic/11924-modweequay-player-race-with-soundset",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/11924-modweequay-player-race-with-soundset",
+          "name": "Deadly Stream: topic/11924 modweequay player race with soundset",
+          "url": "https://deadlystream.com/topic/11924-modweequay-player-race-with-soundset"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T13:32:47.952Z",
+      "completedAt": "2026-05-16T13:33:03.214Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:32:47.952Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:32:48.049Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T13:32:55.974Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        }
+      ]
+    },
+    "b50b8f76-4c62-4ea5-b682-f3fa18dc4bd4": {
+      "queryId": "b50b8f76-4c62-4ea5-b682-f3fa18dc4bd4",
+      "threadId": "53dc36b6-8999-48a8-81ee-743593a2ebdd",
+      "userId": "qa-webui",
+      "query": "Where are Knights of the Old Republic save files stored on Windows?",
+      "status": "complete",
+      "answer": "Here are the most relevant pages I found in the approved KOTOR knowledge sources:\n- Kotor2 Kse No Save Files [1]\n- Deadly Stream: page/2 [2]\n- Full [3]\n- Star Wars: Knights Of The Old Republic [4]\n\nSources\n1. Deadly Stream: topic/5628 kotor2 kse no save files - https://deadlystream.com/topic/5628-kotor2-kse-no-save-files\n2. Deadly Stream: page/2 - https://deadlystream.com/topic/3437-toolkotor-savegame-editor/page/2\n3. KOTOR Neocities: k1/full - https://kotor.neocities.org/modding/mod_builds/k1/full\n4. PCGamingWiki: Star Wars: Knights of the Old Republic - https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/5628-kotor2-kse-no-save-files",
+          "name": "Deadly Stream: topic/5628 kotor2 kse no save files",
+          "url": "https://deadlystream.com/topic/5628-kotor2-kse-no-save-files"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/3437-toolkotor-savegame-editor/page/2",
+          "name": "Deadly Stream: page/2",
+          "url": "https://deadlystream.com/topic/3437-toolkotor-savegame-editor/page/2"
+        },
+        {
+          "id": "kotor-neocities:https://kotor.neocities.org/modding/mod_builds/k1/full",
+          "name": "KOTOR Neocities: k1/full",
+          "url": "https://kotor.neocities.org/modding/mod_builds/k1/full"
+        },
+        {
+          "id": "pcgamingwiki-kotor:https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic",
+          "name": "PCGamingWiki: Star Wars: Knights of the Old Republic",
+          "url": "https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T13:33:04.241Z",
+      "completedAt": "2026-05-16T13:33:14.594Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:33:04.241Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:33:04.260Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T13:33:12.251Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        }
+      ]
+    },
+    "fa1e2616-955d-4500-b7c7-7ff31c888883": {
+      "queryId": "fa1e2616-955d-4500-b7c7-7ff31c888883",
+      "threadId": "53dc36b6-8999-48a8-81ee-743593a2ebdd",
+      "userId": "qa-webui",
+      "query": "What does the reone project provide for Odyssey engine work?",
+      "status": "complete",
+      "answer": "Here are the most relevant pages I found in the approved KOTOR knowledge sources:\n- Reone Kotor Engine Recreation [1]\n\nSources\n1. Deadly Stream: topic/8542 reone kotor engine recreation - https://deadlystream.com/topic/8542-reone-kotor-engine-recreation",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/8542-reone-kotor-engine-recreation",
+          "name": "Deadly Stream: topic/8542 reone kotor engine recreation",
+          "url": "https://deadlystream.com/topic/8542-reone-kotor-engine-recreation"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T13:33:17.186Z",
+      "completedAt": "2026-05-16T13:33:26.805Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:33:17.186Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:33:17.224Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T13:33:25.210Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        }
+      ]
+    },
+    "faa706fb-228d-4611-bb61-b7a5f381ee76": {
+      "queryId": "faa706fb-228d-4611-bb61-b7a5f381ee76",
+      "threadId": "822b14b5-788e-4f1b-a7e2-1ec51a97484f",
+      "userId": "qa-webui",
+      "query": "What is TSLPatcher used for?",
+      "status": "complete",
+      "answer": "I could not complete live archive synthesis for this question right now.\n\nLocal Knowledge Context (lower authority than approved web/repo sources)\n1. Approved Discord Knowledge (discord): Opt-in channel archive for project discussion, troubleshooting, and staff-approved historical answers. (discord://approved-channels) [1]\n\nSources\n1. Deadly Stream: topic/10885 ysk tslpatcher has been rewritten in python and made open source - https://deadlystream.com/topic/10885-ysk-tslpatcher-has-been-rewritten-in-python-and-made-open-source\n2. Deadly Stream: topic/9518 tslpatcher cli - https://deadlystream.com/topic/9518-tslpatcher-cli\n3. Deadly Stream: entry/409 how to make he tslpatcher work pcmac - https://deadlystream.com/blogs/entry/409-how-to-make-he-tslpatcher-work-pcmac\n4. Approved Discord Knowledge: Approved Discord Knowledge (discord) - discord://approved-channels",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/10885-ysk-tslpatcher-has-been-rewritten-in-python-and-made-open-source",
+          "name": "Deadly Stream: topic/10885 ysk tslpatcher has been rewritten in python and made open source",
+          "url": "https://deadlystream.com/topic/10885-ysk-tslpatcher-has-been-rewritten-in-python-and-made-open-source"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/9518-tslpatcher-cli",
+          "name": "Deadly Stream: topic/9518 tslpatcher cli",
+          "url": "https://deadlystream.com/topic/9518-tslpatcher-cli"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/blogs/entry/409-how-to-make-he-tslpatcher-work-pcmac",
+          "name": "Deadly Stream: entry/409 how to make he tslpatcher work pcmac",
+          "url": "https://deadlystream.com/blogs/entry/409-how-to-make-he-tslpatcher-work-pcmac"
+        },
+        {
+          "id": "approved-discord-knowledge:discord://approved-channels",
+          "name": "Approved Discord Knowledge: Approved Discord Knowledge (discord)",
+          "url": "discord://approved-channels"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T13:38:49.840Z",
+      "completedAt": "2026-05-16T13:39:05.231Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:38:49.840Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:38:50.293Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T13:38:57.971Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        }
+      ]
+    },
+    "60696eeb-f289-4d44-9c64-647c742087ac": {
+      "queryId": "60696eeb-f289-4d44-9c64-647c742087ac",
+      "threadId": "eb63b271-f19b-4f3d-8365-1f6750e9e14d",
+      "userId": "qa-webui",
+      "query": "Who is HK-47 and why is he famous in KOTOR?",
+      "status": "complete",
+      "answer": "Here are the most relevant pages I found in the approved KOTOR knowledge sources:\n- Sand People Enclave [1]\n- Kotor 2 G0t0s Ship Best Characters [2]\n- Why Do Most People Dislike G0 T0 [3]\n\nSources\n1. StrategyWiki KOTOR: Sand People Enclave - https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Sand_People_Enclave\n2. Deadly Stream: topic/548 kotor 2 g0t0s ship best characters - https://deadlystream.com/topic/548-kotor-2-g0t0s-ship-best-characters\n3. Deadly Stream: topic/7029 why do most people dislike g0 t0 - https://deadlystream.com/topic/7029-why-do-most-people-dislike-g0-t0",
+      "sources": [
+        {
+          "id": "strategywiki-kotor:https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Sand_People_Enclave",
+          "name": "StrategyWiki KOTOR: Sand People Enclave",
+          "url": "https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Sand_People_Enclave"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/548-kotor-2-g0t0s-ship-best-characters",
+          "name": "Deadly Stream: topic/548 kotor 2 g0t0s ship best characters",
+          "url": "https://deadlystream.com/topic/548-kotor-2-g0t0s-ship-best-characters"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/7029-why-do-most-people-dislike-g0-t0",
+          "name": "Deadly Stream: topic/7029 why do most people dislike g0 t0",
+          "url": "https://deadlystream.com/topic/7029-why-do-most-people-dislike-g0-t0"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T13:40:19.694Z",
+      "completedAt": "2026-05-16T13:40:39.382Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:40:19.694Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:40:19.769Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T13:40:27.745Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        },
+        {
+          "at": "2026-05-16T13:40:35.742Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (16s)"
+        }
+      ]
+    },
+    "2f81b7e9-40ab-4a51-b876-bda44bcda773": {
+      "queryId": "2f81b7e9-40ab-4a51-b876-bda44bcda773",
+      "threadId": "0bbd6e5d-c8a5-472a-af73-ba31e9259873",
+      "userId": "qa-webui",
+      "query": "What lightsaber forms does Bastila Shan use?",
+      "status": "complete",
+      "answer": "Here are the most relevant pages I found in the approved KOTOR knowledge sources:\n- Lightsaber And Force Forms [1]\n- Bastila [2]\n- Lightsabers [3]\n\nSources\n1. Deadly Stream: file/520 lightsaber and force forms - https://deadlystream.com/files/file/520-lightsaber-and-force-forms\n2. StrategyWiki KOTOR: Bastila - https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Bastila\n3. StrategyWiki KOTOR: Lightsabers - https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Lightsabers",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/files/file/520-lightsaber-and-force-forms",
+          "name": "Deadly Stream: file/520 lightsaber and force forms",
+          "url": "https://deadlystream.com/files/file/520-lightsaber-and-force-forms"
+        },
+        {
+          "id": "strategywiki-kotor:https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Bastila",
+          "name": "StrategyWiki KOTOR: Bastila",
+          "url": "https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Bastila"
+        },
+        {
+          "id": "strategywiki-kotor:https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Lightsabers",
+          "name": "StrategyWiki KOTOR: Lightsabers",
+          "url": "https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Lightsabers"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T13:43:59.383Z",
+      "completedAt": "2026-05-16T13:44:16.499Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:43:59.383Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:43:59.427Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T13:44:07.410Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        },
+        {
+          "at": "2026-05-16T13:44:15.418Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (16s)"
+        }
+      ]
+    },
+    "f6e39419-8403-4b2f-996e-36fbfaefd1e6": {
+      "queryId": "f6e39419-8403-4b2f-996e-36fbfaefd1e6",
+      "threadId": "4f2a38d3-6170-4d9d-89a8-40b6d2e1ecae",
+      "userId": "qa-webui",
+      "query": "How do I install KotOR on modern Windows 11?",
+      "status": "complete",
+      "answer": "Here are the most relevant pages I found in the approved KOTOR knowledge sources:\n- Kotor 2 Questions [1]\n- Star Wars: Knights Of The Old Republic [2]\n- Full [3]\n- Kotor 2025 Mod Guide [4]\n\nSources\n1. Deadly Stream: topic/9648 kotor 2 questions - https://deadlystream.com/topic/9648-kotor-2-questions\n2. PCGamingWiki: Star Wars: Knights of the Old Republic - https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic\n3. KOTOR Neocities: k1/full - https://kotor.neocities.org/modding/mod_builds/k1/full\n4. Deadly Stream: file/2689 kotor 2025 mod guide - https://deadlystream.com/files/file/2689-kotor-2025-mod-guide",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/9648-kotor-2-questions",
+          "name": "Deadly Stream: topic/9648 kotor 2 questions",
+          "url": "https://deadlystream.com/topic/9648-kotor-2-questions"
+        },
+        {
+          "id": "pcgamingwiki-kotor:https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic",
+          "name": "PCGamingWiki: Star Wars: Knights of the Old Republic",
+          "url": "https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic"
+        },
+        {
+          "id": "kotor-neocities:https://kotor.neocities.org/modding/mod_builds/k1/full",
+          "name": "KOTOR Neocities: k1/full",
+          "url": "https://kotor.neocities.org/modding/mod_builds/k1/full"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/files/file/2689-kotor-2025-mod-guide",
+          "name": "Deadly Stream: file/2689 kotor 2025 mod guide",
+          "url": "https://deadlystream.com/files/file/2689-kotor-2025-mod-guide"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T13:44:20.047Z",
+      "completedAt": "2026-05-16T13:44:37.094Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:44:20.047Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:44:20.146Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T13:44:28.106Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        },
+        {
+          "at": "2026-05-16T13:44:36.115Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (16s)"
+        }
+      ]
+    },
+    "34686d50-d81a-4d8d-9c3d-9fb8d5d214ad": {
+      "queryId": "34686d50-d81a-4d8d-9c3d-9fb8d5d214ad",
+      "threadId": "b2283c4d-43ab-46bc-8794-ed856c94d76a",
+      "userId": "qa-webui",
+      "query": "What are the best mods for KOTOR 1?",
+      "status": "complete",
+      "answer": "Here are the most relevant pages I found in the approved KOTOR knowledge sources:\n- Essential Mods For Best Possible Kotortsl Experience [1]\n- Best Mods For A Smooth And Enhanced Experience Kotor 1 [2]\n- Kotor 2025 Mod Guide [3]\n- Mod Builds [4]\n- Mods [5]\n\nSources\n1. Deadly Stream: topic/2963 essential mods for best possible kotortsl experience - https://deadlystream.com/topic/2963-essential-mods-for-best-possible-kotortsl-experience\n2. Deadly Stream: topic/3167 best mods for a smooth and enhanced experience kotor 1 - https://deadlystream.com/topic/3167-best-mods-for-a-smooth-and-enhanced-experience-kotor-1\n3. Deadly Stream: file/2689 kotor 2025 mod guide - https://deadlystream.com/files/file/2689-kotor-2025-mod-guide\n4. KOTOR Neocities: modding/mod builds - https://kotor.neocities.org/modding/mod_builds\n5. Deadly Stream: category/6 mods - https://deadlystream.com/files/category/6-mods",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/2963-essential-mods-for-best-possible-kotortsl-experience",
+          "name": "Deadly Stream: topic/2963 essential mods for best possible kotortsl experience",
+          "url": "https://deadlystream.com/topic/2963-essential-mods-for-best-possible-kotortsl-experience"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/3167-best-mods-for-a-smooth-and-enhanced-experience-kotor-1",
+          "name": "Deadly Stream: topic/3167 best mods for a smooth and enhanced experience kotor 1",
+          "url": "https://deadlystream.com/topic/3167-best-mods-for-a-smooth-and-enhanced-experience-kotor-1"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/files/file/2689-kotor-2025-mod-guide",
+          "name": "Deadly Stream: file/2689 kotor 2025 mod guide",
+          "url": "https://deadlystream.com/files/file/2689-kotor-2025-mod-guide"
+        },
+        {
+          "id": "kotor-neocities:https://kotor.neocities.org/modding/mod_builds",
+          "name": "KOTOR Neocities: modding/mod builds",
+          "url": "https://kotor.neocities.org/modding/mod_builds"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/files/category/6-mods",
+          "name": "Deadly Stream: category/6 mods",
+          "url": "https://deadlystream.com/files/category/6-mods"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T13:44:53.006Z",
+      "completedAt": "2026-05-16T13:45:15.988Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:44:53.006Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:44:53.075Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T13:45:01.034Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        },
+        {
+          "at": "2026-05-16T13:45:09.034Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (16s)"
+        }
+      ]
+    },
+    "391565ae-dc75-4344-98d3-7d74b0b288fa": {
+      "queryId": "391565ae-dc75-4344-98d3-7d74b0b288fa",
+      "threadId": "648fc82e-6a04-4684-beda-1064db0ed2e6",
+      "userId": "qa-webui",
+      "query": "What is Carth Onasi's backstory?",
+      "status": "complete",
+      "answer": "I could not complete live archive synthesis for this question right now.\n\nLocal Knowledge Context (lower authority than approved web/repo sources)\n1. Approved Discord Knowledge (discord): Opt-in channel archive for project discussion, troubleshooting, and staff-approved historical answers. (discord://approved-channels) [1]\n\nSources\n1. StrategyWiki KOTOR: Carth - https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Carth\n2. StrategyWiki KOTOR: Taris - https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Taris\n3. Deadly Stream: topic/4819 carth force sensitive - https://deadlystream.com/topic/4819-carth-force-sensitive\n4. Approved Discord Knowledge: Approved Discord Knowledge (discord) - discord://approved-channels",
+      "sources": [
+        {
+          "id": "strategywiki-kotor:https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Carth",
+          "name": "StrategyWiki KOTOR: Carth",
+          "url": "https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Carth"
+        },
+        {
+          "id": "strategywiki-kotor:https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Taris",
+          "name": "StrategyWiki KOTOR: Taris",
+          "url": "https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Taris"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/4819-carth-force-sensitive",
+          "name": "Deadly Stream: topic/4819 carth force sensitive",
+          "url": "https://deadlystream.com/topic/4819-carth-force-sensitive"
+        },
+        {
+          "id": "approved-discord-knowledge:discord://approved-channels",
+          "name": "Approved Discord Knowledge: Approved Discord Knowledge (discord)",
+          "url": "discord://approved-channels"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T13:45:19.528Z",
+      "completedAt": "2026-05-16T13:47:10.651Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:45:19.528Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:45:19.689Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T13:46:41.656Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (81s)"
+        },
+        {
+          "at": "2026-05-16T13:46:49.342Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (89s)"
+        },
+        {
+          "at": "2026-05-16T13:46:57.351Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (97s)"
+        },
+        {
+          "at": "2026-05-16T13:47:05.341Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (105s)"
+        }
+      ]
+    },
+    "93b168e2-602d-4660-a95c-57a38c96672b": {
+      "queryId": "93b168e2-602d-4660-a95c-57a38c96672b",
+      "threadId": "c6fee9dd-3e4b-404d-81fe-40ec65e9a046",
+      "userId": "qa-webui",
+      "query": "How do I get the Ebon Hawk in KOTOR?",
+      "status": "complete",
+      "answer": "Here are the most relevant pages I found in the approved KOTOR knowledge sources:\n- Kotor The Narrative Problem With Stealing The Ebon Hawk [1]\n- Ebon Hawk [2]\n- Empty Ebon Hawk On Nar Shaddaa [3]\n\nSources\n1. Deadly Stream: topic/11888 kotor the narrative problem with stealing the ebon hawk - https://deadlystream.com/topic/11888-kotor-the-narrative-problem-with-stealing-the-ebon-hawk\n2. StrategyWiki KOTOR: Ebon Hawk - https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Ebon_Hawk\n3. Deadly Stream: topic/488 empty ebon hawk on nar shaddaa - https://deadlystream.com/topic/488-empty-ebon-hawk-on-nar-shaddaa",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/11888-kotor-the-narrative-problem-with-stealing-the-ebon-hawk",
+          "name": "Deadly Stream: topic/11888 kotor the narrative problem with stealing the ebon hawk",
+          "url": "https://deadlystream.com/topic/11888-kotor-the-narrative-problem-with-stealing-the-ebon-hawk"
+        },
+        {
+          "id": "strategywiki-kotor:https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Ebon_Hawk",
+          "name": "StrategyWiki KOTOR: Ebon Hawk",
+          "url": "https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Ebon_Hawk"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/488-empty-ebon-hawk-on-nar-shaddaa",
+          "name": "Deadly Stream: topic/488 empty ebon hawk on nar shaddaa",
+          "url": "https://deadlystream.com/topic/488-empty-ebon-hawk-on-nar-shaddaa"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T13:47:15.125Z",
+      "completedAt": "2026-05-16T13:47:23.527Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:47:15.125Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:47:15.171Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T13:47:23.146Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        }
+      ]
+    },
+    "c74bfa7a-8a45-4a2a-8a70-fca08157b70e": {
+      "queryId": "c74bfa7a-8a45-4a2a-8a70-fca08157b70e",
+      "threadId": "1818e814-44dd-456d-b98d-e57fcc859723",
+      "userId": "qa-webui",
+      "query": "What is TSLPatcher used for in KOTOR modding?",
+      "status": "complete",
+      "answer": "Here are the most relevant pages I found in the approved KOTOR knowledge sources:\n- Tslpatcher Only Modify File If Its Present [1]\n- Using Tsl Patcher Without Kotor On Desktop [2]\n- Installing Tslpatcher Mods Without The Exe [3]\n- Tsl Patcher Tlked And Accessories [4]\n\nSources\n1. Deadly Stream: topic/5343 tslpatcher only modify file if its present - https://deadlystream.com/topic/5343-tslpatcher-only-modify-file-if-its-present\n2. Deadly Stream: topic/4098 using tsl patcher without kotor on desktop - https://deadlystream.com/topic/4098-using-tsl-patcher-without-kotor-on-desktop\n3. Deadly Stream: topic/8928 installing tslpatcher mods without the exe - https://deadlystream.com/topic/8928-installing-tslpatcher-mods-without-the-exe\n4. Deadly Stream: file/1039 tsl patcher tlked and accessories - https://deadlystream.com/files/file/1039-tsl-patcher-tlked-and-accessories",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/5343-tslpatcher-only-modify-file-if-its-present",
+          "name": "Deadly Stream: topic/5343 tslpatcher only modify file if its present",
+          "url": "https://deadlystream.com/topic/5343-tslpatcher-only-modify-file-if-its-present"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/4098-using-tsl-patcher-without-kotor-on-desktop",
+          "name": "Deadly Stream: topic/4098 using tsl patcher without kotor on desktop",
+          "url": "https://deadlystream.com/topic/4098-using-tsl-patcher-without-kotor-on-desktop"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/8928-installing-tslpatcher-mods-without-the-exe",
+          "name": "Deadly Stream: topic/8928 installing tslpatcher mods without the exe",
+          "url": "https://deadlystream.com/topic/8928-installing-tslpatcher-mods-without-the-exe"
+        },
+        {
+          "id": "deadlystream:https://deadlystream.com/files/file/1039-tsl-patcher-tlked-and-accessories",
+          "name": "Deadly Stream: file/1039 tsl patcher tlked and accessories",
+          "url": "https://deadlystream.com/files/file/1039-tsl-patcher-tlked-and-accessories"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T13:49:11.420Z",
+      "completedAt": "2026-05-16T13:49:40.177Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:49:11.420Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:49:11.503Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T13:49:19.491Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        },
+        {
+          "at": "2026-05-16T13:49:27.492Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (16s)"
+        },
+        {
+          "at": "2026-05-16T13:49:35.492Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (24s)"
+        }
+      ]
+    },
+    "18197c4e-8048-4b4b-b33d-9e8e62e532f1": {
+      "queryId": "18197c4e-8048-4b4b-b33d-9e8e62e532f1",
+      "threadId": "fce488ff-bf2d-4955-96f2-081741f42ab2",
+      "userId": "qa-webui",
+      "query": "What is Carth Onasi's backstory in KOTOR?",
+      "status": "complete",
+      "answer": "- Enable JavaScript and cookies to continue Enable JavaScript and cookies to continue Enable JavaScript and cookies to continue Enable JavaScript and cookies to continue [1]\n- Enable JavaScript and cookies to continue Enable JavaScript and cookies to continue Enable JavaScript and cookies to continue Enable JavaScript and cookies to continue [1]\n\nSources\n1. StrategyWiki KOTOR: Carth - https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Carth\n2. StrategyWiki KOTOR: Command Module - https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Command_Module",
+      "sources": [
+        {
+          "id": "strategywiki-kotor:https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Carth",
+          "name": "StrategyWiki KOTOR: Carth",
+          "url": "https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Carth"
+        },
+        {
+          "id": "strategywiki-kotor:https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Command_Module",
+          "name": "StrategyWiki KOTOR: Command Module",
+          "url": "https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Command_Module"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T13:50:51.092Z",
+      "completedAt": "2026-05-16T13:50:59.903Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:50:51.092Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:50:51.133Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T13:50:59.124Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        }
+      ]
+    },
+    "1b341a47-4a0f-4abf-8a40-d8b6fbdc5e62": {
+      "queryId": "1b341a47-4a0f-4abf-8a40-d8b6fbdc5e62",
+      "threadId": "01fa2482-f60f-49c8-8e3b-5e380da383f5",
+      "userId": "qa-webui",
+      "query": "What is Carth Onasi's backstory?",
+      "status": "complete",
+      "answer": "I could not complete live archive synthesis for this question right now.\n\nLocal Knowledge Context (lower authority than approved web/repo sources)\n1. Approved Discord Knowledge (discord): Opt-in channel archive for project discussion, troubleshooting, and staff-approved historical answers. (discord://approved-channels)\n2. PCGamingWiki (website): Technical compatibility notes, fixes, and platform troubleshooting for KOTOR and TSL. Note: Cloudflare-protected — serves as reference display only; live scraping will fail. (https://www.pcgamingwiki.com) [1]\n\nSources\n1. Approved Discord Knowledge: Approved Discord Knowledge (discord) - discord://approved-channels\n2. PCGamingWiki: PCGamingWiki (website) - https://www.pcgamingwiki.com",
+      "sources": [
+        {
+          "id": "approved-discord-knowledge:discord://approved-channels",
+          "name": "Approved Discord Knowledge: Approved Discord Knowledge (discord)",
+          "url": "discord://approved-channels"
+        },
+        {
+          "id": "pcgamingwiki-kotor:https://www.pcgamingwiki.com",
+          "name": "PCGamingWiki: PCGamingWiki (website)",
+          "url": "https://www.pcgamingwiki.com"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T13:54:22.819Z",
+      "completedAt": "2026-05-16T13:54:30.615Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:54:22.819Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:54:22.848Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        }
+      ]
+    },
+    "2519a7f2-bd2c-4c3d-9223-1725ec8fedfb": {
+      "queryId": "2519a7f2-bd2c-4c3d-9223-1725ec8fedfb",
+      "threadId": "c759d7ea-ddf7-438b-9a70-bed1b815f0bd",
+      "userId": "qa-webui",
+      "query": "Who is Carth Onasi in KOTOR?",
+      "status": "complete",
+      "answer": "Here are the most relevant pages I found in the approved KOTOR knowledge sources:\n- Kotor Carths Romance Bug [1]\n- Full [2]\n- Carth [3]\n\nSources\n1. Deadly Stream: topic/8313 kotor carths romance bug - https://deadlystream.com/topic/8313-kotor-carths-romance-bug\n2. KOTOR Neocities: k1/full - https://kotor.neocities.org/modding/mod_builds/k1/full\n3. StrategyWiki KOTOR: Carth - https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Carth",
+      "sources": [
+        {
+          "id": "deadlystream:https://deadlystream.com/topic/8313-kotor-carths-romance-bug",
+          "name": "Deadly Stream: topic/8313 kotor carths romance bug",
+          "url": "https://deadlystream.com/topic/8313-kotor-carths-romance-bug"
+        },
+        {
+          "id": "kotor-neocities:https://kotor.neocities.org/modding/mod_builds/k1/full",
+          "name": "KOTOR Neocities: k1/full",
+          "url": "https://kotor.neocities.org/modding/mod_builds/k1/full"
+        },
+        {
+          "id": "strategywiki-kotor:https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Carth",
+          "name": "StrategyWiki KOTOR: Carth",
+          "url": "https://strategywiki.org/wiki/Star_Wars:_Knights_of_the_Old_Republic/Carth"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-05-16T13:56:25.591Z",
+      "completedAt": "2026-05-16T13:56:34.084Z",
+      "liveTrace": [
+        {
+          "at": "2026-05-16T13:56:25.591Z",
+          "phase": "queued",
+          "detail": "Holocron retrieval queued…"
+        },
+        {
+          "at": "2026-05-16T13:56:25.646Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (1s)"
+        },
+        {
+          "at": "2026-05-16T13:56:33.624Z",
+          "phase": "gather",
+          "detail": "Researching approved archive sources… (8s)"
+        }
+      ]
+    }
+  }
+}

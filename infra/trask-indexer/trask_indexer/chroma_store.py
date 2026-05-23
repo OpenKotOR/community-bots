@@ -110,6 +110,7 @@ def query_passages(
         where=where,
     )
     hits: list[PassageHit] = []
+    full_docs: dict[str, str] = {}
     ids = result.get("ids") or [[]]
     docs = result.get("documents") or [[]]
     metas = result.get("metadatas") or [[]]
@@ -118,7 +119,9 @@ def query_passages(
         meta = meta or {}
         # Chroma returns distance; lower is closer — invert to a simple score.
         score = 1.0 / (1.0 + float(dist or 0.0))
-        quote = (doc or "")[:500]
+        full_doc = doc or ""
+        full_docs[row_id] = full_doc
+        quote = full_doc[:1200]
         hits.append(
             PassageHit(
                 id=row_id,
@@ -138,7 +141,7 @@ def query_passages(
     dense_rank = {h.id: i for i, h in enumerate(hits)}
     lex_sorted = sorted(
         hits,
-        key=lambda h: _lexical_score(query, f"{h.url} {h.quote}"),
+        key=lambda h: _lexical_score(query, f"{h.url} {full_docs.get(h.id, h.quote)}"),
         reverse=True,
     )
     lex_rank = {h.id: i for i, h in enumerate(lex_sorted)}

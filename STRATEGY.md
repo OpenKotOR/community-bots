@@ -1,61 +1,64 @@
 ---
 name: Holocron & Trask
-last_updated: 2026-05-18
+last_updated: 2026-05-19
 ---
 
 # Holocron & Trask Strategy
 
 ## Target problem
 
-KotOR modding knowledge is scattered across Discord threads, wikis, and archives. People need answers they can trust with clear citations, without running a heavy vendored research stack or unbounded web scraping on every question.
+KotOR modding knowledge is scattered across Discord, wikis, and file-host threads. Modders and lore seekers need trustworthy, cited answers without hunting multiple sites — but today’s answers often read like raw retrieval dumps (claim bullets, markdown leaks, weak bibliographies) when the owned RAG stack is not fully engaged.
 
 ## Our approach
 
-Holocron and Trask combine allowlisted web research (Crawl4AI + DuckDuckGo) with lower-authority imported and live Discord context in one Node synthesis path. Ship a deployable HTTP surface for the web UI and Discord bots, with explicit source authority and approved-domain guardrails.
+**Owned crawl → embed → retrieve → cite → assistant compose.** Crawl4AI indexes allowlisted sources into Chroma (FastEmbed vectors); every question runs hybrid RAG retrieval first, with bounded live Crawl4AI fetch on weak or empty index hits. Node synthesis rewrites retrieved passages into a conversational, AI-assistant answer with inline [n] citations and a clean Sources bibliography — never unverified snippet padding.
 
 ## Who it's for
 
-**Primary:** Modders and lore seekers — they use Holocron to get cited, on-topic answers from approved KotOR sources.
+**Primary:** Modders and lore seekers — they use Holocron to get cited, conversational answers grounded in approved KotOR archives.
 
-**Secondary:** Discord server members — they ask Trask in-channel and get the same research pipeline with community context when configured.
+**Secondary:** Discord server members — they ask Trask in-channel and get the same RAG + compose pipeline with optional community context when configured.
 
-**Operators:** Maintainers who ingest Discord history, configure env, and deploy the public Trask HTTP Space.
+**Operators:** Maintainers who seed Chroma, run `trask_live_stack.sh`, configure env/LLM keys, and deploy the public Trask HTTP surface.
 
 ## Key metrics
 
-- **Holocron e2e pass rate** — all five canonical research queries complete with substantive answers and ≥2 `https://` citations; measured by `pnpm holocron:e2e`
-- **Research latency (p95)** — time from submit to final answer on `/api/trask/*`; observed in server logs and Playwright runs
-- **Citations per answer** — count of distinct approved sources in the Sources panel; spot-checked in e2e and manual QA
-- **HF deploy health** — Trask HTTP Space builds and serves research after `trask-http-public` workflow; GitHub Actions + Space uptime
+- **Grounded answer quality** — responses read as assistant prose with ≥2 distinct `https://` citations when evidence supports it; spot-checked in Holocron UI and Discord `/ask`
+- **RAG retrieve hit rate** — `passages_count > 0` and `index_miss=false` on expert verification queries; logged in `trask_web_research.py` stderr and research trace JSON
+- **Live crawl recovery rate** — share of weak-retrieve queries where bounded Crawl4AI live index returns usable passages (`live_crawl_passages` in research diagnostics)
+- **Research latency (p95)** — submit → final answer on `/api/trask/*`; server logs and manual QA
 
 ## Tracks
 
-### Live web research
+### Crawl4AI + Chroma RAG
 
-Crawl4AI + DDG discovery with Node LLM rewrite for final Holocron answers.
+Crawl4AI crawl/chunk, FastEmbed vectors, Chroma hybrid retrieve, bounded live crawl on miss.
 
-_Why it serves the approach:_ Replaces the removed GPT-Researcher vendor tree with a maintainable, documented default stack.
+_Why it serves the approach:_ Replaces opaque vendor research with an owned, inspectable retrieval path the team can seed, crawl, and debug.
 
-### Community Discord retrieval
+### Grounded assistant compose
 
-Imported chunks and optional live channel search feed `localHits` before web research.
+LLM rewrite of retrieved passages into conversational answers with aligned Sources bibliographies.
 
-_Why it serves the approach:_ Surfaces community knowledge without treating Discord as equal to approved web archives.
+_Why it serves the approach:_ Users expect an AI assistant, not a research digest; compose must stay tied to verified passages.
 
-### Holocron UX
+### Holocron & Discord surfaces
 
-Server-backed Q&A only; source weighting and keyboard shortcuts; no client-side scraper or agent panel.
+Server-backed Q&A only; one API contract for web and Discord; source weighting without client-side scrapers.
 
-_Why it serves the approach:_ Keeps one authoritative API path and reduces drift between UI and runtime.
+_Why it serves the approach:_ Prevents UI/runtime drift and keeps citations authoritative.
 
 ### Deploy and ops
 
-Docker/HF pack, bootstrap scripts, env maps, and ingest runbooks aligned with runtime.
+`trask_live_stack.sh`, indexer + Worker + HTTP env maps, HF/Docker deploy parity.
 
-_Why it serves the approach:_ Operators can reproduce local and public behavior from the same contracts.
+_Why it serves the approach:_ Operators and agents can reproduce local behavior before shipping public Holocron.
+
+**Requirements detail:** `docs/brainstorms/trask-self-hosted-research-pipeline-requirements.md`
 
 ## Not working on
 
 - Vendored GPT-Researcher / `vendor/ai-researchwizard` as the default research path
+- DuckDuckGo snippets as primary evidence when Crawl4AI + Chroma can serve the query
 - browser-use, llm-scraper, or Firecrawl as the Holocron/Discord answer pipeline
-- SearXNG/Khoj sidecars or `TRASK_RESEARCH_BACKEND_URL` HTTP replacements for `trask_web_research.py`
+- Automated test suites for Trask while the RAG/compose contract is still in active design (manual stack smoke + UI QA instead)

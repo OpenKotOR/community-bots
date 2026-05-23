@@ -1,0 +1,17 @@
+{
+  "id": "kotor-lore-seed-ebon-hawk",
+  "sourceId": "kotor-lore-seed",
+  "sourceName": "KOTOR Lore Compendium",
+  "kind": "website",
+  "url": "local://kotor-lore/ebon-hawk",
+  "title": "Ebon Hawk — KOTOR Ship",
+  "chunkText": "The Ebon Hawk is the main ship and mobile base of operations throughout both KOTOR games. It is a heavily modified Dynamic-class freighter, similar in function to the Millennium Falcon. You steal it from crime lord Davik Kang to escape Taris when the Sith bomb the planet. The ship is the hub world where you interact with companions, rest, play Pazaak, and manage equipment. In KOTOR 2, the Ebon Hawk is found damaged on Peragus Mining Station.",
+  "fetchedAt": 1778939758725,
+  "chunkIndex": 0,
+  "tags": [
+    "lore",
+    "characters",
+    "story",
+    "kotor"
+  ]
+}

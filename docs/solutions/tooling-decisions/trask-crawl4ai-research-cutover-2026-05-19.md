@@ -1,6 +1,7 @@
 ---
 title: "Trask live research cutover to Crawl4AI indexer"
 date: 2026-05-19
+last_refreshed: 2026-05-19
 category: tooling-decisions
 problem_type: tooling_decision
 component: background_job
@@ -10,31 +11,46 @@ tags:
   - "holocron"
   - "crawl4ai"
   - "indexer"
+  - "openrouter"
+  - "llm_fallbacks"
 applies_when: "Implementing or debugging Trask/Holocron live web research, Docker HF deploy, or research env vars"
 ---
 
 ## Context
 
-Holocron and Discord `/ask` previously depended on a vendored Python research subprocess that was fragile to bootstrap (heavy deps, submodule drift, failed venv installs). The product mandate was to own retrieval: approved-host crawl → chunk → embed → index → cite.
+Holocron and Discord `/ask` previously depended on a vendored Python research subprocess that was fragile to bootstrap (heavy deps, submodule drift, failed venv installs). The product mandate is to own retrieval: approved-host crawl → chunk → embed → index → cite → **grounded assistant compose** (not open-web agent loops).
+
+Product policy authority: `docs/brainstorms/trask-self-hosted-research-pipeline-requirements.md`.
 
 ## Guidance
 
-- **Node bridge:** `packages/trask/src/trask-research-subprocess.ts` spawns `scripts/trask_web_research.py` (not the removed vendor tree).
-- **Python runner order:** `POST {TRASK_INDEXER_BASE_URL}/retrieve` → local Chroma (`data/trask-indexer`) → DuckDuckGo (`ddgs`) on allowlisted hosts.
+- **Node bridge:** `packages/trask/src/trask-research-subprocess.ts` spawns `scripts/trask_web_research.py` (not the removed vendor tree). Holocron/Discord compose via `ResearchWizardClient` (`packages/trask/src/research-wizard.ts`) with `TRASK_RESEARCH_COMPOSE_MODE=grounded` (default in `scripts/trask_live_stack.sh`).
+- **Retrieve URL defaults:** `@openkotor/config` and `trask_live_stack.sh` set `TRASK_INDEXER_BASE_URL=http://127.0.0.1:8787` (Cloudflare retrieve **Worker**). Python script fallback default is `8790` (raw `trask-indexer serve`). Local stack: indexer :8790 → Worker :8787 → HTTP :4010.
+- **Python gather order** (`scripts/trask_web_research.py`): `POST {TRASK_INDEXER_BASE_URL}/retrieve` → optional local Chroma → **bounded live Crawl4AI recovery** when `TRASK_WEB_RESEARCH_LIVE_CRAWL=1` and retrieve is weak → DuckDuckGo only when `TRASK_WEB_RESEARCH_DDG_FALLBACK=1` (default **off** in live stack).
+- **Compose LLM (free cloud, not local):** `OPENROUTER_API_KEY` + `TRASK_LLM_PROFILE=free`; fallback chain from `vendor/llm_fallbacks/configs/free_models_ids.txt` when `TRASK_REWRITE_MODEL_FALLBACKS` unset (`@openkotor/config`). Ops path: `bash scripts/trask_litellm_proxy.sh` with `vendor/llm_fallbacks/configs/litellm_config_free.yaml`.
+- **Sufficiency gate (R6):** `passagesSupportGroundedCompose` gates LLM compose; `TRASK_QA_GROUNDING=1` enables 1-URL QA seed escape only.
 - **Config:** `loadResearchWizardRuntimeConfig` (`packages/config/src/index.ts`) exposes `indexerBaseUrl`, `researchScriptPath`, `pythonExecutable`, `timeoutMs`. Prefer `.venv-trask-research` via `bash scripts/bootstrap_trask_research.sh`.
-- **Product policy (repo data):** golden queries, surface profiles, linguistics, and retrieval defaults live under `data/trask/` (loaded by `@openkotor/trask-config`). After edits, run `pnpm trask:config-drift` so code and JSON stay aligned.
-- **Env:** `TRASK_WEB_RESEARCH_PYTHON`, `TRASK_INDEXER_BASE_URL` (default `http://127.0.0.1:8790`), `TRASK_RESEARCH_TIMEOUT_MS` (aliases `TRASK_RESEARCHWIZARD_TIMEOUT_MS`, default **900000**).
-- **HF Docker:** `infra/trask-http-public/Dockerfile` bootstraps `.venv-trask-research` and ships `infra/trask-indexer` + `scripts/trask_web_research.py`.
+- **Product policy (repo data):** golden queries, surface profiles, linguistics, and retrieval defaults live under `data/trask/` (loaded by `@openkotor/trask-config`). After edits, run `pnpm trask:config-drift`.
+- **Env:** `TRASK_WEB_RESEARCH_PYTHON`, `TRASK_INDEXER_BASE_URL`, `TRASK_WEB_RESEARCH_DDG_FALLBACK=0`, `TRASK_WEB_RESEARCH_LIVE_CRAWL=1`, `TRASK_RESEARCH_TIMEOUT_MS` (aliases `TRASK_RESEARCHWIZARD_TIMEOUT_MS`, default **900000**).
+- **HF Docker:** `infra/trask-http-public/Dockerfile` bootstraps `.venv-trask-research`, copies `infra/trask-indexer` + `scripts/trask_web_research.py`, sets `TRASK_INDEXER_BASE_URL=http://127.0.0.1:8790`, but **CMD runs only** `trask-http-server` — no indexer supervisor or baked Chroma in-image. Public deploy needs external retrieve Worker or a supervisor entrypoint change.
 - **Discord `/ask` display:** same research stack; UX gates are `pnpm verify:trask-discord` and `packages/trask/src/discord-reply-format.ts` (single on-topic line, inline `[n](url)` citations — no separate Sources block).
 
 ## Why This Matters
 
-Agents and CI were blocked on a submodule that users explicitly retired. A single owned script plus the existing indexer spike keeps Holocron contracts stable while eliminating the old bootstrap path.
+Agents and CI were blocked on a submodule that users explicitly retired. A single owned script plus the indexer/Worker stack keeps Holocron contracts stable while eliminating the old bootstrap path.
 
 ## When to Apply
 
 - Adding research features, env vars, or deploy docs for Trask/Holocron.
-- Debugging empty reports, timeouts, or missing citations in live Q&A (Holocron: `pnpm holocron:e2e` + `pnpm verify:trask-cli`; Discord: `pnpm verify:trask-discord`).
+- Debugging empty reports, timeouts, or missing citations in live Q&A.
+
+## Verification
+
+- **CLI smoke:** `pnpm verify:trask-cli` (after `bash scripts/trask_live_stack.sh`).
+- **Holocron browser e2e:** `pnpm holocron:e2e` — spec at `apps/holocron-web/e2e/holocron-research.spec.ts` (canonical queries from `data/trask/verification-queries.json`).
+- **Batch corpus:** `bash scripts/trask_crawl_catalog.sh` (`trask-indexer crawl-seeds`) — operator Crawl4AI index of allowlist home URLs into Chroma before query-time recovery.
+- **Discord:** `pnpm verify:trask-discord`.
+- **Offline compose alignment:** `pnpm trask:faithfulness-eval` (fixtures under `data/trask-eval/fixtures/`).
 
 ## Examples
 
@@ -55,6 +71,7 @@ const raw = await runTraskWebResearch(config, {
 ```bash
 bash scripts/bootstrap_trask_research.sh
 export TRASK_WEB_RESEARCH_PYTHON=.venv-trask-research/bin/python
+export TRASK_INDEXER_BASE_URL=http://127.0.0.1:8787   # Worker (live stack)
 echo '{"query":"TSLPatcher","query_domains":["deadlystream.com"]}' \
   | .venv-trask-research/bin/python scripts/trask_web_research.py
 ```

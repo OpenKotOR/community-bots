@@ -28,6 +28,10 @@ export interface TraskWebResearchResult {
     readonly allowed_url_prefixes?: readonly string[] | null;
     readonly rejected_source_urls?: readonly string[] | null;
     readonly index_miss?: boolean | null;
+    readonly passages_count?: number | null;
+    readonly live_crawl_attempted?: boolean | null;
+    readonly live_crawl_passages?: number | null;
+    readonly ddg_fallback_enabled?: boolean | null;
   };
 }
 
@@ -113,6 +117,9 @@ const spawnResearchRunner = (
       env: {
         ...process.env,
         TRASK_INDEXER_BASE_URL: config.indexerBaseUrl,
+        ...(process.env.TRASK_INDEXER_DATA_DIR
+          ? { TRASK_INDEXER_DATA_DIR: process.env.TRASK_INDEXER_DATA_DIR }
+          : {}),
         TRASK_ALLOWED_QUERY_DOMAINS: (payload.query_domains ?? []).join("\n"),
         TRASK_ALLOWED_URL_PREFIXES: (payload.allowed_url_prefixes ?? []).join("\n"),
         PYTHONIOENCODING: "utf-8",

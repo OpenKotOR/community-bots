@@ -6,11 +6,12 @@
 
 ## Learned Workspace Facts
 
+- **`docs/solutions/`** — documented fixes and tooling decisions (YAML frontmatter: `module`, `tags`, `problem_type`). Search before implementing or debugging in Trask, Holocron, Pazaak, or ingest paths.
 - **PazaakWorld gameplay** (authoritative matches, RPCs, realtime): local/dev uses **Nakama** (`infra/nakama`, `@openkotor/pazaak-nakama` runtime). Point the client with `VITE_PAZAAK_BACKEND=nakama` (or set `VITE_NAKAMA_HOST`) and keep `VITE_LEGACY_HTTP_ORIGIN=http://localhost:4001` when you still need the bot for OAuth token exchange and `/api/trask/*`. Older Cloudflare Worker + Durable Object paths remain in-repo for reference but are not the primary gameplay backend for the Nakama cutover.
 - **PazaakWorld HTTP API failover** (non-Nakama paths): `@openkotor/platform` `createBrowserApiClient` walks comma-separated `VITE_API_BASES` in order and retries the next origin on **network errors or 5xx** (4xx does not hop). **`VITE_LEGACY_HTTP_ORIGIN`** origins are **prepended** (deduped) before `VITE_API_BASES`, so Pages can set `VITE_LEGACY_HTTP_ORIGIN` to a public bot and `PAZAAK_API_BASES` to a Cloudflare Worker URL for bot-first → Worker fallback. Worker lives in `infra/pazaak-matchmaking-worker`; CI runs `wrangler deploy --dry-run` in `.github/workflows/pazaak-matchmaking-worker.yml` without secrets; live deploy needs `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` repository secrets.
 - **PazaakWorld on GitHub Pages** (static client only): `OpenKotOR/community-bots` is published at `https://openkotor.github.io/community-bots/`; CI and Vite should use `BASE=/community-bots/` (and `import.meta.env.BASE_URL` in app code). Treat legacy `/bots/` org URLs as mismatched with the renamed repo unless a separate redirect or `bots` Pages repo exists.
 - For KotOR-authentic color theming in PazaakWorld (including fixing mismatched labels like “KotOR classic”), reference OpenKotOR ModSync’s K1 and TSL theme definitions rather than inventing standalone palettes.
-- **Trask / Holocron (RAG contract):** **Crawl4AI → embed/Chroma** on the indexer host (`infra/trask-indexer`, `bash scripts/bootstrap_trask_indexer.sh`) → **`POST /retrieve` only via Cloudflare Worker** (`infra/trask-retrieve-worker`, Wrangler deploy + `.github/workflows/trask-retrieve-worker.yml`) → **`scripts/trask_web_research.py`** (passages JSON; no direct Chroma unless `TRASK_WEB_RESEARCH_LOCAL_CHROMA=1`) → **grounded compose** in `@openkotor/trask` (`TRASK_GROUNDED_COMPOSE` on; `TRASK_RESEARCH_COMPOSE_MODE=grounded`; DDG off by default). UI: **`apps/holocron-web`**; API: **`apps/trask-http-server`** (`/api/trask/*`, port **4010**). Local stack: `bash scripts/trask_live_stack.sh` (indexer **8790** + Worker **8787** + Holocron **4010**). Set `TRASK_INDEXER_BASE_URL=http://127.0.0.1:8787` (Worker), not raw Chroma. **Public:** `TRASK_API_BASE` → `infra/trask-worker` (`TRASK_BUILTIN_API=0`) → live `trask-http-server`; retrieve Worker URL in production secrets. **Discord RAG:** `scripts/trask_discord_sync.py`; bot sync when `TRASK_DISCORD_SYNC_INTERVAL_MS` > 0.
+- **Trask / Holocron (RAG contract):** See **`docs/brainstorms/trask-self-hosted-research-pipeline-requirements.md`** for product policy. Pipeline: **Crawl4AI → embed/Chroma** on the indexer host (`infra/trask-indexer`, `bash scripts/bootstrap_trask_indexer.sh`) → **`POST /retrieve` only via Cloudflare Worker** (`infra/trask-retrieve-worker`, Wrangler deploy + `.github/workflows/trask-retrieve-worker.yml`) → **`scripts/trask_web_research.py`** (passages JSON; no direct Chroma unless `TRASK_WEB_RESEARCH_LOCAL_CHROMA=1`) → **grounded compose** in `@openkotor/trask` (`TRASK_GROUNDED_COMPOSE` on; `TRASK_RESEARCH_COMPOSE_MODE=grounded`; DDG off by default). UI: **`apps/holocron-web`**; API: **`apps/trask-http-server`** (`/api/trask/*`, port **4010**). Local stack: `bash scripts/trask_live_stack.sh` (indexer **8790** + Worker **8787** + Holocron **4010**). Set `TRASK_INDEXER_BASE_URL=http://127.0.0.1:8787` (Worker), not raw Chroma. **Public:** `TRASK_API_BASE` → `infra/trask-worker` (`TRASK_BUILTIN_API=0`) → live `trask-http-server`; retrieve Worker URL in production secrets. **Discord RAG:** `scripts/trask_discord_sync.py`; bot sync when `TRASK_DISCORD_SYNC_INTERVAL_MS` > 0.
 
 ## Cursor Cloud specific instructions
 
@@ -69,7 +70,7 @@ HOLOCRON_REUSE_SERVER=1 pnpm holocron:e2e
 
 **Pass criteria (each of the five queries):** question input enabled → submit → user message visible → assistant answer substantive and on-topic → no stuck **Thinking** (≤ ~200s) → **Sources** panel or visible `https://` citations (≥2) on approved hosts.
 
-**Canonical five queries** (defined in `data/trask/eval/golden-queries.json`, imported by `holocron-research.spec.ts` and CLI verify):
+**Canonical five queries** — browser e2e uses expert phrasing from `data/trask/eval/verification-queries.json` (`holocron-research.spec.ts`); CLI/fixtures use `data/trask/eval/golden-queries.json`:
 
 1. What is TSLPatcher used for in KOTOR modding?
 2. How do I troubleshoot KOTOR widescreen resolution issues on PC?
@@ -157,7 +158,7 @@ This replays committed golden fixtures under `data/trask-eval/fixtures/` (no liv
 
 **Do not claim Discord `/ask` is fixed until live checks pass.** Holocron e2e and `pnpm verify:trask-cli` do **not** satisfy Discord UX.
 
-1. **Indexer** on `TRASK_INDEXER_BASE_URL` (default `http://127.0.0.1:8790`) with QA seed: `bash scripts/bootstrap_trask_indexer.sh`, `bash scripts/trask_index_seed_for_qa.sh`.
+1. **Worker retrieve** at `TRASK_INDEXER_BASE_URL=http://127.0.0.1:8787` (via `bash scripts/trask_live_stack.sh` or manual Worker + indexer) with QA seed: `bash scripts/bootstrap_trask_indexer.sh`, `bash scripts/trask_index_seed_for_qa.sh`.
 2. **Restart** Trask bot after `@openkotor/trask` changes: kill old `trask-bot/dist/main.js`, rebuild (`pnpm build`), start with `TRASK_INDEXER_BASE_URL` + `TRASK_WEB_RESEARCH_PYTHON` + `.env` token.
 3. Run the **full** Discord live gate (golden + expert queries — not a subset):
 

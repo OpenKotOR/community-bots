@@ -2,20 +2,26 @@
 
 Holocron’s UI lives in **`apps/holocron-web`**. It talks to **`apps/trask-http-server`** at `/api/trask/*`.
 
-## Default stack (implemented)
+**Product policy:** `docs/brainstorms/trask-self-hosted-research-pipeline-requirements.md`  
+**Operational cheat sheet:** `docs/solutions/tooling-decisions/trask-crawl4ai-research-cutover-2026-05-19.md`
+
+## Default stack (index-first RAG)
 
 | Layer | Implementation |
 |--------|----------------|
-| **Discovery** | DuckDuckGo (`duckduckgo-search`) with `site:` hints from approved domains |
-| **Scrape** | [Crawl4AI](https://github.com/unclecode/crawl4ai) → LLM-friendly markdown (`scripts/trask_web_research.py`) |
-| **Synthesis** | Node `WebResearchClient` OpenAI-compatible rewrite (`packages/trask/src/web-research.ts`) |
+| **Index** | Crawl4AI + FastEmbed + Chroma (`infra/trask-indexer`, `bash scripts/bootstrap_trask_indexer.sh`) |
+| **Retrieve API** | Cloudflare Worker `POST /retrieve` (`infra/trask-retrieve-worker`, local **:8787**) — clients must not hit raw Chroma |
+| **Gather** | `scripts/trask_web_research.py` — Worker retrieve → optional local Chroma → bounded live crawl on weak hit → DDG only if `TRASK_WEB_RESEARCH_DDG_FALLBACK=1` |
+| **Compose** | `@openkotor/trask` `ResearchWizardClient` — grounded passages → sufficiency gate → OpenRouter `:free` + `vendor/llm_fallbacks` |
 
 ### Bootstrap
 
 ```bash
-bash scripts/bootstrap_trask_research.sh   # creates .venv-trask-research
-export TRASK_WEB_RESEARCH_PYTHON="$(pwd)/.venv-trask-research/bin/python"
-# LLM: OPENROUTER_API_KEY (free models), LITELLM_PROXY_URL / OPENCODE_LLM_PROXY_URL, or OPENAI_API_KEY
+bash scripts/bootstrap_trask_research.sh   # Python venv for gather script
+bash scripts/bootstrap_trask_indexer.sh    # indexer deps + Chroma data dir
+bash scripts/trask_live_stack.sh           # indexer :8790 → Worker :8787 → HTTP :4010
+bash scripts/trask_crawl_catalog.sh --dry-run   # list allowlist seeds (batch corpus)
+bash scripts/trask_crawl_catalog.sh --limit 3   # Crawl4AI batch index (operator)
 ```
 
 Fedora/RHEL hosts need `libxml2-devel` and `libxslt-devel` before the first bootstrap (for `lxml`).
@@ -24,90 +30,49 @@ Fedora/RHEL hosts need `libxml2-devel` and `libxslt-devel` before the first boot
 
 | Variable | Purpose |
 |----------|---------|
+| `TRASK_INDEXER_BASE_URL` | **Worker retrieve** (`http://127.0.0.1:8787` local); not raw Chroma :8790 |
 | `TRASK_WEB_RESEARCH_PYTHON` | Python for `scripts/trask_web_research.py` (defaults to `.venv-trask-research`) |
-| `TRASK_WEB_RESEARCH_SCRIPT` | Optional override script path |
-| `TRASK_GPT_RESEARCHER_PYTHON` | Deprecated alias for `TRASK_WEB_RESEARCH_PYTHON` |
-| `TRASK_WEB_RESEARCH_TIMEOUT_MS` | Subprocess timeout (default **900000**; legacy alias `TRASK_RESEARCHWIZARD_TIMEOUT_MS`) |
-| `OPENROUTER_API_KEY` | Recommended: free-tier models via OpenRouter (`openrouter/openrouter/free` default) |
-| `LITELLM_PROXY_URL` / `OPENCODE_LLM_PROXY_URL` / `TRASK_LLM_BASE_URL` | OpenAI-compatible proxy (LiteLLM or OpenCode plugin); key `sk-local` for sample proxy |
-| `OPENAI_API_KEY` / `GROQ_API_KEY` / … | Direct providers; paid fallbacks when `TRASK_LLM_PROFILE=paid` |
-| `TRASK_LLM_PROFILE` | `free` (default) or `paid` — model + fallback ordering in `@openkotor/config` (`loadSharedAiConfig`) |
-| `TRASK_LLM_MODEL` | LiteLLM/OpenCode proxy alias (default `trask-research` when a proxy URL is set) |
-| `FAST_LLM` / `SMART_LLM` / `TRASK_REWRITE_MODEL_FALLBACKS` | Override defaults; see `python scripts/trask_print_fallback_llm.py` + vendored `llm_fallbacks` |
-| `REDIS_URL` / `TRASK_REDIS_URL` | Optional Redis for research cache (`scripts/trask_cache.py`) |
-| `TRASK_CACHE_DISABLED` | Set to `1` to bypass Redis even when `REDIS_URL` is set |
-| `TRASK_CACHE_SEARCH_TTL_SECONDS` | DuckDuckGo URL-list cache TTL (default **21600** = 6h) |
-| `TRASK_CACHE_PAGE_TTL_SECONDS` | Per-page markdown cache TTL (default **604800** = 7d) |
-| `TRASK_CACHE_RESEARCH_TTL_SECONDS` | Full research JSON cache TTL (default **3600** = 1h) |
+| `TRASK_WEB_RESEARCH_DDG_FALLBACK` | `0` (default in live stack) — DDG is recovery-only, not primary grounded evidence |
+| `TRASK_WEB_RESEARCH_LIVE_CRAWL` | `1` in live stack — bounded allowlisted Crawl4AI recovery on weak retrieve |
+| `TRASK_RESEARCH_COMPOSE_MODE` | `grounded` (default in live stack) |
+| `TRASK_RESEARCH_GATHER_MS` / `TRASK_RESEARCH_COMPOSE_MS` | Tiered timeouts (see env map); legacy `TRASK_RESEARCHWIZARD_TIMEOUT_MS` still honored |
+| `OPENROUTER_API_KEY` | Free-tier compose via OpenRouter (`openrouter/free` default) |
+| `TRASK_LLM_PROFILE` | `free` (default) or `paid` — `@openkotor/config` |
+| `TRASK_REWRITE_MODEL_FALLBACKS` | Override; else loaded from `vendor/llm_fallbacks/configs/free_models_ids.txt` |
+| `LITELLM_PROXY_URL` | Optional LiteLLM proxy (`bash scripts/trask_litellm_proxy.sh`) |
+| `TRASK_QA_GROUNDING` | `1` only for QA seed — allows 1-URL sufficiency escape (not production default) |
+
+See **`docs/knowledgebase/50-execution/trask-configuration-env-map.md`** for the full table.
 
 ### LiteLLM proxy (free → paid fallbacks)
 
-Sample config: **`infra/trask-litellm/litellm_config.yaml`** (alias **`trask-research`**). Start the proxy, then point Holocron at it:
+Minimal sample: **`infra/trask-litellm/litellm_config.yaml`**. Full `:free` catalog:
 
 ```bash
-pip install 'litellm[proxy]'   # or: uv tool install 'litellm[proxy]'
-bash scripts/trask_litellm_proxy.sh   # :4000, loads .env / .env.local
-
-# In .env.local (provider keys stay in LiteLLM's environment):
-# OPENROUTER_API_KEY=sk-or-...
-# LITELLM_PROXY_URL=http://127.0.0.1:4000
-# LITELLM_API_KEY=sk-local
-# TRASK_LLM_MODEL=trask-research
-# TRASK_LLM_PROFILE=free
-
-pnpm build && bash scripts/trask_live_stack.sh
+TRASK_LITELLM_CONFIG=vendor/llm_fallbacks/configs/litellm_config_free.yaml bash scripts/trask_litellm_proxy.sh
 ```
 
-Fallback chain (proxy-side): `trask-research` (OpenRouter free router) → `trask-research-llama-free` → `trask-research-groq` (if `GROQ_API_KEY`) → `trask-research-paid` → `trask-research-openai`. See **`infra/trask-litellm/README.md`**.
-
-Smoke:
+### Verification ladder
 
 ```bash
-curl -sf http://127.0.0.1:4000/health/liveliness
-```
-
-For dozens of OpenRouter `:free` models, use the generated catalog in **`vendor/llm_fallbacks/configs/litellm_config_free.yaml`** instead of the minimal sample.
-
-### Redis cache (optional, no Pinecone)
-
-When `REDIS_URL` is set, `scripts/trask_web_research.py` uses `scripts/trask_cache.py` to avoid repeat work:
-
-| Layer | Key pattern | What it skips |
-|--------|-------------|----------------|
-| Search | `trask:search:{hash}` | DuckDuckGo discovery for the same query + domains |
-| Page | `trask:page:{hash}` | Crawl4AI / trafilatura fetch for the same URL |
-| Research | `trask:research:{hash}` | Entire subprocess result for identical payload |
-
-Cache stats appear under `research_information.cache` (e.g. `page_hits`, `search_misses`, `research_hits`).
-
-```bash
-# Local Redis (example)
-podman run -d --name trask-redis -p 6379:6379 redis:7-alpine
-export REDIS_URL=redis://localhost:6379/0
-python scripts/trask_cache.py   # connectivity self-test
-```
-
-### Verification
-
-```bash
-python scripts/smoke_trask_web_research.py --dry-run
-node --import tsx/esm scripts/verify_trask_cli_qa.mjs
-pnpm holocron:e2e   # with trask-http-server on :4010
+pnpm trask:faithfulness-eval          # offline compose alignment (fixtures)
+pnpm verify:trask-cli                 # CLI smoke (golden queries)
+pnpm holocron:e2e                     # browser e2e (expert queries, live stack on :4010)
+pnpm verify:trask-discord             # Discord display contract
 ```
 
 ## Explicitly rejected (do not implement)
 
-These were considered as follow-ups and are **out of scope**:
-
 | Approach | Reason |
 |----------|--------|
-| Node-native **llm-scraper** for single-URL extraction | Not part of the product path; Crawl4AI + DDG covers live research. |
-| **browser-use** integration | Not part of the product path. |
-| Trask `/ask` via self-hosted **Firecrawl HTTP API** (reuse ingest key without Python) | Firecrawl remains **ingest-worker only** when `FIRECRAWL_API_KEY` is set—not the Holocron/Discord answer pipeline. |
-| `TRASK_RESEARCH_BACKEND_URL` HTTP sidecar | Reserved env name only; no planned sidecar replacing `trask_web_research.py`. |
+| DuckDuckGo as **primary** grounded evidence | Index-first; DDG optional recovery only |
+| Node-native **llm-scraper** | Not product path |
+| **browser-use** integration | Not product path |
+| Firecrawl as Holocron/Discord answer pipeline | Ingest-worker only |
+| Local Ollama as default compose | OpenRouter free + `llm_fallbacks` instead |
+| GPT-Researcher / vendored research-wizard as default | Removed |
 
 ## Other references (not default)
 
 - [khoj-ai/khoj](https://github.com/khoj-ai/khoj) — full Q&A product (not integrated)
-- [assafelovic/gpt-researcher](https://github.com/assafelovic/gpt-researcher) — upstream of the removed vendored fork
 - [searxng/searxng](https://github.com/searxng/searxng) — metasearch sidecar (not integrated)
