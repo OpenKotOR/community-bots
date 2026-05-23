@@ -485,12 +485,54 @@ export const composeGroundedAnswerFromClaims = (
     }
   }
 
+  const collapseWhitespace = (value: string): string => {
+    let out = "";
+    let prevSpace = false;
+    for (const ch of value) {
+      if (/\s/u.test(ch)) {
+        if (!prevSpace) {
+          out += " ";
+          prevSpace = true;
+        }
+      } else {
+        out += ch;
+        prevSpace = false;
+      }
+    }
+    return out.trim();
+  };
+
+  const stripTrailingSlashes = (url: string): string => {
+    let end = url.length;
+    while (end > 0 && url[end - 1] === "/") end -= 1;
+    return url.slice(0, end);
+  };
+
+  const stripTrailingBracketCitation = (value: string): string => {
+    let end = value.length;
+    while (end > 0 && value[end - 1] === " ") end -= 1;
+    if (end === 0 || value[end - 1] !== "]") return value.trim();
+    let i = end - 2;
+    while (i >= 0 && value[i]! >= "0" && value[i]! <= "9") i -= 1;
+    if (i < 0 || value[i] !== "[") return value.trim();
+    let start = i;
+    if (start > 0 && value[start - 1] === " ") start -= 1;
+    return value.slice(0, start).trim();
+  };
+
   const stripClaimTitle = (claim: string): string => {
-    const flattened = claim
-      .replace(/^#{1,6}\s+/u, "")
-      .replace(/\s+#+\s+/u, " ")
-      .replace(/\s+/g, " ")
-      .trim();
+    const lines = claim.split("\n");
+    const strippedLines: string[] = [];
+    for (let line of lines) {
+      line = line.trimStart();
+      while (line.startsWith("#")) {
+        line = line.slice(1).trimStart();
+      }
+      const inlineHash = line.indexOf(" #");
+      if (inlineHash >= 0) line = line.slice(0, inlineHash);
+      strippedLines.push(line.trim());
+    }
+    const flattened = collapseWhitespace(strippedLines.join(" "));
     const duplicateLead = flattened.match(/^(\S+)\s+\1\b/iu);
     return duplicateLead ? flattened.slice(duplicateLead[1]!.length).trimStart() : flattened;
   };
@@ -506,7 +548,7 @@ export const composeGroundedAnswerFromClaims = (
       : "\n\nCaveats: Sources disagree on details; compare the cited pages before installing.";
 
   const orderedSources: SourceDescriptor[] = [];
-  const normalize = (url: string): string => url.trim().replace(/\/+$/u, "");
+  const normalize = (url: string): string => stripTrailingSlashes(url.trim());
   for (const claim of composeClaims) {
     const match = sources.find(
       (source) => normalize(source.homeUrl) === normalize(publicCitationUrlForClaim(claim)),
@@ -519,7 +561,7 @@ export const composeGroundedAnswerFromClaims = (
   const summaryLead =
     profile === "brief" || composeClaims.length === 0
       ? ""
-      : `${stripClaimTitle(composeClaims[0]!.claim).replace(/\s+\[\d+\]\s*$/u, "").trim()} [${composeClaims[0]!.sourceIndex}]`;
+      : `${stripTrailingBracketCitation(stripClaimTitle(composeClaims[0]!.claim))} [${composeClaims[0]!.sourceIndex}]`;
   const body =
     profile === "brief"
       ? [...bullets, caveat].filter(Boolean).join("\n").trim()

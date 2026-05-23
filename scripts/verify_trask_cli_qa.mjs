@@ -36,8 +36,82 @@ const DEFAULT_QUERIES = goldenQueriesForSurface("cli").map((entry) => ({
 }));
 
 const DEGRADED_RE = degradedAnswerRegexes()[0] ?? /could not complete live (?:web )?research/i;
-const SOURCE_LINE_RE = /https?:\/\/[^\s)]+/i;
 const MIN_HTTPS_SOURCES = DEFAULT_QUERIES[0]?.minCitations ?? 2;
+
+const collapseWhitespace = (value) => {
+  let out = "";
+  let prevSpace = false;
+  for (const ch of value) {
+    if (/\s/u.test(ch)) {
+      if (!prevSpace) {
+        out += " ";
+        prevSpace = true;
+      }
+    } else {
+      out += ch;
+      prevSpace = false;
+    }
+  }
+  return out.trim();
+};
+
+const hasSourcesSection = (value) => {
+  for (const line of value.replace(/\r\n/g, "\n").split("\n")) {
+    const trimmed = line.trim().toLowerCase();
+    if (trimmed === "sources" || trimmed === "references") return true;
+  }
+  return false;
+};
+
+const collectHttpUrls = (text) => {
+  const urls = [];
+  let i = 0;
+  while (i < text.length) {
+    const url = findHttpUrlInText(text, i);
+    if (!url) break;
+    urls.push(url);
+    i = text.indexOf(url, i) + url.length;
+  }
+  return urls;
+};
+
+const collectBracketCitationIndices = (text) => {
+  const indices = [];
+  let i = 0;
+  while (i < text.length) {
+    if (text[i] !== "[") {
+      i += 1;
+      continue;
+    }
+    let j = i + 1;
+    let digits = "";
+    while (j < text.length && text[j] >= "0" && text[j] <= "9") {
+      digits += text[j];
+      j += 1;
+    }
+    if (digits && text[j] === "]") {
+      const value = Number(digits);
+      if (Number.isFinite(value) && value > 0) indices.push(value);
+      i = j + 1;
+      continue;
+    }
+    i += 1;
+  }
+  return indices;
+};
+
+const countMarkdownHttpsLinks = (text) => {
+  let count = 0;
+  let i = 0;
+  const needle = "](https://";
+  while (i < text.length) {
+    const at = text.indexOf(needle, i);
+    if (at < 0) break;
+    count += 1;
+    i = at + needle.length;
+  }
+  return count;
+};
 
 const stripTrailingUrlPunctuation = (url) => {
   let end = url.length;
@@ -97,13 +171,13 @@ const auditDiscordDisplay = (answer, approvedSources) => {
   if (lines.length > DISCORD_ASK_MAX_BODY_LINES) {
     return `Discord display has ${lines.length} lines (max ${DISCORD_ASK_MAX_BODY_LINES})`;
   }
-  if (/\nSources\s*\n/i.test(display)) {
+  if (hasSourcesSection(display)) {
     return "Discord display still contains a Sources heading";
   }
-  const linked = [...display.matchAll(/\]\(https:\/\/[^)]+\)/g)];
+  const linkedCount = countMarkdownHttpsLinks(display);
   const minLinked = approvedSources.length >= 2 ? MIN_HTTPS_SOURCES : 1;
-  if (linked.length < minLinked) {
-    return `Discord display has ${linked.length} linked https citation(s); need ≥${minLinked}`;
+  if (linkedCount < minLinked) {
+    return `Discord display has ${linkedCount} linked https citation(s); need ≥${minLinked}`;
   }
   const onlyBareRoots =
     approvedSources.length >= MIN_HTTPS_SOURCES
@@ -116,9 +190,7 @@ const auditDiscordDisplay = (answer, approvedSources) => {
 
 const auditCitationAlignment = (answer, approvedSources) => {
   const { body, sourceLines } = splitResearchAnswer(answer);
-  const citedIndices = [...body.matchAll(/\[(\d{1,3})\]/g)]
-    .map((match) => Number(match[1]))
-    .filter((value) => Number.isFinite(value) && value > 0);
+  const citedIndices = collectBracketCitationIndices(body);
   const sourceUrls = sourceLines
     .map((line) => findHttpUrlInText(line))
     .filter(Boolean);
@@ -142,14 +214,15 @@ const auditCitationAlignment = (answer, approvedSources) => {
 
 const scoreAnswer = (query, answer, approvedSources) => {
   const { body, sourceLines } = splitResearchAnswer(answer);
-  const urlsInAnswer = [...answer.matchAll(/[a-z][a-z0-9+.-]*:\/\/[^\s)]+/gi)].map((m) => m[0]);
-  const hasSourcesHeading = /\nSources\s*\n/i.test(answer);
-  const hasInlineCitation = /\[\d+\]/.test(body);
+  const urlsInAnswer = collectHttpUrls(answer);
+  const hasSourcesHeading = hasSourcesSection(answer);
+  const hasInlineCitation = collectBracketCitationIndices(body).length > 0;
   const citationMisaligned = auditCitationAlignment(answer, approvedSources);
   const discordDisplayIssue = auditDiscordDisplay(answer, approvedSources);
-  const hasSourceUrls = sourceLines.some((line) => SOURCE_LINE_RE.test(line)) || urlsInAnswer.length > 0;
+  const hasSourceUrls =
+    sourceLines.some((line) => findHttpUrlInText(line) !== null) || urlsInAnswer.length > 0;
   const degraded = DEGRADED_RE.test(answer);
-  const substantive = body.replace(/\s+/g, " ").trim().length >= 40;
+  const substantive = collapseWhitespace(body).length >= 40;
   const expectation = expectationForQuery(query);
   const sourceText = `${sourceLines.join(" ")} ${approvedSources.map((source) => `${source.name} ${source.homeUrl}`).join(" ")}`;
   const topicMatch = expectation ? expectation.expectPattern.test(body) : true;

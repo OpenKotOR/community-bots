@@ -196,6 +196,8 @@ const stripTrailingChars = (value: string, chars: string): string => {
 
 const stripTrailingSlashes = (value: string): string => stripTrailingChars(value, "/");
 
+const stripTrailingQuestionMarks = (value: string): string => stripTrailingChars(value.trim(), "?");
+
 const normalizeUrl = (value: string): string => stripTrailingSlashes(value).trim();
 
 const isSourcesHeadingLine = (line: string): boolean => {
@@ -206,6 +208,13 @@ const isSourcesHeadingLine = (line: string): boolean => {
   }
   const lower = trimmed.toLowerCase();
   return lower === "sources" || lower === "references";
+};
+
+const hasSourcesSection = (value: string): boolean => {
+  for (const line of value.replace(/\r\n/g, "\n").split("\n")) {
+    if (isSourcesHeadingLine(line)) return true;
+  }
+  return false;
 };
 
 const isUrlTerminator = (ch: string): boolean => /\s/u.test(ch) || ch === ")" || ch === ">" || ch === "]";
@@ -606,7 +615,7 @@ const briefDualSourceAnswer = (query: string, sources: readonly SourceDescriptor
 
 const sourceOnlyFallbackAnswer = (query: string, sources: readonly SourceDescriptor[]): string => {
   if (sources.length === 0) return "I could not complete live archive synthesis for this question right now.";
-  const topic = query.trim().replace(/\?+$/u, "") || "this question";
+  const topic = stripTrailingQuestionMarks(query) || "this question";
   const cited = sources.slice(0, Math.max(BRIEF_DISCORD_MIN_CITATIONS, 2));
   const lines = cited.map(
     (source, index) =>
@@ -1211,7 +1220,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
 
         const rewritten = completion.choices[0]?.message?.content?.trim();
 
-        if (rewritten && /\nSources\s*\n/i.test(rewritten)) {
+        if (rewritten && hasSourcesSection(rewritten)) {
           return rewritten;
         }
       } catch {
@@ -1273,7 +1282,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
 
         const rewritten = completion.choices[0]?.message?.content?.trim();
 
-        if (rewritten && /\nSources\s*\n/i.test(rewritten)) {
+        if (rewritten && hasSourcesSection(rewritten)) {
           return rewritten;
         }
       } catch {
@@ -1722,7 +1731,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
           error: detail.slice(0, 200),
         },
       });
-      const topic = query.trim().replace(/\?+$/u, "") || "this question";
+      const topic = stripTrailingQuestionMarks(query) || "this question";
       return {
         answer: `I could not complete live web research for "${topic}" right now (${detail}). Ensure the Trask indexer or research venv is running (TRASK_INDEXER_BASE_URL, TRASK_WEB_RESEARCH_PYTHON, bootstrap via scripts/bootstrap_trask_research.sh), then retry.`,
         approvedSources: [],
@@ -1845,7 +1854,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
         groundingStatus: inferGroundingStatus(answer, citedSources.length),
       };
     } catch {
-      const topic = query.trim().replace(/\?+$/u, "") || "this question";
+      const topic = stripTrailingQuestionMarks(query) || "this question";
       const answer = `I could not complete live web research for "${topic}" right now.`;
       return {
         answer,
