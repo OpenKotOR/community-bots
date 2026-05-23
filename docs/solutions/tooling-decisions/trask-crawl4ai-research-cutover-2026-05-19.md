@@ -32,7 +32,7 @@ Product policy authority: `docs/brainstorms/trask-self-hosted-research-pipeline-
 - **Config:** `loadResearchWizardRuntimeConfig` (`packages/config/src/index.ts`) exposes `indexerBaseUrl`, `researchScriptPath`, `pythonExecutable`, `timeoutMs`. Prefer `.venv-trask-research` via `bash scripts/bootstrap_trask_research.sh`.
 - **Product policy (repo data):** golden queries, surface profiles, linguistics, and retrieval defaults live under `data/trask/` (loaded by `@openkotor/trask-config`). After edits, run `pnpm trask:config-drift`.
 - **Env:** `TRASK_WEB_RESEARCH_PYTHON`, `TRASK_INDEXER_BASE_URL`, `TRASK_WEB_RESEARCH_DDG_FALLBACK=0`, `TRASK_WEB_RESEARCH_LIVE_CRAWL=1`, `TRASK_RESEARCH_TIMEOUT_MS` (aliases `TRASK_RESEARCHWIZARD_TIMEOUT_MS`, default **900000**).
-- **HF Docker:** `infra/trask-http-public/Dockerfile` bootstraps `.venv-trask-research`, copies `infra/trask-indexer` + `scripts/trask_web_research.py`, sets `TRASK_INDEXER_BASE_URL=http://127.0.0.1:8790`, but **CMD runs only** `trask-http-server` — no indexer supervisor or baked Chroma in-image. Public deploy needs external retrieve Worker or a supervisor entrypoint change.
+- **HF Docker:** `infra/trask-http-public/Dockerfile` bootstraps research + indexer venvs, seeds QA Chroma at build, and **`docker-entrypoint.sh`** supervises `trask-indexer serve` (:8790) then `trask-http-server`. No Cloudflare Worker in-container — `TRASK_INDEXER_BASE_URL` hits raw indexer HTTP.
 - **Discord `/ask` display:** same research stack; UX gates are `pnpm verify:trask-discord` and `packages/trask/src/discord-reply-format.ts` (single on-topic line, inline `[n](url)` citations — no separate Sources block).
 
 ## Why This Matters

@@ -1,7 +1,7 @@
 ---
 title: "feat: Trask RAG incremental hardening (sufficiency, docs, QA)"
 type: feat
-status: active
+status: completed
 date: 2026-05-19
 origin: docs/brainstorms/trask-self-hosted-research-pipeline-requirements.md
 ---
