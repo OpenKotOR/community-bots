@@ -83,8 +83,8 @@ test("loadSharedAiConfig returns undefined headers when no OpenRouter vars are s
 test("loadSharedAiConfig free profile uses OpenRouter free model when only OPENROUTER_API_KEY is set", () => {
   const cfg = loadSharedAiConfig({ OPENROUTER_API_KEY: "sk-or-test" });
   assert.equal(cfg.openAiBaseUrl, "https://openrouter.ai/api/v1");
-  assert.equal(cfg.chatModel, "openrouter/openrouter/free");
-  assert.ok(cfg.chatModelFallbacks.includes("openrouter/openrouter/auto"));
+  assert.equal(cfg.chatModel, "openrouter/free");
+  assert.ok(cfg.chatModelFallbacks.includes("openrouter/auto"));
 });
 
 test("loadSharedAiConfig wires LiteLLM proxy URL and placeholder key", () => {
@@ -108,7 +108,7 @@ test("loadSharedAiConfig paid profile prefers paid OpenRouter model", () => {
     OPENROUTER_API_KEY: "sk-or-test",
     TRASK_LLM_PROFILE: "paid",
   });
-  assert.equal(cfg.chatModel, "openrouter/openrouter/auto");
+  assert.equal(cfg.chatModel, "openrouter/auto");
 });
 
 // ---------------------------------------------------------------------------

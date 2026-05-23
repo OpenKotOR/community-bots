@@ -35,8 +35,9 @@ if (dotEnvPath) {
 const defaultChatModel = "gpt-5.4-mini";
 const defaultEmbeddingModel = "text-embedding-3-large";
 const openRouterApiBase = "https://openrouter.ai/api/v1";
-const freeDefaultChatModel = "openrouter/openrouter/free";
-const paidOpenRouterChatModel = "openrouter/openrouter/auto";
+/** Direct OpenRouter API model ids (not LiteLLM `openrouter/...` prefixes). */
+const freeDefaultOpenRouterChatModel = "openrouter/free";
+const paidOpenRouterChatModel = "openrouter/auto";
 const paidDirectChatModel = "gpt-4o-mini";
 const defaultFreeModelFallbacks = [
   "meta-llama/llama-3.3-70b-instruct:free",
@@ -469,7 +470,7 @@ const resolveDefaultChatModel = (
   const usesOpenRouter =
     Boolean(openRouterKey) || openAiBaseUrl?.includes("openrouter.ai") === true;
   if (usesOpenRouter) {
-    return profile === "paid" ? paidOpenRouterChatModel : freeDefaultChatModel;
+    return profile === "paid" ? paidOpenRouterChatModel : freeDefaultOpenRouterChatModel;
   }
 
   if (profile === "paid" || openAiKey) {
