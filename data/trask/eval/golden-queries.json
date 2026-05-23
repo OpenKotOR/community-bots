@@ -1,0 +1,120 @@
+{
+  "version": 3,
+  "queries": [
+    {
+      "id": "tslpatcher",
+      "question": "What is TSLPatcher used for in KOTOR modding?",
+      "expectPattern": "TSLPatcher|2DA|GFF|TLK|patch",
+      "sourcePattern": "tslpatcher|deadlystream|github",
+      "minCitations": 2,
+      "intent": "tooling",
+      "surfaces": ["cli", "faithfulness"],
+      "fixture": {
+        "url": "https://deadlystream.com/files/file/1982-tslpatcher/",
+        "sourceId": "deadlystream",
+        "host": "deadlystream.com",
+        "markdown": "# TSLPatcher\n\nTSLPatcher is a mod installation tool for Knights of the Old Republic and The Sith Lords. It applies 2DA, GFF, and TLK patches from list files so players do not copy files by hand.",
+        "mustContain": "tslpatcher"
+      },
+      "companionFixture": {
+        "url": "https://github.com/th3w1zard1/TSLPatcher",
+        "sourceId": "pykotor-repo",
+        "host": "github.com",
+        "markdown": "# TSLPatcher on GitHub\n\nThe TSLPatcher project documents how mod authors ship list-driven 2DA, GFF, and TLK changes for KotOR and TSL installs.",
+        "mustContain": "tslpatcher"
+      }
+    },
+    {
+      "id": "widescreen",
+      "question": "How do I troubleshoot KOTOR widescreen resolution issues on PC?",
+      "expectPattern": "widescreen|resolution|HUD|aspect",
+      "sourcePattern": "widescreen|resolution|deadlystream|aspect|ini",
+      "minCitations": 2,
+      "intent": "technical",
+      "surfaces": ["cli", "faithfulness"],
+      "fixture": {
+        "url": "https://deadlystream.com/files/file/1313-kotor-widescreen-resolutions/",
+        "sourceId": "deadlystream",
+        "host": "deadlystream.com",
+        "markdown": "# KOTOR widescreen resolutions\n\nWidescreen support adjusts aspect ratio and HUD layout on PC. Resolution issues usually trace to the graphics ini, aspect patch, and matching desktop resolution.",
+        "mustContain": "widescreen"
+      },
+      "companionFixture": {
+        "url": "https://deadlystream.com/files/file/1252-widescreen-support/",
+        "sourceId": "deadlystream",
+        "host": "deadlystream.com",
+        "markdown": "# Widescreen support\n\nWhen the HUD or menus look stretched after a widescreen patch, verify aspect ratio settings and the game's resolution entries in the graphics configuration on Windows.",
+        "mustContain": "widescreen"
+      }
+    },
+    {
+      "id": "mdlops",
+      "question": "What is MDLOps used for in the KOTOR toolchain?",
+      "expectPattern": "MDLOps|MDL|model",
+      "sourcePattern": "mdlops|deadlystream|github|model",
+      "minCitations": 2,
+      "intent": "tooling",
+      "surfaces": ["cli", "faithfulness"],
+      "fixture": {
+        "url": "https://deadlystream.com/files/file/1198-mdlops/",
+        "sourceId": "deadlystream",
+        "host": "deadlystream.com",
+        "markdown": "# MDLOps\n\nMDLOps converts KotOR MDL and MDX models for editing in 3ds Max or Blender pipelines and exports them back to game-ready formats.",
+        "mustContain": "mdlops"
+      },
+      "companionFixture": {
+        "url": "https://github.com/ndixUR/MDLOps",
+        "sourceId": "mdlops-repo",
+        "host": "github.com",
+        "markdown": "# MDLOps repository\n\nMDLOps is used in the KotOR toolchain to import and export MDL/MDX assets between the game and DCC tools.",
+        "mustContain": "mdlops"
+      }
+    },
+    {
+      "id": "saves",
+      "question": "Where are Knights of the Old Republic save files stored on Windows?",
+      "expectPattern": "save|Saves|Windows|profile|KOTOR|Documents",
+      "sourcePattern": "save|windows|deadlystream|documents|profile",
+      "minCitations": 2,
+      "intent": "technical",
+      "surfaces": ["cli", "faithfulness"],
+      "fixture": {
+        "url": "https://deadlystream.com/topic/5844-kotor-save-game-location/",
+        "sourceId": "deadlystream",
+        "host": "deadlystream.com",
+        "markdown": "# KOTOR save game location\n\nKnights of the Old Republic save games on Windows are stored under the active user profile, typically in Documents in a KOTOR Saves folder.",
+        "mustContain": "save"
+      },
+      "companionFixture": {
+        "url": "https://steamcommunity.com/sharedfiles/filedetails/?id=128193866",
+        "sourceId": "pcgamingwiki-kotor",
+        "host": "steamcommunity.com",
+        "markdown": "# Save file paths\n\nKOTOR save files on Windows live under the current user's Documents folder in the game's Saves directory for the active profile.",
+        "mustContain": "save"
+      }
+    },
+    {
+      "id": "reone",
+      "question": "What does the reone project provide for Odyssey engine work?",
+      "expectPattern": "reone|Odyssey|engine|open.?source",
+      "sourcePattern": "reone|github|engine|odyssey",
+      "minCitations": 2,
+      "intent": "tooling",
+      "surfaces": ["cli", "faithfulness"],
+      "fixture": {
+        "url": "https://github.com/seedhartha/reone",
+        "sourceId": "reone-repo",
+        "host": "github.com",
+        "markdown": "# reone Odyssey engine\n\nThe reone project is an open-source reimplementation of the Odyssey engine for KotOR and TSL. It provides runtime, rendering, and scripting surfaces for engine research.",
+        "mustContain": "reone"
+      },
+      "companionFixture": {
+        "url": "https://github.com/seedhartha/reone/wiki",
+        "sourceId": "reone-repo",
+        "host": "github.com",
+        "markdown": "# reone wiki\n\nreone exposes Odyssey runtime and scripting capabilities so researchers can experiment with KotOR and TSL behavior outside the retail executable.",
+        "mustContain": "reone"
+      }
+    }
+  ]
+}

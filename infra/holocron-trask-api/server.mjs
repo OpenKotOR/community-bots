@@ -1,5 +1,5 @@
 /**
- * Deprecated HF mirror — bundled reference Q&A removed. Deploy holocron-trask-http for live GPTR.
+ * Deprecated HF mirror — bundled reference Q&A removed. Deploy holocron-trask-http for live research.
  */
 
 import { createServer } from 'node:http';
@@ -26,7 +26,7 @@ function jsonResponse(status, body, origin) {
 
 const LIVE_RESEARCH_REQUIRED = {
   error:
-    'Bundled reference answers are disabled on this Space. Use OpenKotOR/holocron-trask-http (full trask-http-server + GPTR) as TRASK_RESEARCHWIZARD_BASE_URL.',
+    'Bundled reference answers are disabled on this Space. Use OpenKotOR/holocron-trask-http (full trask-http-server) as TRASK_RESEARCHWIZARD_BASE_URL.',
 };
 
 async function handleRequest(request) {
@@ -50,12 +50,12 @@ async function handleRequest(request) {
     return {
       status: 200,
       headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-      body: 'Holocron Trask API — live GPTR only (bundled references removed).\n',
+      body: 'Holocron Trask API — live research only (bundled references removed).\n',
     };
   }
 
   if (url.pathname === '/healthz' && request.method === 'GET') {
-    return jsonResponse(200, { ok: true, mode: 'live-gptr-required', bundledReferenceApi: false }, origin);
+    return jsonResponse(200, { ok: true, mode: 'live-trask-http-required', bundledReferenceApi: false }, origin);
   }
 
   if (url.pathname.startsWith('/reference') || url.pathname.startsWith('/api/trask')) {

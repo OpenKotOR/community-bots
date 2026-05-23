@@ -13,32 +13,40 @@ import { loadPolicyFromFile } from "@openkotor/pazaak-policy/file-loader";
 import { config as loadDotEnv } from "dotenv";
 import { z } from "zod";
 
-function findDotEnvFiles(): string[] {
-  const found: string[] = [];
+function findDotEnv(): string | undefined {
   let dir = resolve(process.cwd());
   for (;;) {
-    const local = join(dir, ".env.local");
-    const env = join(dir, ".env");
-    if (existsSync(local)) found.push(local);
-    if (existsSync(env)) found.push(env);
+    const candidate = join(dir, ".env");
+    if (existsSync(candidate)) return candidate;
     const parent = dirname(dir);
-    if (parent === dir) break;
+    if (parent === dir) return undefined;
     dir = parent;
   }
-  return found;
 }
 
-const dotEnvPaths = findDotEnvFiles();
-if (dotEnvPaths.length > 0) {
-  for (const path of dotEnvPaths) {
-    loadDotEnv({ path });
-  }
+const dotEnvPath = findDotEnv();
+
+if (dotEnvPath) {
+  loadDotEnv({ path: dotEnvPath });
 } else {
   loadDotEnv();
 }
 
 const defaultChatModel = "gpt-5.4-mini";
 const defaultEmbeddingModel = "text-embedding-3-large";
+const openRouterApiBase = "https://openrouter.ai/api/v1";
+/** Direct OpenRouter API model ids (not LiteLLM `openrouter/...` prefixes). */
+const freeDefaultOpenRouterChatModel = "openrouter/free";
+const paidOpenRouterChatModel = "openrouter/auto";
+const paidDirectChatModel = "gpt-4o-mini";
+const defaultFreeModelFallbacks = [
+  "meta-llama/llama-3.3-70b-instruct:free",
+  paidOpenRouterChatModel,
+] as const;
+/** Matches `general_settings.master_key` in `infra/trask-litellm/litellm_config.yaml`. */
+const proxyPlaceholderApiKey = "sk-local";
+
+type TraskLlmProfile = "free" | "paid";
 const defaultPazaakWorldUrl = "https://openkotor.github.io/community-bots/pazaakworld";
 
 const integerish = z.coerce.number().int().nonnegative();
@@ -112,28 +120,33 @@ export interface SharedAiConfig {
   databaseUrl: string | undefined;
 }
 
-export interface WebResearchRuntimeConfig {
-  /** Monorepo root (contains `scripts/trask_web_research.py`). */
-  repoRoot: string;
-  /** Python interpreter for `scripts/trask_web_research.py`. */
+export type ResearchComposeMode = "grounded" | "rewrite";
+
+export interface ResearchWizardRuntimeConfig {
+  /** Base URL for `infra/trask-indexer` retrieve API (POST /retrieve). */
+  indexerBaseUrl: string;
+  /** Python interpreter for `scripts/trask_web_research.py` (default `python`). */
   pythonExecutable: string;
-  /** Optional absolute path to the headless runner; default `<repoRoot>/scripts/trask_web_research.py`. */
-  headlessScriptPath: string | undefined;
-  /** Reserved for a future HTTP research sidecar (`TRASK_RESEARCH_BACKEND_URL`). */
-  backendUrl: string | undefined;
+  /** Optional absolute path to the research runner; default `<repo>/scripts/trask_web_research.py`. */
+  researchScriptPath: string | undefined;
+  /** Legacy overall budget; subprocess gather uses {@link gatherTimeoutMs}. */
   timeoutMs: number;
+  /** Python `trask_web_research.py` subprocess wall clock (Holocron ~2m default). */
+  gatherTimeoutMs: number;
+  /** Node rewrite / LLM compose ceiling per query. */
+  composeTimeoutMs: number;
+  /** When true (default), use question-last grounded compose when passages exist. */
+  groundedComposeEnabled: boolean;
+  /** `rewrite` enables legacy digest rewrite; default `grounded`. */
+  composeMode: ResearchComposeMode;
+  /** Kill Discord index sync subprocess after this many ms (0 = no timeout). */
+  discordSyncTimeoutMs: number;
 }
 
-/** @deprecated Use WebResearchRuntimeConfig */
-export type ResearchWizardRuntimeConfig = WebResearchRuntimeConfig;
-
-const hasTraskWebResearchScript = (rootDir: string): boolean =>
-  existsSync(join(rootDir, "scripts", "trask_web_research.py"));
-
-const findRepoRootWithWebResearch = (startDir: string, maxHops = 24): string | undefined => {
+const findMonorepoRoot = (startDir: string, maxHops = 24): string | undefined => {
   let dir = resolve(startDir);
   for (let hop = 0; hop < maxHops; hop++) {
-    if (hasTraskWebResearchScript(dir)) {
+    if (existsSync(join(dir, "pnpm-workspace.yaml")) && existsSync(join(dir, "scripts", "trask_web_research.py"))) {
       return dir;
     }
     const parent = dirname(dir);
@@ -145,80 +158,113 @@ const findRepoRootWithWebResearch = (startDir: string, maxHops = 24): string | u
   return undefined;
 };
 
-const resolveTraskResearchRepoRoot = (env: NodeJS.ProcessEnv): string => {
-  const explicit = readOptionalEnv("TRASK_REPO_ROOT", env);
+const resolveMonorepoRoot = (env: NodeJS.ProcessEnv): string => {
+  const explicit = readOptionalEnv("TRASK_REPO_ROOT", env)?.trim();
   if (explicit) {
-    return resolve(explicit.trim());
+    return resolve(explicit);
   }
 
-  const fromCwd = findRepoRootWithWebResearch(process.cwd());
+  const fromCwd = findMonorepoRoot(process.cwd());
   if (fromCwd) {
     return fromCwd;
   }
 
   const configModuleDir = dirname(fileURLToPath(import.meta.url));
-  const fromPackage = findRepoRootWithWebResearch(join(configModuleDir, "..", ".."));
-  if (fromPackage) {
-    return fromPackage;
-  }
-
-  return process.cwd();
+  return findMonorepoRoot(configModuleDir) ?? resolve(configModuleDir, "..", "..", "..");
 };
 
 /**
- * Prefer `.venv-trask-research` when `TRASK_WEB_RESEARCH_PYTHON` is unset.
- * Falls back to deprecated `TRASK_GPT_RESEARCHER_PYTHON` for migration.
+ * Prefer the monorepo bootstrap venv (`scripts/bootstrap_trask_research.sh`) when
+ * `TRASK_WEB_RESEARCH_PYTHON` is unset.
  */
-const resolveTraskWebResearchPythonExecutable = (repoRoot: string, env: NodeJS.ProcessEnv): string => {
+const resolveTraskResearchPythonExecutable = (repoRoot: string, env: NodeJS.ProcessEnv): string => {
   const explicit =
-    readOptionalEnv("TRASK_WEB_RESEARCH_PYTHON", env)?.trim() ||
-    readOptionalEnv("TRASK_GPT_RESEARCHER_PYTHON", env)?.trim();
+    readOptionalEnv("TRASK_WEB_RESEARCH_PYTHON", env)?.trim() ??
+    readOptionalEnv("TRASK_RESEARCH_PYTHON", env)?.trim();
   if (explicit) {
     return explicit;
   }
 
   const winPy = join(repoRoot, ".venv-trask-research", "Scripts", "python.exe");
   const unixPy = join(repoRoot, ".venv-trask-research", "bin", "python");
-  const legacyWin = join(repoRoot, ".venv-trask-gptr", "Scripts", "python.exe");
-  const legacyUnix = join(repoRoot, ".venv-trask-gptr", "bin", "python");
 
   if (process.platform === "win32" && existsSync(winPy)) {
     return winPy;
   }
+
   if (existsSync(unixPy)) {
     return unixPy;
   }
-  if (process.platform === "win32" && existsSync(legacyWin)) {
-    return legacyWin;
-  }
-  if (existsSync(legacyUnix)) {
-    return legacyUnix;
-  }
 
-  return "python3";
+  return "python";
 };
 
-export const loadWebResearchRuntimeConfig = (env: NodeJS.ProcessEnv = process.env): WebResearchRuntimeConfig => {
-  const repoRoot = resolveTraskResearchRepoRoot(env);
+export const loadResearchWizardRuntimeConfig = (env: NodeJS.ProcessEnv = process.env): ResearchWizardRuntimeConfig => {
+  const repoRoot = resolveMonorepoRoot(env);
   const scriptRaw =
-    readOptionalEnv("TRASK_WEB_RESEARCH_SCRIPT", env) ?? readOptionalEnv("TRASK_GPT_RESEARCHER_SCRIPT", env);
-  const backendUrl = readOptionalEnv("TRASK_RESEARCH_BACKEND_URL", env)?.trim() || undefined;
+    readOptionalEnv("TRASK_WEB_RESEARCH_SCRIPT", env) ?? readOptionalEnv("TRASK_RESEARCH_SCRIPT", env);
   const timeoutRaw =
-    readOptionalEnv("TRASK_WEB_RESEARCH_TIMEOUT_MS", env)
-    ?? readOptionalEnv("TRASK_RESEARCHWIZARD_TIMEOUT_MS", env)
-    ?? "900000";
+    readOptionalEnv("TRASK_RESEARCH_TIMEOUT_MS", env) ??
+    readOptionalEnv("TRASK_WEB_RESEARCH_TIMEOUT_MS", env) ??
+    readOptionalEnv("TRASK_RESEARCHWIZARD_TIMEOUT_MS", env) ??
+    "900000";
+  const gatherTimeoutRaw =
+    readOptionalEnv("TRASK_RESEARCH_GATHER_MS", env) ??
+    readOptionalEnv("TRASK_WEB_RESEARCH_GATHER_MS", env) ??
+    "120000";
+  const composeTimeoutRaw =
+    readOptionalEnv("TRASK_RESEARCH_COMPOSE_MS", env) ??
+    readOptionalEnv("TRASK_WEB_RESEARCH_COMPOSE_MS", env) ??
+    "60000";
+
+  const composeModeRaw = readOptionalEnv("TRASK_RESEARCH_COMPOSE_MODE", env)?.trim().toLowerCase();
+  const composeMode: ResearchComposeMode = composeModeRaw === "rewrite" ? "rewrite" : "grounded";
+
+  const groundedRaw = readOptionalEnv("TRASK_GROUNDED_COMPOSE", env)?.trim().toLowerCase();
+  let groundedComposeEnabled = composeMode === "grounded";
+  if (groundedRaw === "0" || groundedRaw === "false" || groundedRaw === "no" || groundedRaw === "off") {
+    groundedComposeEnabled = false;
+  }
+
+  const syncTimeoutRaw = readOptionalEnv("TRASK_DISCORD_SYNC_TIMEOUT_MS", env) ?? "600000";
 
   return {
-    repoRoot,
-    pythonExecutable: resolveTraskWebResearchPythonExecutable(repoRoot, env),
-    headlessScriptPath: scriptRaw ? resolve(scriptRaw.trim()) : undefined,
-    backendUrl,
+    indexerBaseUrl: (readOptionalEnv("TRASK_INDEXER_BASE_URL", env) ?? "http://127.0.0.1:8787").trim(),
+    pythonExecutable: resolveTraskResearchPythonExecutable(repoRoot, env),
+    researchScriptPath: scriptRaw ? resolve(scriptRaw.trim()) : undefined,
     timeoutMs: integerish.parse(timeoutRaw),
+    gatherTimeoutMs: integerish.parse(gatherTimeoutRaw),
+    composeTimeoutMs: integerish.parse(composeTimeoutRaw),
+    groundedComposeEnabled,
+    composeMode,
+    discordSyncTimeoutMs: integerish.parse(syncTimeoutRaw),
   };
 };
 
-/** @deprecated Use loadWebResearchRuntimeConfig */
-export const loadResearchWizardRuntimeConfig = loadWebResearchRuntimeConfig;
+/** Legacy headless runner config used by `WebResearchClient` (pazaak embedded Trask). */
+export interface WebResearchRuntimeConfig {
+  repoRoot: string;
+  pythonExecutable: string;
+  headlessScriptPath: string | undefined;
+  backendUrl: string | undefined;
+  timeoutMs: number;
+}
+
+export const loadWebResearchRuntimeConfig = (env: NodeJS.ProcessEnv = process.env): WebResearchRuntimeConfig => {
+  const wizard = loadResearchWizardRuntimeConfig(env);
+  const repoRoot = resolveMonorepoRoot(env);
+  const scriptRaw =
+    readOptionalEnv("TRASK_WEB_RESEARCH_SCRIPT", env)?.trim()
+    ?? readOptionalEnv("TRASK_GPT_RESEARCHER_SCRIPT", env)?.trim();
+  const backendUrl = readOptionalEnv("TRASK_RESEARCH_BACKEND_URL", env)?.trim() || undefined;
+  return {
+    repoRoot,
+    pythonExecutable: wizard.pythonExecutable,
+    headlessScriptPath: wizard.researchScriptPath ?? (scriptRaw ? resolve(scriptRaw) : undefined),
+    backendUrl,
+    timeoutMs: wizard.timeoutMs,
+  };
+};
 
 export interface TraskProactiveConfig {
   /** When true, reads channel messages (privileged intents) and may reply without `/ask`. */
@@ -251,9 +297,13 @@ export interface TraskWelcomeConfig {
 export interface TraskBotConfig {
   discord: DiscordRuntimeConfig;
   ai: SharedAiConfig;
-  webResearch: WebResearchRuntimeConfig;
+  researchWizard: ResearchWizardRuntimeConfig;
   allowedGuildIds: string[];
   approvedChannelIds: string[];
+  /** Channel IDs excluded from automatic Discord indexing (`TRASK_DISCORD_CHANNEL_BLACKLIST`). */
+  discordChannelBlacklist: string[];
+  /** When > 0, Trask bot runs `scripts/trask_discord_sync.py` on this interval (ms). */
+  discordSyncIntervalMs: number;
   /** Guild IDs where slash commands are registered (comma list in `TRASK_SLASH_GUILD_IDS`). */
   slashCommandGuildIds: string[];
   chunkDir: string;
@@ -365,15 +415,116 @@ const buildOpenAiProviderHeaders = (env: NodeJS.ProcessEnv): Record<string, stri
   return Object.keys(headers).length > 0 ? headers : undefined;
 };
 
+const stripTrailingSlashes = (value: string): string => {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === "/") end -= 1;
+  return value.slice(0, end);
+};
+
+const normalizeOpenAiCompatibleBaseUrl = (raw: string): string => {
+  const trimmed = stripTrailingSlashes(raw.trim());
+  if (trimmed.endsWith("/v1")) return trimmed;
+  return `${trimmed}/v1`;
+};
+
+const resolveTraskLlmProfile = (env: NodeJS.ProcessEnv): TraskLlmProfile => {
+  const raw = readOptionalEnv("TRASK_LLM_PROFILE", env)?.toLowerCase();
+  return raw === "paid" ? "paid" : "free";
+};
+
+/** LiteLLM (:4000) or OpenCode LLM proxy — OpenAI-compatible; fallbacks live in the proxy config. */
+const resolveLlmProxyBaseUrl = (env: NodeJS.ProcessEnv): string | undefined => {
+  const hit =
+    readOptionalEnv("TRASK_LLM_BASE_URL", env) ??
+    readOptionalEnv("LITELLM_PROXY_URL", env) ??
+    readOptionalEnv("OPENCODE_LLM_PROXY_URL", env);
+  return hit ? normalizeOpenAiCompatibleBaseUrl(hit) : undefined;
+};
+
+const resolveOpenAiApiKey = (env: NodeJS.ProcessEnv, proxyBaseUrl: string | undefined): string | undefined => {
+  const direct =
+    readOptionalEnv("OPENAI_API_KEY", env) ??
+    readOptionalEnv("OPENROUTER_API_KEY", env) ??
+    readOptionalEnv("GROQ_API_KEY", env);
+  if (direct) return direct;
+  if (proxyBaseUrl) {
+    return (
+      readOptionalEnv("LITELLM_API_KEY", env) ??
+      readOptionalEnv("OPENCODE_LLM_PROXY_TOKEN", env) ??
+      readOptionalEnv("LITELLM_MASTER_KEY", env) ??
+      proxyPlaceholderApiKey
+    );
+  }
+  return undefined;
+};
+
+const resolveDefaultChatModel = (
+  env: NodeJS.ProcessEnv,
+  profile: TraskLlmProfile,
+  proxyBaseUrl: string | undefined,
+  openRouterKey: string | undefined,
+  openAiKey: string | undefined,
+  openAiBaseUrl: string | undefined,
+): string => {
+  const explicit = readOptionalEnv("OPENAI_CHAT_MODEL", env) ?? readOptionalEnv("TRASK_LLM_MODEL", env);
+  if (explicit) return explicit;
+
+  if (proxyBaseUrl) {
+    return profile === "paid" ? "trask-research-paid-only" : "trask-research";
+  }
+
+  const usesOpenRouter =
+    Boolean(openRouterKey) || openAiBaseUrl?.includes("openrouter.ai") === true;
+  if (usesOpenRouter) {
+    return profile === "paid" ? paidOpenRouterChatModel : freeDefaultOpenRouterChatModel;
+  }
+
+  if (profile === "paid" || openAiKey) {
+    return paidDirectChatModel;
+  }
+
+  return defaultChatModel;
+};
+
+const resolveDefaultChatModelFallbacks = (
+  env: NodeJS.ProcessEnv,
+  profile: TraskLlmProfile,
+  proxyBaseUrl: string | undefined,
+  openRouterKey: string | undefined,
+): readonly string[] => {
+  const explicit = readListEnv("TRASK_REWRITE_MODEL_FALLBACKS", env);
+  if (explicit.length > 0) return explicit;
+  if (profile !== "free") return [];
+  if (proxyBaseUrl) return [];
+  if (openRouterKey) return [...defaultFreeModelFallbacks];
+  return [];
+};
+
 export const loadSharedAiConfig = (env: NodeJS.ProcessEnv = process.env): SharedAiConfig => {
-  const openAiKey = readOptionalEnv("OPENAI_API_KEY", env) ?? readOptionalEnv("OPENROUTER_API_KEY", env);
+  const profile = resolveTraskLlmProfile(env);
+  const proxyBaseUrl = resolveLlmProxyBaseUrl(env);
+  const openRouterKey = readOptionalEnv("OPENROUTER_API_KEY", env);
+  const openAiKey = readOptionalEnv("OPENAI_API_KEY", env);
+  const explicitBaseUrl = readOptionalEnv("OPENAI_BASE_URL", env);
+
+  let openAiBaseUrl = explicitBaseUrl
+    ? normalizeOpenAiCompatibleBaseUrl(explicitBaseUrl)
+    : proxyBaseUrl;
+  if (!openAiBaseUrl && openRouterKey && !openAiKey) {
+    openAiBaseUrl = openRouterApiBase;
+  }
+
+  const openAiApiKey = resolveOpenAiApiKey(env, proxyBaseUrl);
+  const chatModel = resolveDefaultChatModel(env, profile, proxyBaseUrl, openRouterKey, openAiKey, openAiBaseUrl);
+  const chatModelFallbacks = resolveDefaultChatModelFallbacks(env, profile, proxyBaseUrl, openRouterKey);
+
   return {
-    openAiApiKey: openAiKey,
-    openAiBaseUrl: readOptionalEnv("OPENAI_BASE_URL", env),
+    openAiApiKey,
+    openAiBaseUrl,
     openAiDefaultHeaders: buildOpenAiProviderHeaders(env),
     firecrawlApiKey: readOptionalEnv("FIRECRAWL_API_KEY", env),
-    chatModel: readOptionalEnv("OPENAI_CHAT_MODEL", env) ?? defaultChatModel,
-    chatModelFallbacks: readListEnv("TRASK_REWRITE_MODEL_FALLBACKS", env),
+    chatModel,
+    chatModelFallbacks,
     embeddingModel: readOptionalEnv("OPENAI_EMBEDDING_MODEL", env) ?? defaultEmbeddingModel,
     databaseUrl: readOptionalEnv("DATABASE_URL", env),
   };
@@ -394,9 +545,11 @@ export const loadTraskBotConfig = (env: NodeJS.ProcessEnv = process.env): TraskB
   return {
     discord: loadDiscordRuntimeConfig("TRASK", env),
     ai: loadSharedAiConfig(env),
-    webResearch: loadWebResearchRuntimeConfig(env),
+    researchWizard: loadResearchWizardRuntimeConfig(env),
     allowedGuildIds: readListEnv("TRASK_ALLOWED_GUILD_IDS", env),
     approvedChannelIds,
+    discordChannelBlacklist: readListEnv("TRASK_DISCORD_CHANNEL_BLACKLIST", env),
+    discordSyncIntervalMs: integerish.parse(readOptionalEnv("TRASK_DISCORD_SYNC_INTERVAL_MS", env) ?? "0"),
     slashCommandGuildIds: readListEnv("TRASK_SLASH_GUILD_IDS", env),
     chunkDir: readOptionalEnv("INGEST_STATE_DIR", env) ?? "data/ingest-worker",
     queryDataDir: readOptionalEnv("TRASK_QUERY_DATA_DIR", env) ?? "data/trask-bot",
@@ -468,7 +621,7 @@ export const loadIngestWorkerConfig = (env: NodeJS.ProcessEnv = process.env): In
 
 export interface TraskHttpServerConfig {
   port: number;
-  webResearch: WebResearchRuntimeConfig;
+  researchWizard: ResearchWizardRuntimeConfig;
   ai: SharedAiConfig;
   dataDir: string;
   /** When set, require `Authorization: Bearer <key>` or `X-Trask-Api-Key`. */
@@ -485,7 +638,7 @@ export interface TraskHttpServerConfig {
 export const loadTraskHttpServerConfig = (env: NodeJS.ProcessEnv = process.env): TraskHttpServerConfig => {
   return {
     port: integerish.parse(readOptionalEnv("TRASK_HTTP_PORT", env) ?? "4010"),
-    webResearch: loadWebResearchRuntimeConfig(env),
+    researchWizard: loadResearchWizardRuntimeConfig(env),
     ai: loadSharedAiConfig(env),
     dataDir: readOptionalEnv("TRASK_HTTP_DATA_DIR", env) ?? "data/trask-http-server",
     webApiKey: readOptionalEnv("TRASK_WEB_API_KEY", env),

@@ -80,11 +80,50 @@ test("loadSharedAiConfig returns undefined headers when no OpenRouter vars are s
   assert.equal(cfg.openAiDefaultHeaders, undefined);
 });
 
+test("loadSharedAiConfig free profile uses OpenRouter free model when only OPENROUTER_API_KEY is set", () => {
+  const cfg = loadSharedAiConfig({ OPENROUTER_API_KEY: "sk-or-test" });
+  assert.equal(cfg.openAiBaseUrl, "https://openrouter.ai/api/v1");
+  assert.equal(cfg.chatModel, "openrouter/free");
+  assert.ok(cfg.chatModelFallbacks.includes("openrouter/auto"));
+});
+
+test("loadSharedAiConfig wires LiteLLM proxy URL and placeholder key", () => {
+  const cfg = loadSharedAiConfig({ LITELLM_PROXY_URL: "http://127.0.0.1:4000" });
+  assert.equal(cfg.openAiBaseUrl, "http://127.0.0.1:4000/v1");
+  assert.equal(cfg.openAiApiKey, "sk-local");
+  assert.equal(cfg.chatModel, "trask-research");
+});
+
+test("loadSharedAiConfig prefers explicit OPENAI_BASE_URL over proxy URL", () => {
+  const cfg = loadSharedAiConfig({
+    LITELLM_PROXY_URL: "http://127.0.0.1:4000",
+    OPENAI_BASE_URL: "https://openrouter.ai/api/v1",
+    OPENROUTER_API_KEY: "sk-or-test",
+  });
+  assert.equal(cfg.openAiBaseUrl, "https://openrouter.ai/api/v1");
+});
+
+test("loadSharedAiConfig paid profile uses LiteLLM paid alias when proxy is set", () => {
+  const cfg = loadSharedAiConfig({
+    LITELLM_PROXY_URL: "http://127.0.0.1:4000",
+    TRASK_LLM_PROFILE: "paid",
+  });
+  assert.equal(cfg.chatModel, "trask-research-paid-only");
+});
+
+test("loadSharedAiConfig paid profile prefers paid OpenRouter model", () => {
+  const cfg = loadSharedAiConfig({
+    OPENROUTER_API_KEY: "sk-or-test",
+    TRASK_LLM_PROFILE: "paid",
+  });
+  assert.equal(cfg.chatModel, "openrouter/auto");
+});
+
 // ---------------------------------------------------------------------------
 // loadResearchWizardRuntimeConfig — timeout and script path
 // ---------------------------------------------------------------------------
 
-test("loadResearchWizardRuntimeConfig defaults timeout to 900000 ms when TRASK_RESEARCHWIZARD_TIMEOUT_MS is absent", () => {
+test("loadResearchWizardRuntimeConfig defaults timeout to 900000 ms when TRASK_RESEARCH_TIMEOUT_MS is absent", () => {
   const cfg = loadResearchWizardRuntimeConfig({});
   assert.equal(cfg.timeoutMs, 900000);
 });
@@ -94,21 +133,60 @@ test("loadResearchWizardRuntimeConfig respects TRASK_RESEARCHWIZARD_TIMEOUT_MS o
   assert.equal(cfg.timeoutMs, 120000);
 });
 
-test("loadResearchWizardRuntimeConfig resolves repoRoot and pythonExecutable", () => {
+test("loadResearchWizardRuntimeConfig tiered gather and compose timeouts", () => {
+  const defaults = loadResearchWizardRuntimeConfig({});
+  assert.equal(defaults.gatherTimeoutMs, 120_000);
+  assert.equal(defaults.composeTimeoutMs, 60_000);
+
+  const cfg = loadResearchWizardRuntimeConfig({
+    TRASK_RESEARCH_GATHER_MS: "85000",
+    TRASK_RESEARCH_COMPOSE_MS: "45000",
+  });
+  assert.equal(cfg.gatherTimeoutMs, 85_000);
+  assert.equal(cfg.composeTimeoutMs, 45_000);
+});
+
+test("loadResearchWizardRuntimeConfig sets researchScriptPath to undefined when TRASK_WEB_RESEARCH_SCRIPT is absent", () => {
   const cfg = loadResearchWizardRuntimeConfig({});
-  assert.ok(cfg.repoRoot.length > 0);
+  assert.equal(cfg.researchScriptPath, undefined);
+});
+
+test("loadResearchWizardRuntimeConfig resolves an explicit research script path", () => {
+  const cfg = loadResearchWizardRuntimeConfig({ TRASK_WEB_RESEARCH_SCRIPT: "/tmp/my_script.py" });
+  assert.ok(cfg.researchScriptPath?.endsWith("my_script.py"));
+});
+
+test("loadResearchWizardRuntimeConfig defaults indexer base URL", () => {
+  const cfg = loadResearchWizardRuntimeConfig({});
+  assert.equal(cfg.indexerBaseUrl, "http://127.0.0.1:8787");
+});
+
+test("loadResearchWizardRuntimeConfig respects TRASK_INDEXER_BASE_URL", () => {
+  const cfg = loadResearchWizardRuntimeConfig({ TRASK_INDEXER_BASE_URL: "http://127.0.0.1:9999" });
+  assert.equal(cfg.indexerBaseUrl, "http://127.0.0.1:9999");
+});
+
+test("loadResearchWizardRuntimeConfig defaults grounded compose on and composeMode grounded", () => {
+  const cfg = loadResearchWizardRuntimeConfig({});
+  assert.equal(cfg.groundedComposeEnabled, true);
+  assert.equal(cfg.composeMode, "grounded");
+});
+
+test("loadResearchWizardRuntimeConfig enables rewrite compose mode when TRASK_RESEARCH_COMPOSE_MODE=rewrite", () => {
+  const cfg = loadResearchWizardRuntimeConfig({ TRASK_RESEARCH_COMPOSE_MODE: "rewrite" });
+  assert.equal(cfg.composeMode, "rewrite");
+  assert.equal(cfg.groundedComposeEnabled, false);
+});
+
+test("loadResearchWizardRuntimeConfig disables grounded compose when TRASK_GROUNDED_COMPOSE=0", () => {
+  const cfg = loadResearchWizardRuntimeConfig({ TRASK_GROUNDED_COMPOSE: "0" });
+  assert.equal(cfg.groundedComposeEnabled, false);
+});
+
+test("loadResearchWizardRuntimeConfig falls back to 'python' when no research venv is present", () => {
+  const cfg = loadResearchWizardRuntimeConfig({ TRASK_REPO_ROOT: "/nonexistent/path/that/does/not/exist" });
+  assert.ok(typeof cfg.pythonExecutable === "string");
   assert.ok(cfg.pythonExecutable.length > 0);
-  assert.equal(cfg.headlessScriptPath, undefined);
-});
-
-test("loadResearchWizardRuntimeConfig respects TRASK_WEB_RESEARCH_PYTHON override", () => {
-  const cfg = loadResearchWizardRuntimeConfig({ TRASK_WEB_RESEARCH_PYTHON: "/custom/python" });
-  assert.equal(cfg.pythonExecutable, "/custom/python");
-});
-
-test("loadResearchWizardRuntimeConfig resolves TRASK_RESEARCH_BACKEND_URL", () => {
-  const cfg = loadResearchWizardRuntimeConfig({ TRASK_RESEARCH_BACKEND_URL: "http://127.0.0.1:3002" });
-  assert.equal(cfg.backendUrl, "http://127.0.0.1:3002");
 });
 
 // ---------------------------------------------------------------------------

@@ -32,7 +32,7 @@ Administers:
 - citation-heavy research replies limited to approved sources
 
 Implements its logic by:
-- sending `/ask` queries to an `ai-researchwizard` sidecar
+- sending `/ask` queries through Trask live web research (`scripts/trask_web_research.py` + indexer)
 - constraining the request to the repo's hardcoded approved source list
 - formatting the result into a Discord-friendly briefing with inline citations and a compact sources block
 
@@ -83,7 +83,7 @@ packages/
   trask/
   trask-http/
 vendor/
-  ai-researchwizard/
+  trask-indexer/
 docs/
 infra/
 ```
@@ -100,8 +100,8 @@ infra/
 - This deployment targets workers.dev (free tier) and proxies the Holocron `/api/trask/*` surface when the worker path is used.
 - Required secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
 - Required repository variable for Pages: `TRASK_API_BASE` (typically `https://trask-worker.<account>.workers.dev`).
-- Set `TRASK_BUILTIN_API=0` and `TRASK_RESEARCHWIZARD_BASE_URL` to a live `trask-http-server` (GPTR) origin. Bundled reference answers were removed.
-- Optional variable: `TRASK_RESEARCHWIZARD_BASE_URL` when `TRASK_BUILTIN_API=0` (full `trask-http-server` + GPTR origin).
+- Set `TRASK_BUILTIN_API=0` and `TRASK_RESEARCHWIZARD_BASE_URL` to a live `trask-http-server` origin. Bundled reference answers were removed.
+- Optional variable: `TRASK_RESEARCHWIZARD_BASE_URL` when `TRASK_BUILTIN_API=0` (full `trask-http-server` with live research).
 - Optional secrets: `TRASK_RESEARCHWIZARD_API_KEY`, `TRASK_WEB_API_KEY`, `HUGGINGFACE_TOKEN` (HF mirror of `infra/holocron-trask-api`).
 - Optional variable: `TRASK_WEB_ALLOW_ANONYMOUS` (`1` default).
 - Pages build for `qa-webui` fails if `TRASK_API_BASE` is unset so a broken API origin is never published.
@@ -236,6 +236,6 @@ Export output lands in `exports/discord-server-<guild>-<id>-<timestamp>/` with a
 
 ## Notes
 
-- Trask is being moved to a sidecar-backed research flow. The approved source list stays hardcoded in this repo, while the answer synthesis path is delegated to `ai-researchwizard`.
+- Trask uses Crawl4AI indexer retrieval and DuckDuckGo fallback for live research; the approved source list stays hardcoded in this repo.
 - Pazaak Bot wallets are persisted to a JSON file so the game loop is usable before the Postgres layer is wired in.
 - HK only manages a curated allowlist of opt-in roles and refuses to touch roles above the bot in the guild hierarchy.

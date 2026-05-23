@@ -1,5 +1,5 @@
 /**
- * Deprecated bundled Q&A surface. Holocron/Trask require live GPTR web research on approved hosts.
+ * Deprecated bundled Q&A surface. Holocron/Trask require live web research on approved hosts.
  * This handler only answers health checks; all /api/trask research routes return 503.
  */
 
@@ -34,7 +34,7 @@ function jsonResponse(
 
 const LIVE_RESEARCH_REQUIRED = {
   error:
-    "Bundled reference answers are disabled. Configure TRASK_RESEARCHWIZARD_BASE_URL to a live trask-http-server (GPTR) and set TRASK_BUILTIN_API=0 on the worker.",
+    "Bundled reference answers are disabled. Configure TRASK_RESEARCHWIZARD_BASE_URL to a live trask-http-server and set TRASK_BUILTIN_API=0 on the worker.",
 };
 
 export async function handleBuiltinRequest(request: Request): Promise<Response | null> {
@@ -54,7 +54,7 @@ export async function handleBuiltinRequest(request: Request): Promise<Response |
   }
 
   if (url.pathname === "/" && request.method === "GET") {
-    return new Response("OpenKotOR Trask worker (live GPTR upstream required).\n", {
+    return new Response("OpenKotOR Trask worker (live Trask HTTP upstream required).\n", {
       status: 200,
       headers: { "Content-Type": "text/plain; charset=utf-8" },
     });
@@ -63,7 +63,7 @@ export async function handleBuiltinRequest(request: Request): Promise<Response |
   if (url.pathname === "/healthz" && request.method === "GET") {
     return jsonResponse(
       200,
-      { ok: true, mode: "live-gptr-required", bundledReferenceApi: false },
+      { ok: true, mode: "live-trask-http-required", bundledReferenceApi: false },
       origin,
     );
   }

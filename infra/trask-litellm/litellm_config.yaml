@@ -1,0 +1,66 @@
+# Trask / Holocron LiteLLM proxy — free-first with paid fallbacks
+#
+# Clients (trask-http-server, trask-bot) use:
+#   LITELLM_PROXY_URL=http://127.0.0.1:4000
+#   LITELLM_API_KEY=sk-local       # must match general_settings.master_key below
+#   TRASK_LLM_MODEL=trask-research
+#   TRASK_LLM_PROFILE=free
+#
+# Start: bash scripts/trask_litellm_proxy.sh
+# Docs:  docs/trask-research-backends.md
+
+general_settings:
+  master_key: sk-local
+  # Optional: Postgres for virtual keys / spend logs
+  # database_url: os.environ/DATABASE_URL
+
+litellm_settings:
+  num_retries: 1
+  request_timeout: 120
+  set_verbose: false
+  # Try free aliases in order; escalate to paid when free tiers rate-limit or fail.
+  fallbacks:
+    - trask-research:
+        - trask-research-llama-free
+        - trask-research-groq
+        - trask-research-paid
+        - trask-research-openai
+
+model_list:
+  # Primary alias — matches TRASK_LLM_MODEL default in @openkotor/config
+  - model_name: trask-research
+    litellm_params:
+      model: openrouter/openrouter/free
+      api_base: https://openrouter.ai/api/v1
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: trask-research-llama-free
+    litellm_params:
+      model: openrouter/meta-llama/llama-3.3-70b-instruct:free
+      api_base: https://openrouter.ai/api/v1
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  # Optional: set GROQ_API_KEY for a fast free tier (no OpenRouter markup path)
+  - model_name: trask-research-groq
+    litellm_params:
+      model: groq/llama-3.3-70b-versatile
+      api_key: os.environ/GROQ_API_KEY
+
+  # Paid fallbacks (OpenRouter auto-router, then direct OpenAI mini)
+  - model_name: trask-research-paid
+    litellm_params:
+      model: openrouter/openrouter/auto
+      api_base: https://openrouter.ai/api/v1
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: trask-research-openai
+    litellm_params:
+      model: gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+
+  # Paid profile shortcut (TRASK_LLM_PROFILE=paid + TRASK_LLM_MODEL=trask-research-paid)
+  - model_name: trask-research-paid-only
+    litellm_params:
+      model: openrouter/openrouter/auto
+      api_base: https://openrouter.ai/api/v1
+      api_key: os.environ/OPENROUTER_API_KEY

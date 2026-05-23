@@ -1,3 +1,7 @@
+# Trask indexer (Crawl4AI + Chroma)
+.venv-trask-indexer/
+data/trask-indexer/chroma/
+
 # Logs
 logs
 *.log
@@ -158,7 +162,10 @@ infra/matchmaking-inducer/matchmaking-ci.env
 *.log
 *.pyc
 *.tsbuildinfo
-data/
+# Local runtime data (tracked Trask policy/prompts/eval canon is excepted below)
+data/*
+!data/trask/
+!data/trask/**
 dist/
 exports/
 node_modules/

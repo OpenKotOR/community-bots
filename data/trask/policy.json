@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "minWebCitations": 2,
+  "degradedAnswerPatterns": [
+    "could not complete live (?:web )?research",
+    "could not support grounded answer",
+    "could not complete live research"
+  ],
+  "discord": {
+    "maxBodyLines": 5,
+    "maxLineChars": 220,
+    "descriptionMaxLength": 4096
+  },
+  "holocron": {
+    "minHttpsSources": 2,
+    "minAnswerLength": 60
+  }
+}

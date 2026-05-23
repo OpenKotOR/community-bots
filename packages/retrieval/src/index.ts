@@ -1,17 +1,15 @@
 import { mkdir, open, readFile, readdir, rename, rm, stat, utimes, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-export {
-  anchorMessageIdFromChunkTags,
-  buildDiscordMessagePermalink,
-  channelIdFromChunkTags,
-  guildIdFromChunkTags,
-  isDiscordCitationUrl,
-  parseDiscordChunkUrl,
-  resolveDiscordChunkCitationUrl,
-} from "./discord-permalink.js";
+import {
+  classifyQueryIntent as classifyQueryIntentFromConfig,
+  intentScoreDelta as intentScoreDeltaFromConfig,
+  type QueryIntent,
+} from "@openkotor/trask-config";
 
 export type SourceKind = "website" | "github" | "discord";
+
+export type SourceIntentBias = QueryIntent;
 
 export interface SourceDescriptor {
   id: string;
@@ -22,6 +20,10 @@ export interface SourceDescriptor {
   freshnessPolicy: string;
   approvalScope: string;
   tags: readonly string[];
+  /** Optional ranking hint for query-intent routing (see data/trask/linguistics.json). */
+  intentBias?: SourceIntentBias;
+  /** Optional host authority override (0–10); catalog default used when unset. */
+  authorityWeight?: number;
 }
 
 const normalizeHost = (host: string): string => host.trim().toLowerCase().replace(/^www\./, "");
@@ -243,72 +245,7 @@ const RETRIEVAL_STOPWORDS = new Set([
   "pc",
 ]);
 
-type RetrievalQueryIntent = "tooling" | "technical" | "lore" | "general";
-
-const TOOLING_QUERY_TERMS = [
-  "mdlops",
-  "mdledit",
-  "kotormax",
-  "kotorblender",
-  "pykotor",
-  "tslpatcher",
-  "toolchain",
-  "modding",
-  "mod",
-  "convert",
-  "conversion",
-  "texture",
-  "tpc",
-  "tga",
-  "mdl",
-  "mdx",
-  "gff",
-  "2da",
-  "tlk",
-  "nss",
-  "script",
-  "engine",
-  "reone",
-  "xoreos",
-];
-
-const TECHNICAL_QUERY_TERMS = [
-  "widescreen",
-  "resolution",
-  "hud",
-  "aspect",
-  "compatibility",
-  "save",
-  "windows",
-  "linux",
-  "mac",
-  "crash",
-  "install",
-  "driver",
-  "cutscene",
-  "movies",
-  "graphics",
-  "display",
-];
-
-const LORE_QUERY_TERMS = [
-  "bastila",
-  "revan",
-  "malak",
-  "kreia",
-  "exile",
-  "canderous",
-  "hk-47",
-  "rakata",
-  "star",
-  "forge",
-  "temple",
-  "summit",
-  "companion",
-  "romance",
-  "story",
-  "lore",
-];
+type RetrievalQueryIntent = QueryIntent;
 
 const normalizeToken = (token: string): string => {
   const lowered = token.toLowerCase();
@@ -326,32 +263,14 @@ const tokenize = (value: string): string[] => {
   )];
 };
 
-const queryIncludesAny = (query: string, terms: readonly string[]): boolean => {
-  const lowered = query.toLowerCase();
-  return terms.some((term) => lowered.includes(term));
-};
+const classifyQueryIntent = (query: string): RetrievalQueryIntent => classifyQueryIntentFromConfig(query);
 
-const classifyQueryIntent = (query: string): RetrievalQueryIntent => {
-  if (queryIncludesAny(query, TOOLING_QUERY_TERMS)) return "tooling";
-  if (queryIncludesAny(query, TECHNICAL_QUERY_TERMS)) return "technical";
-  if (queryIncludesAny(query, LORE_QUERY_TERMS)) return "lore";
-  return "general";
-};
+const intentScoreDelta = (intent: RetrievalQueryIntent, tags: readonly string[]): number =>
+  intentScoreDeltaFromConfig(intent, tags);
 
-const intentScoreDelta = (intent: RetrievalQueryIntent, tags: readonly string[]): number => {
-  const tagSet = new Set(tags.map((tag) => tag.toLowerCase()));
-  const hasLore = ["lore", "story", "characters", "companions", "quests", "walkthrough", "gameplay"].some((tag) => tagSet.has(tag));
-  const hasTooling = ["tooling", "formats", "reference", "automation", "python", "engine", "conversion", "assets", "textures", "mods", "forum", "support", "fixes", "troubleshooting", "compatibility"].some((tag) => tagSet.has(tag));
-
-  if (intent === "tooling" || intent === "technical") {
-    if (hasLore && !hasTooling) return -12;
-    if (hasTooling) return 6;
-  }
-  if (intent === "lore") {
-    if (hasLore) return 6;
-    if (hasTooling && !hasLore) return -4;
-  }
-  return 0;
+export const loreSourceIdsFromCatalog = (sources: readonly SourceDescriptor[]): readonly string[] => {
+  const fromCatalog = sources.filter((source) => source.intentBias === "lore").map((source) => source.id);
+  return fromCatalog.length > 0 ? fromCatalog : [];
 };
 
 export const defaultSourceCatalog: readonly SourceDescriptor[] = [
@@ -524,6 +443,7 @@ export const defaultSourceCatalog: readonly SourceDescriptor[] = [
     freshnessPolicy: "on-demand scrape for cited articles; weekly refresh of KOTOR-era pages",
     approvalScope: "public encyclopedia articles",
     tags: ["lore", "characters", "story", "wiki", "history"],
+    intentBias: "lore",
   },
   {
     id: "strategywiki-kotor",
@@ -534,6 +454,7 @@ export const defaultSourceCatalog: readonly SourceDescriptor[] = [
     freshnessPolicy: "weekly crawl for walkthrough and strategy pages",
     approvalScope: "public wiki articles",
     tags: ["walkthrough", "gameplay", "strategy", "guides", "companions", "quests"],
+    intentBias: "lore",
   },
   {
     id: "approved-discord-knowledge",
@@ -560,6 +481,7 @@ export const traskApprovedResearchBaseHosts: readonly string[] = [
   "deadlystream.com",
   "github.com",
   "kotor.neocities.org",
+  "steamcommunity.com",
   // pcgamingwiki.com excluded: Cloudflare-protected, returns JS challenge on automated requests.
   "en.wikipedia.org",
   "strategywiki.org",
@@ -719,9 +641,8 @@ export interface SourceIndexRecord {
   tags: readonly string[];
 }
 
-import { isDiscordCitationUrl, resolveDiscordChunkCitationUrl } from "./discord-permalink.js";
-
-const isExcludedChunkUrl = (url: string): boolean => url.startsWith("local://");
+const isNonWebChunkUrl = (url: string): boolean =>
+  url.startsWith("local://") || url.startsWith("discord://");
 
 type SerializableValue = object | string | number | boolean | null;
 
@@ -885,16 +806,10 @@ export class FileChunkStore {
   }
 }
 
-export interface ChunkSearchProviderOptions {
-  /** Resolves `discord://` chunk URLs to HTTPS permalinks when tags omit guild id. */
-  discordGuildId?: string;
-}
-
 export class ChunkSearchProvider implements SearchProvider {
   public constructor(
     private readonly chunkStore: FileChunkStore,
     private readonly catalog: StaticCatalogSearchProvider,
-    private readonly options: ChunkSearchProviderOptions = {},
   ) {}
 
   public async listSources(): Promise<readonly SourceDescriptor[]> {
@@ -910,7 +825,7 @@ export class ChunkSearchProvider implements SearchProvider {
       this.catalog.search(query, limit),
       this.chunkStore.loadAllChunks(),
     ]);
-    const searchableChunks = allChunks.filter((chunk) => !isExcludedChunkUrl(chunk.url));
+    const searchableChunks = allChunks.filter((chunk) => !isNonWebChunkUrl(chunk.url));
 
     const chunkHits: SearchHit[] = searchableChunks
       .map((chunk) => {
@@ -925,11 +840,6 @@ export class ChunkSearchProvider implements SearchProvider {
           score += textTokens.filter((t) => t === token).length;
         }
         score += intentScoreDelta(intent, chunk.tags);
-        if (isDiscordCitationUrl(chunk.url)) {
-          score += 1;
-        }
-
-        const citationUrl = resolveDiscordChunkCitationUrl(chunk, this.options.discordGuildId);
 
         return {
           sourceId: chunk.sourceId,
@@ -937,7 +847,7 @@ export class ChunkSearchProvider implements SearchProvider {
           kind: chunk.kind,
           title: chunk.title,
           snippet: chunk.chunkText.slice(0, 800).trim() + (chunk.chunkText.length > 800 ? "\u2026" : ""),
-          url: citationUrl,
+          url: chunk.url,
           score,
           tags: chunk.tags,
         } satisfies SearchHit;
@@ -964,13 +874,16 @@ export class ChunkSearchProvider implements SearchProvider {
   }
 }
 
-export const createChunkSearchProvider = (
-  stateDir: string,
-  options?: ChunkSearchProviderOptions,
-): ChunkSearchProvider => {
+export const createChunkSearchProvider = (stateDir: string): ChunkSearchProvider => {
   return new ChunkSearchProvider(
     new FileChunkStore(stateDir),
     new StaticCatalogSearchProvider(defaultSourceCatalog, new FileReindexQueueStore(stateDir)),
-    options ?? {},
   );
 };
+
+export {
+  buildDiscordMessagePermalink,
+  parseDiscordChunkUrl,
+  resolveDiscordChunkCitationUrl,
+  isDiscordCitationUrl,
+} from "./discord-permalink.js";

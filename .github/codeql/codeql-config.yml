@@ -1,0 +1,5 @@
+name: "Community bots CodeQL"
+paths-ignore:
+  - "**/*.test.ts"
+  - "**/*.test.js"
+  - "**/*.test.mjs"

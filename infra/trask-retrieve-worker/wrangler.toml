@@ -1,0 +1,12 @@
+name = "trask-retrieve"
+main = "src/index.ts"
+compatibility_date = "2026-05-19"
+workers_dev = true
+
+# Edge retrieve API for Trask RAG. Chroma stays on a persistent host (or future Vectorize index);
+# this Worker forwards POST /retrieve to that backend until Vectorize migration lands.
+[vars]
+TRASK_INDEXER_BASE_URL = "http://127.0.0.1:8790"
+
+# Production: set the public indexer origin (or replace handler with Vectorize bindings).
+#   pnpm dlx wrangler secret put TRASK_INDEXER_BASE_URL --config infra/trask-retrieve-worker/wrangler.toml

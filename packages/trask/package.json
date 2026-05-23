@@ -15,6 +15,7 @@
   "dependencies": {
     "@openkotor/config": "workspace:*",
     "@openkotor/retrieval": "workspace:*",
+    "@openkotor/trask-config": "workspace:*",
     "openai": "^6.34.0"
   },
   "devDependencies": {

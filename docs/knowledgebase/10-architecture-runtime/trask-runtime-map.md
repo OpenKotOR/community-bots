@@ -2,7 +2,7 @@
 title: Trask Runtime Map
 owner: trask-bot
 status: active
-lastUpdated: 2026-05-18
+lastUpdated: 2026-05-15
 ---
 
 # Runtime Surfaces
@@ -26,7 +26,7 @@ lastUpdated: 2026-05-18
 See [answer-pipeline.md](answer-pipeline.md) for the full Discord + Holocron + local-chunk path. Summary:
 
 1. [REPO] User asks in Discord or Holocron.
-2. [REPO] Trask runs headless `scripts/trask_web_research.py` (Crawl4AI + DuckDuckGo) constrained to approved source roots.
+2. [REPO] Trask runs `scripts/trask_web_research.py` constrained to approved source roots.
 3. [REPO] Trask formats answer plus sources and stores query history.
 4. [SYNTH] Local chunk hits (including Discord export chunks) merge into synthesis as lower-authority context.
 

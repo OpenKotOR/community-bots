@@ -186,6 +186,8 @@ function mapResearchStepsFromRecord(rec: TraskHistoryRecordDto): MessageResearch
       phase: ev.phase,
       detail,
       sources: ev.sources,
+      ...(ev.diag ? { diag: { ...ev.diag } } : {}),
+      ...(ev.urls?.length ? { urls: [...ev.urls] } : {}),
     }
   })
 }
@@ -259,6 +261,8 @@ function createAssistantMessageFromTraskRecord(rec: TraskHistoryRecordDto, query
     queryType,
     researchStatus: failedSynthesis ? 'failed' : 'complete',
     researchSteps,
+    groundingStatus: rec.groundingStatus,
+    consultedSourceCount: (rec.retrievedSources ?? rec.sources ?? []).length,
   }
 }
 

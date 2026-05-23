@@ -1,0 +1,96 @@
+name: Trask retrieve Worker
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "infra/trask-retrieve-worker/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/trask-retrieve-worker.yml"
+  pull_request:
+    paths:
+      - "infra/trask-retrieve-worker/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/trask-retrieve-worker.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trask-retrieve-worker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.11.0
+
+      - name: Install retrieve worker package
+        run: pnpm install --frozen-lockfile --filter @openkotor/trask-retrieve-worker
+
+      - name: Typecheck
+        run: pnpm --dir infra/trask-retrieve-worker run check
+
+      - name: Wrangler deploy dry-run
+        run: pnpm dlx wrangler@4.87.0 deploy --config infra/trask-retrieve-worker/wrangler.toml --dry-run
+
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: verify-bundle
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.11.0
+
+      - name: Install retrieve worker package
+        run: pnpm install --frozen-lockfile --filter @openkotor/trask-retrieve-worker
+
+      - name: Deploy Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::notice::Skipping deploy — set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID."
+            exit 0
+          fi
+          pnpm dlx wrangler@4.87.0 deploy --config infra/trask-retrieve-worker/wrangler.toml
+
+      - name: Sync indexer secret (optional)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          TRASK_INDEXER_BASE_URL: ${{ vars.TRASK_INDEXER_BASE_URL }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            exit 0
+          fi
+          if [ -z "$TRASK_INDEXER_BASE_URL" ]; then
+            echo "::notice::Skipping TRASK_INDEXER_BASE_URL secret — set repository variable to persistent indexer origin."
+            exit 0
+          fi
+          echo -n "$TRASK_INDEXER_BASE_URL" | pnpm dlx wrangler@4.87.0 secret put TRASK_INDEXER_BASE_URL --config infra/trask-retrieve-worker/wrangler.toml

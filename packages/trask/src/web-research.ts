@@ -1556,4 +1556,11 @@ export {
   matchApprovedSource as _matchApprovedSource,
   classifyQueryIntent as _classifyQueryIntent,
   routeSourcesForQuery as _routeSourcesForQuery,
+  rewriteMarkdownLinks as _rewriteMarkdownLinks,
+  splitAtSourcesHeading as _splitAtSourcesHeading,
+  stripMarkdownHeaders as _stripMarkdownHeaders,
+  stripMarkdownTableRows as _stripMarkdownTableRows,
+  stripAsteriskRuns as _stripAsteriskRuns,
+  splitParagraphs as _splitParagraphs,
+  collapseExcessiveNewlines as _collapseExcessiveNewlines,
 };

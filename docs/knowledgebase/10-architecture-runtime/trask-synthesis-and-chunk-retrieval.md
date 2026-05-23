@@ -2,51 +2,51 @@
 title: Trask Synthesis And Chunk Retrieval
 owner: trask-bot
 status: active
-lastUpdated: 2026-05-18
+lastUpdated: 2026-05-19
 ---
 
 # Package roles
 
-- [REPO] **`@openkotor/trask`** — `WebResearchClient`, headless `scripts/trask_web_research.py` (Crawl4AI + DDG) subprocess bridge, optional OpenAI-compatible rewrite passes (`web-research.ts`; `research-wizard.ts` re-exports deprecated `ResearchWizard*` aliases).
+- [REPO] **`@openkotor/trask`** — `ResearchWizardClient`, `scripts/trask_web_research.py` subprocess bridge, optional OpenAI-compatible rewrite passes (`research-wizard.ts`).
 - [REPO] **`@openkotor/retrieval`** — `defaultSourceCatalog`, `FileChunkStore`, `ChunkSearchProvider`, `createChunkSearchProvider`, URL allowlist helpers (`traskApprovedResearchSources`, `isTraskApprovedBaseUrl`, …).
 
-# `createWebResearchClient`
+# `createResearchWizardClient`
 
-- [REPO] Factory in `packages/trask/src/web-research.ts`: `(config, aiConfig?, factoryOptions?)` where `factoryOptions.localSearchProvider` is typically `createChunkSearchProvider(INGEST_STATE_DIR, { discordGuildId })` from HTTP hosts.
-- [REPO] Discord bot `/ask` passes **`options.localHits`** (merged imported chunks + live channel pagination) instead of relying on the factory alone.
+- [REPO] Factory in `packages/trask/src/research-wizard.ts`: `(config, aiConfig?, localSearchProvider?)` → client wired to **`traskApprovedResearchSources`** for live web research plus optional **`localSearchProvider`** (typically `createChunkSearchProvider(INGEST_STATE_DIR)` from hosts).
 
-# Community knowledge (Discord)
+# Local knowledge (`SearchProvider`)
 
-- [REPO] `packages/trask/src/community-knowledge.ts` maps `SearchHit[]` → `SourceDescriptor[]`, builds a **“Community context (lower authority…)”** digest, and merges Discord permalinks with web citations via `mergeCommunityAndWebSources`.
-- [REPO] Holocron minimum web citation policy (`MIN_HOLOCRON_WEB_CITATIONS = 2`) applies only to **approved web archive** URLs; `https://discord.com/channels/...` permalinks are a separate lower-authority class.
-- [REPO] When `localSearchProvider` is set and `localHits` are omitted, `answerQuestion` calls `search(query, 6)` and emits `gather` progress (“Searching imported server history…”).
+- [REPO] When `localSearchProvider` is set, **`searchLocalKnowledge`** runs `search(query, 4)`, drops hits whose URL passes **`isTraskApprovedBaseUrl`** (avoids double-counting catalog home URLs), and builds a **“Local Knowledge Context (lower authority…)”** digest string plus `SourceDescriptor[]` from `searchHitToSource`.
+- [REPO] On search throw, digest/sources are empty (silent degrade).
 
 # `ChunkSearchProvider` (`packages/retrieval`)
 
-- [REPO] **`createChunkSearchProvider(stateDir, { discordGuildId? })`** wraps `FileChunkStore(stateDir)` + catalog search.
-- [REPO] **`search`**: token overlap over **all** chunks except `local://`; **Discord** chunks resolve citation URLs to HTTPS permalinks when `guild:` tags or `discordGuildId` are present (`packages/retrieval/src/discord-permalink.ts`).
+- [REPO] **`createChunkSearchProvider(stateDir)`** wraps `FileChunkStore(stateDir)` + `StaticCatalogSearchProvider(defaultSourceCatalog, FileReindexQueueStore(stateDir))`.
+- [REPO] **`search`**: token overlap scoring over **all** loaded chunks plus catalog search; **merges** chunk hits before catalog hits, dedupes by URL, sorts by score descending, returns up to **`limit`** (default **5** in `listSources` callers; local path uses **4**).
 
 # `answerQuestion` (full Holocron / Discord `/ask`)
 
-- [REPO] Applies **`applySourcePreferences`** when `options.sourcePreferences` is present.
-- [REPO] Resolves community hits (`localHits` or `localSearchProvider`), then runs **`fetchResearchReport`** (`trask_web_research.py`) for approved web archives.
-- [REPO] Rewrite stage (`rewriteForDiscord` when OpenAI-compatible key is set) receives web + community sources; community digest is appended to the user prompt.
-- [REPO] **`approvedSources`** in the response = `ensureMinimumWebCitations(...)` **plus** Discord permalinks cited in the final answer text.
-- [REPO] **Catch path**: user-facing error mentions bootstrap env vars; no silent local-only success without web when synthesis throws.
+- [REPO] Applies **`applySourcePreferences`** to `traskApprovedResearchSources` when `options.sourcePreferences` is present.
+- [REPO] Loads local digest via **`searchLocalKnowledge`**; emits **`onProgress`** `gather` when local hits exist. Local digest is appended to the web research report for passage extraction only — **`local://`** URLs are not emitted in public **Sources**.
+- [REPO] **`fetchResearchReport`** → `runTraskWebResearch` with `allowed_url_prefixes` from approved sources, optional `model`, and custom prompt **`buildCustomPrompt()`**.
+- [REPO] When **`TRASK_GROUNDED_COMPOSE=1`** and an OpenAI-compatible client is configured, **`tryGroundedCompose`** (`grounded-evidence.ts`) splits the enriched report into passages, extracts claims (LLM with heuristic fallback), and composes an answer with inline `[n]` citations. **`approvedSources`** are **`alignCitedSourcesToAnswer`** — only URLs cited in the body; no URL-padding to meet **`MIN_HOLOCRON_WEB_CITATIONS`**.
+- [REPO] Otherwise: **`rewriteForDiscord`** when an LLM client exists, else **`fallbackDiscordRewrite`**; synthesis-failure reports may use **`sourceOnlyFallbackAnswer`**. Final **`approvedSources`** always pass through **`alignCitedSourcesToAnswer`** (except the grounded path, which already aligned).
+- [REPO] Returns **`groundingStatus`** (`grounded` | `partial` | `failed`) via **`inferGroundingStatus`** for Holocron provenance UX and persistence.
+- [REPO] **Catch path**: research/timeout errors return a user-visible failure string with empty sources (no fake citations).
 
 # `answerQuestionBrief` (proactive)
 
-- [REPO] Uses **`buildCustomPromptBrief()`** (~900 word digest contract); **does not** take `WebResearchQueryOptions` / source weight overrides.
+- [REPO] Uses **`buildCustomPromptBrief()`** (~900 word digest contract); **does not** take `ResearchWizardQueryOptions` / source weight overrides.
 - [REPO] Always uses full **`this.approvedSources`** for `fetchResearchReport`.
 - [REPO] Returns **`researchReport`** (report + optional local digest) for **`scoreResearchAlignment`** in proactive mode.
 
 # Model listing
 
-- [REPO] **`listModels()`** merges `DEFAULT_WEB_RESEARCH_MODELS` (`auto`) with `listHeadlessWebResearchModels`; on failure returns defaults only.
+- [REPO] **`listModels()`** returns `DEFAULT_RESEARCH_WIZARD_MODELS` (`auto` and configured rewrite ids).
 
 # Operator troubleshooting
 
-- [trask-research-troubleshooting.md](../50-execution/trask-research-troubleshooting.md) — timeouts, Crawl4AI+DDG / empty report, `INGEST_STATE_DIR` layout and mismatches, proactive gates, lexical chunk search limits.
+- [trask-research-troubleshooting.md](../50-execution/trask-research-troubleshooting.md) — timeouts, empty research report, `INGEST_STATE_DIR` layout and mismatches, proactive gates, lexical chunk search limits.
 
 # Related
 
@@ -54,5 +54,4 @@ lastUpdated: 2026-05-18
 - [discord-history-ingestion.md](discord-history-ingestion.md) — where Discord chunks enter `FileChunkStore`.
 - [trask-reindex-queue-contract.md](trask-reindex-queue-contract.md) — catalog `reindex-queue.json` + ingest-worker drain.
 - [trask-research-troubleshooting.md](../50-execution/trask-research-troubleshooting.md) — operator symptom index.
-- `packages/trask/src/community-knowledge.test.ts` — [REPO] community digest and web/discord source split.
-- `packages/retrieval/src/discord-permalink.test.ts` — [REPO] permalink resolution from chunk tags.
+- `packages/trask/src/local-knowledge.test.ts` — [REPO] merge/fallback behavior.

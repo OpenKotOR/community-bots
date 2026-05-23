@@ -37,7 +37,9 @@ function hasValidClientAuth(request: Request, apiKey: string): boolean {
 }
 
 function normalizeBackendBaseUrl(rawBaseUrl: string): string {
-  return rawBaseUrl.replace(/\/+$/, "");
+  let end = rawBaseUrl.length;
+  while (end > 0 && rawBaseUrl[end - 1] === "/") end -= 1;
+  return rawBaseUrl.slice(0, end);
 }
 
 function isTraskApiPath(pathname: string): boolean {
@@ -66,12 +68,21 @@ function upstreamBaseUrl(env: Env): string {
   return (env.TRASK_RESEARCHWIZARD_BASE_URL ?? "").trim();
 }
 
-function hasRealUpstream(env: Env): boolean {
-  const baseUrl = upstreamBaseUrl(env);
-  return Boolean(baseUrl) && !baseUrl.includes("example.com");
+function isPlaceholderUpstream(baseUrl: string): boolean {
+  try {
+    const host = new URL(baseUrl).hostname.toLowerCase();
+    return host === "example.com" || host.endsWith(".example.com");
+  } catch {
+    return true;
+  }
 }
 
-/** Serve bundled references only (no GPTR upstream). */
+function hasRealUpstream(env: Env): boolean {
+  const baseUrl = upstreamBaseUrl(env);
+  return Boolean(baseUrl) && !isPlaceholderUpstream(baseUrl);
+}
+
+/** Serve bundled references only (no live Trask HTTP upstream). */
 function useBuiltinApi(env: Env): boolean {
   const builtinRaw = (env.TRASK_BUILTIN_API ?? "").trim().toLowerCase();
   if (builtinRaw === "0" || builtinRaw === "false") {
@@ -176,7 +187,7 @@ async function serveUpstreamOrFallback(
       502,
       {
         error: "Upstream Trask HTTP origin is unreachable.",
-        detail: "Bundled reference fallback is disabled; fix GPTR upstream or TRASK_RESEARCHWIZARD_BASE_URL.",
+        detail: "Bundled reference fallback is disabled; fix Trask HTTP upstream or TRASK_RESEARCHWIZARD_BASE_URL.",
       },
       origin,
     );

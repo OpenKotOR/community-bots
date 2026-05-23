@@ -1,0 +1,2 @@
+[console_scripts]
+trask-indexer = trask_indexer.cli:main

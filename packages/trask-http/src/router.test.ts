@@ -7,10 +7,10 @@ import path from "node:path";
 import { JsonTraskQueryRepository } from "@openkotor/persistence";
 import type { SourceDescriptor } from "@openkotor/retrieval";
 import type {
-  WebResearchAnswer,
-  WebResearchProgressEvent,
-  WebResearchQueryHandler,
-  WebResearchQueryOptions,
+  ResearchWizardAnswer,
+  ResearchWizardProgressEvent,
+  ResearchWizardQueryHandler,
+  ResearchWizardQueryOptions,
 } from "@openkotor/trask";
 import express from "express";
 import request from "supertest";
@@ -28,11 +28,11 @@ const mockSource: SourceDescriptor = {
   tags: [],
 };
 
-const mockWizard: WebResearchQueryHandler = {
+const mockWizard: ResearchWizardQueryHandler = {
   async answerQuestion(
     _query: string,
-    onProgress?: (event: WebResearchProgressEvent) => void,
-  ): Promise<WebResearchAnswer> {
+    onProgress?: (event: ResearchWizardProgressEvent) => void,
+  ): Promise<ResearchWizardAnswer> {
     onProgress?.({ phase: "gather", detail: "test" });
     return {
       answer: "Stub answer.\n\nSources\n1. Test Source - https://example.com",
@@ -375,6 +375,180 @@ test("POST /ask persists, returns 202, completes asynchronously", async () => {
   assert.ok(String(row?.answer).includes("Stub answer"));
 });
 
+test("POST /ask accumulates liveTrace with diag through async progress", async () => {
+  const queryRepository = new JsonTraskQueryRepository(path.join(tmpDir, `q-trace-${Math.random()}.json`));
+  const searchProvider = {
+    async listSources() {
+      return [];
+    },
+    async search() {
+      return [];
+    },
+    async queueReindex() {
+      return { queuedSourceIds: [] as string[], mode: "file-queue" as const };
+    },
+  };
+
+  const traceWizard: ResearchWizardQueryHandler = {
+    async answerQuestion(_query, onProgress) {
+      await onProgress?.({
+        phase: "gather",
+        detail: "POST /retrieve → 9 passage(s)",
+        diag: { passages: 9, indexer: "http://127.0.0.1:8787" },
+        urls: ["https://example.com/a"],
+      });
+      await onProgress?.({
+        phase: "compose",
+        detail: "Done · grounded",
+        diag: { grounding_status: "grounded", cited_sources: 2 },
+      });
+      return {
+        answer: "Trace answer.\n\nSources\n1. Test Source - https://example.com",
+        approvedSources: [mockSource],
+        retrievedSources: [mockSource],
+        visitedUrls: ["https://example.com"],
+        groundingStatus: "grounded",
+      };
+    },
+  };
+
+  const app = express();
+  app.use(express.json());
+  app.use(
+    "/api/trask",
+    createTraskHttpRouter({
+      runtime: {
+        searchProvider,
+        webResearch: traceWizard,
+        queryRepository,
+      },
+      auth: {
+        requireAuth: (handler) => async (req, res) => handler(req, res, { id: "user-1" }),
+      },
+    }),
+  );
+
+  const created = await request(app).post("/api/trask/ask").send({ query: "Trace test?" });
+  assert.equal(created.status, 202);
+  const threadId = created.body.query?.threadId as string;
+  const queryId = created.body.query?.queryId as string;
+
+  type TraceRow = {
+    status?: string;
+    groundingStatus?: string;
+    liveTrace?: Array<{ phase?: string; detail?: string; diag?: Record<string, unknown> }>;
+  };
+  let completed: TraceRow | undefined;
+  for (let i = 0; i < 40; i++) {
+    const pub = await request(app).get(`/api/trask/thread/${threadId}`);
+    assert.equal(pub.status, 200);
+    completed = pub.body.history?.find((row: { queryId?: string }) => row.queryId === queryId) as TraceRow | undefined;
+    if (completed?.status === "complete") break;
+    await sleep(25);
+  }
+
+  assert.equal(completed?.status, "complete");
+  assert.equal(completed?.groundingStatus, "grounded");
+  const trace = completed?.liveTrace ?? [];
+  assert.ok(trace.length >= 3, `expected multiple liveTrace steps, got ${trace.length}`);
+  assert.ok(
+    trace.some((step) => step.diag && typeof step.diag.indexer === "string"),
+    "liveTrace should persist indexer diag",
+  );
+  assert.ok(
+    trace.some((step) => step.phase === "compose" && String(step.detail).includes("Done")),
+    "liveTrace should include final compose step",
+  );
+});
+
+test("POST /ask grows liveTrace while query is still pending", async () => {
+  const queryRepository = new JsonTraskQueryRepository(path.join(tmpDir, `q-pending-trace-${Math.random()}.json`));
+  const searchProvider = {
+    async listSources() {
+      return [];
+    },
+    async search() {
+      return [];
+    },
+    async queueReindex() {
+      return { queuedSourceIds: [] as string[], mode: "file-queue" as const };
+    },
+  };
+
+  let releaseGather!: () => void;
+  const gatherGate = new Promise<void>((resolve) => {
+    releaseGather = resolve;
+  });
+
+  const gatedWizard: ResearchWizardQueryHandler = {
+    async answerQuestion(_query, onProgress) {
+      await onProgress?.({ phase: "gather", detail: "mid-gather checkpoint" });
+      await gatherGate;
+      await onProgress?.({ phase: "compose", detail: "Done · grounded" });
+      return {
+        answer: "Gated answer.\n\nSources\n1. Test Source - https://example.com",
+        approvedSources: [mockSource],
+        retrievedSources: [mockSource],
+        visitedUrls: ["https://example.com"],
+        groundingStatus: "grounded",
+      };
+    },
+  };
+
+  const app = express();
+  app.use(express.json());
+  app.use(
+    "/api/trask",
+    createTraskHttpRouter({
+      runtime: {
+        searchProvider,
+        webResearch: gatedWizard,
+        queryRepository,
+      },
+      auth: {
+        requireAuth: (handler) => async (req, res) => handler(req, res, { id: "user-1" }),
+      },
+    }),
+  );
+
+  const created = await request(app).post("/api/trask/ask").send({ query: "Pending trace?" });
+  assert.equal(created.status, 202);
+  const threadId = created.body.query?.threadId as string;
+  const queryId = created.body.query?.queryId as string;
+
+  type TraceRow = {
+    status?: string;
+    liveTrace?: Array<{ phase?: string }>;
+  };
+  let sawPendingTrace = false;
+  for (let i = 0; i < 40; i++) {
+    const pub = await request(app).get(`/api/trask/thread/${threadId}`);
+    const row = pub.body.history?.find((entry: { queryId?: string }) => entry.queryId === queryId) as
+      | TraceRow
+      | undefined;
+    if (row?.status === "pending" && (row.liveTrace?.length ?? 0) >= 2) {
+      sawPendingTrace = true;
+      break;
+    }
+    await sleep(25);
+  }
+  assert.equal(sawPendingTrace, true, "expected liveTrace to grow before completion");
+
+  releaseGather();
+
+  let completed: TraceRow | undefined;
+  for (let i = 0; i < 40; i++) {
+    const pub = await request(app).get(`/api/trask/thread/${threadId}`);
+    completed = pub.body.history?.find((entry: { queryId?: string }) => entry.queryId === queryId) as
+      | TraceRow
+      | undefined;
+    if (completed?.status === "complete") break;
+    await sleep(25);
+  }
+  assert.equal(completed?.status, "complete");
+  assert.ok((completed?.liveTrace?.length ?? 0) >= 3);
+});
+
 test("POST /ask forwards source weights to the research wizard", async () => {
   const queryRepository = new JsonTraskQueryRepository(path.join(tmpDir, `q-weights-${Math.random()}.json`));
   const searchProvider = {
@@ -388,8 +562,8 @@ test("POST /ask forwards source weights to the research wizard", async () => {
       return { queuedSourceIds: [] as string[], mode: "file-queue" as const };
     },
   };
-  let receivedOptions: WebResearchQueryOptions | undefined;
-  const weightedWizard: WebResearchQueryHandler = {
+  let receivedOptions: ResearchWizardQueryOptions | undefined;
+  const weightedWizard: ResearchWizardQueryHandler = {
     async answerQuestion(_query, _onProgress, options) {
       receivedOptions = options;
       return {

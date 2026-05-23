@@ -11,7 +11,7 @@ import {
   resolveCorsHeaders,
 } from "@openkotor/platform";
 import { createChunkSearchProvider } from "@openkotor/retrieval";
-import { createWebResearchClient, probeHeadlessWebResearchDryRun } from "@openkotor/trask";
+import { createResearchWizardClient, setTraskResearchLogSink } from "@openkotor/trask";
 import { createTraskHttpRouter, type TraskHttpAuth } from "@openkotor/trask-http";
 import express, { type Request, type Response } from "express";
 
@@ -61,16 +61,19 @@ const config = loadTraskHttpServerConfig();
 const resolveFromRoot = (p: string) => (path.isAbsolute(p) ? p : path.resolve(repoRoot, p));
 
 const queryRepository = new JsonTraskQueryRepository(resolveDataFile(resolveFromRoot(config.dataDir), "trask-queries.json"));
-const discordGuildId =
-  process.env.TRASK_DISCORD_GUILD_ID?.trim()
-  || process.env.DISCORD_TARGET_GUILD_ID?.trim()
-  || undefined;
-const searchProvider = createChunkSearchProvider(resolveFromRoot(config.chunkDir), {
-  ...(discordGuildId ? { discordGuildId } : {}),
-});
-const webResearch = createWebResearchClient(config.webResearch, config.ai, {
-  localSearchProvider: searchProvider,
-});
+const searchProvider = createChunkSearchProvider(resolveFromRoot(config.chunkDir));
+const webResearch = createResearchWizardClient(config.researchWizard, config.ai);
+
+const researchLogVerbose = (process.env.TRASK_RESEARCH_LOG_VERBOSE ?? "").trim().toLowerCase();
+if (researchLogVerbose === "1" || researchLogVerbose === "true" || researchLogVerbose === "yes") {
+  setTraskResearchLogSink((line, level) => {
+    if (level === "debug") {
+      logger.debug(line);
+    } else {
+      logger.info(line);
+    }
+  });
+}
 
 const runtime = {
   searchProvider,
@@ -159,36 +162,11 @@ app.use((req, res, next) => {
   next();
 });
 
-const hasLlmRewriteKey = Boolean(config.ai.openAiApiKey?.trim());
-
-const researchUnavailableReason = (): string => {
-  if (!hasLlmRewriteKey) {
-    return "Set OPENAI_API_KEY or OPENROUTER_API_KEY for Holocron answer synthesis.";
-  }
-  return "Run scripts/bootstrap_trask_research.sh (Crawl4AI venv) and set TRASK_WEB_RESEARCH_PYTHON. See docs/trask-research-backends.md.";
-};
-
-const holocronSessionState: {
-  researchAvailable: boolean;
-  researchUnavailableReason?: string;
-} = {
-  researchAvailable: false,
-  researchUnavailableReason: researchUnavailableReason(),
-};
-
 app.use(
   "/api/trask",
   createTraskHttpRouter({
     runtime,
     auth: createWebAuth(config),
-    getSession: () => ({
-      loggedIn: false,
-      oauthAvailable: false,
-      researchAvailable: holocronSessionState.researchAvailable,
-      ...(holocronSessionState.researchUnavailableReason
-        ? { researchUnavailableReason: holocronSessionState.researchUnavailableReason }
-        : {}),
-    }),
   }),
 );
 
@@ -215,25 +193,6 @@ const { server, listen } = createNodeApiHost({
 
 listen(config.port, () => {
   logger.info(`Trask HTTP API listening on port ${config.port}`);
-  void (async () => {
-    try {
-      const dryRunOk = await probeHeadlessWebResearchDryRun(config.webResearch);
-      if (dryRunOk && hasLlmRewriteKey) {
-        holocronSessionState.researchAvailable = true;
-        delete holocronSessionState.researchUnavailableReason;
-        logger.info("Holocron live web research is available (Crawl4AI gather + LLM synthesis).");
-        return;
-      }
-      holocronSessionState.researchAvailable = false;
-      holocronSessionState.researchUnavailableReason = researchUnavailableReason();
-      logger.warn(`Holocron live research unavailable: ${holocronSessionState.researchUnavailableReason}`);
-    } catch (error: unknown) {
-      const detail = error instanceof Error ? error.message : String(error);
-      holocronSessionState.researchAvailable = false;
-      holocronSessionState.researchUnavailableReason = `${researchUnavailableReason()} (${detail})`;
-      logger.warn(`Holocron research probe failed: ${detail}`);
-    }
-  })();
 });
 
 process.on("SIGINT", () => {
