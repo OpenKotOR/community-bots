@@ -388,9 +388,59 @@ def run_research(payload: dict[str, Any]) -> dict[str, Any]:
     if not passages and allow_local_chroma:
         LOG.info("retrieve_http empty; trying local chroma (TRASK_WEB_RESEARCH_LOCAL_CHROMA=1)")
         passages = _retrieve_via_local_chroma(query, limit)
+
+    live_crawl_passages: list[dict[str, Any]] = []
+    live_crawl_attempted = False
+    try:
+        indexer_src = REPO_ROOT / "infra" / "trask-indexer"
+        if indexer_src.is_dir():
+            sys.path.insert(0, str(indexer_src))
+            from trask_indexer.live_index import (  # type: ignore[import-not-found]
+                live_crawl_and_index,
+                live_crawl_enabled,
+                should_live_crawl,
+            )
+
+            if live_crawl_enabled() and should_live_crawl(passages):
+                live_crawl_attempted = True
+                seed_urls = [str(p.get("url") or "").strip() for p in passages if str(p.get("url") or "").strip()]
+                LOG.info(
+                    "live_crawl_start existing_passages=%s seed_urls=%s",
+                    len(passages),
+                    len(seed_urls),
+                )
+                live_crawl_passages = live_crawl_and_index(query, extra_urls=seed_urls)
+                if live_crawl_passages:
+                    merged: dict[str, dict[str, Any]] = {}
+                    for passage in [*passages, *live_crawl_passages]:
+                        url = str(passage.get("url") or "").strip()
+                        if not url:
+                            continue
+                        prev = merged.get(url)
+                        if prev is None or float(passage.get("score") or 0.0) > float(prev.get("score") or 0.0):
+                            merged[url] = passage
+                    passages = sorted(
+                        merged.values(),
+                        key=lambda item: float(item.get("score") or 0.0),
+                        reverse=True,
+                    )[:limit]
+                    LOG.info("live_crawl_merged passages=%s", len(passages))
+                elif live_crawl_attempted:
+                    refreshed = _retrieve_via_http(query, limit)
+                    if refreshed:
+                        passages = refreshed
+                        LOG.info("live_crawl_http_refresh passages=%s", len(passages))
+    except Exception as exc:
+        LOG.warning("live_crawl failed error=%s", exc)
+
+    if not passages and allow_local_chroma:
+        LOG.info("retrieve still empty after live crawl; retrying local chroma")
+        passages = _retrieve_via_local_chroma(query, limit)
     elif not passages:
         LOG.warning(
-            "retrieve_http returned no passages; local chroma disabled (set TRASK_WEB_RESEARCH_LOCAL_CHROMA=1 to bypass Worker)"
+            "retrieve returned no passages after vector + live crawl (indexer=%s live_crawl=%s)",
+            _indexer_base_url(),
+            live_crawl_attempted,
         )
 
     vector_miss = len(passages) == 0
@@ -461,6 +511,8 @@ def run_research(payload: dict[str, Any]) -> dict[str, Any]:
             "passages_count": len(passages),
             "local_chroma_enabled": allow_local_chroma,
             "ddg_fallback_enabled": ddg_fallback,
+            "live_crawl_attempted": live_crawl_attempted,
+            "live_crawl_passages": len(live_crawl_passages),
         },
     }
 

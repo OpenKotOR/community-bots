@@ -22,6 +22,7 @@ import {
   type QueryIntent,
 } from "@openkotor/trask-config";
 
+import { syncSourcesSectionToApproved } from "./discord-reply-format.js";
 import {
   _collapseExcessiveNewlines,
   _rewriteMarkdownLinks,
@@ -39,6 +40,7 @@ import {
   composeGroundedAnswerWithLlm,
   hasMinimumDiscordBriefGroundedSupport,
   hasMinimumHolocronGroundedSupport,
+  passagesSupportGroundedCompose,
   claimMatchesQueryAnchor,
   passageMatchesQueryAnchor,
   passagesAnchoredForQuery,
@@ -177,6 +179,8 @@ interface ResearchWizardResponsePayload {
     passages_count?: number | null;
     local_chroma_enabled?: boolean | null;
     ddg_fallback_enabled?: boolean | null;
+    live_crawl_attempted?: boolean | null;
+    live_crawl_passages?: number | null;
   };
 }
 
@@ -317,6 +321,8 @@ const diagFromResearchPayload = (
     report_chars: typeof payload.report === "string" ? payload.report.length : 0,
     local_chroma: Boolean(info?.local_chroma_enabled),
     ddg_fallback: Boolean(info?.ddg_fallback_enabled),
+    live_crawl_attempted: Boolean(info?.live_crawl_attempted),
+    live_crawl_passages: Number(info?.live_crawl_passages ?? 0),
   };
 };
 
@@ -617,10 +623,15 @@ const sourceOnlyFallbackAnswer = (query: string, sources: readonly SourceDescrip
   if (sources.length === 0) return "I could not complete live archive synthesis for this question right now.";
   const topic = stripTrailingQuestionMarks(query) || "this question";
   const cited = sources.slice(0, Math.max(BRIEF_DISCORD_MIN_CITATIONS, 2));
-  const lines = cited.map(
-    (source, index) =>
-      `Candidate source ${index + 1}: ${source.name?.trim() || source.homeUrl} [${index + 1}]`,
-  );
+  const lines = cited.map((source, index) => {
+    let label = source.homeUrl;
+    try {
+      label = new URL(source.homeUrl).hostname.replace(/^www\./i, "");
+    } catch {
+      /* keep homeUrl */
+    }
+    return `Candidate source ${index + 1}: ${label} [${index + 1}]`;
+  });
   return [
     `I found candidate sources for ${topic}, but I could not support a grounded answer from the retrieved evidence.`,
     ...lines,
@@ -630,7 +641,7 @@ const sourceOnlyFallbackAnswer = (query: string, sources: readonly SourceDescrip
   ].join("\n");
 };
 
-const MAX_REWRITE_ATTEMPTS = 2;
+const MAX_REWRITE_ATTEMPTS = 6;
 
 const normalizePreferredRewriteModel = (model: string | undefined): string | undefined => {
   const trimmed = model?.trim();
@@ -1311,6 +1322,18 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
     }
   }
 
+  private passagesSupportLlmRewrite(
+    query: string,
+    report: string,
+    payload: ResearchWizardResponsePayload,
+  ): boolean {
+    const ranked = rankPassagesForQuery(
+      passagesAnchoredForQuery(resolveEvidencePassages(report, payload), query),
+      query,
+    );
+    return passagesSupportGroundedCompose(ranked, query);
+  }
+
   private async tryGroundedCompose(
     query: string,
     report: string,
@@ -1334,6 +1357,9 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
     );
     const passages = await filterReachableByUrl(rankedPassages);
     if (passages.length === 0) {
+      return null;
+    }
+    if (!passagesSupportGroundedCompose(passages, query)) {
       return null;
     }
 
@@ -1411,7 +1437,12 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
     const needsMoreHolocronCitations =
       approvedSources.length < MIN_HOLOCRON_WEB_CITATIONS
       || citationIndexCount < MIN_HOLOCRON_WEB_CITATIONS;
+    const usedLlmCompose = answer !== templateAnswer;
     if (composeProfile !== "brief" && needsMoreHolocronCitations) {
+      if (usedLlmCompose && approvedSources.length > 0) {
+        answer = syncSourcesSectionToApproved(answer, approvedSources);
+        approvedSources = alignCitedSourcesToAnswer(answer, webSources);
+      } else {
       const templateAligned = alignCitedSourcesToAnswer(templateAnswer, webSources);
       const templateCitationCount = collectCitationIndicesFromAnswer(templateAnswer).length;
       if (
@@ -1439,6 +1470,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
       } else if (approvedSources.length === 0) {
         answer = sourceOnlyFallbackAnswer(query, webSources.slice(0, 5));
         approvedSources = alignCitedSourcesToAnswer(answer, webSources);
+      }
       }
     }
 
@@ -1631,8 +1663,12 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
         answer = degradedAnswerFallback(query, approvedSources);
       } else if (isSynthesisFailureReport(enrichedReport, payload)) {
         const webSources = resolveWebSourcesForFailedSynthesis(query, retrievedSources);
-        if (webSources.length >= MIN_HOLOCRON_WEB_CITATIONS && isRewriteComposeEnabled(this.config)) {
-          const sourcesForRewrite = filterPublicWebCitationSources(webSources);
+        const sourcesForRewrite = filterPublicWebCitationSources(webSources);
+        if (
+          webSources.length >= MIN_HOLOCRON_WEB_CITATIONS
+          && isRewriteComposeEnabled(this.config)
+          && this.passagesSupportLlmRewrite(query, enrichedReport, payload)
+        ) {
           answer = this.openAiClient
             ? await this.rewriteForDiscord(query, enrichedReport, sourcesForRewrite, options?.model)
             : fallbackDiscordRewrite(query, enrichedReport, sourcesForRewrite);
@@ -1645,6 +1681,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
         isRewriteComposeEnabled(this.config)
         && this.openAiClient
         && (payload.passages?.length ?? 0) === 0
+        && !isGroundedComposeEnabled(this.config)
       ) {
         answer = await this.rewriteForDiscord(
           query,

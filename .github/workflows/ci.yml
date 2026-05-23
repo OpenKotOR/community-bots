@@ -95,3 +95,4 @@ jobs:
           TRASK_WEB_ALLOW_ANONYMOUS: "1"
           TRASK_INDEXER_BASE_URL: http://127.0.0.1:8787
           TRASK_WEB_RESEARCH_PYTHON: .venv-trask-indexer/bin/python
+          TRASK_QA_GROUNDING: "1"

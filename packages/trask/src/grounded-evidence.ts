@@ -9,7 +9,7 @@ import {
   loadTraskPolicy,
 } from "@openkotor/trask-config";
 
-import { splitResearchAnswer } from "./discord-reply-format.js";
+import { splitResearchAnswer, syncSourcesSectionToApproved } from "./discord-reply-format.js";
 import {
   isDiscordJumpUrl,
   resolvePublicCitationUrl,
@@ -609,8 +609,31 @@ export const composeGroundedAnswerWithLlm = async (
   });
 
   const text = completion.choices[0]?.message?.content?.trim();
-  if (!text || !/\nSources\s*\n/i.test(text)) return null;
-  return text;
+  if (!text || text.length < 24) return null;
+
+  const { body } = splitResearchAnswer(text);
+  if (!body || body.length < 16) return null;
+  if (!/\[\d{1,3}\]/u.test(body)) return null;
+
+  const citedSources = collectCitedSourcesFromAnswer(
+    text,
+    sources,
+    (answerText, pool) => {
+      const indices = collectCitationIndicesFromAnswer(answerText);
+      const aligned: SourceDescriptor[] = [];
+      for (const index of indices) {
+        const source = pool[index - 1];
+        if (!source) continue;
+        if (aligned.some((entry) => entry.homeUrl === source.homeUrl)) continue;
+        aligned.push(source);
+      }
+      return aligned;
+    },
+  );
+
+  const bibliography = citedSources.length > 0 ? citedSources : sources.slice(0, Math.min(sources.length, indexed.length));
+
+  return syncSourcesSectionToApproved(text, bibliography);
 };
 
 export const rankPassagesForQuery = (
@@ -710,14 +733,27 @@ export const hasMinimumGroundedSupport = (claims: readonly EvidenceClaim[]): boo
   return false;
 };
 
-/** Holocron: standard 2-URL bar, or one strong on-topic anchored web claim (small QA index). */
+/** Holocron: ≥2 public https citations; 1-URL escape only when `TRASK_QA_GROUNDING=1` (QA seed). */
 export const hasMinimumHolocronGroundedSupport = (
   claims: readonly EvidenceClaim[],
   query: string,
 ): boolean => {
   if (hasMinimumGroundedSupport(claims)) return true;
-  return hasMinimumBriefGroundedSupport(claims, query);
+  if (process.env.TRASK_QA_GROUNDING === "1") {
+    return hasMinimumBriefGroundedSupport(claims, query);
+  }
+  return false;
 };
+
+/** Minimum distinct https URLs required before LLM compose (R6 sufficiency bar). */
+export const minDistinctUrlsForGrounding = (): number =>
+  process.env.TRASK_QA_GROUNDING === "1" ? 1 : MIN_WEB_CITATIONS;
+
+export const passagesSupportGroundedCompose = (
+  passages: readonly EvidencePassage[],
+  query: string,
+): boolean =>
+  hasSufficientPassagesForGrounding(passages, query, minDistinctUrlsForGrounding());
 
 export const countDistinctPublicCitationUrls = (claims: readonly EvidenceClaim[]): number =>
   new Set(

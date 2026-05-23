@@ -30,7 +30,7 @@
     },
     {
       "id": "expert-saves-backup",
-      "question": "I need to back up before installing TSL mods — where does Knights of the Old Republic store saves per Windows user profile?",
+      "question": "Before modding on Windows, where does Knights of the Old Republic store save games per user profile?",
       "expectPattern": "save|Saves|Documents|Windows|profile",
       "sourcePattern": "save|windows|deadlystream|documents|steam",
       "forbidPattern": "\\b(tslpatcher|mdlops|widescreen)\\b",

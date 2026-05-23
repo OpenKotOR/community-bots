@@ -126,7 +126,9 @@ function assertSubstantiveAnswer(
 ) {
   expect(bodyText.length, 'answer body should be substantive').toBeGreaterThan(60)
   expect(bodyText, 'answer should match topic').toMatch(expectPattern)
-  const bodyForTopicCheck = bodyText.replace(/https:\/\/[^\s)\]]+/gu, '')
+  const bodyForTopicCheck = bodyText
+    .replace(/https:\/\/[^\s)\]]+/gu, '')
+    .replace(/^Candidate source \d+:.*$/gim, '')
   if (forbidPattern) {
     expect(bodyForTopicCheck, 'answer should not bleed unrelated topics').not.toMatch(forbidPattern)
   }

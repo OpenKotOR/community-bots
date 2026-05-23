@@ -1,0 +1,17 @@
+{
+  "id": "kotor-lore-seed-revan",
+  "sourceId": "kotor-lore-seed",
+  "sourceName": "KOTOR Lore Compendium",
+  "kind": "website",
+  "url": "local://kotor-lore/revan",
+  "title": "Revan — KOTOR Protagonist",
+  "chunkText": "Revan is the player character and protagonist of Star Wars: Knights of the Old Republic. Once a powerful Jedi Knight, Revan fell to the dark side and became a Sith Lord alongside Malak during the Mandalorian Wars. The Jedi Council captured and wiped Revan's memory, sending him back as a soldier. The iconic twist reveals the player IS the fallen Sith Lord. Revan can be played as male or female, dark side or light side, and is celebrated as one of gaming's greatest RPG protagonists.",
+  "fetchedAt": 1778939758725,
+  "chunkIndex": 0,
+  "tags": [
+    "lore",
+    "characters",
+    "story",
+    "kotor"
+  ]
+}

@@ -620,7 +620,7 @@ const sourceOnlyFallbackAnswer = (query: string, sources: readonly SourceDescrip
 };
 
 const DEFAULT_REWRITE_TIMEOUT_MS = 15_000;
-const MAX_REWRITE_ATTEMPTS = 2;
+const MAX_REWRITE_ATTEMPTS = 6;
 
 const normalizePreferredRewriteModel = (model: string | undefined): string | undefined => {
   const trimmed = model?.trim();

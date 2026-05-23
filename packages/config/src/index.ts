@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -13,21 +13,30 @@ import { loadPolicyFromFile } from "@openkotor/pazaak-policy/file-loader";
 import { config as loadDotEnv } from "dotenv";
 import { z } from "zod";
 
-function findDotEnv(): string | undefined {
-  let dir = resolve(process.cwd());
+function findRepoEnvDir(startDir: string = process.cwd()): string | undefined {
+  let dir = resolve(startDir);
   for (;;) {
-    const candidate = join(dir, ".env");
-    if (existsSync(candidate)) return candidate;
+    if (existsSync(join(dir, ".env")) || existsSync(join(dir, ".env.local"))) {
+      return dir;
+    }
     const parent = dirname(dir);
     if (parent === dir) return undefined;
     dir = parent;
   }
 }
 
-const dotEnvPath = findDotEnv();
-
-if (dotEnvPath) {
-  loadDotEnv({ path: dotEnvPath });
+const envDir = findRepoEnvDir();
+if (envDir) {
+  const dotEnvPath = join(envDir, ".env");
+  const dotEnvLocalPath = join(envDir, ".env.local");
+  if (existsSync(dotEnvPath)) {
+    loadDotEnv({ path: dotEnvPath });
+  } else {
+    loadDotEnv();
+  }
+  if (existsSync(dotEnvLocalPath)) {
+    loadDotEnv({ path: dotEnvLocalPath, override: true });
+  }
 } else {
   loadDotEnv();
 }
@@ -43,6 +52,68 @@ const defaultFreeModelFallbacks = [
   "meta-llama/llama-3.3-70b-instruct:free",
   paidOpenRouterChatModel,
 ] as const;
+
+/** Providers in free_models_ids.txt that need non-OpenRouter credentials — skip for direct OR API. */
+const NON_OPENROUTER_FREE_PREFIXES = [
+  "chatgpt/",
+  "github_copilot/",
+  "gemini/",
+  "dashscope/",
+  "volcengine/",
+  "lemonade/",
+  "anthropic.",
+  "baidu/",
+  "kimi",
+  "glm-",
+] as const;
+
+const resolveRepoRoot = (startDir: string = process.cwd()): string | undefined => {
+  let dir = resolve(startDir);
+  for (;;) {
+    if (existsSync(join(dir, "vendor", "llm_fallbacks", "configs", "free_models_ids.txt"))) {
+      return dir;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) return undefined;
+    dir = parent;
+  }
+};
+
+/** Ordered OpenRouter-routable `:free` models from vendored bolabaden/llm_fallbacks. */
+const loadVendorOpenRouterFreeFallbacks = (maxModels = 8): readonly string[] => {
+  const root = resolveRepoRoot();
+  if (!root) return [...defaultFreeModelFallbacks];
+
+  const listPath = join(root, "vendor", "llm_fallbacks", "configs", "free_models_ids.txt");
+  let raw: string;
+  try {
+    raw = readFileSync(listPath, "utf8");
+  } catch {
+    return [...defaultFreeModelFallbacks];
+  }
+
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+  for (const line of raw.split("\n")) {
+    const id = line.trim();
+    if (!id || seen.has(id)) continue;
+    if (id === freeDefaultOpenRouterChatModel) continue;
+    const lower = id.toLowerCase();
+    if (NON_OPENROUTER_FREE_PREFIXES.some((prefix) => lower.startsWith(prefix))) continue;
+    const openRouterRoutable =
+      lower.startsWith("openrouter/") || lower.includes(":free") || lower === "openrouter/auto";
+    if (!openRouterRoutable) continue;
+    seen.add(id);
+    ordered.push(id);
+    if (ordered.length >= maxModels) break;
+  }
+
+  if (ordered.length === 0) return [...defaultFreeModelFallbacks];
+  if (!ordered.includes(paidOpenRouterChatModel)) {
+    ordered.push(paidOpenRouterChatModel);
+  }
+  return ordered;
+};
 /** Matches `general_settings.master_key` in `infra/trask-litellm/litellm_config.yaml`. */
 const proxyPlaceholderApiKey = "sk-local";
 
@@ -496,7 +567,7 @@ const resolveDefaultChatModelFallbacks = (
   if (explicit.length > 0) return explicit;
   if (profile !== "free") return [];
   if (proxyBaseUrl) return [];
-  if (openRouterKey) return [...defaultFreeModelFallbacks];
+  if (openRouterKey) return loadVendorOpenRouterFreeFallbacks();
   return [];
 };
 

@@ -7,6 +7,8 @@ cd "$ROOT"
 
 PORT="${LITELLM_PORT:-4000}"
 CONFIG="${TRASK_LITELLM_CONFIG:-$ROOT/infra/trask-litellm/litellm_config.yaml}"
+# Full OpenRouter :free catalog (bolabaden/llm_fallbacks):
+#   TRASK_LITELLM_CONFIG=$ROOT/vendor/llm_fallbacks/configs/litellm_config_free.yaml bash scripts/trask_litellm_proxy.sh
 
 for envfile in ".env" ".env.local"; do
   if [[ -f "$envfile" ]]; then

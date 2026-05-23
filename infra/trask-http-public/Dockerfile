@@ -5,7 +5,7 @@ FROM node:24-bookworm AS base
 WORKDIR /workspace
 ENV NODE_ENV=production
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends python3 python3-venv python3-pip \
+  && apt-get install -y --no-install-recommends python3 python3-venv python3-pip curl \
   && rm -rf /var/lib/apt/lists/*
 RUN corepack enable && corepack prepare pnpm@10.11.0 --activate
 
@@ -13,13 +13,20 @@ FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json tsconfig.workspace.json ./
 COPY packages ./packages
 COPY apps/trask-http-server ./apps/trask-http-server
+COPY apps/holocron-web ./apps/holocron-web
 COPY infra/trask-indexer ./infra/trask-indexer
 COPY scripts ./scripts
 COPY vendor/llm_fallbacks ./vendor/llm_fallbacks
 COPY data/ingest-worker ./data/ingest-worker
+COPY data/trask ./data/trask
 RUN pnpm install --frozen-lockfile
+RUN pnpm --filter @openkotor/retrieval build
 RUN pnpm --filter @openkotor/trask-http-server build
+RUN pnpm --filter @openkotor/holocron-web build
 RUN bash scripts/bootstrap_trask_research.sh
+RUN bash scripts/bootstrap_trask_indexer.sh
+RUN node scripts/export_trask_allowlist_catalog.mjs
+RUN TRASK_INDEX_SEED_REQUIRE_INDEXER=0 bash scripts/trask_index_seed_for_qa.sh
 
 FROM base AS runtime
 WORKDIR /workspace
@@ -36,5 +43,7 @@ ENV TRASK_RESEARCHWIZARD_TIMEOUT_MS=900000
 ENV INGEST_STATE_DIR=/workspace/data/ingest-worker
 ENV TRASK_HTTP_DATA_DIR=/workspace/data/trask-http-server
 COPY --from=deps /workspace /workspace
+COPY infra/trask-http-public/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 EXPOSE 7860
-CMD ["node", "apps/trask-http-server/dist/main.js"]
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

@@ -5,10 +5,11 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="${1:-$(mktemp -d)}"
 
-mkdir -p "$OUT/apps" "$OUT/infra" "$OUT/vendor" "$OUT/data" "$OUT/scripts"
+mkdir -p "$OUT/apps" "$OUT/infra/trask-http-public" "$OUT/vendor" "$OUT/data" "$OUT/scripts"
 
 cp "$ROOT/infra/trask-http-public/Dockerfile" "$OUT/Dockerfile"
 cp "$ROOT/infra/trask-http-public/README.md" "$OUT/README.md"
+cp "$ROOT/infra/trask-http-public/docker-entrypoint.sh" "$OUT/infra/trask-http-public/docker-entrypoint.sh"
 
 cp "$ROOT/package.json" "$ROOT/pnpm-lock.yaml" "$ROOT/pnpm-workspace.yaml" "$ROOT/tsconfig.base.json" "$ROOT/tsconfig.workspace.json" "$OUT/"
 
@@ -19,7 +20,17 @@ rsync -a --exclude node_modules --exclude dist --exclude .venv --exclude data/tr
 rsync -a --exclude .git --exclude node_modules --exclude dist --exclude tests \
   "$ROOT/vendor/llm_fallbacks/" "$OUT/vendor/llm_fallbacks/"
 rsync -a "$ROOT/data/ingest-worker/" "$OUT/data/ingest-worker/"
-cp "$ROOT/scripts/bootstrap_trask_research.sh" "$OUT/scripts/bootstrap_trask_research.sh"
-cp "$ROOT/scripts/trask_web_research.py" "$OUT/scripts/trask_web_research.py"
+rsync -a "$ROOT/data/trask/" "$OUT/data/trask/"
+
+for script in \
+  bootstrap_trask_research.sh \
+  bootstrap_trask_indexer.sh \
+  trask_index_seed_for_qa.sh \
+  smoke_trask_indexed_stack.py \
+  export_trask_allowlist_catalog.mjs \
+  trask_web_research.py
+do
+  cp "$ROOT/scripts/$script" "$OUT/scripts/$script"
+done
 
 echo "$OUT"

@@ -10,6 +10,13 @@ on:
       - "packages/**"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
+      - "infra/trask-http-public/**"
+      - "scripts/bootstrap_trask_indexer.sh"
+      - "scripts/trask_index_seed_for_qa.sh"
+      - "scripts/smoke_trask_indexed_stack.py"
+      - "scripts/export_trask_allowlist_catalog.mjs"
+      - "scripts/pack-trask-http-hf-context.sh"
+      - "data/trask/**"
       - ".github/workflows/docker-builds.yml"
   pull_request:
     branches:
@@ -20,6 +27,13 @@ on:
       - "packages/**"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
+      - "infra/trask-http-public/**"
+      - "scripts/bootstrap_trask_indexer.sh"
+      - "scripts/trask_index_seed_for_qa.sh"
+      - "scripts/smoke_trask_indexed_stack.py"
+      - "scripts/export_trask_allowlist_catalog.mjs"
+      - "scripts/pack-trask-http-hf-context.sh"
+      - "data/trask/**"
       - ".github/workflows/docker-builds.yml"
   workflow_dispatch:
 
@@ -107,6 +121,28 @@ jobs:
           docker image inspect "$image" >/dev/null
           docker run --rm "$image" ls -lh /app/dist
           echo "OK: Nakama module bundle verified"
+
+      - name: Build and smoke test Trask HTTP public (HF Space)
+        run: |
+          set -euo pipefail
+          image="trask-http-public:test"
+          container="trask-http-public-ci"
+          docker buildx build --load --progress=plain -f infra/trask-http-public/Dockerfile -t "$image" .
+          docker image inspect "$image" >/dev/null
+          docker run --rm -d --name "$container" -e PORT=7860 -p 7860:7860 "$image"
+          for i in $(seq 1 120); do
+            if curl -sf http://127.0.0.1:7860/ >/dev/null \
+              && docker exec "$container" curl -sf http://127.0.0.1:8790/health >/dev/null; then
+              echo "OK: trask-http-public HTTP + indexer healthy"
+              docker kill "$container" || true
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "ERROR: trask-http-public smoke test timed out"
+          docker logs "$container" || true
+          docker kill "$container" || true
+          exit 1
 
       - name: CI summary
         run: echo "All Docker build and smoke tests passed"

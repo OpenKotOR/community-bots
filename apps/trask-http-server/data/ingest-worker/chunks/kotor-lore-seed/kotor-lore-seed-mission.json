@@ -1,0 +1,17 @@
+{
+  "id": "kotor-lore-seed-mission",
+  "sourceId": "kotor-lore-seed",
+  "sourceName": "KOTOR Lore Compendium",
+  "kind": "website",
+  "url": "local://kotor-lore/mission-vao",
+  "title": "Mission Vao — Young Twi'lek Companion",
+  "chunkText": "Mission Vao is a young Twi'lek street kid companion found on Taris in KOTOR 1. Approximately 14-16 years old, she grew up on the streets with her Wookiee best friend Zaalbar. Mission is skilled as a scoundrel and thief, expert at slicing computer systems and picking locks. She and Zaalbar are a package deal — recruiting one recruits both. Her brother Griff abandoned her on Taris and appears as a minor side character across the game.",
+  "fetchedAt": 1778939758725,
+  "chunkIndex": 0,
+  "tags": [
+    "lore",
+    "characters",
+    "story",
+    "kotor"
+  ]
+}
