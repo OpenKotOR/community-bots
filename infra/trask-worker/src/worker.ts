@@ -37,7 +37,9 @@ function hasValidClientAuth(request: Request, apiKey: string): boolean {
 }
 
 function normalizeBackendBaseUrl(rawBaseUrl: string): string {
-  return rawBaseUrl.replace(/\/+$/, "");
+  let end = rawBaseUrl.length;
+  while (end > 0 && rawBaseUrl[end - 1] === "/") end -= 1;
+  return rawBaseUrl.slice(0, end);
 }
 
 function isTraskApiPath(pathname: string): boolean {
