@@ -103,7 +103,7 @@ async function submitQueryAndAwaitAnswer(page: Page, question: string) {
   await expect(assistantArticle).toBeVisible({ timeout: 30_000 })
   await expect(assistantArticle.getByText(/^Thinking$/i)).toHaveCount(0, { timeout: 200_000 })
 
-  const answerRegion = assistantArticle.getByLabel('Answer')
+  const answerRegion = assistantArticle.getByLabel('Answer', { exact: true })
   await expect(answerRegion).toBeVisible({ timeout: 30_000 })
   const bodyText = (await answerRegion.innerText()).trim()
   const rawText = (await assistantArticle.innerText()).trim()
