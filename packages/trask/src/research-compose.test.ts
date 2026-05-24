@@ -58,3 +58,14 @@ test("isRewriteComposeEnabled is true only in rewrite mode", () => {
   assert.equal(isRewriteComposeEnabled(baseConfig()), false);
   assert.equal(isRewriteComposeEnabled({ ...baseConfig(), composeMode: "rewrite" }), true);
 });
+
+test("isRewriteComposeEnabled accepts WebResearchRuntimeConfig compose fields", () => {
+  assert.equal(
+    isRewriteComposeEnabled({ composeMode: "grounded", groundedComposeEnabled: true }),
+    false,
+  );
+  assert.equal(
+    isRewriteComposeEnabled({ composeMode: "rewrite", groundedComposeEnabled: false }),
+    true,
+  );
+});

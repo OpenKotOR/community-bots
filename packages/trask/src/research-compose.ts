@@ -7,14 +7,19 @@ export type ResearchComposeStrategy =
   | "rewrite"
   | "fallback_discord";
 
-export const isGroundedComposeEnabled = (config: ResearchWizardRuntimeConfig): boolean => {
+type ComposePolicyConfig = Pick<
+  ResearchWizardRuntimeConfig,
+  "composeMode" | "groundedComposeEnabled"
+>;
+
+export const isGroundedComposeEnabled = (config: ComposePolicyConfig): boolean => {
   if (config.composeMode === "rewrite") {
     return false;
   }
   return config.groundedComposeEnabled;
 };
 
-export const isRewriteComposeEnabled = (config: ResearchWizardRuntimeConfig): boolean =>
+export const isRewriteComposeEnabled = (config: ComposePolicyConfig): boolean =>
   config.composeMode === "rewrite";
 
 export const isIndexMissPayload = (payload: {

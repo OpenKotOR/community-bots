@@ -94,7 +94,7 @@ Holocron and Discord users ask toolchain questions where a wrong absolute (“al
 - **R-10** **Question-last prompting:** the final user-role message (or final block before generation) must be the **verbatim user question**; evidence and instructions precede it.
 - **R-11** Composer may not introduce facts, paths, or install steps **not supported by an extracted quote** in the evidence pack.
 - **R-12** When evidence conflicts, surface a **Caveats** line — do not pick one source silently.
-- **R-13** Remove or gate `rewriteForDiscord(enrichedReport)` except when explicitly in degraded/source-only modes.
+- **R-13** Remove or gate `rewriteForDiscord(enrichedReport)` except when explicitly in degraded/source-only modes. **Partial (2026-05-24):** `ResearchWizardClient` and `WebResearchClient` gate rewrite behind `TRASK_RESEARCH_COMPOSE_MODE=rewrite`; default grounded uses source-only/degraded fallbacks. See `docs/solutions/tooling-decisions/trask-web-research-rewrite-compose-gate-2026-05-24.md`.
 
 ### Contracts unchanged
 
