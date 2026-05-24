@@ -165,7 +165,8 @@ See [`docs/trask-ops.md`](docs/trask-ops.md#hk-86-reaction-role-setup) for full 
 ### Verify
 
 ```bash
-pnpm trask:gate                 # recommended offline: build + full + CI optimize-measure (floor 165)
+pnpm trask:smoke-imports        # build + workspace package import smoke
+pnpm trask:gate                 # smoke-imports + full + CI optimize-measure (floor 165)
 pnpm holocron:e2e               # trask:gate, then Playwright: 5 live KOTOR research queries on :4010
 pnpm verify:trask-cli           # trask:gate, then 5 golden CLI queries (grounded-source gate)
 pnpm verify:trask-discord       # trask:gate, then live Discord expert embeds (token + stack)
