@@ -430,16 +430,7 @@ export const selectDistinctBriefClaims = (
     }
   };
 
-  tryPick(pool, anchored.length > 0);
-  if (picked.length < MIN_WEB_CITATIONS && maxLines >= MIN_WEB_CITATIONS) {
-    const tokens = queryTokens(query);
-    const tokenMatched = ranked.filter((claim) => {
-      if (tokens.length === 0) return true;
-      const haystack = `${claim.claim} ${claim.quote}`.toLowerCase();
-      return tokens.some((token) => haystackIncludesToken(haystack, token));
-    });
-    tryPick(tokenMatched.length > 0 ? tokenMatched : ranked, false);
-  }
+  tryPick(pool, true);
   return picked;
 };
 
@@ -683,9 +674,14 @@ export const claimsFromDistinctPassages = (
         const tokens = queryTokens(query);
         const tokenMatched = ranked.filter((passage) => {
           if (anchoredUrls.has(publicCitationUrlForPassage(passage))) return false;
-          if (extraAnchored.some((extra) => publicCitationUrlForPassage(extra) === publicCitationUrlForPassage(passage))) {
+          if (
+            extraAnchored.some(
+              (extra) => publicCitationUrlForPassage(extra) === publicCitationUrlForPassage(passage),
+            )
+          ) {
             return false;
           }
+          if (!passageMatchesQueryAnchor(passage, query)) return false;
           if (tokens.length === 0) return true;
           return tokens.some((token) => haystackIncludesToken(passage.text.toLowerCase(), token));
         });

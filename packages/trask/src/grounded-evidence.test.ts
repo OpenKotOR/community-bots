@@ -207,16 +207,16 @@ test("claimsFromDistinctPassages prefers query-anchored passages", () => {
 test("selectDistinctBriefClaims requires two distinct citation URLs", () => {
   const claims = [
     {
-      claim: "First",
-      quote: "First quote",
+      claim: "TSLPatcher applies 2DA patches for KotOR modding.",
+      quote: "TSLPatcher applies 2DA patches.",
       url: sources[0]!.homeUrl,
       citationUrl: sources[0]!.homeUrl,
       sourceIndex: 1,
       authority: "web" as const,
     },
     {
-      claim: "Second",
-      quote: "Second quote",
+      claim: "GFF and TLK are also patched by TSLPatcher.",
+      quote: "GFF and TLK are also patched.",
       url: sources[1]!.homeUrl,
       citationUrl: sources[1]!.homeUrl,
       sourceIndex: 2,
