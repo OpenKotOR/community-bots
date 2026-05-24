@@ -42,6 +42,7 @@ lastUpdated: 2026-05-19
 
 # Related
 
+- [trask-discord-ask-defer-sla-2026-05-24.md](../../solutions/tooling-decisions/trask-discord-ask-defer-sla-2026-05-24.md) — early defer SLA and operator checks.
 - [trask-http-ask-contract.md](trask-http-ask-contract.md) — Holocron REST parity differences.
 - [trask-embedded-holocron-web.md](trask-embedded-holocron-web.md) — Holocron served from the bot process.
 - [trask-proactive-mode-contract.md](trask-proactive-mode-contract.md) — debounce, classifier, and gates.

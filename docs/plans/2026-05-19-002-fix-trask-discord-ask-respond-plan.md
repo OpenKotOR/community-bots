@@ -1,8 +1,9 @@
 ---
 title: "fix: Restore Discord /ask within interaction SLA"
 type: fix
-status: active
+status: completed
 date: 2026-05-19
+closed: 2026-05-24
 origin: docs/plans/2026-05-19-001-feat-trask-crawl4ai-rag-plan.md
 ---
 
@@ -11,6 +12,13 @@ origin: docs/plans/2026-05-19-001-feat-trask-crawl4ai-rag-plan.md
 ## Summary
 
 Discord `/ask` is failing with “The application did not respond” because the interaction is not acknowledged within Discord’s ~3s window. This plan hardens the bot handler (defer before policy checks), adds unit coverage for defer/stale paths, documents always-on runtime requirements, and re-verifies the shared research stack with Holocron Playwright and `verify:trask-cli`.
+
+### Closure (2026-05-24)
+
+- **U1 landed:** `apps/trask-bot/src/discord-ask-interaction.ts` + tests; early `ensureAskDeferred` in `interactionCreate` before guild/channel gates; policy denials via `safeEditReply`.
+- **U2 landed:** `scripts/trask_discord_channel_verify.mjs`; `docs/trask-ops.md` always-on note; slash contract updated.
+- **U3:** Holocron/CLI gates documented in AGENTS.md; live Discord gate via `pnpm verify:trask-discord` (manual when token present).
+- **Compound:** `docs/solutions/tooling-decisions/trask-discord-ask-defer-sla-2026-05-24.md`
 
 ---
 
