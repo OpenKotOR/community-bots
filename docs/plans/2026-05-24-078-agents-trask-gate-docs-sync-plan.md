@@ -1,7 +1,7 @@
 ---
 title: "docs: sync AGENTS and trask.md with trask:gate ladder"
 type: docs
-status: active
+status: completed
 date: 2026-05-24
 origin: docs/plans/2026-05-24-077-wire-trask-gate-live-verify-plan.md
 ---
