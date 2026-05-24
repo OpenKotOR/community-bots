@@ -18,7 +18,7 @@ Deferred from PR #33 correctness review: `embedInlineCitationLinks` uses `CITATI
 - R1. Export bare citation capture regex from `citation-markers.ts` (only match `[n]` not already followed by `(`).
 - R2. `embedInlineCitationLinks` uses bare regex; `normalizeBodyCitationIndices` keeps full capture (remaps all markers in body).
 - R3. Unit test: pre-linked `[1](url)` plus bare `[2]` → one link for 1, new link for 2, no double-wrap.
-- R4. `pnpm trask:optimize-measure` composite_score **155**, all gates pass.
+- R4. `pnpm trask:optimize-measure` composite_score **165** (13 discord stress tests), all gates pass.
 - R5. Ship via PR.
 
 ## Scope Boundaries

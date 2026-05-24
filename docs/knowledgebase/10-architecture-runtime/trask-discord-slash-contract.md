@@ -15,7 +15,7 @@ lastUpdated: 2026-05-24
 - [REPO] Interaction flow: `ensureAskDeferred` in `apps/trask-bot/src/discord-ask-interaction.ts` runs **immediately** when `/ask` is received (before guild/channel policy checks); public `deferReply` first, ephemeral fallback on defer failure; policy denials use `editReply` after defer; stale interactions (Discord `10062`) are skipped with a log.
 - [REPO] **Thread id behavior:** if `thread` is missing or **not** a valid UUID (`isTraskThreadId`), the bot generates a **new random UUID** for `threadId` (unlike Holocron HTTP, which returns **422** for bad UUIDs — see [trask-http-ask-contract.md](trask-http-ask-contract.md)).
 - [REPO] Research timeout for Discord is **`min(TRASK_RESEARCHWIZARD_TIMEOUT_MS, 90_000)`** ms (`DISCORD_ASK_RESPONSE_SLA_MS`); exceeding SLA records a failed query and edits reply with a timeout message.
-- [REPO] Successful answers use `buildResearchEmbed` with `formatDiscordAskDisplay` (`packages/trask/src/discord-reply-format.ts`): **≤5** non-empty lines in the embed description, inline `[n](https://…)` citations only — **no** separate Sources embed fields. Research uses `answerQuestionBrief` (shorter compose than Holocron HTTP). Description is truncated to **4000** chars for Discord limits.
+- [REPO] Successful answers use `buildResearchEmbed` with `formatDiscordAskDisplay` (`packages/trask/src/discord-reply-format.ts`, citation markers in `packages/trask/src/citation-markers.ts`): **≤5** non-empty lines in the embed description, inline `[n](https://…)` citations only — **no** separate Sources embed fields. `embedInlineCitationLinks` uses `BARE_CITATION_INDEX_CAPTURE_RE` so pre-linked `[n](url)` is not double-wrapped. Research uses `answerQuestionBrief` (shorter compose than Holocron HTTP). Description is truncated to **4000** chars for Discord limits.
 - [REPO] Each `/ask` appends a row to `JsonTraskQueryRepository` (`TRASK_QUERY_DATA_DIR` / `trask-queries.json`) with `queryId`, `threadId`, `userId`, status, answer/sources/error.
 - [REPO] When `TRASK_HOLOCRON_PUBLIC_URL` is set, embeds add a **Holocron** field linking `?thread=<threadId>` (success and error paths).
 
@@ -43,7 +43,7 @@ lastUpdated: 2026-05-24
 # Related
 
 - [trask-discord-ask-defer-sla-2026-05-24.md](../../solutions/tooling-decisions/trask-discord-ask-defer-sla-2026-05-24.md) — early defer SLA and operator checks.
-- [trask-discord-dual-citation-line-filter-2026-05-24.md](../../solutions/tooling-decisions/trask-discord-dual-citation-line-filter-2026-05-24.md) — preserve ≥2 inline citations after query-line filtering (PR #15; optimize/maintainability PR #24–#26; `pnpm trask:optimize-measure`).
+- [trask-discord-dual-citation-line-filter-2026-05-24.md](../../solutions/tooling-decisions/trask-discord-dual-citation-line-filter-2026-05-24.md) — preserve ≥2 inline citations after query-line filtering (PR #15; PR #24–#26 maintainability; PR #33–#35 citation policy; `pnpm trask:optimize-measure` floor **composite_score 165**).
 - [trask-http-ask-contract.md](trask-http-ask-contract.md) — Holocron REST parity differences.
 - [trask-embedded-holocron-web.md](trask-embedded-holocron-web.md) — Holocron served from the bot process.
 - [trask-proactive-mode-contract.md](trask-proactive-mode-contract.md) — debounce, classifier, and gates.

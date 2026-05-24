@@ -2,6 +2,7 @@
 title: "Trask Discord dual-citation line filter preservation"
 date: 2026-05-24
 last_refreshed: 2026-05-24
+last_gate: "composite_score 165 (13 discord stress tests, post PR #35)"
 category: tooling-decisions
 problem_type: quality
 component: trask
@@ -33,9 +34,11 @@ PR #15 fixed this by backfilling from the cited pool after filtering.
 2. **`filterDiscordLinesForQuery`** — When ≥2 cited lines exist, run scoring on cited lines only, then call `ensureMinimumDistinctCitedLines` so anti-dump filtering does not collapse citation count.
 3. **Upstream compose** — `selectDistinctBriefClaims` in `grounded-evidence.ts` prefers query-anchored claims before lines reach the formatter (reduces off-topic padding).
 
-Implementation: `packages/trask/src/discord-reply-format.ts` (`ensureMinimumDistinctCitedLines`, `sliceLinesPreservingDistinctCitations`, exported `citationIndicesInLines` / `citationIndicesInText` for tests). Citation marker regex and `parseCitationIndex` live in `packages/trask/src/citation-markers.ts` (shared with `grounded-evidence.ts`). Tests: `packages/trask/src/discord-reply-format.test.ts` import production helpers — no duplicate citation regex literals.
+Implementation: `packages/trask/src/discord-reply-format.ts` (`ensureMinimumDistinctCitedLines`, `sliceLinesPreservingDistinctCitations`, exported `citationIndicesInLines` / `citationIndicesInText` for tests). Shared citation markers: `packages/trask/src/citation-markers.ts` exports `CITATION_MARKER_RE`, `CITATION_INDEX_CAPTURE_RE`, `BARE_CITATION_INDEX_CAPTURE_RE`, and `parseCitationIndex` (shared with `grounded-evidence.ts`). `normalizeBodyCitationIndices` uses full capture; `embedInlineCitationLinks` uses **bare** capture (`(?!\()`) so existing `[n](url)` is not double-wrapped. Tests: `packages/trask/src/discord-reply-format.test.ts` import production helpers — no duplicate citation regex literals.
 
 ## Verification
+
+`pnpm trask:optimize-measure` (`scripts/trask_optimize_measure.mjs`) emits **composite_score** = (`citation_stress_pass_count` × 10) + (`faithfulness_pass_count` × 5) + (`check_pass` × 10), where **citation_stress_pass_count** is the pass count from `packages/trask/dist/discord-reply-format.test.js` only. **Current floor on main (post PR #35): composite_score 165** = 13 discord tests × 10 + faithfulness 5 × 5 + `pnpm check` 10. Older figures in plan history (115/8, 125, 135, 155) are point-in-time only.
 
 ```bash
 pnpm build
@@ -56,7 +59,10 @@ Pass criteria (expert queries): ≥2 distinct inline `https://` links, ≤5 non-
 
 ## History
 
-- 2026-05-24 — PR #26 (`4935482`) exported `citationIndicesInLines` / `citationIndicesInText`; tests use production `CITATION_INDEX_CAPTURE_RE` (no duplicate helpers).
+- 2026-05-24 — PR #35 (`c62365b`) `BARE_CITATION_INDEX_CAPTURE_RE` in `embedInlineCitationLinks`; **composite_score 165**, 13 discord stress tests.
+- 2026-05-24 — PR #34 (`2ca7ece`) shared `citation-markers.ts`; deduplicated `\d{1,3}` regex and `parseCitationIndex`; **composite_score 155** unchanged (12 tests).
+- 2026-05-24 — PR #33 (`99455eb`) aligned Discord citation regex to `\d{1,3}`, `[10]` stress tests, `[0]` guard; **composite_score 155**, 12 discord stress tests.
+- 2026-05-24 — PR #26 (`4935482`) exported `citationIndicesInLines` / `citationIndicesInText`; tests use production citation helpers from `discord-reply-format.ts` (later centralized in `citation-markers.ts`).
 - 2026-05-24 — PR #25 (`5455582`) maintainability: `CITATION_MARKER_IN_LINE_RE` vs `CITATION_INDEX_CAPTURE_RE` split; `sliceLinesPreservingDistinctCitations` uses `citationIndicesInLines` for distinctness.
 - 2026-05-24 — PR #24 (`85a66fd`) added `swapWeakOffTopicCitedLines`, `sliceLinesPreservingDistinctCitations`, clamp backfill when line caps drop a second citation, and `scripts/trask_optimize_measure.mjs` (+ `pnpm trask:optimize-measure`) for ce-optimize gates (`composite_score` 115, 8 discord stress tests).
 - 2026-05-24 — Documented after PR #15 merge (`ensureMinimumDistinctCitedLines` + claim selection hardening).

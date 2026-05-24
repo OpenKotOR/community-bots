@@ -19,7 +19,7 @@ PR [#33](https://github.com/OpenKotOR/community-bots/pull/33) aligns Discord cit
 - R1. Review `packages/trask/src/discord-reply-format.ts` and tests for citation index handling (`[1]`–`[999]`, normalization, embed, filter, clamp paths).
 - R2. Confirm no remaining `\d{1,2}` citation paths in Discord format pipeline that would diverge from `grounded-evidence.ts`.
 - R3. Fix correctness issues found by review (not style-only).
-- R4. Gates: `pnpm trask:optimize-measure` composite_score **135**, faithfulness 5/5, all unit suites green.
+- R4. Gates: `pnpm trask:optimize-measure` composite_score **155** (12 discord stress tests), faithfulness 5/5, all unit suites green.
 - R5. Update plan `status: completed` and ship PR #33 (merge or squash per repo norm).
 
 ## Scope Boundaries
