@@ -47,7 +47,8 @@ Root `package.json` lists workspace packages as **devDependencies** so Node reso
 ## Verification
 
 ```bash
-pnpm trask:gate
+pnpm trask:smoke-imports   # resolves @openkotor/trask, trask-config, config, retrieval
+pnpm trask:gate            # smoke-imports + optimize-measure (full + :ci)
 pnpm trask:config-drift
 ```
 

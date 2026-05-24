@@ -1,5 +1,5 @@
 ---
-title: "Trask citation module architecture (PR #33–#58)"
+title: "Trask citation module architecture (PR #33–#60)"
 date: 2026-05-24
 category: tooling-decisions
 problem_type: architecture
@@ -36,7 +36,7 @@ discord-reply-format.ts      ← line filters, embedInlineCitationLinks (imports
 
 | Gate | Command | Proves |
 |------|---------|--------|
-| Recommended preflight | `pnpm trask:gate` | `pnpm build` + full `optimize-measure` + `:ci`; both runs **composite_score 165** |
+| Recommended preflight | `pnpm trask:gate` | `trask:smoke-imports` + full `optimize-measure` + `:ci`; both runs **composite_score 165** |
 | Local offline (full) | `pnpm trask:optimize-measure` | Faithfulness 5/5 + 13 discord stress tests + all citation unit suites + `pnpm check`; **composite_score 165** |
 | CI offline (narrow) | `pnpm trask:optimize-measure:ci` (`TRASK_OPTIMIZE_CI_MODE=1`; same as `.github/workflows/ci.yml`) | Faithfulness + discord stress + **composite_score ≥ 165** without re-running full Trask unit matrix (unit step runs all packages separately) |
 | Live Discord | `pnpm verify:trask-discord` | Preflight `trask:gate`, then LLM + indexer embed contract |
@@ -55,6 +55,7 @@ Formula: `composite_score` = (`citation_stress_pass_count` × 10) + (`faithfulne
 | #39 | `research-answer-split.test.ts` |
 | #40 | `query-anchor.ts` — display decoupled from grounded-evidence |
 | #41 | Split/anchor/markers tests in optimize-measure |
+| #60 | `pnpm trask:smoke-imports` wired into `trask:gate` |
 | #59 | Export `query-anchor` from `@openkotor/trask` index |
 | #58 | Config drift + allowlist export use `@openkotor/retrieval`; root import compound doc |
 | #57 | Root verify scripts import `@openkotor/config`; holocron browser verify uses package entries |
@@ -74,7 +75,7 @@ Formula: `composite_score` = (`citation_stress_pass_count` × 10) + (`faithfulne
 
 ## Related
 
-- [trask-citation-stack-closeout-2026-05-24.md](trask-citation-stack-closeout-2026-05-24.md) — PR #33–#58 arc summary and `pnpm trask:gate`
+- [trask-citation-stack-closeout-2026-05-24.md](trask-citation-stack-closeout-2026-05-24.md) — PR #33–#60 arc summary and `pnpm trask:gate`
 - [trask-root-script-package-imports-2026-05-24.md](trask-root-script-package-imports-2026-05-24.md) — root `scripts/` workspace package imports
 - `packages/trask/src/` — implementation
 - `scripts/trask_optimize_measure.mjs` — measurement harness

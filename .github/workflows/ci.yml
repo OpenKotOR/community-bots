@@ -37,6 +37,11 @@ jobs:
       - name: TypeScript build
         run: pnpm build
 
+      - name: Trask package import smoke
+        run: node scripts/trask_smoke_package_imports.mjs
+        env:
+          TRASK_SKIP_BUILD: "1"
+
       - name: Trask config drift gate
         run: pnpm trask:config-drift
         env:

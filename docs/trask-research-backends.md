@@ -55,14 +55,15 @@ TRASK_LITELLM_CONFIG=vendor/llm_fallbacks/configs/litellm_config_free.yaml bash 
 ### Verification ladder
 
 ```bash
-pnpm trask:gate                       # recommended offline: build + full + CI optimize-measure (floor 165)
+pnpm trask:smoke-imports              # build + workspace package import smoke
+pnpm trask:gate                       # smoke-imports + full + CI optimize-measure (floor 165)
 pnpm trask:faithfulness-eval          # faithfulness fixtures only (subset of optimize-measure)
 pnpm verify:trask-cli                 # trask:gate preflight, then CLI golden queries
 pnpm holocron:e2e                     # trask:gate preflight, then Playwright (expert queries, :4010)
 pnpm verify:trask-discord             # trask:gate preflight, then live Discord expert queries
 ```
 
-CI runs `pnpm build`, `pnpm trask:optimize-measure:ci`, then `pnpm holocron:e2e:playwright` with `TRASK_SKIP_BUILD=1` (local `pnpm holocron:e2e` runs full `trask:gate` first).
+CI runs `pnpm build`, package import smoke, `pnpm trask:optimize-measure:ci`, then `pnpm holocron:e2e:playwright` with `TRASK_SKIP_BUILD=1` (local `pnpm holocron:e2e` runs full `trask:gate` first).
 
 ## Explicitly rejected (do not implement)
 

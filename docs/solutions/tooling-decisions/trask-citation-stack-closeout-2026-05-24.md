@@ -1,5 +1,5 @@
 ---
-title: "Trask citation stack closeout (PR #33–#59)"
+title: "Trask citation stack closeout (PR #33–#60)"
 date: 2026-05-24
 category: tooling-decisions
 problem_type: quality
@@ -31,6 +31,7 @@ Discord `/ask` brief embeds could collapse to a single inline citation after agg
 | Runbook sync | #51–#53 | AGENTS, trask.md, README, CONTRIBUTING, KB ladder |
 | Package exports | #54–#55 | `@openkotor/trask` index + verify scripts; `#55` live gates use package entry |
 | Config imports | #56–#58 | `@openkotor/trask-config`, `@openkotor/config`, `@openkotor/retrieval` for root scripts |
+| Import smoke in gate | #60 | `pnpm trask:smoke-imports` wired into `trask:gate`; CI runs smoke after build |
 
 Authoritative module map: [trask-citation-module-architecture-2026-05-24.md](trask-citation-module-architecture-2026-05-24.md). Line-filter incident: [trask-discord-dual-citation-line-filter-2026-05-24.md](trask-discord-dual-citation-line-filter-2026-05-24.md).
 
@@ -47,7 +48,7 @@ Offline floor: **composite_score 165** = 13 discord stress × 10 + faithfulness 
 
 ## One-command preflight
 
-`pnpm trask:gate` runs `pnpm build`, then `pnpm trask:optimize-measure`, then `pnpm trask:optimize-measure:ci`. Use before opening a PR that touches citation modules.
+`pnpm trask:gate` runs `pnpm trask:smoke-imports` (build + workspace package import smoke), then `pnpm trask:optimize-measure`, then `pnpm trask:optimize-measure:ci`. Use before opening a PR that touches citation modules.
 
 ## Related
 
