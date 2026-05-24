@@ -1,8 +1,9 @@
 ---
 title: "ship: merge PR #17 Discord citation compound doc"
 type: ship
-status: active
+status: completed
 date: 2026-05-24
+merged: 21c24c6
 origin: docs/plans/2026-05-24-020-docs-pr15-discord-citation-compound-plan.md
 pr: https://github.com/OpenKotOR/community-bots/pull/17
 ---
