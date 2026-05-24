@@ -1,7 +1,7 @@
 ---
 title: "docs: citation module stack compound + validation ladder sync"
 type: docs
-status: active
+status: completed
 date: 2026-05-24
 origin: docs/plans/2026-05-24-069-ci-trask-optimize-composite-floor-plan.md
 ---
