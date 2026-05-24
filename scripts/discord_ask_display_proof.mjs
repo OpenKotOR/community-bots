@@ -12,7 +12,7 @@ import {
   createResearchWizardClient,
   formatDiscordAskDisplay,
   DISCORD_ASK_MAX_BODY_LINES,
-} from "../packages/trask/dist/index.js";
+} from "@openkotor/trask";
 import { goldenQueriesForSurface } from "../packages/trask-config/dist/golden-queries.js";
 import { loadEnvFiles, repoRoot } from "./lib/trask-env.mjs";
 
