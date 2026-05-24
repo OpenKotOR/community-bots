@@ -1,7 +1,7 @@
 ---
 title: "refactor: root verify scripts import @openkotor/config"
 type: refactor
-status: active
+status: completed
 date: 2026-05-24
 origin: docs/plans/2026-05-24-083-root-scripts-trask-config-import-plan.md
 ---

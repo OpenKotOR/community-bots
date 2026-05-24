@@ -1,5 +1,5 @@
 ---
-title: "Trask citation module architecture (PR #33–#56)"
+title: "Trask citation module architecture (PR #33–#57)"
 date: 2026-05-24
 category: tooling-decisions
 problem_type: architecture
