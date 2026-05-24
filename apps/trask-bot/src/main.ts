@@ -45,6 +45,7 @@ import { startEmbeddedTraskWebUi } from "./web-server.js";
 
 const logger = createLogger("trask-bot");
 const config = loadTraskBotConfig();
+/** Legacy FileChunkStore queue for `/queue-reindex` only — answers use Chroma via `TRASK_INDEXER_BASE_URL`. */
 const searchProvider = createChunkSearchProvider(config.chunkDir);
 const DISCORD_ASK_RESPONSE_SLA_MS = 90_000;
 const DISCORD_ASK_SYNTHESIS_FAILURE_MESSAGE = "I could not complete live archive synthesis for this question right now.";

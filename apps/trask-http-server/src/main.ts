@@ -61,6 +61,7 @@ const config = loadTraskHttpServerConfig();
 const resolveFromRoot = (p: string) => (path.isAbsolute(p) ? p : path.resolve(repoRoot, p));
 
 const queryRepository = new JsonTraskQueryRepository(resolveDataFile(resolveFromRoot(config.dataDir), "trask-queries.json"));
+/** Legacy FileChunkStore queue surface only; Holocron compose uses Chroma retrieve (`TRASK_INDEXER_BASE_URL`). */
 const searchProvider = createChunkSearchProvider(resolveFromRoot(config.chunkDir));
 const webResearch = createResearchWizardClient(config.researchWizard, config.ai);
 

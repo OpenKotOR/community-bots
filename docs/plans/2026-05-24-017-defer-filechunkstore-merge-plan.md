@@ -27,6 +27,12 @@ Dual stores exist: `INGEST_STATE_DIR/chunks` (`FileChunkStore`) vs Chroma (`tras
 - Remove or gate `searchLocalKnowledge` in `ResearchWizardClient`
 - Operator migration for existing chunk manifests
 
+## Phase 0 (2026-05-24 — landed)
+
+- Removed dead `searchLocalKnowledge` / `localSearchProvider` from `ResearchWizardClient` (indexed path never wired it).
+- Documented that `createChunkSearchProvider` on Trask bot/http hosts is **`/queue-reindex` only**; answers use Chroma via `TRASK_INDEXER_BASE_URL`.
+- See `docs/plans/2026-05-24-020-refactor-filechunkstore-phase0-plan.md`.
+
 ---
 
 ## References
