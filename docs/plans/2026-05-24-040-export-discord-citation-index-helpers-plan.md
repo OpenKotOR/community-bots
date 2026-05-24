@@ -3,6 +3,8 @@ title: "refactor: export Discord citation index helpers for tests"
 type: refactor
 status: completed
 date: 2026-05-24
+merged: 4935482
+pr: https://github.com/OpenKotOR/community-bots/pull/26
 origin: docs/plans/2026-05-24-034-maintainability-closeout-pr24-plan.md
 ---
 
