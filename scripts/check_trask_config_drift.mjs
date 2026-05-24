@@ -79,7 +79,7 @@ const isAllowedGoldenLiteral = (relPath) => {
 const main = async () => {
   ensureWorkspaceBuilt(repoRoot, CONFIG_DRIFT_BUILD_MARKERS);
 
-  const { defaultSourceCatalog } = await import("../packages/retrieval/dist/index.js");
+  const { defaultSourceCatalog } = await import("@openkotor/retrieval");
   const { goldenFixtures, loadGoldenQueries } = await import("@openkotor/trask-config");
 
   const catalogIds = new Set(defaultSourceCatalog.map((source) => source.id));

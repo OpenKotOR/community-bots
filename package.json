@@ -47,6 +47,7 @@
   },
   "devDependencies": {
     "@openkotor/config": "workspace:*",
+    "@openkotor/retrieval": "workspace:*",
     "@openkotor/trask": "workspace:*",
     "@openkotor/trask-config": "workspace:*",
     "@playwright/test": "^1.58.0",

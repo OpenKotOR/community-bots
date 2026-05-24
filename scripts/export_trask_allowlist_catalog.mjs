@@ -10,7 +10,7 @@ import {
   traskApprovedResearchBaseHosts,
   traskApprovedResearchSources,
   traskApprovedResearchUrlPrefixes,
-} from "../packages/retrieval/dist/index.js";
+} from "@openkotor/retrieval";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const outDir = join(repoRoot, "data", "trask-indexer");

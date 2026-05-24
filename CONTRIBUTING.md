@@ -37,7 +37,7 @@ Both measure runs in `pnpm trask:gate` must reach **composite_score 165** (13 di
 
 `pnpm verify:trask-cli`, `pnpm verify:trask-discord`, and `pnpm holocron:e2e` preflight with **`pnpm trask:gate`** before live or browser steps.
 
-Architecture and module map: [`docs/solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md`](docs/solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md). Pull requests use the checklist in [`.github/pull_request_template.md`](.github/pull_request_template.md). Live Discord/Holocron validation: [`AGENTS.md`](AGENTS.md) (not replaced by offline gates alone).
+Architecture and module map: [`docs/solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md`](docs/solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md). Root verification scripts resolve workspace packages via root `devDependencies` (`@openkotor/trask`, `@openkotor/trask-config`, `@openkotor/config`, `@openkotor/retrieval`) — see [`trask-root-script-package-imports-2026-05-24.md`](docs/solutions/tooling-decisions/trask-root-script-package-imports-2026-05-24.md). Pull requests use the checklist in [`.github/pull_request_template.md`](.github/pull_request_template.md). Live Discord/Holocron validation: [`AGENTS.md`](AGENTS.md) (not replaced by offline gates alone).
 
 ## Lint
 
