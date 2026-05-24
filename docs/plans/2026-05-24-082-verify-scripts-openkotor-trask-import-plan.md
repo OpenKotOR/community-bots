@@ -1,7 +1,7 @@
 ---
 title: "refactor: verify scripts import @openkotor/trask"
 type: refactor
-status: active
+status: completed
 date: 2026-05-24
 origin: docs/plans/2026-05-24-081-export-research-answer-split-plan.md
 ---
