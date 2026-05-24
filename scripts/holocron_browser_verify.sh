@@ -10,7 +10,7 @@ if ! curl -sf http://127.0.0.1:4010/ >/dev/null; then
 fi
 
 mapfile -t QUERIES < <(node -e "
-import { verificationQueriesForSurface } from './packages/trask-config/dist/verification-queries.js';
+import { verificationQueriesForSurface } from '@openkotor/trask-config';
 for (const q of verificationQueriesForSurface('browser')) console.log(q.question);
 ")
 
@@ -65,7 +65,7 @@ for question in "${QUERIES[@]}"; do
     https_count="$(echo "$body" | grep -oE 'https://[^ )"<>]+' | sort -u | wc -l)"
     if [[ "$https_count" -ge 2 ]] && [[ ${#body} -gt 80 ]]; then
       if node -e "
-        import { verificationQueriesForSurface } from './packages/trask-config/dist/verification-queries.js';
+        import { verificationQueriesForSurface } from '@openkotor/trask-config';
         import { isHttpsCitationReachable } from './scripts/lib/url-verify.mjs';
         const q = process.argv[1];
         const body = process.argv[2];

@@ -16,7 +16,7 @@
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { loadResearchWizardRuntimeConfig, loadSharedAiConfig } from "../packages/config/dist/index.js";
+import { loadResearchWizardRuntimeConfig, loadSharedAiConfig } from "@openkotor/config";
 import {
   createResearchWizardClient,
   formatDiscordAskDisplay,

@@ -22,7 +22,7 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { loadResearchWizardRuntimeConfig, loadSharedAiConfig } from "../packages/config/dist/index.js";
+import { loadResearchWizardRuntimeConfig, loadSharedAiConfig } from "@openkotor/config";
 import {
   createResearchWizardClient,
   formatDiscordAskDisplay,
