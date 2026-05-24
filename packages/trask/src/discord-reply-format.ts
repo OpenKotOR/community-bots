@@ -48,6 +48,11 @@ const findSourcesSectionIndex = (value: string): number | null => {
 
 const discordPolicy = loadTraskPolicy().discord;
 
+const CITATION_MARKER_IN_LINE_RE = /\[\d{1,2}\]/;
+const CITATION_INDEX_CAPTURE_RE = /\[(\d{1,2})\]/g;
+
+const lineHasCitationMarker = (line: string): boolean => CITATION_MARKER_IN_LINE_RE.test(line);
+
 export const DISCORD_ASK_MAX_BODY_LINES = discordPolicy.maxBodyLines;
 export const DISCORD_ASK_MAX_LINE_CHARS = discordPolicy.maxLineChars;
 export const DISCORD_ASK_DESCRIPTION_MAX_LENGTH = discordPolicy.descriptionMaxLength;
@@ -235,7 +240,7 @@ const scoreAndFilterLines = (pool: readonly string[], query: string): string[] =
 const citationIndicesInLines = (lines: readonly string[]): Set<number> => {
   const indices = new Set<number>();
   for (const line of lines) {
-    for (const match of line.matchAll(/\[(\d{1,2})\]/g)) {
+    for (const match of line.matchAll(CITATION_INDEX_CAPTURE_RE)) {
       indices.add(Number(match[1]));
     }
   }
@@ -281,21 +286,17 @@ const sliceLinesPreservingDistinctCitations = (
     return [...lines];
   }
   const out: string[] = [];
-  const indices = new Set<number>();
   for (const line of lines) {
-    if (!/\[\d{1,2}\]/.test(line)) {
+    if (!lineHasCitationMarker(line)) {
       continue;
     }
-    const lineIndices = citationIndicesInLines([line]);
-    const addsDistinct = [...lineIndices].some((index) => !indices.has(index));
-    if (!addsDistinct) {
+    const beforeSize = citationIndicesInLines(out).size;
+    const afterSize = citationIndicesInLines([...out, line]).size;
+    if (afterSize <= beforeSize) {
       continue;
     }
     out.push(line);
-    for (const index of lineIndices) {
-      indices.add(index);
-    }
-    if (indices.size >= minDistinct && out.length >= maxLines) {
+    if (afterSize >= minDistinct && out.length >= maxLines) {
       return out.slice(0, maxLines);
     }
   }
@@ -349,7 +350,7 @@ export const filterDiscordLinesForQuery = (lines: readonly string[], query: stri
   if (lines.length <= 1 || !query.trim()) {
     return [...lines];
   }
-  const cited = lines.filter((line) => /\[\d{1,2}\]/.test(line));
+  const cited = lines.filter((line) => lineHasCitationMarker(line));
   if (cited.length >= BRIEF_DISCORD_MIN_CITATIONS) {
     const onTopic = scoreAndFilterLines(cited, query);
     if (onTopic.length > 0) {
@@ -379,8 +380,8 @@ export const clampDiscordBodyLines = (body: string, maxLines: number, query?: st
   }
 
   if (lines.length > maxLines) {
-    const cited = lines.filter((line) => /\[\d{1,2}\]/.test(line));
-    const uncited = lines.filter((line) => !/\[\d{1,2}\]/.test(line));
+    const cited = lines.filter((line) => lineHasCitationMarker(line));
+    const uncited = lines.filter((line) => !lineHasCitationMarker(line));
     if (query?.trim() && cited.length >= BRIEF_DISCORD_MIN_CITATIONS) {
       lines = ensureMinimumDistinctCitedLines([], cited, query, BRIEF_DISCORD_MIN_CITATIONS);
     } else if (cited.length > 0) {
