@@ -8,10 +8,16 @@ from pathlib import Path
 import pytest
 
 from trask_indexer.worker import (
+    DEFAULT_QUEUE_POLL_MS,
+    DrainQueueResult,
+    MAX_QUEUE_POLL_MS,
+    MIN_QUEUE_POLL_MS,
     drain_reindex_queue,
     empty_queue_state,
     load_queue_state,
+    parse_queue_poll_ms,
     queue_lock,
+    run_queue_worker,
     save_queue_state,
 )
 
@@ -132,3 +138,30 @@ def test_queue_lock_timeout_on_fresh_lock(tmp_path: Path, monkeypatch):
     with pytest.raises(TimeoutError):
         with queue_lock():
             pass
+
+
+def test_parse_queue_poll_ms_defaults_and_clamps():
+    assert parse_queue_poll_ms(None) == DEFAULT_QUEUE_POLL_MS
+    assert parse_queue_poll_ms("500") == MIN_QUEUE_POLL_MS
+    assert parse_queue_poll_ms("999999") == MAX_QUEUE_POLL_MS
+    assert parse_queue_poll_ms("30000") == 30_000
+    assert parse_queue_poll_ms("not-a-number") == DEFAULT_QUEUE_POLL_MS
+
+
+def test_run_queue_worker_runs_one_cycle_before_interrupt(monkeypatch):
+    calls: list[bool] = []
+
+    def fake_drain(**kwargs):
+        calls.append(True)
+        return DrainQueueResult(dequeued_source_ids=[], crawl=None)
+
+    def fake_sleep(_seconds: float) -> None:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr("trask_indexer.worker.drain_reindex_queue", fake_drain)
+    monkeypatch.setattr("trask_indexer.worker.time.sleep", fake_sleep)
+
+    with pytest.raises(KeyboardInterrupt):
+        run_queue_worker(poll_ms=2000)
+
+    assert calls == [True]

@@ -18,10 +18,11 @@ python scripts/smoke_trask_indexed_stack.py
 python -m trask_indexer.cli list-seeds
 python -m trask_indexer.cli crawl-seeds [--source-id ID] [--limit N] [--dry-run]
 python -m trask_indexer.cli drain-queue [--dry-run]
+python -m trask_indexer.cli run-queue-worker [pollMs]
 python -m trask_indexer.cli serve --port 8790
 ```
 
-Shell wrappers: `scripts/trask_crawl_catalog.sh`, `scripts/trask_indexer_drain_queue.sh`, `scripts/trask_index_golden_corpus.sh`.
+Shell wrappers: `scripts/trask_crawl_catalog.sh`, `scripts/trask_indexer_drain_queue.sh`, `scripts/trask_indexer_run_queue_worker.sh`, `scripts/trask_index_golden_corpus.sh`.
 
 ## Environment
 

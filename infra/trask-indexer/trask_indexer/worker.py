@@ -18,6 +18,9 @@ LOG = logging.getLogger("trask.worker")
 LOCK_TIMEOUT_MS = 5_000
 LOCK_RETRY_MS = 0.05
 LOCK_STALE_MS = 5 * 60
+DEFAULT_QUEUE_POLL_MS = 15_000
+MIN_QUEUE_POLL_MS = 1_000
+MAX_QUEUE_POLL_MS = 5 * 60_000
 
 @dataclass(frozen=True)
 class ReindexQueueState:
@@ -153,3 +156,48 @@ def drain_reindex_queue(
         data_dir=data_dir,
     )
     return DrainQueueResult(dequeued_source_ids=queued, crawl=crawl)
+
+
+def parse_queue_poll_ms(raw_value: str | None) -> int:
+    if not raw_value:
+        return DEFAULT_QUEUE_POLL_MS
+    try:
+        parsed = int(raw_value, 10)
+    except ValueError:
+        return DEFAULT_QUEUE_POLL_MS
+    return max(MIN_QUEUE_POLL_MS, min(MAX_QUEUE_POLL_MS, parsed))
+
+
+def run_queue_worker(
+    *,
+    poll_ms: int | None = None,
+    state_dir: Path | None = None,
+    data_dir: Path | None = None,
+) -> None:
+    """Continuously drain the reindex queue into Chroma."""
+    interval_ms = poll_ms if poll_ms is not None else DEFAULT_QUEUE_POLL_MS
+    interval_s = interval_ms / 1000.0
+    LOG.info("starting queue worker poll_ms=%d state_dir=%s", interval_ms, state_dir or ingest_state_dir())
+
+    while True:
+        try:
+            result = drain_reindex_queue(dry_run=False, state_dir=state_dir, data_dir=data_dir)
+        except (TimeoutError, FileNotFoundError) as exc:
+            LOG.error("queue worker drain failed: %s", exc)
+            time.sleep(interval_s)
+            continue
+
+        if result.dequeued_source_ids:
+            crawl = result.crawl
+            if crawl is not None:
+                LOG.info(
+                    "queue worker cycle dequeued=%d attempted=%d indexed=%d failed=%d",
+                    len(result.dequeued_source_ids),
+                    crawl.attempted,
+                    crawl.indexed,
+                    crawl.failed,
+                )
+            else:
+                LOG.info("queue worker cycle dequeued=%d", len(result.dequeued_source_ids))
+
+        time.sleep(interval_s)

@@ -60,6 +60,7 @@ Discord `/queue-reindex` and ingest-worker CLI enqueue catalog source ids into `
 ```bash
 bash scripts/trask_indexer_drain_queue.sh
 bash scripts/trask_indexer_drain_queue.sh --dry-run
+bash scripts/trask_indexer_run_queue_worker.sh [pollMs]
 ```
 
 Uses the same lock contract as ingest-worker (`reindex-queue.lock`). Do not run ingest-worker `drain-queue` and indexer `drain-queue` concurrently on the same `INGEST_STATE_DIR`.
