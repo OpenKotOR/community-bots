@@ -1,6 +1,11 @@
 import { loadTraskPolicy } from "@openkotor/trask-config";
 
 import {
+  CITATION_INDEX_CAPTURE_RE,
+  CITATION_MARKER_RE,
+  parseCitationIndex,
+} from "./citation-markers.js";
+import {
   BRIEF_DISCORD_MIN_CITATIONS,
   claimMatchesQueryAnchor,
   distinctiveAnchorTokens,
@@ -48,12 +53,7 @@ const findSourcesSectionIndex = (value: string): number | null => {
 
 const discordPolicy = loadTraskPolicy().discord;
 
-/** Non-global: safe for repeated `.test()` in filters. Match grounded-evidence `CITATION_INDEX_RE`. */
-const CITATION_MARKER_IN_LINE_RE = /\[\d{1,3}\]/;
-/** Global: use only with `matchAll` (do not call `.test()` on this instance). */
-const CITATION_INDEX_CAPTURE_RE = /\[(\d{1,3})\]/g;
-
-const lineHasCitationMarker = (line: string): boolean => CITATION_MARKER_IN_LINE_RE.test(line);
+const lineHasCitationMarker = (line: string): boolean => CITATION_MARKER_RE.test(line);
 
 export const DISCORD_ASK_MAX_BODY_LINES = discordPolicy.maxBodyLines;
 export const DISCORD_ASK_MAX_LINE_CHARS = discordPolicy.maxLineChars;
@@ -168,7 +168,7 @@ export const buildCitationUrlMap = (
 export const normalizeBodyCitationIndices = (body: string): string => {
   const seen = new Map<number, number>();
   let next = 1;
-  return body.replace(/\[(\d{1,3})\]/g, (_match, rawIndex: string) => {
+  return body.replace(CITATION_INDEX_CAPTURE_RE, (_match, rawIndex: string) => {
     const oldIndex = Number(rawIndex);
     let mapped = seen.get(oldIndex);
     if (!mapped) {
@@ -182,7 +182,7 @@ export const normalizeBodyCitationIndices = (body: string): string => {
 
 /** Turn bare [n] markers into Discord markdown links on the number only. */
 export const embedInlineCitationLinks = (body: string, citationUrls: ReadonlyMap<number, string>): string =>
-  body.replace(/\[(\d{1,3})\]/g, (_match, rawIndex: string) => {
+  body.replace(CITATION_INDEX_CAPTURE_RE, (_match, rawIndex: string) => {
     const index = Number(rawIndex);
     const url = citationUrls.get(index);
     return url ? `[${index}](${url})` : `[${index}]`;
@@ -242,9 +242,10 @@ const scoreAndFilterLines = (pool: readonly string[], query: string): string[] =
 export const citationIndicesInLines = (lines: readonly string[]): Set<number> => {
   const indices = new Set<number>();
   for (const line of lines) {
-    for (const match of line.matchAll(CITATION_INDEX_CAPTURE_RE)) {
-      const index = Number(match[1]);
-      if (Number.isFinite(index) && index > 0) {
+    const captureRe = new RegExp(CITATION_INDEX_CAPTURE_RE.source, "g");
+    for (const match of line.matchAll(captureRe)) {
+      const index = parseCitationIndex(match[1]!);
+      if (index !== null) {
         indices.add(index);
       }
     }

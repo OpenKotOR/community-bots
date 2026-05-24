@@ -33,7 +33,7 @@ PR #15 fixed this by backfilling from the cited pool after filtering.
 2. **`filterDiscordLinesForQuery`** — When ≥2 cited lines exist, run scoring on cited lines only, then call `ensureMinimumDistinctCitedLines` so anti-dump filtering does not collapse citation count.
 3. **Upstream compose** — `selectDistinctBriefClaims` in `grounded-evidence.ts` prefers query-anchored claims before lines reach the formatter (reduces off-topic padding).
 
-Implementation: `packages/trask/src/discord-reply-format.ts` (`ensureMinimumDistinctCitedLines`, `sliceLinesPreservingDistinctCitations`, exported `citationIndicesInLines` / `citationIndicesInText` for tests). Tests: `packages/trask/src/discord-reply-format.test.ts` (import production helpers — no duplicate citation regex).
+Implementation: `packages/trask/src/discord-reply-format.ts` (`ensureMinimumDistinctCitedLines`, `sliceLinesPreservingDistinctCitations`, exported `citationIndicesInLines` / `citationIndicesInText` for tests). Citation marker regex and `parseCitationIndex` live in `packages/trask/src/citation-markers.ts` (shared with `grounded-evidence.ts`). Tests: `packages/trask/src/discord-reply-format.test.ts` import production helpers — no duplicate citation regex literals.
 
 ## Verification
 

@@ -9,6 +9,11 @@ import {
   loadTraskPolicy,
 } from "@openkotor/trask-config";
 
+import {
+  CITATION_INDEX_CAPTURE_RE,
+  CITATION_MARKER_RE,
+  parseCitationIndex,
+} from "./citation-markers.js";
 import { splitResearchAnswer, syncSourcesSectionToApproved } from "./discord-reply-format.js";
 import {
   isDiscordJumpUrl,
@@ -48,8 +53,6 @@ export interface EvidenceClaim {
 }
 
 const HOST_AUTHORITY_SCORE: Readonly<Record<string, number>> = loadLinguistics().hostAuthorityScores;
-
-const CITATION_INDEX_RE = /\[(\d{1,3})\]/g;
 
 const passageAuthority = (url: string): EvidenceAuthority => {
   if (url.startsWith("local://")) return "local";
@@ -604,7 +607,7 @@ export const composeGroundedAnswerWithLlm = async (
 
   const { body } = splitResearchAnswer(text);
   if (!body || body.length < 16) return null;
-  if (!/\[\d{1,3}\]/u.test(body)) return null;
+  if (!CITATION_MARKER_RE.test(body)) return null;
 
   const citedSources = collectCitedSourcesFromAnswer(
     text,
@@ -780,9 +783,11 @@ export const hasMinimumBriefGroundedSupport = (
 export const collectCitationIndicesFromAnswer = (answer: string): number[] => {
   const { body } = splitResearchAnswer(answer);
   const indices = new Set<number>();
-  for (const match of body.matchAll(CITATION_INDEX_RE)) {
-    const value = Number(match[1]);
-    if (Number.isFinite(value) && value > 0) indices.add(value);
+  for (const match of body.matchAll(new RegExp(CITATION_INDEX_CAPTURE_RE.source, "g"))) {
+    const index = parseCitationIndex(match[1]!);
+    if (index !== null) {
+      indices.add(index);
+    }
   }
   return [...indices].sort((left, right) => left - right);
 };
