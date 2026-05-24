@@ -166,7 +166,9 @@ See [`docs/trask-ops.md`](docs/trask-ops.md#hk-86-reaction-role-setup) for full 
 
 ```bash
 pnpm holocron:e2e            # Playwright: 5 live KOTOR research queries on :4010
-pnpm verify:trask-cli        # optimize-measure preflight, then 5 golden queries (grounded-source gate)
+pnpm trask:optimize-measure     # offline citation gate (composite_score floor 165)
+pnpm trask:optimize-measure:ci  # CI-equivalent citation gate (after build)
+pnpm verify:trask-cli           # optimize-measure preflight, then 5 golden queries (grounded-source gate)
 pnpm discord:smoke-bots      # Discord REST: confirm all slash commands are registered
 pnpm test                    # 130 unit tests
 ```

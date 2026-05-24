@@ -30,6 +30,7 @@
     "trask:faithfulness-eval": "pnpm build && node scripts/trask_faithfulness_eval.mjs --fixtures",
     "trask:config-drift": "node scripts/check_trask_config_drift.mjs",
     "trask:optimize-measure": "node scripts/trask_optimize_measure.mjs",
+    "trask:optimize-measure:ci": "TRASK_OPTIMIZE_CI_MODE=1 TRASK_SKIP_BUILD=1 node scripts/trask_optimize_measure.mjs",
     "trask:indexer:test": ".venv-trask-indexer/bin/python -m pytest infra/trask-indexer/tests/ -q",
     "trask:stack:health": "bash scripts/trask_indexed_stack_health.sh",
     "discord:setup": "node scripts/discord_setup_wizard.mjs --write",

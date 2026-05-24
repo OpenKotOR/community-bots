@@ -36,7 +36,7 @@ discord-reply-format.ts      ← line filters, embedInlineCitationLinks (imports
 | Gate | Command | Proves |
 |------|---------|--------|
 | Local offline (full) | `pnpm trask:optimize-measure` | Faithfulness 5/5 + 13 discord stress tests + all citation unit suites + `pnpm check`; **composite_score 165** |
-| CI offline (narrow) | `TRASK_OPTIMIZE_CI_MODE=1` (set in `.github/workflows/ci.yml`) | Faithfulness + discord stress + **composite_score ≥ 165** without re-running full Trask unit matrix (unit step runs all packages separately) |
+| CI offline (narrow) | `pnpm trask:optimize-measure:ci` (`TRASK_OPTIMIZE_CI_MODE=1`; same as `.github/workflows/ci.yml`) | Faithfulness + discord stress + **composite_score ≥ 165** without re-running full Trask unit matrix (unit step runs all packages separately) |
 | Live Discord | `pnpm verify:trask-discord` | Preflight full optimize-measure, then LLM + indexer embed contract |
 | Holocron UI | `pnpm holocron:e2e` | Full optimize-measure + Playwright on live stack |
 
@@ -53,6 +53,7 @@ Formula: `composite_score` = (`citation_stress_pass_count` × 10) + (`faithfulne
 | #39 | `research-answer-split.test.ts` |
 | #40 | `query-anchor.ts` — display decoupled from grounded-evidence |
 | #41 | Split/anchor/markers tests in optimize-measure |
+| #45 | `pnpm trask:optimize-measure:ci` script alias |
 | #42 | `TRASK_OPTIMIZE_CI_MODE` — CI enforces composite floor |
 
 ## Related
