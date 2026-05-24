@@ -24,7 +24,20 @@ curl -sS -X POST http://127.0.0.1:8787/retrieve \
 
 Point bots and Holocron at the Worker with `TRASK_INDEXER_BASE_URL=https://trask-retrieve.<account>.workers.dev` once deployed.
 
-## Deploy
+## VPS co-located (wrangler dev proxy)
+
+When Chroma indexer runs on the same host, run the Worker locally on `:8787` so clients match the CI/local stack contract:
+
+```bash
+bash scripts/trask_retrieve_worker_start.sh
+pnpm trask:stack:health
+```
+
+systemd: `infra/trask-retrieve-worker/systemd/trask-retrieve-worker.service.example` (requires `trask-indexer.service`).
+
+Set holocron/bot `TRASK_INDEXER_BASE_URL=http://127.0.0.1:8787`.
+
+## Deploy (Cloudflare edge)
 
 ```bash
 pnpm dlx wrangler deploy --config infra/trask-retrieve-worker/wrangler.toml
