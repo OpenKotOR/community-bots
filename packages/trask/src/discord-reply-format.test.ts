@@ -147,6 +147,19 @@ test("embedInlineCitationLinks links [10] when citation map includes index 10", 
   assert.match(linked, /\[10\]\(https:\/\/example\.com\/tlk-list\)/);
 });
 
+test("embedInlineCitationLinks does not double-wrap existing markdown links", () => {
+  const body =
+    "Already linked [1](https://example.com/a) and a bare second source [2] here.";
+  const map = new Map([
+    [1, "https://example.com/a"],
+    [2, "https://example.com/b"],
+  ]);
+  const linked = embedInlineCitationLinks(body, map);
+  assert.equal(linked.match(/\(https:\/\/example\.com\/a\)/g)?.length, 1);
+  assert.match(linked, /\[2\]\(https:\/\/example\.com\/b\)/);
+  assert.doesNotMatch(linked, /\]\(https:\/\/example\.com\/a\)\(/);
+});
+
 test("formatDiscordAskDisplay preserves two links when body has low-score second citation", () => {
   const raw = `TSLPatcher applies 2DA and TLK list patches for KotOR modding workflows. [1]
 A brief note about unrelated widescreen HUD tweaks on PC without a citation marker.
