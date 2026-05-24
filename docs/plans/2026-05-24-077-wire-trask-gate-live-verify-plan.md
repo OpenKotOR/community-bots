@@ -1,7 +1,7 @@
 ---
 title: "feat: wire trask:gate into live-verify preflights"
 type: feat
-status: active
+status: completed
 date: 2026-05-24
 origin: docs/solutions/tooling-decisions/trask-citation-stack-closeout-2026-05-24.md
 ---
