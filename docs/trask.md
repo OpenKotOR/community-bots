@@ -151,7 +151,7 @@ queries in Chromium (202 → thread poll → answer + grounded **Sources** / cit
 
 ```bash
 pnpm exec playwright install chromium --with-deps   # once per machine (repo root)
-pnpm holocron:e2e
+pnpm holocron:e2e   # runs pnpm trask:gate (offline citation floor 165), then Playwright
 ```
 
 Requires repo **`.env`** with **at least one working LLM provider** (`OPENROUTER_API_KEY` or `OPENAI_API_KEY`)
@@ -161,7 +161,7 @@ E2E requires **at least two** distinct `https://` sources. Set `HOLOCRON_REUSE_S
 CLI debug gate:
 
 ```bash
-pnpm verify:trask-cli
+pnpm verify:trask-cli   # pnpm trask:gate preflight, then live CLI golden queries
 ```
 
 That script mirrors the same canonical five technical queries as Holocron e2e. It is for subprocess/retrieval
