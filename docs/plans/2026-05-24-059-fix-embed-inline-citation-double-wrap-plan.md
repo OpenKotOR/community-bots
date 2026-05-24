@@ -2,6 +2,7 @@
 title: "fix: skip already-linked markers in embedInlineCitationLinks"
 type: fix
 status: completed
+merged: c62365b
 date: 2026-05-24
 origin: docs/plans/2026-05-24-055-correctness-review-pr33-citation-digit-plan.md
 ---
