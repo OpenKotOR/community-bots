@@ -1,5 +1,5 @@
 ---
-title: "Trask citation stack closeout (PR #33–#58)"
+title: "Trask citation stack closeout (PR #33–#59)"
 date: 2026-05-24
 category: tooling-decisions
 problem_type: quality

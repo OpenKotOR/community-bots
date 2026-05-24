@@ -1,7 +1,7 @@
 ---
 title: "feat(trask): export query-anchor from package index"
 type: feat
-status: active
+status: completed
 date: 2026-05-24
 origin: docs/solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md
 ---
