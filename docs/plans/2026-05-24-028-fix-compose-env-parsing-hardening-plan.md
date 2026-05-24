@@ -1,8 +1,9 @@
 ---
 title: "fix: harden Trask compose env parsing"
 type: fix
-status: active
+status: completed
 date: 2026-05-24
+merged: b66d622
 origin: docs/plans/2026-05-24-027-ship-pr20-web-research-compose-gate-plan.md
 ---
 
