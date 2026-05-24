@@ -3,8 +3,12 @@
  * Live Discord /ask pipeline gate: answerForSurface("discord") + formatDiscordAskDisplay.
  * Uses expert verification queries only (not golden fixture literals).
  *
- * Usage (repo root, after pnpm build):
+ * Usage (repo root):
+ *   pnpm verify:trask-discord
  *   node --import tsx/esm scripts/verify_trask_discord_live.mjs
+ *
+ * Preflight: `pnpm verify:trask-discord` runs `pnpm trask:optimize-measure` first
+ * (build, faithfulness fixtures, discord citation stress tests) before live LLM calls.
  *   node --import tsx/esm scripts/verify_trask_discord_live.mjs --post
  *   node --import tsx/esm scripts/verify_trask_discord_live.mjs --skip-url-check
  */

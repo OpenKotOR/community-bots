@@ -5,7 +5,7 @@ set -euo pipefail
 ACTION="${1:?action: create|cleanup|count}"
 SPEC_NAME="${2:-}"
 EXP_INDEX="${3:-001}"
-BASE_BRANCH="${4:-optimize/trask-citation-alignment}"
+BASE_BRANCH="${4:-main}"
 shift 4 || true
 SHARED_FILES=("$@")
 
