@@ -16,6 +16,9 @@ importers:
       '@openkotor/config':
         specifier: workspace:*
         version: link:packages/config
+      '@openkotor/retrieval':
+        specifier: workspace:*
+        version: link:packages/retrieval
       '@openkotor/trask':
         specifier: workspace:*
         version: link:packages/trask
