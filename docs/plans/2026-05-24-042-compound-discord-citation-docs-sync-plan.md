@@ -3,6 +3,8 @@ title: "docs: sync Discord citation compound docs after PR #24–#26"
 type: docs
 status: completed
 date: 2026-05-24
+merged: 4a67c6a
+pr: https://github.com/OpenKotOR/community-bots/pull/27
 origin: docs/solutions/tooling-decisions/trask-discord-dual-citation-line-filter-2026-05-24.md
 ---
 
