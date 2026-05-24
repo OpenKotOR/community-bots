@@ -1,7 +1,7 @@
 ---
 title: "docs: sync answer-pipeline and runtime-map for citation modules"
 type: docs
-status: active
+status: completed
 date: 2026-05-24
 origin: docs/solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md
 ---
