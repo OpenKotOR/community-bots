@@ -2,7 +2,7 @@
 title: Trask Runtime Map
 owner: trask-bot
 status: active
-lastUpdated: 2026-05-15
+lastUpdated: 2026-05-24
 ---
 
 # Runtime Surfaces
@@ -13,6 +13,7 @@ lastUpdated: 2026-05-15
 - [REPO] `apps/holocron-web` SPA calls `/api/trask` via `src/lib/trask-api.ts` ([holocron-web-trask-client.md](../30-product-ux/holocron-web-trask-client.md)).
 - [REPO] `packages/trask-http` defines shared API contracts consumed by Discord and web surfaces (see [trask-http-ask-contract.md](trask-http-ask-contract.md), [trask-http-session-history-contract.md](trask-http-session-history-contract.md)); Discord slash behavior is [trask-discord-slash-contract.md](trask-discord-slash-contract.md).
 - [REPO] `packages/trask` handles synthesis and source mapping for Trask answers ([trask-synthesis-and-chunk-retrieval.md](trask-synthesis-and-chunk-retrieval.md)); `packages/retrieval` supplies chunk store + catalog search merged into that path.
+- [REPO] Discord and Holocron share `packages/trask/src/citation-markers.ts`; Discord `/ask` embed text is produced by `formatDiscordAskDisplay` ([trask-citation-display-contract.md](trask-citation-display-contract.md)). Command-level behavior: [trask-discord-slash-contract.md](trask-discord-slash-contract.md).
 
 # Storage And Retrieval
 

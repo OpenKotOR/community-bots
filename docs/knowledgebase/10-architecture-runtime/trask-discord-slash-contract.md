@@ -43,6 +43,7 @@ lastUpdated: 2026-05-24
 # Related
 
 - [trask-discord-ask-defer-sla-2026-05-24.md](../../solutions/tooling-decisions/trask-discord-ask-defer-sla-2026-05-24.md) — early defer SLA and operator checks.
+- [trask-citation-display-contract.md](trask-citation-display-contract.md) — citation markers, `formatDiscordAskDisplay` pipeline, verification ladder.
 - [trask-discord-dual-citation-line-filter-2026-05-24.md](../../solutions/tooling-decisions/trask-discord-dual-citation-line-filter-2026-05-24.md) — preserve ≥2 inline citations after query-line filtering (PR #15; PR #24–#26 maintainability; PR #33–#35 citation policy; `pnpm trask:optimize-measure` floor **composite_score 165**).
 - [trask-http-ask-contract.md](trask-http-ask-contract.md) — Holocron REST parity differences.
 - [trask-embedded-holocron-web.md](trask-embedded-holocron-web.md) — Holocron served from the bot process.
