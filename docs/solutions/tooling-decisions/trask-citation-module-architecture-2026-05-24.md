@@ -53,6 +53,7 @@ Formula: `composite_score` = (`citation_stress_pass_count` × 10) + (`faithfulne
 | #39 | `research-answer-split.test.ts` |
 | #40 | `query-anchor.ts` — display decoupled from grounded-evidence |
 | #41 | Split/anchor/markers tests in optimize-measure |
+| #46 | CI workflow calls `pnpm trask:optimize-measure:ci` directly |
 | #45 | `pnpm trask:optimize-measure:ci` script alias |
 | #42 | `TRASK_OPTIMIZE_CI_MODE` — CI enforces composite floor |
 

@@ -149,11 +149,12 @@ Use only when debugging retrieval without the Holocron UI; it does **not** repla
 After code changes to answer formatting, citation alignment, or `grounded-evidence.ts`, run:
 
 ```bash
-pnpm trask:optimize-measure   # faithfulness + discord stress + all Trask citation unit suites locally; CI uses TRASK_OPTIMIZE_CI_MODE=1 (faithfulness + discord stress, composite_score floor 165). See docs/solutions/tooling-decisions/trask-discord-dual-citation-line-filter-2026-05-24.md
+pnpm trask:optimize-measure      # faithfulness + discord stress + all Trask citation unit suites + check (composite_score floor 165)
+pnpm trask:optimize-measure:ci   # CI-equivalent gate after build — see docs/solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md
 pnpm trask:faithfulness-eval  # faithfulness fixtures only
 ```
 
-`trask:faithfulness-eval` replays committed golden fixtures under `data/trask-eval/fixtures/` (no live web research). It does **not** replace Holocron e2e for end-to-end research validation. `pnpm holocron:e2e` runs full `trask:optimize-measure` then `holocron:e2e:playwright`. CI runs `trask:optimize-measure` with `TRASK_OPTIMIZE_CI_MODE=1` (faithfulness + discord stress, composite_score floor 165), then `holocron:e2e:playwright` with `TRASK_SKIP_BUILD=1` after the job’s `pnpm build`. Product policy strings live under `data/trask/`; run `pnpm trask:config-drift` after changes to catch duplicated golden questions in code.
+`trask:faithfulness-eval` replays committed golden fixtures under `data/trask-eval/fixtures/` (no live web research). It does **not** replace Holocron e2e for end-to-end research validation. `pnpm holocron:e2e` runs full `trask:optimize-measure` then `holocron:e2e:playwright`. CI runs `trask:optimize-measure:ci` then `holocron:e2e:playwright` with `TRASK_SKIP_BUILD=1` after the job’s `pnpm build`. Product policy strings live under `data/trask/`; run `pnpm trask:config-drift` after changes to catch duplicated golden questions in code.
 
 ### Trask Discord `/ask` — mandatory verification (agents)
 
