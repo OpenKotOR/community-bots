@@ -1,7 +1,7 @@
 ---
 title: "feat(trask): CI smoke-imports and gate ladder docs sync"
 type: feat
-status: active
+status: completed
 date: 2026-05-24
 origin: docs/solutions/tooling-decisions/trask-root-script-package-imports-2026-05-24.md
 ---

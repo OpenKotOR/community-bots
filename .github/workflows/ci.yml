@@ -38,9 +38,7 @@ jobs:
         run: pnpm build
 
       - name: Trask package import smoke
-        run: node scripts/trask_smoke_package_imports.mjs
-        env:
-          TRASK_SKIP_BUILD: "1"
+        run: pnpm trask:smoke-imports:ci
 
       - name: Trask config drift gate
         run: pnpm trask:config-drift
