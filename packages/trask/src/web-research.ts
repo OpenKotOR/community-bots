@@ -1429,8 +1429,11 @@ export class WebResearchClient implements WebResearchQueryHandler {
           answer = this.openAiClient
             ? await this.rewriteForDiscord(query, report, rewritePool, options?.model, communityDigest)
             : fallbackDiscordRewrite(query, report, rewritePool);
-        } else if (webSources.length > 0 || communitySources.length > 0) {
-          answer = sourceOnlyFallbackAnswer(query, sourcesForRewrite);
+        } else if (webSources.length > 0) {
+          answer = sourceOnlyFallbackAnswer(
+            query,
+            filterPublicWebCitationSources(webSources),
+          );
         } else {
           answer = degradedAnswerFallback(query, approvedSources);
         }
@@ -1448,8 +1451,8 @@ export class WebResearchClient implements WebResearchQueryHandler {
           report,
           sourcesForRewrite,
         );
-      } else if (webSourcesForRewrite.length > 0 || communitySources.length > 0) {
-        answer = sourceOnlyFallbackAnswer(query, sourcesForRewrite);
+      } else if (webSourcesForRewrite.length > 0) {
+        answer = sourceOnlyFallbackAnswer(query, webSourcesForRewrite);
       } else {
         answer = degradedAnswerFallback(query, approvedSources);
       }
