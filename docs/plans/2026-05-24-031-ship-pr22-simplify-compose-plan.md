@@ -1,8 +1,9 @@
 ---
 title: "ship: merge PR #22 compose policy simplify + simplicity review"
 type: ship
-status: active
+status: completed
 date: 2026-05-24
+merged: e66d699
 origin: docs/plans/2026-05-24-030-simplify-compose-policy-plan.md
 pr: https://github.com/OpenKotOR/community-bots/pull/22
 ---
