@@ -203,11 +203,8 @@ export const resolveResearchComposeMode = (
     return "grounded";
   }
   const normalized = raw.trim().toLowerCase();
-  if (normalized === "rewrite") {
-    return "rewrite";
-  }
-  if (normalized === "grounded") {
-    return "grounded";
+  if (normalized === "rewrite" || normalized === "grounded") {
+    return normalized;
   }
   onWarn(
     `Unrecognized TRASK_RESEARCH_COMPOSE_MODE=${JSON.stringify(raw)}; defaulting to grounded compose`,
@@ -313,12 +310,9 @@ export const loadResearchWizardRuntimeConfig = (env: NodeJS.ProcessEnv = process
   const composeMode = resolveResearchComposeMode(
     readOptionalEnv("TRASK_RESEARCH_COMPOSE_MODE", env),
   );
-
-  const groundedExplicit = readBooleanEnv("TRASK_GROUNDED_COMPOSE", env);
-  let groundedComposeEnabled = composeMode === "grounded";
-  if (groundedExplicit === false) {
-    groundedComposeEnabled = false;
-  }
+  const groundedComposeEnabled =
+    composeMode === "grounded"
+    && readBooleanEnv("TRASK_GROUNDED_COMPOSE", env) !== false;
 
   const syncTimeoutRaw = readOptionalEnv("TRASK_DISCORD_SYNC_TIMEOUT_MS", env) ?? "600000";
 

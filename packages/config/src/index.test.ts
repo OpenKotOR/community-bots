@@ -208,6 +208,17 @@ test("resolveResearchComposeMode accepts explicit grounded", () => {
   assert.equal(resolveResearchComposeMode("grounded", () => {}), "grounded");
 });
 
+test("resolveResearchComposeMode warns on whitespace-only values", () => {
+  const warnings: string[] = [];
+  assert.equal(
+    resolveResearchComposeMode("   ", (message) => {
+      warnings.push(message);
+    }),
+    "grounded",
+  );
+  assert.equal(warnings.length, 1);
+});
+
 test("loadWebResearchRuntimeConfig inherits composeMode from wizard env", () => {
   const cfg = loadWebResearchRuntimeConfig({});
   assert.equal(cfg.composeMode, "grounded");
