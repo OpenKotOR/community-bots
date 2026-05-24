@@ -16,9 +16,9 @@ compose_authority: docs/brainstorms/trask-rag-discord-compose-requirements.md
 
 ### Delta update (2026-05-24)
 
-- **Landed:** PR #9–#11 VPS stack; compound rollout checklist in `docs/solutions/tooling-decisions/trask-vps-indexed-stack-rollout-2026-05-24.md`.
+- **Landed:** PR #9–#12 — VPS stack + compound rollout checklist (`docs/solutions/tooling-decisions/trask-vps-indexed-stack-rollout-2026-05-24.md`, merged `3402ae4`).
 - **Partial:** VPS install execution manual; `FileChunkStore` ingest merge deferred.
-- **Next:** Optional `FileChunkStore` merge.
+- **Next:** Optional `FileChunkStore` merge only (indexed-stack ops closure complete).
 
 ### Delta update (2026-05-19)
 

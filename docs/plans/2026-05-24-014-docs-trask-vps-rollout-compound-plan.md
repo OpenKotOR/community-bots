@@ -3,6 +3,8 @@ title: "docs: Trask VPS indexed stack rollout compound doc"
 type: docs
 status: completed
 date: 2026-05-24
+merged: 3402ae4
+pr: https://github.com/OpenKotOR/community-bots/pull/12
 origin: docs/plans/2026-05-19-001-feat-trask-crawl4ai-rag-plan.md
 ---
 
