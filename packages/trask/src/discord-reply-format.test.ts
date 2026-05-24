@@ -5,6 +5,7 @@ import {
   citationIndicesInLines,
   citationIndicesInText,
   clampDiscordBodyLines,
+  embedInlineCitationLinks,
   ensureMinimumDistinctCitedLines,
   filterDiscordLinesForQuery,
   formatDiscordAskDisplay,
@@ -110,6 +111,20 @@ test("clampDiscordBodyLines backfills missing citation when first capped lines s
 
   const clamped = clampDiscordBodyLines(body, 2, expertQuery);
   assert.equal(citationIndicesInText(clamped).size, BRIEF_DISCORD_MIN_CITATIONS, clamped);
+});
+
+test("citationIndicesInText recognizes three-digit citation index [10]", () => {
+  const line =
+    "Extended KotOR modding docs reference TLK list formats and patch tooling. [10]";
+  const indices = citationIndicesInText(line);
+  assert.ok(indices.has(10), [...indices].join(","));
+});
+
+test("embedInlineCitationLinks links [10] when citation map includes index 10", () => {
+  const body = "Tenth source about TLK automation for large mod lists. [10]";
+  const map = new Map([[10, "https://example.com/tlk-list"]]);
+  const linked = embedInlineCitationLinks(body, map);
+  assert.match(linked, /\[10\]\(https:\/\/example\.com\/tlk-list\)/);
 });
 
 test("formatDiscordAskDisplay preserves two links when body has low-score second citation", () => {
