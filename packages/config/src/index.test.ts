@@ -5,6 +5,7 @@ import {
   loadSharedAiConfig,
   loadResearchWizardRuntimeConfig,
   loadWebResearchRuntimeConfig,
+  resolveResearchComposeMode,
   loadTraskHttpServerConfig,
   loadHkBotConfig,
   loadPazaakBotConfig,
@@ -182,6 +183,29 @@ test("loadResearchWizardRuntimeConfig enables rewrite compose mode when TRASK_RE
 test("loadResearchWizardRuntimeConfig disables grounded compose when TRASK_GROUNDED_COMPOSE=0", () => {
   const cfg = loadResearchWizardRuntimeConfig({ TRASK_GROUNDED_COMPOSE: "0" });
   assert.equal(cfg.groundedComposeEnabled, false);
+});
+
+test("loadResearchWizardRuntimeConfig throws on invalid TRASK_GROUNDED_COMPOSE", () => {
+  assert.throws(
+    () => loadResearchWizardRuntimeConfig({ TRASK_GROUNDED_COMPOSE: "maybe" }),
+    /Invalid boolean value for environment variable TRASK_GROUNDED_COMPOSE/,
+  );
+});
+
+test("resolveResearchComposeMode warns and defaults on unrecognized values", () => {
+  const warnings: string[] = [];
+  assert.equal(
+    resolveResearchComposeMode("rewite", (message) => {
+      warnings.push(message);
+    }),
+    "grounded",
+  );
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0]!, /Unrecognized TRASK_RESEARCH_COMPOSE_MODE/);
+});
+
+test("resolveResearchComposeMode accepts explicit grounded", () => {
+  assert.equal(resolveResearchComposeMode("grounded", () => {}), "grounded");
 });
 
 test("loadWebResearchRuntimeConfig inherits composeMode from wizard env", () => {

@@ -193,6 +193,28 @@ export interface SharedAiConfig {
 
 export type ResearchComposeMode = "grounded" | "rewrite";
 
+export const resolveResearchComposeMode = (
+  raw: string | undefined,
+  onWarn: (message: string) => void = (message) => {
+    console.warn(message);
+  },
+): ResearchComposeMode => {
+  if (!raw) {
+    return "grounded";
+  }
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === "rewrite") {
+    return "rewrite";
+  }
+  if (normalized === "grounded") {
+    return "grounded";
+  }
+  onWarn(
+    `Unrecognized TRASK_RESEARCH_COMPOSE_MODE=${JSON.stringify(raw)}; defaulting to grounded compose`,
+  );
+  return "grounded";
+};
+
 export interface ResearchWizardRuntimeConfig {
   /** Base URL for `infra/trask-indexer` retrieve API (POST /retrieve). */
   indexerBaseUrl: string;
@@ -288,12 +310,13 @@ export const loadResearchWizardRuntimeConfig = (env: NodeJS.ProcessEnv = process
     readOptionalEnv("TRASK_WEB_RESEARCH_COMPOSE_MS", env) ??
     "60000";
 
-  const composeModeRaw = readOptionalEnv("TRASK_RESEARCH_COMPOSE_MODE", env)?.trim().toLowerCase();
-  const composeMode: ResearchComposeMode = composeModeRaw === "rewrite" ? "rewrite" : "grounded";
+  const composeMode = resolveResearchComposeMode(
+    readOptionalEnv("TRASK_RESEARCH_COMPOSE_MODE", env),
+  );
 
-  const groundedRaw = readOptionalEnv("TRASK_GROUNDED_COMPOSE", env)?.trim().toLowerCase();
+  const groundedExplicit = readBooleanEnv("TRASK_GROUNDED_COMPOSE", env);
   let groundedComposeEnabled = composeMode === "grounded";
-  if (groundedRaw === "0" || groundedRaw === "false" || groundedRaw === "no" || groundedRaw === "off") {
+  if (groundedExplicit === false) {
     groundedComposeEnabled = false;
   }
 

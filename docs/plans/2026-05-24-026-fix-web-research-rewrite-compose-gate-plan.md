@@ -1,8 +1,9 @@
 ---
 title: "fix: gate WebResearchClient rewrite compose behind composeMode"
 type: fix
-status: active
+status: completed
 date: 2026-05-24
+merged: a3a214a
 origin: docs/brainstorms/trask-rag-discord-compose-requirements.md
 ---
 
