@@ -1,0 +1,11 @@
+# Daily Chroma backup at 03:15 UTC (adjust for VPS timezone).
+# Install: sudo crontab -e — paste the line below (set REPO to your checkout path).
+#
+# REPO=/opt/community-bots
+# 15 3 * * * cd $REPO && TRASK_CHROMA_BACKUP_RETAIN=7 bash scripts/trask_chroma_backup_scheduled.sh >> /var/log/trask-chroma-backup.log 2>&1
+#
+# Off-site upload (optional — set on cron line or in /etc/environment):
+#   TRASK_CHROMA_BACKUP_UPLOAD_CMD='aws s3 cp "$ARCHIVE" s3://my-bucket/trask-chroma/'
+#   TRASK_CHROMA_BACKUP_UPLOAD_CMD='rclone copy "$ARCHIVE" remote:trask-backups/'
+
+15 3 * * * cd /opt/community-bots && TRASK_CHROMA_BACKUP_RETAIN=7 bash scripts/trask_chroma_backup_scheduled.sh >> /var/log/trask-chroma-backup.log 2>&1

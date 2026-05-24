@@ -82,6 +82,14 @@ bash scripts/trask_chroma_backup.sh
 bash scripts/trask_chroma_backup.sh --dry-run
 bash scripts/trask_chroma_backup.sh --output-dir /var/backups/trask
 
+# Scheduled (cron): backup + retain N local copies + optional off-site upload
+bash scripts/trask_chroma_backup_scheduled.sh
+TRASK_CHROMA_BACKUP_RETAIN=7 \
+TRASK_CHROMA_BACKUP_UPLOAD_CMD='aws s3 cp "$ARCHIVE" s3://my-bucket/trask-chroma/' \
+  bash scripts/trask_chroma_backup_scheduled.sh
+
+# Cron example: infra/trask-indexer/cron/trask-chroma-backup.cron.example
+
 # Stop indexer first, then:
 bash scripts/trask_chroma_restore.sh data/trask-indexer/backups/trask-chroma-YYYYMMDDTHHMMSSZ.tar.gz
 ```

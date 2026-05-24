@@ -16,9 +16,9 @@ compose_authority: docs/brainstorms/trask-rag-discord-compose-requirements.md
 
 ### Delta update (2026-05-24)
 
-- **Landed (PR #9):** `trask-indexer drain-queue` + `run-queue-worker`; operator runbook; golden corpus script; `pnpm trask:indexer:test` + allowlist export + drain smoke in CI; `discord_sync_stale` on `/health`; Chroma backup/restore scripts; **production bot deploy manifest** (`infra/trask-bot-stack/` with `TRASK_DISCORD_SYNC_INTERVAL_MS=1800000` template); doc decommission of unused `TRASK_RESEARCH_BACKEND` flag.
-- **Partial:** Operators must copy `.env.production.example` on VPS and set secrets; `FileChunkStore` ingest merge deferred.
-- **Next:** (1) optional LLM keys in CI for richer compose; (2) scheduled off-site Chroma backup upload (cron/S3).
+- **Landed (PR #9):** `trask-indexer drain-queue` + `run-queue-worker`; operator runbook; golden corpus script; `pnpm trask:indexer:test` + allowlist export + drain smoke in CI; `discord_sync_stale` on `/health`; Chroma backup/restore scripts; **scheduled backup wrapper** + cron example; production bot deploy manifest (`infra/trask-bot-stack/`); doc decommission of unused `TRASK_RESEARCH_BACKEND` flag.
+- **Partial:** Operators must copy `.env.production.example` on VPS and set secrets; off-site upload requires operator `TRASK_CHROMA_BACKUP_UPLOAD_CMD`; `FileChunkStore` ingest merge deferred.
+- **Next:** optional LLM keys in CI for richer Holocron compose when repository secrets are configured.
 
 ### Delta update (2026-05-19)
 
