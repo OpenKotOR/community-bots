@@ -16,9 +16,9 @@ compose_authority: docs/brainstorms/trask-rag-discord-compose-requirements.md
 
 ### Delta update (2026-05-24)
 
-- **Landed (PR #9):** Full indexed-stack ops closure — queue worker, CI pytest/drain smoke, discord sync stale health, Chroma backup/restore/scheduled cron, production bot manifest, **optional LLM keys in CI Holocron e2e**; doc decommission of unused `TRASK_RESEARCH_BACKEND` flag.
-- **Partial:** Operators must deploy VPS `.env` and backup upload hooks; `FileChunkStore` ingest merge deferred.
-- **Next:** Merge PR #9 when CI green; post-merge VPS operator rollout (bot systemd, backup cron, Discord sync interval).
+- **Landed:** PR #9 merged (`6e982fb`) — full indexed-stack ops closure (queue worker, CI gates, discord sync stale health, Chroma backup/cron, production bot manifest, optional LLM keys in Holocron e2e).
+- **Partial:** VPS operator rollout (systemd bot, backup cron, Discord sync interval) is manual; `FileChunkStore` ingest merge deferred.
+- **Next:** Operator rollout on VPS; optional `FileChunkStore` merge in a future slice.
 
 ### Delta update (2026-05-19)
 

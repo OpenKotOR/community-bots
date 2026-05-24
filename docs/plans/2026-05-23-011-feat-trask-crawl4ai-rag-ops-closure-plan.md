@@ -2,7 +2,9 @@
 title: "feat: Trask Crawl4AI RAG ops closure (queue bridge + runbook)"
 type: feat
 status: completed
-date: 2026-05-23
+date: 2026-05-24
+merged: 6e982fb
+pr: https://github.com/OpenKotOR/community-bots/pull/9
 origin: docs/plans/2026-05-19-001-feat-trask-crawl4ai-rag-plan.md
 ---
 
