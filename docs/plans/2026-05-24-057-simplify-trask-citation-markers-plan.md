@@ -2,6 +2,7 @@
 title: "refactor: shared Trask citation marker module"
 type: refactor
 status: completed
+merged: 2ca7ece
 date: 2026-05-24
 origin: docs/plans/2026-05-24-056-ship-pr33-citation-digit-policy-plan.md
 ---
