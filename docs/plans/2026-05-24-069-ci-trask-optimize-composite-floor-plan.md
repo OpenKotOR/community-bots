@@ -1,7 +1,7 @@
 ---
 title: "ci: enforce trask optimize composite_score floor in CI"
 type: fix
-status: active
+status: completed
 date: 2026-05-24
 origin: docs/solutions/tooling-decisions/trask-discord-dual-citation-line-filter-2026-05-24.md
 ---
