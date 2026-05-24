@@ -78,8 +78,18 @@ Enable periodic sync on trask-bot with `TRASK_DISCORD_SYNC_INTERVAL_MS` > 0. Ind
 Chroma persists under `TRASK_INDEXER_DATA_DIR/chroma` (default `data/trask-indexer/chroma`).
 
 ```bash
+bash scripts/trask_chroma_backup.sh
+bash scripts/trask_chroma_backup.sh --dry-run
+bash scripts/trask_chroma_backup.sh --output-dir /var/backups/trask
+
+# Stop indexer first, then:
+bash scripts/trask_chroma_restore.sh data/trask-indexer/backups/trask-chroma-YYYYMMDDTHHMMSSZ.tar.gz
+```
+
+Manual equivalent:
+
+```bash
 tar -czf trask-chroma-backup-$(date +%Y%m%d).tar.gz -C data/trask-indexer chroma
-# restore: stop indexer, replace chroma/, restart indexer
 ```
 
 ## Verification gates
