@@ -56,7 +56,7 @@ TRASK_LITELLM_CONFIG=vendor/llm_fallbacks/configs/litellm_config_free.yaml bash 
 
 ```bash
 pnpm trask:faithfulness-eval          # offline compose alignment (fixtures)
-pnpm verify:trask-cli                 # CLI smoke (golden queries)
+pnpm verify:trask-cli                 # optimize-measure preflight, then CLI golden queries
 pnpm holocron:e2e                     # browser e2e (expert queries, live stack on :4010)
 pnpm verify:trask-discord             # Discord display contract
 ```
