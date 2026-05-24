@@ -1,5 +1,5 @@
 ---
-title: "Trask root script package imports (PR #54–#58)"
+title: "Trask root script package imports (PR #54–#61)"
 date: 2026-05-24
 category: tooling-decisions
 problem_type: tooling
@@ -38,6 +38,8 @@ Root `package.json` lists workspace packages as **devDependencies** so Node reso
 | #57 | Verify scripts import `@openkotor/config`; holocron browser verify uses package entries |
 | #59 | Export `query-anchor` from `@openkotor/trask` index |
 | #58 | Config drift + allowlist export import `@openkotor/retrieval` |
+| #60 | `trask:smoke-imports` in `trask:gate`; CI smoke after build |
+| #61 | Holocron Playwright e2e imports `@openkotor/trask-config` |
 
 ## Exceptions
 

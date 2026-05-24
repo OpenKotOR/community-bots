@@ -352,6 +352,9 @@ importers:
       '@eslint/js':
         specifier: ^9.21.0
         version: 9.39.4
+      '@openkotor/trask-config':
+        specifier: workspace:*
+        version: link:../../packages/trask-config
       '@tailwindcss/postcss':
         specifier: ^4.1.8
         version: 4.2.4
