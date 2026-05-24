@@ -1,7 +1,7 @@
 ---
 title: "feat: add pnpm trask:optimize-measure:ci script"
 type: feat
-status: active
+status: completed
 date: 2026-05-24
 origin: docs/plans/2026-05-24-069-ci-trask-optimize-composite-floor-plan.md
 ---
