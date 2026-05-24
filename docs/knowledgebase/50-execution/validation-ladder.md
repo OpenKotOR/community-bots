@@ -18,10 +18,11 @@ lastUpdated: 2026-05-24
 
 ## 3. Citation offline gate
 
-- [REPO] **Local / preflight:** `pnpm trask:optimize-measure` — faithfulness + discord stress + citation helper unit suites (`research-answer-split`, `query-anchor`, `citation-markers`, `grounded-evidence`, `research-compose`) + `pnpm check`; **composite_score** floor **165** (13 discord stress tests).
-- [REPO] **CI:** `pnpm trask:optimize-measure:ci` — faithfulness + discord stress only; enforces **composite_score ≥ 165** without duplicating the full Trask unit matrix (see [trask-citation-module-architecture-2026-05-24.md](../../solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md)).
+- [REPO] **Recommended preflight:** `pnpm trask:gate` — `pnpm build`, then full `pnpm trask:optimize-measure`, then CI-equivalent `pnpm trask:optimize-measure:ci`; both measure runs must reach **composite_score** **165**.
+- [REPO] **Full local measure:** `pnpm trask:optimize-measure` — faithfulness + discord stress + citation helper unit suites (`research-answer-split`, `query-anchor`, `citation-markers`, `grounded-evidence`, `research-compose`) + `pnpm check`.
+- [REPO] **CI measure:** `pnpm trask:optimize-measure:ci` — faithfulness + discord stress only; enforces **composite_score ≥ 165** without duplicating the full Trask unit matrix (see [trask-citation-module-architecture-2026-05-24.md](../../solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md)).
 - [SYNTH] Authoritative formula and incident history: [trask-citation-display-contract.md](../10-architecture-runtime/trask-citation-display-contract.md), [trask-discord-dual-citation-line-filter-2026-05-24.md](../../solutions/tooling-decisions/trask-discord-dual-citation-line-filter-2026-05-24.md).
-- [REPO] `pnpm verify:trask-discord` — live Discord expert queries (preflight: optimize-measure).
+- [REPO] `pnpm verify:trask-discord`, `pnpm verify:trask-cli`, and `pnpm holocron:e2e` preflight with `pnpm trask:gate` before live or browser steps.
 
 ## 4. Package tests
 
