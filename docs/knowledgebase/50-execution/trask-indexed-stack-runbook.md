@@ -135,7 +135,7 @@ bash scripts/trask_indexed_stack_health.sh --strict-stale # fail if discord_sync
 |------|---------|
 | Indexer unit tests | `pnpm trask:indexer:test` (after `bootstrap_trask_indexer.sh`) |
 | Holocron e2e (5 queries) | `pnpm holocron:e2e` — CI passes optional `OPENROUTER_API_KEY` / `OPENAI_API_KEY` repo secrets for richer LLM compose |
-| CLI QA | `pnpm verify:trask-cli` |
+| CLI QA | `pnpm verify:trask-cli` (runs `pnpm trask:optimize-measure` first) |
 | Offline faithfulness | `pnpm trask:faithfulness-eval` |
 | Stack health (VPS) | `bash scripts/trask_indexed_stack_health.sh [--check-http]` |
 

@@ -3,6 +3,8 @@ title: "feat: preflight CLI verify with trask:optimize-measure"
 type: feat
 status: completed
 date: 2026-05-24
+merged: b65e0f0
+pr: https://github.com/OpenKotOR/community-bots/pull/29
 origin: docs/plans/2026-05-24-044-wire-optimize-measure-discord-verify-plan.md
 ---
 
