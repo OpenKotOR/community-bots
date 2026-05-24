@@ -1,7 +1,7 @@
 ---
 title: "refactor: extract query-anchor module"
 type: refactor
-status: active
+status: completed
 date: 2026-05-24
 origin: docs/knowledgebase/10-architecture-runtime/trask-citation-display-contract.md
 ---
