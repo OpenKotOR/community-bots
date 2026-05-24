@@ -18,7 +18,7 @@ lastUpdated: 2026-05-24
 
 ## 3. Citation offline gate
 
-- [REPO] **Recommended preflight:** `pnpm trask:gate` — `pnpm trask:smoke-imports` (build + workspace package import smoke), then full `pnpm trask:optimize-measure`, then CI-equivalent `pnpm trask:optimize-measure:ci`; both measure runs must reach **composite_score** **165**.
+- [REPO] **Recommended preflight:** `pnpm trask:gate` — one `pnpm build`, then import smoke (`trask:smoke-imports:ci`), then full `optimize-measure` with `TRASK_SKIP_BUILD` and `TRASK_OPTIMIZE_SKIP_CHECK`, then `trask:optimize-measure:ci`; both measure runs must reach **composite_score** **165**.
 - [REPO] **CI:** after `pnpm build`, GitHub Actions runs `pnpm trask:smoke-imports:ci`, then `trask:optimize-measure:ci`.
 - [REPO] **Full local measure:** `pnpm trask:optimize-measure` — faithfulness + discord stress + citation helper unit suites (`research-answer-split`, `query-anchor`, `citation-markers`, `grounded-evidence`, `research-compose`) + `pnpm check`.
 - [REPO] **CI measure:** `pnpm trask:optimize-measure:ci` — faithfulness + discord stress only; enforces **composite_score ≥ 165** without duplicating the full Trask unit matrix (see [trask-citation-module-architecture-2026-05-24.md](../../solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md)).
