@@ -13,6 +13,9 @@ importers:
 
   .:
     devDependencies:
+      '@openkotor/config':
+        specifier: workspace:*
+        version: link:packages/config
       '@openkotor/trask':
         specifier: workspace:*
         version: link:packages/trask

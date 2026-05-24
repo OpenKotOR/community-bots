@@ -55,6 +55,7 @@ Formula: `composite_score` = (`citation_stress_pass_count` × 10) + (`faithfulne
 | #39 | `research-answer-split.test.ts` |
 | #40 | `query-anchor.ts` — display decoupled from grounded-evidence |
 | #41 | Split/anchor/markers tests in optimize-measure |
+| #57 | Root verify scripts import `@openkotor/config`; holocron browser verify uses package entries |
 | #56 | Root scripts import `@openkotor/trask-config` package entry |
 | #55 | Verify scripts import `@openkotor/trask` package entry |
 | #54 | Export `research-answer-split` from `@openkotor/trask`; faithfulness eval uses package entry |
