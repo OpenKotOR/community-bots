@@ -1,0 +1,51 @@
+---
+title: "Trask citation stack closeout (PR #33–#48)"
+date: 2026-05-24
+category: tooling-decisions
+problem_type: quality
+component: trask
+module: trask
+tags:
+  - trask
+  - discord
+  - citations
+  - optimize-measure
+  - closeout
+applies_when: "Onboarding to Trask citation work after May 2026 refactor arc"
+last_gate: "pnpm trask:gate → composite_score 165 (full + ci)"
+---
+
+## Problem
+
+Discord `/ask` brief embeds could collapse to a single inline citation after aggressive query-line filtering, even when the raw answer had two markers. Separately, `grounded-evidence.ts` and `discord-reply-format.ts` shared answer parsing and anchor helpers via import cycles, making display changes risky.
+
+## Solution arc (shipped)
+
+| Theme | PRs | Outcome |
+|-------|-----|---------|
+| Digit policy + stress | #33–#35 | `\d{1,3}` markers, `citation-markers.ts`, bare embed regex |
+| Module extraction | #38–#40 | `research-answer-split.ts`, `query-anchor.ts`; no display↔compose cycle on parsing/anchors |
+| Test + CI gates | #41–#46 | All citation unit suites in local measure; CI enforces discord stress + floor **165** |
+| Contributor docs | #47–#48 | CONTRIBUTING, AGENTS, PR template checklist |
+
+Authoritative module map: [trask-citation-module-architecture-2026-05-24.md](trask-citation-module-architecture-2026-05-24.md). Line-filter incident: [trask-discord-dual-citation-line-filter-2026-05-24.md](trask-discord-dual-citation-line-filter-2026-05-24.md).
+
+## Verification ladder
+
+```bash
+pnpm trask:gate                    # build + full optimize-measure + :ci
+pnpm verify:trask-discord          # live Discord (after stack + token)
+pnpm holocron:e2e                  # browser + live research (after stack)
+```
+
+Offline floor: **composite_score 165** = 13 discord stress × 10 + faithfulness 5 × 5 + check 10.
+
+## One-command preflight
+
+`pnpm trask:gate` runs `pnpm build`, then `pnpm trask:optimize-measure`, then `pnpm trask:optimize-measure:ci`. Use before opening a PR that touches citation modules.
+
+## Related
+
+- [trask-citation-display-contract.md](../../knowledgebase/10-architecture-runtime/trask-citation-display-contract.md)
+- [validation-ladder.md](../../knowledgebase/50-execution/validation-ladder.md)
+- [CONTRIBUTING.md](../../../CONTRIBUTING.md)

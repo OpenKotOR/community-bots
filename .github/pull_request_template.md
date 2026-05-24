@@ -12,7 +12,7 @@
 ## Trask citation gates (check if applicable)
 
 - [ ] N/A — no changes under `packages/trask/src/` citation modules (`citation-markers`, `research-answer-split`, `query-anchor`, `discord-reply-format`, `grounded-evidence`) or `scripts/trask_optimize_measure.mjs`
-- [ ] `pnpm build` then `pnpm trask:optimize-measure` — **composite_score 165** (faithfulness + discord stress + citation unit suites + check)
+- [ ] `pnpm trask:gate` (or `pnpm build` then `pnpm trask:optimize-measure`) — **composite_score 165**
 - [ ] Optional: `pnpm trask:optimize-measure:ci` matches CI gate after build
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [trask-citation-module-architecture](docs/solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md). Live Discord/Holocron validation is separate ([AGENTS.md](AGENTS.md)).
