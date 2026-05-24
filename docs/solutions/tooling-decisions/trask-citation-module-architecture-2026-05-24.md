@@ -11,7 +11,7 @@ tags:
   - discord
   - optimize-measure
 applies_when: "Changing citation markers, answer split, query anchors, Discord display, or optimize-measure gates"
-last_gate: "composite_score 165; pnpm trask:optimize-measure + pnpm trask:optimize-measure:ci"
+last_gate: "composite_score 165; pnpm trask:gate"
 ---
 
 ## Context
@@ -23,9 +23,9 @@ Authoritative display contract: [trask-citation-display-contract.md](../../knowl
 ## Module map (dependency direction)
 
 ```
-citation-markers.ts          ← regex + parseCitationIndex (internal)
-query-anchor.ts              ← BRIEF_DISCORD_MIN_CITATIONS, distinctiveAnchorTokens, claimMatchesQueryAnchor
-research-answer-split.ts     ← splitResearchAnswer, syncSourcesSectionToApproved
+citation-markers.ts          ← regex + parseCitationIndex (**internal** — not exported from `@openkotor/trask` index)
+query-anchor.ts              ← BRIEF_DISCORD_MIN_CITATIONS, distinctiveAnchorTokens, claimMatchesQueryAnchor (re-exported via `grounded-evidence`)
+research-answer-split.ts     ← splitResearchAnswer, syncSourcesSectionToApproved (**exported** from `@openkotor/trask` index)
 grounded-evidence.ts         ← compose, claims, sufficiency (imports split + anchor; re-exports anchor)
 discord-reply-format.ts      ← line filters, embedInlineCitationLinks (imports markers, anchor, split; NOT grounded-evidence)
 ```
@@ -55,6 +55,7 @@ Formula: `composite_score` = (`citation_stress_pass_count` × 10) + (`faithfulne
 | #39 | `research-answer-split.test.ts` |
 | #40 | `query-anchor.ts` — display decoupled from grounded-evidence |
 | #41 | Split/anchor/markers tests in optimize-measure |
+| #54 | Export `research-answer-split` from `@openkotor/trask`; faithfulness eval uses package entry |
 | #53 | KB + trask-research-backends trask:gate ladder sync |
 | #52 | README + CONTRIBUTING + gate table trask:gate sync |
 | #51 | AGENTS.md + docs/trask.md trask:gate ladder sync |
