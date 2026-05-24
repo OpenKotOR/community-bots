@@ -2,8 +2,7 @@ import { randomUUID } from 'node:crypto'
 
 import { expect, test, type Page } from '@playwright/test'
 
-import { loadTraskPolicy } from '../../../packages/trask-config/dist/policy.js'
-import { verificationQueriesForSurface } from '../../../packages/trask-config/dist/verification-queries.js'
+import { loadTraskPolicy, verificationQueriesForSurface } from '@openkotor/trask-config'
 import { assertAllUrlsReachable } from '../../../scripts/lib/url-verify.mjs'
 
 /**
