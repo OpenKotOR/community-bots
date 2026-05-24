@@ -46,6 +46,7 @@ lastUpdated: 2026-05-19
 | `TRASK_RESEARCH_COMPOSE_MODE` | [REPO] `rewrite` enables legacy digest rewrite fallbacks; default `grounded`. |
 | `TRASK_WEB_RESEARCH_DDG_FALLBACK` | [REPO] When `1` / `true`, Python runner may use DuckDuckGo only after empty Chroma retrieve (operator bootstrap; not used for compose when index miss). |
 | `TRASK_INDEXER_DATA_DIR` | [REPO] Chroma persist dir (default `data/trask-indexer`). |
+| `TRASK_DISCORD_SYNC_STALE_HOURS` | [REPO] Indexer `/health` marks `discord_sync_stale` when `last_discord_sync` is older than this many hours (default **48**; `0` disables stale flag). |
 | `TRASK_DISCORD_SYNC_TIMEOUT_MS` | [REPO] Kill `trask_discord_sync.py` subprocess after N ms (default **600000**; `0` = no timeout). |
 
 # Trask Discord bot (`loadTraskBotConfig`)
