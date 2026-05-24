@@ -21,7 +21,7 @@ import {
   type QueryIntent,
 } from "@openkotor/trask-config";
 
-import { syncSourcesSectionToApproved } from "./discord-reply-format.js";
+import { syncSourcesSectionToApproved } from "./research-answer-split.js";
 import {
   _collapseExcessiveNewlines,
   _rewriteMarkdownLinks,

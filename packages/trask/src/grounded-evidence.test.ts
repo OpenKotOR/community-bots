@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import type { SourceDescriptor } from "@openkotor/retrieval";
 
-import { splitResearchAnswer } from "./discord-reply-format.js";
+import { splitResearchAnswer } from "./research-answer-split.js";
 import {
   collectCitedSourcesFromAnswer,
   collectCitationIndicesFromAnswer,

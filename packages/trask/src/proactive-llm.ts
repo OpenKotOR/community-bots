@@ -2,7 +2,7 @@ import OpenAI from "openai";
 
 import type { SharedAiConfig } from "@openkotor/config";
 
-import { splitResearchAnswer } from "./discord-reply-format.js";
+import { splitResearchAnswer } from "./research-answer-split.js";
 
 export const cosineSimilarity = (a: readonly number[], b: readonly number[]): number => {
   if (a.length !== b.length || a.length === 0) {
