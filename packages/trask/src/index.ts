@@ -14,6 +14,7 @@ export {
   type WebResearchSourcePreference,
 } from "./web-research.js";
 export * from "./web-research-subprocess.js";
+export * from "./research-answer-split.js";
 export * from "./discord-reply-format.js";
 export * from "./discord-citation-url.js";
 export * from "./citation-url-verify.js";

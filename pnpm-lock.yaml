@@ -13,6 +13,9 @@ importers:
 
   .:
     devDependencies:
+      '@openkotor/trask':
+        specifier: workspace:*
+        version: link:packages/trask
       '@playwright/test':
         specifier: ^1.58.0
         version: 1.59.1

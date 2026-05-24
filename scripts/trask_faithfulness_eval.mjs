@@ -11,8 +11,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { citationIndicesInText } from "../packages/trask/dist/discord-reply-format.js";
-import { splitResearchAnswer } from "../packages/trask/dist/research-answer-split.js";
+import { citationIndicesInText, splitResearchAnswer } from "@openkotor/trask";
 import { loadGoldenQueries } from "../packages/trask-config/dist/golden-queries.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");

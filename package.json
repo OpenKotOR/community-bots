@@ -46,6 +46,7 @@
     "discord:smoke-trask-commands": "node scripts/discord_trask_commands_smoke.mjs"
   },
   "devDependencies": {
+    "@openkotor/trask": "workspace:*",
     "@playwright/test": "^1.58.0",
     "@types/node": "^24.12.3",
     "tsx": "^4.20.6",
