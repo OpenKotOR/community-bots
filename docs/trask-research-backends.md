@@ -55,20 +55,14 @@ TRASK_LITELLM_CONFIG=vendor/llm_fallbacks/configs/litellm_config_free.yaml bash 
 ### Verification ladder
 
 ```bash
-pnpm trask:optimize-measure           # offline gate: faithfulness + discord stress + trask unit suites
+pnpm trask:gate                       # recommended offline: build + full + CI optimize-measure (floor 165)
 pnpm trask:faithfulness-eval          # faithfulness fixtures only (subset of optimize-measure)
-pnpm verify:trask-cli                 # optimize-measure preflight, then CLI golden queries
-pnpm holocron:e2e                     # optimize-measure preflight, then Playwright (expert queries, :4010)
-pnpm verify:trask-discord             # optimize-measure preflight, then live Discord expert queries
+pnpm verify:trask-cli                 # trask:gate preflight, then CLI golden queries
+pnpm holocron:e2e                     # trask:gate preflight, then Playwright (expert queries, :4010)
+pnpm verify:trask-discord             # trask:gate preflight, then live Discord expert queries
 ```
 
-CI runs `pnpm trask:optimize-measure` once, then `pnpm holocron:e2e:playwright` (local `pnpm holocron:e2e` includes the offline preflight).
-
-After the job’s authoritative `pnpm build`, CI sets:
-
-- `TRASK_SKIP_BUILD=1` — skip redundant `tsc -b` in config-drift, optimize-measure, and holocron e2e workspace build
-- `TRASK_OPTIMIZE_SKIP_UNIT_TESTS=1` — faithfulness-only in optimize-measure (full unit tests run earlier in the job)
-- `TRASK_OPTIMIZE_SKIP_CHECK=1` — skip duplicate `pnpm check` inside optimize-measure (`tsc -b` already ran in the build step)
+CI runs `pnpm build`, `pnpm trask:optimize-measure:ci`, then `pnpm holocron:e2e:playwright` with `TRASK_SKIP_BUILD=1` (local `pnpm holocron:e2e` runs full `trask:gate` first).
 
 ## Explicitly rejected (do not implement)
 

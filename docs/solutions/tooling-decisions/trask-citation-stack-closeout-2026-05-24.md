@@ -1,5 +1,5 @@
 ---
-title: "Trask citation stack closeout (PR #33–#48)"
+title: "Trask citation stack closeout (PR #33–#52)"
 date: 2026-05-24
 category: tooling-decisions
 problem_type: quality
@@ -28,7 +28,7 @@ Discord `/ask` brief embeds could collapse to a single inline citation after agg
 | Test + CI gates | #41–#46 | All citation unit suites in local measure; CI enforces discord stress + floor **165** |
 | Contributor docs | #47–#48 | CONTRIBUTING, AGENTS, PR template checklist |
 | Gate script + live preflight | #49–#50 | `pnpm trask:gate`; verify/holocron scripts preflight with gate |
-| Runbook sync | #51 | AGENTS.md + docs/trask.md ladder |
+| Runbook sync | #51–#52 | AGENTS, trask.md, README, CONTRIBUTING, KB ladder |
 
 Authoritative module map: [trask-citation-module-architecture-2026-05-24.md](trask-citation-module-architecture-2026-05-24.md). Line-filter incident: [trask-discord-dual-citation-line-filter-2026-05-24.md](trask-discord-dual-citation-line-filter-2026-05-24.md).
 

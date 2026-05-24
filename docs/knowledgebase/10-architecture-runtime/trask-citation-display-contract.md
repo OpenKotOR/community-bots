@@ -80,9 +80,9 @@ pr_refs: [33, 34, 35, 36, 38]
 
 | Order | Gate | Proves |
 |-------|------|--------|
-| 1 | `pnpm trask:optimize-measure` | Faithfulness fixtures + discord stress tests + citation helper unit suites (`research-answer-split`, `query-anchor`, `citation-markers`) + `pnpm check` — **`composite_score`** floor **165** counts discord stress passes only (13 tests); see solutions doc |
-| 2 | `pnpm verify:trask-discord` | Live LLM + indexer + embed contract (preflight runs optimize-measure) |
-| 3 | `pnpm holocron:e2e` | Holocron UI + full research stack (preflight runs optimize-measure) |
+| 1 | `pnpm trask:gate` | `pnpm build` + full `optimize-measure` + `:ci` — both runs **`composite_score`** floor **165** (discord stress: 13 tests); see solutions doc |
+| 2 | `pnpm verify:trask-discord` | Live LLM + indexer + embed contract (preflight runs `trask:gate`) |
+| 3 | `pnpm holocron:e2e` | Holocron UI + full research stack (preflight runs `trask:gate`) |
 
 [REPO] `scripts/trask_optimize_measure.mjs` counts only **`packages/trask/dist/discord-reply-format.test.js`** passes toward `citation_stress_pass_count` / **`composite_score`**. It also runs **`research-answer-split.test.js`**, **`query-anchor.test.js`**, and **`citation-markers.test.js`** for `trask_unit_pass_rate` (must be 1.0).
 
