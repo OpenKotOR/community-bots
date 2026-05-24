@@ -28,14 +28,14 @@ When you change Trask answer formatting, Discord `/ask` display, or citation mod
 ```bash
 pnpm trask:smoke-imports         # build + workspace package import smoke (trask, trask-config, config, retrieval)
 pnpm trask:smoke-imports:ci      # smoke only after build (CI uses this)
-pnpm trask:gate                  # one build, smoke, full measure (skip-check), + :ci (recommended)
+pnpm trask:gate                  # one build, smoke, config-drift, full measure (skip-check), + :ci (recommended)
 # or individually:
 pnpm build
 pnpm trask:optimize-measure      # full local gate: faithfulness + discord stress + citation unit suites + check
 pnpm trask:optimize-measure:ci   # CI-equivalent (faithfulness + discord stress only; run after build)
 ```
 
-Both measure runs in `pnpm trask:gate` must reach **composite_score 165** (13 discord stress tests × 10 + faithfulness 5 × 5 + check 10). GitHub Actions runs `pnpm build`, `trask:smoke-imports:ci`, then `trask:optimize-measure:ci` in [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+Both measure runs in `pnpm trask:gate` must reach **composite_score 165** (13 discord stress tests × 10 + faithfulness 5 × 5 + check 10). GitHub Actions runs `pnpm build`, `trask:smoke-imports:ci`, `trask:config-drift`, then `trask:optimize-measure:ci` in [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 `pnpm verify:trask-cli`, `pnpm verify:trask-discord`, and `pnpm holocron:e2e` preflight with **`pnpm trask:gate`** before live or browser steps.
 
