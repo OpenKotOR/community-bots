@@ -38,7 +38,7 @@ Implementation: `packages/trask/src/discord-reply-format.ts` (`ensureMinimumDist
 
 ## Verification
 
-`pnpm trask:optimize-measure` (`scripts/trask_optimize_measure.mjs`) emits **composite_score** = (`citation_stress_pass_count` × 10) + (`faithfulness_pass_count` × 5) + (`check_pass` × 10), where **citation_stress_pass_count** is the pass count from `packages/trask/dist/discord-reply-format.test.js` only. **Current floor on main (post PR #35): composite_score 165** = 13 discord tests × 10 + faithfulness 5 × 5 + `pnpm check` 10. Older figures in plan history (115/8, 125, 135, 155) are point-in-time only.
+`pnpm trask:optimize-measure` (`scripts/trask_optimize_measure.mjs`) emits **composite_score** = (`citation_stress_pass_count` × 10) + (`faithfulness_pass_count` × 5) + (`check_pass` × 10), where **citation_stress_pass_count** is the pass count from `packages/trask/dist/discord-reply-format.test.js` only. The harness also runs `research-answer-split`, `query-anchor`, `citation-markers`, `grounded-evidence`, and `research-compose` unit files; all must pass for `trask_unit_pass_rate` = 1. **Current floor on main (post PR #35): composite_score 165** = 13 discord tests × 10 + faithfulness 5 × 5 + `pnpm check` 10. Older figures in plan history (115/8, 125, 135, 155) are point-in-time only.
 
 ```bash
 pnpm build
@@ -59,6 +59,7 @@ Pass criteria (expert queries): ≥2 distinct inline `https://` links, ≤5 non-
 
 ## History
 
+- 2026-05-24 — PR #41 wired `research-answer-split`, `query-anchor`, and `citation-markers` tests into `trask_optimize_measure.mjs`; added `query-anchor.test.ts`; **composite_score 165** unchanged.
 - 2026-05-24 — PR #40 extracted `query-anchor.ts` so `discord-reply-format.ts` no longer imports `grounded-evidence.ts`; **composite_score 165** unchanged.
 - 2026-05-24 — PR #38 (`0585c0f`) extracted `research-answer-split.ts` (breaks `grounded-evidence` ↔ `discord-reply-format` cycle on answer parsing); **composite_score 165** unchanged.
 - 2026-05-24 — PR #35 (`c62365b`) `BARE_CITATION_INDEX_CAPTURE_RE` in `embedInlineCitationLinks`; **composite_score 165**, 13 discord stress tests.
