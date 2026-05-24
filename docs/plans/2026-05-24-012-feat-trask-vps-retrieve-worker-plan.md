@@ -3,8 +3,9 @@ title: "feat: VPS co-located Trask retrieve Worker (wrangler + systemd)"
 type: feat
 status: completed
 date: 2026-05-24
+merged: 30700ce
+pr: https://github.com/OpenKotOR/community-bots/pull/11
 origin: docs/plans/2026-05-19-001-feat-trask-crawl4ai-rag-plan.md
-predecessor: docs/plans/2026-05-24-010-feat-trask-vps-indexer-systemd-health-plan.md
 ---
 
 # VPS Co-Located Retrieve Worker
