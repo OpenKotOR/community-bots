@@ -2,6 +2,10 @@
 /**
  * JSON measurement harness for ce-optimize Trask citation alignment runs.
  * Emits scalar metrics for faithfulness, unit suites, and citation stress tests.
+ *
+ * CI mode (`TRASK_OPTIMIZE_CI_MODE=1`): faithfulness + discord stress only; enforces
+ * composite_score floor (default 165) without re-running the full Trask unit matrix
+ * (see `.github/workflows/ci.yml` unit test step).
  */
 import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
@@ -35,8 +39,12 @@ const runTraskTestFile = (relativePath) => {
 };
 
 const main = () => {
-  const skipUnitTests = process.env.TRASK_OPTIMIZE_SKIP_UNIT_TESTS === "1";
-  const skipCheck = process.env.TRASK_OPTIMIZE_SKIP_CHECK === "1";
+  const ciMode = process.env.TRASK_OPTIMIZE_CI_MODE === "1";
+  const skipUnitTests = !ciMode && process.env.TRASK_OPTIMIZE_SKIP_UNIT_TESTS === "1";
+  const skipCheck = ciMode || process.env.TRASK_OPTIMIZE_SKIP_CHECK === "1";
+  const minCompositeScore = Number(
+    process.env.TRASK_OPTIMIZE_MIN_COMPOSITE_SCORE ?? (ciMode ? "165" : "0"),
+  );
 
   ensureWorkspaceBuilt(repoRoot);
 
@@ -55,7 +63,9 @@ const main = () => {
   let anchorStats = { pass: 0, fail: 0, total: 0 };
   let markersStats = { pass: 0, fail: 0, total: 0 };
 
-  if (!skipUnitTests) {
+  if (ciMode) {
+    discordStats = runTraskTestFile("packages/trask/dist/discord-reply-format.test.js");
+  } else if (!skipUnitTests) {
     discordStats = runTraskTestFile("packages/trask/dist/discord-reply-format.test.js");
     groundedStats = runTraskTestFile("packages/trask/dist/grounded-evidence.test.js");
     composeStats = runTraskTestFile("packages/trask/dist/research-compose.test.js");
@@ -80,28 +90,36 @@ const main = () => {
   const traskUnitPassRate = skipUnitTests ? 1 : unitPassTotal / Math.max(1, unitTotal);
 
   const checkPass = skipCheck || check.status === 0 ? 1 : 0;
+  const runsDiscordStress = ciMode || !skipUnitTests;
   const compositeScore =
-    (skipUnitTests ? 0 : citationStressPassCount * 10)
+    (runsDiscordStress ? citationStressPassCount * 10 : 0)
     + faithfulnessPassCount * 5
     + checkPass * 10;
 
-  const suitePass = (stats) => (skipUnitTests ? null : stats.pass === stats.total ? 1 : 0);
+  const suitePass = (stats, ran) => {
+    if (!ran) return null;
+    return stats.pass === stats.total ? 1 : 0;
+  };
+
+  const ranFullUnits = !ciMode && !skipUnitTests;
 
   const payload = {
-    citation_stress_pass_count: skipUnitTests ? null : citationStressPassCount,
+    citation_stress_pass_count: runsDiscordStress ? citationStressPassCount : null,
     faithfulness_pass_count: faithfulnessPassCount,
     faithfulness_pass_rate: faithfulnessPassRate,
     trask_unit_pass_rate: traskUnitPassRate,
-    discord_test_pass: suitePass(discordStats),
-    grounded_test_pass: suitePass(groundedStats),
-    compose_test_pass: suitePass(composeStats),
-    split_test_pass: suitePass(splitStats),
-    anchor_test_pass: suitePass(anchorStats),
-    markers_test_pass: suitePass(markersStats),
+    discord_test_pass: suitePass(discordStats, runsDiscordStress),
+    grounded_test_pass: suitePass(groundedStats, ranFullUnits),
+    compose_test_pass: suitePass(composeStats, ranFullUnits),
+    split_test_pass: suitePass(splitStats, ranFullUnits),
+    anchor_test_pass: suitePass(anchorStats, ranFullUnits),
+    markers_test_pass: suitePass(markersStats, ranFullUnits),
     check_pass: checkPass,
-    unit_tests_skipped: skipUnitTests ? 1 : 0,
+    unit_tests_skipped: skipUnitTests && !ciMode ? 1 : 0,
     check_skipped: skipCheck ? 1 : 0,
+    ci_mode: ciMode ? 1 : 0,
     composite_score: compositeScore,
+    composite_score_floor: minCompositeScore > 0 ? minCompositeScore : null,
   };
 
   console.log(JSON.stringify(payload, null, 0));
@@ -109,6 +127,12 @@ const main = () => {
   const unitOk = skipUnitTests || traskUnitPassRate >= 1;
   const checkOk = skipCheck || check.status === 0;
   if (faithfulnessPassRate < 1 || !unitOk || !checkOk) {
+    process.exit(1);
+  }
+  if (minCompositeScore > 0 && compositeScore < minCompositeScore) {
+    console.error(
+      `composite_score ${compositeScore} below floor ${minCompositeScore} (ci_mode=${ciMode ? 1 : 0})`,
+    );
     process.exit(1);
   }
 };
