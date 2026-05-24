@@ -62,7 +62,17 @@ After editing golden questions or fixtures, run `pnpm trask:config-drift`. Env o
 | `TRASK_RESEARCH_TRACE_LOG=0` | Disable Node JSON `trask_research_trace` lines on stderr (enabled by default; mirrors Holocron `liveTrace`) |
 | `TRASK_DISCORD_SYNC_INTERVAL_MS` | When &gt; 0, `trask-bot` runs `scripts/trask_discord_sync.py` on startup and on interval (recommended 15–60 min in production) |
 
-Gate: `pnpm verify:trask-discord` runs `pnpm trask:optimize-measure` first (offline citation + faithfulness), then live expert queries (requires indexer + LLM; use `--skip-url-check` only offline).
+**Citation offline gates**
+
+| Command | When |
+|---------|------|
+| `pnpm trask:optimize-measure` | Local preflight: faithfulness + discord stress + all citation unit suites + `pnpm check` (**composite_score** floor **165**) |
+| `pnpm trask:optimize-measure:ci` | CI-equivalent: faithfulness + discord stress + floor **165** (after `pnpm build`) |
+| `pnpm trask:faithfulness-eval` | Fixtures-only replay (no discord stress) |
+
+Module map: [trask-citation-module-architecture-2026-05-24.md](solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md).
+
+Gate: `pnpm verify:trask-discord` runs full `pnpm trask:optimize-measure` first, then live expert queries (requires indexer + LLM; use `--skip-url-check` only offline).
 
 ### 3. Configure Discord credentials
 

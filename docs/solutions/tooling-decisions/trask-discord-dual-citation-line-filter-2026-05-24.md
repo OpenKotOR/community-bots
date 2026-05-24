@@ -43,7 +43,7 @@ Implementation: `packages/trask/src/discord-reply-format.ts` (`ensureMinimumDist
 ```bash
 pnpm build
 pnpm trask:optimize-measure   # composite_score ≥ 165, 13 discord stress tests, faithfulness 5/5, all citation unit suites
-TRASK_OPTIMIZE_CI_MODE=1 TRASK_SKIP_BUILD=1 pnpm trask:optimize-measure   # CI-equivalent: faithfulness + discord stress + floor 165
+pnpm trask:optimize-measure:ci   # CI-equivalent: faithfulness + discord stress + floor 165 (after build)
 node --test packages/trask/dist/discord-reply-format.test.js
 pnpm trask:stack:health
 pnpm verify:trask-discord   # optimize-measure preflight, then live queries (token + LLM + indexer)
@@ -61,6 +61,7 @@ Pass criteria (expert queries): ≥2 distinct inline `https://` links, ≤5 non-
 
 ## History
 
+- 2026-05-24 — PR #45 adds `pnpm trask:optimize-measure:ci` script alias for CI-equivalent gate.
 - 2026-05-24 — PR #42 CI `TRASK_OPTIMIZE_CI_MODE=1` runs faithfulness + discord stress in GitHub Actions and enforces **composite_score ≥ 165** (replaces skip-unit-tests path that never ran discord stress).
 - 2026-05-24 — PR #41 wired `research-answer-split`, `query-anchor`, and `citation-markers` tests into `trask_optimize_measure.mjs`; added `query-anchor.test.ts`; **composite_score 165** unchanged.
 - 2026-05-24 — PR #40 extracted `query-anchor.ts` so `discord-reply-format.ts` no longer imports `grounded-evidence.ts`; **composite_score 165** unchanged.
