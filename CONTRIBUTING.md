@@ -28,7 +28,7 @@ When you change Trask answer formatting, Discord `/ask` display, or citation mod
 ```bash
 pnpm trask:smoke-imports         # build + workspace package import smoke (trask, trask-config, config, retrieval)
 pnpm trask:smoke-imports:ci      # smoke only after build (CI uses this)
-pnpm trask:gate                  # one build, then smoke + full + CI-equivalent optimize-measure (recommended)
+pnpm trask:gate                  # one build, smoke, full measure (skip-check), + :ci (recommended)
 # or individually:
 pnpm build
 pnpm trask:optimize-measure      # full local gate: faithfulness + discord stress + citation unit suites + check

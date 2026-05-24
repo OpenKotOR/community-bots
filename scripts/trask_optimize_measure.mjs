@@ -6,6 +6,10 @@
  * CI mode (`TRASK_OPTIMIZE_CI_MODE=1`): faithfulness + discord stress only; enforces
  * composite_score floor (default 165) without re-running the full Trask unit matrix
  * (see `.github/workflows/ci.yml` unit test step).
+ *
+ * Skip typecheck (`TRASK_OPTIMIZE_SKIP_CHECK=1`): omit `pnpm check` when `pnpm build`
+ * already ran (e.g. `pnpm trask:gate` full measure step). Standalone
+ * `pnpm trask:optimize-measure` does not set this flag.
  */
 import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
