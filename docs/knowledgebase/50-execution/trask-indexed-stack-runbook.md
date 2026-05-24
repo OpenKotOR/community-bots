@@ -111,6 +111,14 @@ Templates under `infra/trask-indexer/systemd/`:
 
 Bot deploy: `infra/trask-bot-stack/` (Discord sync interval, separate host or same VPS).
 
+Retrieve Worker on VPS (co-located wrangler proxy, production parity with local stack):
+
+- `scripts/trask_retrieve_worker_start.sh` — `:8787` → indexer `:8790`
+- `infra/trask-retrieve-worker/systemd/trask-retrieve-worker.service.example`
+- **Alternative:** Cloudflare `wrangler deploy` (edge); set clients to Workers URL
+
+Set `TRASK_INDEXER_BASE_URL=http://127.0.0.1:8787` on bot and trask-http-server when using co-located Worker.
+
 After install:
 
 ```bash

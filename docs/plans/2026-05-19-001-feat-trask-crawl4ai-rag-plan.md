@@ -16,9 +16,9 @@ compose_authority: docs/brainstorms/trask-rag-discord-compose-requirements.md
 
 ### Delta update (2026-05-24)
 
-- **Landed:** PR #9 (`6e982fb`) ops closure; PR #10 (`fbc6533`) VPS indexer systemd + `trask_indexed_stack_health.sh`.
-- **Partial:** VPS operator install is manual; `FileChunkStore` ingest merge deferred.
-- **Next:** Optional `FileChunkStore` merge; production retrieve Worker on VPS.
+- **Landed:** PR #9–#10; VPS retrieve Worker start script + systemd (`2026-05-24` slice).
+- **Partial:** VPS operator install manual; `FileChunkStore` ingest merge deferred.
+- **Next:** Optional `FileChunkStore` merge.
 
 ### Delta update (2026-05-19)
 

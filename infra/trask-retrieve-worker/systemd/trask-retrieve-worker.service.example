@@ -1,0 +1,29 @@
+# systemd unit for co-located Trask retrieve Worker (wrangler dev proxy).
+# Use when TRASK_INDEXER_BASE_URL should be http://127.0.0.1:8787 on the same VPS as Holocron/bot.
+# Alternative: Cloudflare Workers deploy (see infra/trask-retrieve-worker/README.md).
+#
+# Install:
+#   sudo cp infra/trask-retrieve-worker/systemd/trask-retrieve-worker.service.example \
+#     /etc/systemd/system/trask-retrieve-worker.service
+#   sudo systemctl daemon-reload && sudo systemctl enable --now trask-retrieve-worker
+
+[Unit]
+Description=Trask retrieve Worker (wrangler proxy to Chroma indexer)
+After=network-online.target trask-indexer.service
+Wants=network-online.target
+Requires=trask-indexer.service
+
+[Service]
+Type=simple
+User=trask
+Group=trask
+WorkingDirectory=/opt/community-bots
+EnvironmentFile=-/opt/community-bots/.env
+Environment=TRASK_INDEXER_PORT=8790
+Environment=TRASK_RETRIEVE_WORKER_PORT=8787
+ExecStart=/opt/community-bots/scripts/trask_retrieve_worker_start.sh
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
