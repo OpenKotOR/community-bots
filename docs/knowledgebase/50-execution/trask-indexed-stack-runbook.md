@@ -9,6 +9,8 @@ lastUpdated: 2026-05-23
 
 Operator guide for the self-hosted Trask research path: crawl → embed → Chroma → retrieve Worker → Holocron / Discord.
 
+**VPS rollout checklist:** [trask-vps-indexed-stack-rollout-2026-05-24.md](../../solutions/tooling-decisions/trask-vps-indexed-stack-rollout-2026-05-24.md)
+
 ## Components
 
 | Service | Local port | Role |
