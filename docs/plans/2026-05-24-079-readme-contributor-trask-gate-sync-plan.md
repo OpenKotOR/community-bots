@@ -1,7 +1,7 @@
 ---
 title: "docs: README and contributor trask:gate ladder sync"
 type: docs
-status: active
+status: completed
 date: 2026-05-24
 origin: docs/plans/2026-05-24-078-agents-trask-gate-docs-sync-plan.md
 ---
