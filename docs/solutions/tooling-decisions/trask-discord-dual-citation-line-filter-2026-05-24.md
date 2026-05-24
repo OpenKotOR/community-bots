@@ -55,4 +55,5 @@ Pass criteria (expert queries): ≥2 distinct inline `https://` links, ≤5 non-
 
 ## History
 
+- 2026-05-24 — PR #24 (`85a66fd`) added `swapWeakOffTopicCitedLines`, `sliceLinesPreservingDistinctCitations`, clamp backfill when line caps drop a second citation, and `scripts/trask_optimize_measure.mjs` for ce-optimize gates (`composite_score` 115, 8 discord stress tests).
 - 2026-05-24 — Documented after PR #15 merge (`ensureMinimumDistinctCitedLines` + claim selection hardening).
