@@ -49,10 +49,7 @@ jobs:
         run: node --test packages/*/dist/*.test.js apps/*/dist/*.test.js
 
       - name: Trask optimize measure gate (faithfulness + citation stress)
-        run: pnpm trask:optimize-measure
-        env:
-          TRASK_SKIP_BUILD: "1"
-          TRASK_OPTIMIZE_CI_MODE: "1"
+        run: pnpm trask:optimize-measure:ci
 
       - name: Install Playwright (Chromium)
         run: pnpm exec playwright install chromium --with-deps

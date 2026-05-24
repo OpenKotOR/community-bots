@@ -61,6 +61,7 @@ Pass criteria (expert queries): ≥2 distinct inline `https://` links, ≤5 non-
 
 ## History
 
+- 2026-05-24 — PR #46 CI workflow invokes `pnpm trask:optimize-measure:ci` (drops manual env block).
 - 2026-05-24 — PR #45 adds `pnpm trask:optimize-measure:ci` script alias for CI-equivalent gate.
 - 2026-05-24 — PR #42 CI `TRASK_OPTIMIZE_CI_MODE=1` runs faithfulness + discord stress in GitHub Actions and enforces **composite_score ≥ 165** (replaces skip-unit-tests path that never ran discord stress).
 - 2026-05-24 — PR #41 wired `research-answer-split`, `query-anchor`, and `citation-markers` tests into `trask_optimize_measure.mjs`; added `query-anchor.test.ts`; **composite_score 165** unchanged.

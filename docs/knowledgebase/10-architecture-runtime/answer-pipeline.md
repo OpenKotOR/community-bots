@@ -14,7 +14,7 @@ lastUpdated: 2026-05-24
 5. [REPO] Optional **`TRASK_GROUNDED_COMPOSE=1`** enables extract-then-compose over the report (`grounded-evidence.ts`); **`approvedSources`** are aligned to inline `[n]` citations (no padding).
 6. [REPO] Answers include a `Sources` block and **`groundingStatus`** on HTTP/Holocron records; UI shows provenance (cited vs consulted) per [holocron-web-trask-client.md](../30-product-ux/holocron-web-trask-client.md).
 7. [REPO] Discord uses embeds in `apps/trask-bot`; Holocron polls history per [trask-http-session-history-contract.md](trask-http-session-history-contract.md). Brief display runs `formatDiscordAskDisplay` after compose; modules: `citation-markers`, `research-answer-split`, `query-anchor`, `discord-reply-format` — see [trask-citation-display-contract.md](trask-citation-display-contract.md) and [trask-citation-module-architecture-2026-05-24.md](../../solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md).
-8. [REPO] Offline citation gates: local `pnpm trask:optimize-measure` (faithfulness + discord stress + citation unit suites + `pnpm check`; **composite_score** floor **165**); CI uses `TRASK_OPTIMIZE_CI_MODE=1` for faithfulness + discord stress + same floor. Optional `pnpm trask:faithfulness-eval` replays fixtures only.
+8. [REPO] Offline citation gates: local `pnpm trask:optimize-measure` (faithfulness + discord stress + citation unit suites + `pnpm check`; **composite_score** floor **165**); CI uses `pnpm trask:optimize-measure:ci` for faithfulness + discord stress + same floor. Optional `pnpm trask:faithfulness-eval` replays fixtures only.
 
 # Surfaces
 
