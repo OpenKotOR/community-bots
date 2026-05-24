@@ -110,7 +110,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
       - name: Holocron functional e2e (live Trask research in browser)
-        run: pnpm holocron:e2e
+        run: pnpm holocron:e2e:playwright
         env:
           TRASK_WEB_ALLOW_ANONYMOUS: "1"
           TRASK_INDEXER_BASE_URL: http://127.0.0.1:8787

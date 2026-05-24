@@ -31,7 +31,12 @@ const main = () => {
   run("pnpm", ["build"]);
 
   const faithfulness = run("node", ["scripts/trask_faithfulness_eval.mjs", "--fixtures"], { allowFail: true });
-  const faithfulnessPass = faithfulness.status === 0 ? 5 : 0;
+  const faithfulnessOutput = faithfulness.stdout + faithfulness.stderr;
+  const faithfulnessPassCount = (faithfulnessOutput.match(/^PASS /gm) ?? []).length;
+  const faithfulnessFailCount = (faithfulnessOutput.match(/^FAIL /gm) ?? []).length;
+  const faithfulnessEvaluated = faithfulnessPassCount + faithfulnessFailCount;
+  const faithfulnessPassRate =
+    faithfulnessEvaluated > 0 ? faithfulnessPassCount / faithfulnessEvaluated : 0;
 
   const discordOut = run("node", ["--test", "packages/trask/dist/discord-reply-format.test.js"], { allowFail: true });
   const discordStats = countTests(discordOut.stdout + discordOut.stderr);
@@ -45,14 +50,13 @@ const main = () => {
   const check = run("pnpm", ["check"], { allowFail: true });
 
   const citationStressPassCount = discordStats.pass;
-  const faithfulnessPassRate = faithfulnessPass / 5;
   const traskUnitPassRate =
     (discordStats.pass + groundedStats.pass + composeStats.pass)
     / Math.max(1, discordStats.total + groundedStats.total + composeStats.total);
 
   const payload = {
     citation_stress_pass_count: citationStressPassCount,
-    faithfulness_pass_count: faithfulnessPass,
+    faithfulness_pass_count: faithfulnessPassCount,
     faithfulness_pass_rate: faithfulnessPassRate,
     trask_unit_pass_rate: traskUnitPassRate,
     discord_test_pass: discordStats.pass === discordStats.total ? 1 : 0,
@@ -61,7 +65,7 @@ const main = () => {
     check_pass: check.status === 0 ? 1 : 0,
     composite_score:
       citationStressPassCount * 10
-      + faithfulnessPass * 5
+      + faithfulnessPassCount * 5
       + (check.status === 0 ? 10 : 0),
   };
 

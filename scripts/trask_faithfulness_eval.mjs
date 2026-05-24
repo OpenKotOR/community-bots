@@ -11,19 +11,17 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { splitResearchAnswer } from "../packages/trask/dist/discord-reply-format.js";
+import {
+  citationIndicesInText,
+  splitResearchAnswer,
+} from "../packages/trask/dist/discord-reply-format.js";
 import { loadGoldenQueries } from "../packages/trask-config/dist/golden-queries.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 const collectCitationIndices = (answer) => {
   const { body } = splitResearchAnswer(answer);
-  const indices = new Set();
-  for (const match of body.matchAll(/\[(\d{1,3})\]/g)) {
-    const value = Number(match[1]);
-    if (Number.isFinite(value) && value > 0) indices.add(value);
-  }
-  return [...indices].sort((a, b) => a - b);
+  return [...citationIndicesInText(body)].sort((a, b) => a - b);
 };
 
 const parseSourcesFromAnswer = (answer) => {
