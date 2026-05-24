@@ -48,7 +48,9 @@ const findSourcesSectionIndex = (value: string): number | null => {
 
 const discordPolicy = loadTraskPolicy().discord;
 
+/** Non-global: safe for repeated `.test()` in filters. */
 const CITATION_MARKER_IN_LINE_RE = /\[\d{1,2}\]/;
+/** Global: use only with `matchAll` (do not call `.test()` on this instance). */
 const CITATION_INDEX_CAPTURE_RE = /\[(\d{1,2})\]/g;
 
 const lineHasCitationMarker = (line: string): boolean => CITATION_MARKER_IN_LINE_RE.test(line);
