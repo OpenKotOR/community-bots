@@ -20,7 +20,7 @@ Canonical operator narrative for commands and env remains [docs/trask.md](../tra
 | 20 Domain theory | [kotor-modding-source-map.md](20-domain-theory/kotor-modding-source-map.md) |
 | 30 Product UX | [trask-persona-and-welcome-style.md](30-product-ux/trask-persona-and-welcome-style.md), [holocron-web-trask-client.md](30-product-ux/holocron-web-trask-client.md) |
 | 40 Risk | [discord-privacy-and-source-authority.md](40-operational-risk/discord-privacy-and-source-authority.md) |
-| 50 Execution | [discord-text-ingestion-runbook.md](50-execution/discord-text-ingestion-runbook.md), [ingest-worker-cli-runbook.md](50-execution/ingest-worker-cli-runbook.md), [trask-configuration-env-map.md](50-execution/trask-configuration-env-map.md), [trask-research-troubleshooting.md](50-execution/trask-research-troubleshooting.md), [validation-ladder.md](50-execution/validation-ladder.md) |
+| 50 Execution | [discord-text-ingestion-runbook.md](50-execution/discord-text-ingestion-runbook.md), [ingest-worker-cli-runbook.md](50-execution/ingest-worker-cli-runbook.md), [trask-indexed-stack-runbook.md](50-execution/trask-indexed-stack-runbook.md), [trask-configuration-env-map.md](50-execution/trask-configuration-env-map.md), [trask-research-troubleshooting.md](50-execution/trask-research-troubleshooting.md), [validation-ladder.md](50-execution/validation-ladder.md) |
 | 90 Meta | [evidence-label-contract.md](90-meta/evidence-label-contract.md), [caveat-register.md](90-meta/caveat-register.md), [prefer-defer-avoid.md](90-meta/prefer-defer-avoid.md) |
 
 ## Quick paths

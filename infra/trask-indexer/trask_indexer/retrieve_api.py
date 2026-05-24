@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 from pathlib import Path
 
@@ -13,6 +12,7 @@ from trask_indexer.chroma_store import (
     get_or_create_collection,
     query_passages,
 )
+from trask_indexer.health import build_health_payload
 
 DATA_DIR = Path(os.environ.get("TRASK_INDEXER_DATA_DIR", "data/trask-indexer"))
 PERSIST_DIR = DATA_DIR / "chroma"
@@ -47,16 +47,7 @@ def create_app() -> FastAPI:
 
     @app.get("/health")
     def health():
-        payload: dict[str, object] = {"ok": True, "collection": DEFAULT_COLLECTION}
-        status_path = DATA_DIR / "discord_sync_status.json"
-        if status_path.is_file():
-            try:
-                status = json.loads(status_path.read_text(encoding="utf-8"))
-                if isinstance(status, dict) and status.get("last_discord_sync"):
-                    payload["last_discord_sync"] = status["last_discord_sync"]
-            except json.JSONDecodeError:
-                pass
-        return payload
+        return build_health_payload(DATA_DIR, collection=DEFAULT_COLLECTION)
 
     @app.post("/retrieve", response_model=RetrieveResponse)
     def retrieve(body: RetrieveRequest):

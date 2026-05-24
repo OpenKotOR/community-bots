@@ -3,7 +3,7 @@ title: "feat: Trask Crawl4AI + Chroma CPU RAG migration"
 type: feat
 status: active
 date: 2026-05-19
-last_updated: 2026-05-19
+last_updated: 2026-05-24
 origin: docs/brainstorms/trask-crawl4ai-rag-requirements.md
 compose_authority: docs/brainstorms/trask-rag-discord-compose-requirements.md
 ---
@@ -13,6 +13,12 @@ compose_authority: docs/brainstorms/trask-rag-discord-compose-requirements.md
 ## Living plan status
 
 **Authority split:** This plan owns **indexer + crawl + VPS**. Product behavior for **Discord auto-index, grounded compose, question-last** is in `docs/brainstorms/trask-rag-discord-compose-requirements.md` (supersedes this plan’s stale “no LLM on compose” assumption).
+
+### Delta update (2026-05-24)
+
+- **Landed (PR #9):** Full indexed-stack ops closure — queue worker, CI pytest/drain smoke, discord sync stale health, Chroma backup/restore/scheduled cron, production bot manifest, **optional LLM keys in CI Holocron e2e**; doc decommission of unused `TRASK_RESEARCH_BACKEND` flag.
+- **Partial:** Operators must deploy VPS `.env` and backup upload hooks; `FileChunkStore` ingest merge deferred.
+- **Next:** Merge PR #9 when CI green; post-merge VPS operator rollout (bot systemd, backup cron, Discord sync interval).
 
 ### Delta update (2026-05-19)
 

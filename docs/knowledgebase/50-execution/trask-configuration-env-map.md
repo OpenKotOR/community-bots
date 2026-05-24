@@ -34,7 +34,7 @@ lastUpdated: 2026-05-19
 
 | Variable | Notes |
 |----------|--------|
-| `TRASK_INDEXER_BASE_URL` | [REPO] Trask indexer retrieve API (default `http://127.0.0.1:8790`). |
+| `TRASK_INDEXER_BASE_URL` | [REPO] Retrieve Worker or Chroma indexer API (local stack default: `http://127.0.0.1:8787` via Worker; raw indexer `:8790`). Consumed by `scripts/trask_web_research.py`. |
 | `TRASK_WEB_RESEARCH_PYTHON` | [REPO] Override Python; else `.venv-trask-research` from `scripts/bootstrap_trask_research.sh`. |
 | `TRASK_WEB_RESEARCH_SCRIPT` | [REPO] Optional explicit path to `scripts/trask_web_research.py`. |
 | `TRASK_RESEARCH_TIMEOUT_MS` | [REPO] Legacy overall budget (aliases `TRASK_RESEARCHWIZARD_TIMEOUT_MS`, default **900000**). |
@@ -46,6 +46,7 @@ lastUpdated: 2026-05-19
 | `TRASK_RESEARCH_COMPOSE_MODE` | [REPO] `rewrite` enables legacy digest rewrite fallbacks; default `grounded`. |
 | `TRASK_WEB_RESEARCH_DDG_FALLBACK` | [REPO] When `1` / `true`, Python runner may use DuckDuckGo only after empty Chroma retrieve (operator bootstrap; not used for compose when index miss). |
 | `TRASK_INDEXER_DATA_DIR` | [REPO] Chroma persist dir (default `data/trask-indexer`). |
+| `TRASK_DISCORD_SYNC_STALE_HOURS` | [REPO] Indexer `/health` marks `discord_sync_stale` when `last_discord_sync` is older than this many hours (default **48**; `0` disables stale flag). |
 | `TRASK_DISCORD_SYNC_TIMEOUT_MS` | [REPO] Kill `trask_discord_sync.py` subprocess after N ms (default **600000**; `0` = no timeout). |
 
 # Trask Discord bot (`loadTraskBotConfig`)

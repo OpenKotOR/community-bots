@@ -1,6 +1,7 @@
 # Trask indexer (Crawl4AI + Chroma)
 .venv-trask-indexer/
 data/trask-indexer/chroma/
+data/trask-indexer/backups/
 
 # Logs
 logs
@@ -75,6 +76,7 @@ web_modules/
 !.env.example
 !.env.cf.local.example
 !.env.local.example
+!infra/trask-bot-stack/.env.production.example
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
