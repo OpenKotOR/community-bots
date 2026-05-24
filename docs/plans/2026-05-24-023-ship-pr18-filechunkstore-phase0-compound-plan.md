@@ -1,8 +1,9 @@
 ---
 title: "ship: merge PR #18 FileChunkStore phase 0 compound doc"
 type: ship
-status: active
+status: completed
 date: 2026-05-24
+merged: 1a85b01
 origin: docs/plans/2026-05-24-022-docs-pr16-filechunkstore-phase0-compound-plan.md
 pr: https://github.com/OpenKotOR/community-bots/pull/18
 ---
