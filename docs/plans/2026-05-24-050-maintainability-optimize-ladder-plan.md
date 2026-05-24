@@ -3,6 +3,8 @@ title: "maintainability: review optimize-measure verification ladder"
 type: refactor
 status: completed
 date: 2026-05-24
+merged: 995b384
+pr: https://github.com/OpenKotOR/community-bots/pull/31
 origin: docs/plans/2026-05-24-048-optimize-measure-ci-holocron-plan.md
 ---
 
