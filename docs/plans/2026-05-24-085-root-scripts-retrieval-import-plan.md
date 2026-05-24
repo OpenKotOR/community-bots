@@ -1,7 +1,7 @@
 ---
 title: "refactor: finish root Trask script package imports"
 type: refactor
-status: active
+status: completed
 date: 2026-05-24
 origin: docs/plans/2026-05-24-084-root-scripts-openkotor-config-import-plan.md
 ---
