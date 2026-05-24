@@ -21,6 +21,20 @@ pnpm check
 - **Packages:** `packages/*` — shared TypeScript libraries consumed by apps.
 - **Infra:** `infra/*` — Nakama bundle, Cloudflare Workers, etc.
 
+## Trask citation gates (offline)
+
+When you change Trask answer formatting, Discord `/ask` display, or citation modules under `packages/trask/src/` (`citation-markers.ts`, `research-answer-split.ts`, `query-anchor.ts`, `discord-reply-format.ts`, `grounded-evidence.ts`):
+
+```bash
+pnpm build
+pnpm trask:optimize-measure      # full local gate: faithfulness + discord stress + citation unit suites + check
+pnpm trask:optimize-measure:ci   # CI-equivalent (faithfulness + discord stress only; run after build)
+```
+
+Both must reach **composite_score 165** (13 discord stress tests × 10 + faithfulness 5 × 5 + check 10). GitHub Actions runs `trask:optimize-measure:ci` in [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+
+Architecture and module map: [`docs/solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md`](docs/solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md). Live Discord/Holocron validation: [`AGENTS.md`](AGENTS.md) (not replaced by offline gates alone).
+
 ## Lint
 
 Only `pazaak-world` (and packages with their own eslint config) may have ESLint wired today:
