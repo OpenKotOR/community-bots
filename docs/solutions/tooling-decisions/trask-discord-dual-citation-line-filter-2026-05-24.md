@@ -42,7 +42,7 @@ pnpm build
 pnpm trask:optimize-measure   # composite_score ≥ 115, 8 discord stress tests, faithfulness 5/5
 node --test packages/trask/dist/discord-reply-format.test.js
 pnpm trask:stack:health
-pnpm verify:trask-discord   # when TRASK_DISCORD_BOT_TOKEN + LLM + indexer up
+pnpm verify:trask-discord   # optimize-measure preflight, then live queries (token + LLM + indexer)
 ```
 
 Pass criteria (expert queries): ≥2 distinct inline `https://` links, ≤5 non-empty lines, no `Sources` heading in embed.

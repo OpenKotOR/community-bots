@@ -3,6 +3,8 @@ title: "feat: preflight Discord live verify with trask:optimize-measure"
 type: feat
 status: completed
 date: 2026-05-24
+merged: 99085e1
+pr: https://github.com/OpenKotOR/community-bots/pull/28
 origin: docs/solutions/tooling-decisions/trask-discord-dual-citation-line-filter-2026-05-24.md
 ---
 
