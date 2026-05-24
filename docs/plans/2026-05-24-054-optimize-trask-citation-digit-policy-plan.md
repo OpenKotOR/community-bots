@@ -2,6 +2,7 @@
 title: "optimize: unify Trask citation digit policy (phase 2)"
 type: optimize
 status: completed
+merged: 99455eb
 date: 2026-05-24
 origin: docs/solutions/tooling-decisions/trask-discord-dual-citation-line-filter-2026-05-24.md
 ---

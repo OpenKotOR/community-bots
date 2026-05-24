@@ -1,7 +1,8 @@
 ---
 title: "ship: merge PR #33 citation digit policy"
 type: ship
-status: active
+status: completed
+merged: 99455eb
 date: 2026-05-24
 origin: docs/plans/2026-05-24-054-optimize-trask-citation-digit-policy-plan.md
 pr: https://github.com/OpenKotOR/community-bots/pull/33
