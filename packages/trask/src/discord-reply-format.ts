@@ -48,8 +48,7 @@ const findSourcesSectionIndex = (value: string): number | null => {
 
 const discordPolicy = loadTraskPolicy().discord;
 
-/** Non-global: safe for repeated `.test()` in filters. */
-/** Match grounded-evidence `CITATION_INDEX_RE` (1–3 digit indices). */
+/** Non-global: safe for repeated `.test()` in filters. Match grounded-evidence `CITATION_INDEX_RE`. */
 const CITATION_MARKER_IN_LINE_RE = /\[\d{1,3}\]/;
 /** Global: use only with `matchAll` (do not call `.test()` on this instance). */
 const CITATION_INDEX_CAPTURE_RE = /\[(\d{1,3})\]/g;
@@ -244,7 +243,10 @@ export const citationIndicesInLines = (lines: readonly string[]): Set<number> =>
   const indices = new Set<number>();
   for (const line of lines) {
     for (const match of line.matchAll(CITATION_INDEX_CAPTURE_RE)) {
-      indices.add(Number(match[1]));
+      const index = Number(match[1]);
+      if (Number.isFinite(index) && index > 0) {
+        indices.add(index);
+      }
     }
   }
   return indices;
