@@ -12,7 +12,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { citationIndicesInText, splitResearchAnswer } from "@openkotor/trask";
-import { loadGoldenQueries } from "../packages/trask-config/dist/golden-queries.js";
+import { loadGoldenQueries } from "@openkotor/trask-config";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 

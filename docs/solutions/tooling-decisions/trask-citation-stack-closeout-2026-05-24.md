@@ -1,5 +1,5 @@
 ---
-title: "Trask citation stack closeout (PR #33–#54)"
+title: "Trask citation stack closeout (PR #33–#55)"
 date: 2026-05-24
 category: tooling-decisions
 problem_type: quality
@@ -29,7 +29,8 @@ Discord `/ask` brief embeds could collapse to a single inline citation after agg
 | Contributor docs | #47–#48 | CONTRIBUTING, AGENTS, PR template checklist |
 | Gate script + live preflight | #49–#50 | `pnpm trask:gate`; verify/holocron scripts preflight with gate |
 | Runbook sync | #51–#53 | AGENTS, trask.md, README, CONTRIBUTING, KB ladder |
-| Package exports | #54 | `research-answer-split` on `@openkotor/trask` index; faithfulness eval |
+| Package exports | #54–#55 | `@openkotor/trask` index + verify scripts; `#55` live gates use package entry |
+| Config imports | #56 | Root scripts use `@openkotor/trask-config` package entry |
 
 Authoritative module map: [trask-citation-module-architecture-2026-05-24.md](trask-citation-module-architecture-2026-05-24.md). Line-filter incident: [trask-discord-dual-citation-line-filter-2026-05-24.md](trask-discord-dual-citation-line-filter-2026-05-24.md).
 

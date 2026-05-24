@@ -6,7 +6,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { resolveRepoRoot } from "../../packages/trask-config/dist/repo-root.js";
+import { resolveRepoRoot } from "@openkotor/trask-config";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 

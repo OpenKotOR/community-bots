@@ -12,7 +12,7 @@
  *   node scripts/verify_trask_webui_browser.mjs [--url=http://127.0.0.1:4010] [--headful]
  */
 
-import { verificationQueriesForSurface } from "../packages/trask-config/dist/verification-queries.js";
+import { verificationQueriesForSurface } from "@openkotor/trask-config";
 
 const defaultQueries = verificationQueriesForSurface("holocron").map((entry) => entry.question);
 
