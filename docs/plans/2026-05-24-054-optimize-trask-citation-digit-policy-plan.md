@@ -59,7 +59,7 @@ Phase 1 (`optimize/trask-citation-alignment`) raised `composite_score` to **115*
 - `embedInlineCitationLinks` turns `[10]` into a markdown link when URL map includes index 10.
 - `formatDiscordAskDisplay` still yields ≥2 https links for expert TSLPatcher fixture.
 
-**Verification:** `pnpm trask:optimize-measure` → `composite_score >= 125`, all gates pass.
+**Verification:** `pnpm trask:optimize-measure` → `composite_score >= 125` planned; shipped at **155** (PR #33).
 
 ### U3. Ship
 
