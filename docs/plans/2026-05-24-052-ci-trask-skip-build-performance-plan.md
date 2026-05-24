@@ -3,6 +3,8 @@ title: "perf: CI skip redundant Trask builds and duplicate tests"
 type: perf
 status: completed
 date: 2026-05-24
+merged: 018bb05
+pr: https://github.com/OpenKotOR/community-bots/pull/32
 origin: docs/plans/2026-05-24-050-maintainability-optimize-ladder-plan.md
 ---
 
