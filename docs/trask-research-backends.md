@@ -56,7 +56,7 @@ TRASK_LITELLM_CONFIG=vendor/llm_fallbacks/configs/litellm_config_free.yaml bash 
 
 ```bash
 pnpm trask:smoke-imports              # build + workspace package import smoke
-pnpm trask:gate                       # smoke-imports + full + CI optimize-measure (floor 165)
+pnpm trask:gate                       # one build, smoke, full measure (skip-check), :ci (floor 165)
 pnpm trask:faithfulness-eval          # faithfulness fixtures only (subset of optimize-measure)
 pnpm verify:trask-cli                 # trask:gate preflight, then CLI golden queries
 pnpm holocron:e2e                     # trask:gate preflight, then Playwright (expert queries, :4010)

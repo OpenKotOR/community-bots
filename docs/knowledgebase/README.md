@@ -23,6 +23,14 @@ Canonical operator narrative for commands and env remains [docs/trask.md](../tra
 | 50 Execution | [discord-text-ingestion-runbook.md](50-execution/discord-text-ingestion-runbook.md), [ingest-worker-cli-runbook.md](50-execution/ingest-worker-cli-runbook.md), [trask-indexed-stack-runbook.md](50-execution/trask-indexed-stack-runbook.md), [trask-configuration-env-map.md](50-execution/trask-configuration-env-map.md), [trask-research-troubleshooting.md](50-execution/trask-research-troubleshooting.md), [validation-ladder.md](50-execution/validation-ladder.md) |
 | 90 Meta | [evidence-label-contract.md](90-meta/evidence-label-contract.md), [caveat-register.md](90-meta/caveat-register.md), [prefer-defer-avoid.md](90-meta/prefer-defer-avoid.md) |
 
+## Solutions (compound closeout)
+
+| Doc | Use when |
+|-----|----------|
+| [trask-citation-stack-closeout-2026-05-24.md](../solutions/tooling-decisions/trask-citation-stack-closeout-2026-05-24.md) | Citation refactor arc **PR #33–#63** and `pnpm trask:gate` ladder |
+| [trask-citation-module-architecture-2026-05-24.md](../solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md) | Module map, exports, local vs CI gates |
+| [trask-root-script-package-imports-2026-05-24.md](../solutions/tooling-decisions/trask-root-script-package-imports-2026-05-24.md) | Root script `@openkotor/*` imports and smoke |
+
 ## Quick paths
 
 - [REPO] Export guild text: `scripts/export_discord_server.py` (see runbook).

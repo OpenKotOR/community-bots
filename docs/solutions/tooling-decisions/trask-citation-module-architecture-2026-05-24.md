@@ -1,5 +1,5 @@
 ---
-title: "Trask citation module architecture (PR #33–#62)"
+title: "Trask citation module architecture (PR #33–#63)"
 date: 2026-05-24
 category: tooling-decisions
 problem_type: architecture
@@ -78,7 +78,7 @@ Formula: `composite_score` = (`citation_stress_pass_count` × 10) + (`faithfulne
 
 ## Related
 
-- [trask-citation-stack-closeout-2026-05-24.md](trask-citation-stack-closeout-2026-05-24.md) — PR #33–#62 arc summary and `pnpm trask:gate`
+- [trask-citation-stack-closeout-2026-05-24.md](trask-citation-stack-closeout-2026-05-24.md) — PR #33–#63 arc summary and `pnpm trask:gate`
 - [trask-root-script-package-imports-2026-05-24.md](trask-root-script-package-imports-2026-05-24.md) — root `scripts/` workspace package imports
 - `packages/trask/src/` — implementation
 - `scripts/trask_optimize_measure.mjs` — measurement harness

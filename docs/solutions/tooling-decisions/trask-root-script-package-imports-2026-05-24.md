@@ -1,5 +1,5 @@
 ---
-title: "Trask root script package imports (PR #54–#62)"
+title: "Trask root script package imports (PR #54–#63)"
 date: 2026-05-24
 category: tooling-decisions
 problem_type: tooling
@@ -41,6 +41,7 @@ Root `package.json` lists workspace packages as **devDependencies** so Node reso
 | #60 | `trask:smoke-imports` in `trask:gate`; CI smoke after build |
 | #61 | Holocron Playwright e2e imports `@openkotor/trask-config` |
 | #62 | Single-build gate, `trask:smoke-imports:ci`, extended smoke |
+| #63 | Gate full measure uses `TRASK_OPTIMIZE_SKIP_CHECK=1` after build |
 
 ## Exceptions
 

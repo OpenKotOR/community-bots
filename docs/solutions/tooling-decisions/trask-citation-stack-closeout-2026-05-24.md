@@ -1,5 +1,5 @@
 ---
-title: "Trask citation stack closeout (PR #33–#62)"
+title: "Trask citation stack closeout (PR #33–#63)"
 date: 2026-05-24
 category: tooling-decisions
 problem_type: quality
@@ -31,14 +31,15 @@ Discord `/ask` brief embeds could collapse to a single inline citation after agg
 | Runbook sync | #51–#53 | AGENTS, trask.md, README, CONTRIBUTING, KB ladder |
 | Package exports | #54–#55 | `@openkotor/trask` index + verify scripts; `#55` live gates use package entry |
 | Config imports | #56–#58 | `@openkotor/trask-config`, `@openkotor/config`, `@openkotor/retrieval` for root scripts |
-| Import smoke in gate | #60–#62 | `trask:smoke-imports` in gate; CI `trask:smoke-imports:ci`; holocron e2e package entry (#61) |
+| Import smoke in gate | #60–#62 | `trask:smoke-imports` in gate; CI `trask:smoke-imports:ci`; holocron e2e package entry (#61); single-build gate (#62) |
+| Gate skip-check | #63 | Full measure in gate uses `TRASK_OPTIMIZE_SKIP_CHECK=1` after build |
 
 Authoritative module map: [trask-citation-module-architecture-2026-05-24.md](trask-citation-module-architecture-2026-05-24.md). Line-filter incident: [trask-discord-dual-citation-line-filter-2026-05-24.md](trask-discord-dual-citation-line-filter-2026-05-24.md).
 
 ## Verification ladder
 
 ```bash
-pnpm trask:gate                    # build + full optimize-measure + :ci
+pnpm trask:gate                    # one build, smoke, full measure (skip-check), :ci
 pnpm verify:trask-discord          # trask:gate preflight, then live Discord (stack + token)
 pnpm verify:trask-cli              # trask:gate preflight, then CLI golden queries
 pnpm holocron:e2e                  # trask:gate preflight, then Playwright + live research (stack)
@@ -48,7 +49,7 @@ Offline floor: **composite_score 165** = 13 discord stress × 10 + faithfulness 
 
 ## One-command preflight
 
-`pnpm trask:gate` runs one `pnpm build`, then import smoke, full `pnpm trask:optimize-measure`, then `pnpm trask:optimize-measure:ci` (subsequent steps use `TRASK_SKIP_BUILD=1`). Use before opening a PR that touches citation modules.
+`pnpm trask:gate` runs one `pnpm build`, then import smoke (`TRASK_SKIP_BUILD=1`), full `optimize-measure` with `TRASK_SKIP_BUILD` and `TRASK_OPTIMIZE_SKIP_CHECK`, then `trask:optimize-measure:ci`. Use before opening a PR that touches citation modules.
 
 ## Related
 
