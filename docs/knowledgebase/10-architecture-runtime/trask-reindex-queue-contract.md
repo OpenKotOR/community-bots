@@ -25,6 +25,7 @@ lastUpdated: 2026-05-15
 # Who drains
 
 - [REPO] **`drain-queue`** in **`apps/ingest-worker/src/main.ts`** — **`dequeueAll`** under lock, then **`runReindexTargets`** for each id (Firecrawl vs raw fetch per env).
+- [REPO] **`trask-indexer drain-queue`** (`scripts/trask_indexer_drain_queue.sh`) — same queue file/lock, drains into **Chroma** via Crawl4AI batch crawl ([trask-indexed-stack-runbook.md](../50-execution/trask-indexed-stack-runbook.md)).
 - [REPO] **`run-queue-worker [pollMs]`** — loop **`drain-queue`** then sleep; **`pollMs`** clamped **1000–300000** (default **15000**).
 
 # What reindex does **not** cover

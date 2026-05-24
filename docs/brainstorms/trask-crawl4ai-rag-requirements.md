@@ -125,7 +125,7 @@ If vector service is down, API returns explicit failure—not a confident halluc
 
 ## Success Criteria
 
-1. All five Holocron e2e queries pass with **`TRASK_RESEARCH_BACKEND=indexed`** (or successor flag) without legacy vendor research.
+1. All five Holocron e2e queries pass with **`TRASK_INDEXER_BASE_URL`** (retrieve Worker or indexer) and the Python research subprocess — without legacy vendor research.
 2. No OpenAI/OpenRouter/legacy vendor research calls on the research/retrieve path (compose extractive only in v1).
 3. Median Holocron query completes within existing client timeout budget on CPU hardware used in prod.
 4. Operator can reindex one catalog source and observe new passages in retrieve results.

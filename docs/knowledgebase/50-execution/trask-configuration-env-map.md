@@ -34,7 +34,7 @@ lastUpdated: 2026-05-19
 
 | Variable | Notes |
 |----------|--------|
-| `TRASK_INDEXER_BASE_URL` | [REPO] Trask indexer retrieve API (default `http://127.0.0.1:8790`). |
+| `TRASK_INDEXER_BASE_URL` | [REPO] Retrieve Worker or Chroma indexer API (local stack default: `http://127.0.0.1:8787` via Worker; raw indexer `:8790`). Consumed by `scripts/trask_web_research.py`. |
 | `TRASK_WEB_RESEARCH_PYTHON` | [REPO] Override Python; else `.venv-trask-research` from `scripts/bootstrap_trask_research.sh`. |
 | `TRASK_WEB_RESEARCH_SCRIPT` | [REPO] Optional explicit path to `scripts/trask_web_research.py`. |
 | `TRASK_RESEARCH_TIMEOUT_MS` | [REPO] Legacy overall budget (aliases `TRASK_RESEARCHWIZARD_TIMEOUT_MS`, default **900000**). |
