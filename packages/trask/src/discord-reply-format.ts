@@ -48,10 +48,10 @@ const findSourcesSectionIndex = (value: string): number | null => {
 
 const discordPolicy = loadTraskPolicy().discord;
 
-/** Non-global: safe for repeated `.test()` in filters. */
-const CITATION_MARKER_IN_LINE_RE = /\[\d{1,2}\]/;
+/** Non-global: safe for repeated `.test()` in filters. Match grounded-evidence `CITATION_INDEX_RE`. */
+const CITATION_MARKER_IN_LINE_RE = /\[\d{1,3}\]/;
 /** Global: use only with `matchAll` (do not call `.test()` on this instance). */
-const CITATION_INDEX_CAPTURE_RE = /\[(\d{1,2})\]/g;
+const CITATION_INDEX_CAPTURE_RE = /\[(\d{1,3})\]/g;
 
 const lineHasCitationMarker = (line: string): boolean => CITATION_MARKER_IN_LINE_RE.test(line);
 
@@ -168,7 +168,7 @@ export const buildCitationUrlMap = (
 export const normalizeBodyCitationIndices = (body: string): string => {
   const seen = new Map<number, number>();
   let next = 1;
-  return body.replace(/\[(\d{1,2})\]/g, (_match, rawIndex: string) => {
+  return body.replace(/\[(\d{1,3})\]/g, (_match, rawIndex: string) => {
     const oldIndex = Number(rawIndex);
     let mapped = seen.get(oldIndex);
     if (!mapped) {
@@ -182,7 +182,7 @@ export const normalizeBodyCitationIndices = (body: string): string => {
 
 /** Turn bare [n] markers into Discord markdown links on the number only. */
 export const embedInlineCitationLinks = (body: string, citationUrls: ReadonlyMap<number, string>): string =>
-  body.replace(/\[(\d{1,2})\]/g, (_match, rawIndex: string) => {
+  body.replace(/\[(\d{1,3})\]/g, (_match, rawIndex: string) => {
     const index = Number(rawIndex);
     const url = citationUrls.get(index);
     return url ? `[${index}](${url})` : `[${index}]`;
@@ -243,7 +243,10 @@ export const citationIndicesInLines = (lines: readonly string[]): Set<number> =>
   const indices = new Set<number>();
   for (const line of lines) {
     for (const match of line.matchAll(CITATION_INDEX_CAPTURE_RE)) {
-      indices.add(Number(match[1]));
+      const index = Number(match[1]);
+      if (Number.isFinite(index) && index > 0) {
+        indices.add(index);
+      }
     }
   }
   return indices;

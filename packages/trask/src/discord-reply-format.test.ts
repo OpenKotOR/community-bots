@@ -5,6 +5,7 @@ import {
   citationIndicesInLines,
   citationIndicesInText,
   clampDiscordBodyLines,
+  embedInlineCitationLinks,
   ensureMinimumDistinctCitedLines,
   filterDiscordLinesForQuery,
   formatDiscordAskDisplay,
@@ -110,6 +111,40 @@ test("clampDiscordBodyLines backfills missing citation when first capped lines s
 
   const clamped = clampDiscordBodyLines(body, 2, expertQuery);
   assert.equal(citationIndicesInText(clamped).size, BRIEF_DISCORD_MIN_CITATIONS, clamped);
+});
+
+test("citationIndicesInText recognizes two-digit citation index [10]", () => {
+  const line =
+    "Extended KotOR modding docs reference TLK list formats and patch tooling. [10]";
+  const indices = citationIndicesInText(line);
+  assert.ok(indices.has(10), [...indices].join(","));
+});
+
+test("citationIndicesInText ignores [0] markers", () => {
+  const indices = citationIndicesInText("Invalid zero index. [0] Valid cited line. [1]");
+  assert.ok(indices.has(1));
+  assert.ok(!indices.has(0));
+});
+
+test("formatDiscordAskDisplay links body [10] and [11] after normalize with approvedSources", () => {
+  const raw = `TSLPatcher applies 2DA and TLK list patches for KotOR mod installs. [10]
+The TSLPatcher GitHub repo documents GFF and TLK list-driven changes. [11]
+
+Sources
+10. Deadly Stream - https://deadlystream.com/files/file/1982-tslpatcher
+11. github.com - https://github.com/th3w1zard1/TSLPatcher`;
+
+  const display = formatDiscordAskDisplay(raw, approvedSources, { query: expertQuery });
+  const links = [...display.matchAll(/\]\((https:\/\/[^)]+)\)/g)];
+  assert.ok(links.length >= BRIEF_DISCORD_MIN_CITATIONS, display);
+  assert.doesNotMatch(display, /\[(?:10|11)\](?!\()/);
+});
+
+test("embedInlineCitationLinks links [10] when citation map includes index 10", () => {
+  const body = "Tenth source about TLK automation for large mod lists. [10]";
+  const map = new Map([[10, "https://example.com/tlk-list"]]);
+  const linked = embedInlineCitationLinks(body, map);
+  assert.match(linked, /\[10\]\(https:\/\/example\.com\/tlk-list\)/);
 });
 
 test("formatDiscordAskDisplay preserves two links when body has low-score second citation", () => {

@@ -39,7 +39,7 @@ Implementation: `packages/trask/src/discord-reply-format.ts` (`ensureMinimumDist
 
 ```bash
 pnpm build
-pnpm trask:optimize-measure   # composite_score ≥ 115, 8 discord stress tests, faithfulness 5/5
+pnpm trask:optimize-measure   # composite_score ≥ 155, 12 discord stress tests, faithfulness 5/5
 node --test packages/trask/dist/discord-reply-format.test.js
 pnpm trask:stack:health
 pnpm verify:trask-discord   # optimize-measure preflight, then live queries (token + LLM + indexer)
