@@ -22,7 +22,11 @@ python -m trask_indexer.cli run-queue-worker [pollMs]
 python -m trask_indexer.cli serve --port 8790
 ```
 
-Shell wrappers: `scripts/trask_crawl_catalog.sh`, `scripts/trask_indexer_drain_queue.sh`, `scripts/trask_indexer_run_queue_worker.sh`, `scripts/trask_index_golden_corpus.sh`.
+Shell wrappers: `scripts/trask_crawl_catalog.sh`, `scripts/trask_indexer_drain_queue.sh`, `scripts/trask_indexer_run_queue_worker.sh`, `scripts/trask_index_golden_corpus.sh`, `scripts/trask_indexed_stack_health.sh`.
+
+## VPS systemd
+
+See `infra/trask-indexer/systemd/` for `trask-indexer.service.example` and `trask-indexer-queue-worker.service.example`. Pair with `infra/trask-bot-stack/` for Discord bot + sync interval.
 
 ## Environment
 

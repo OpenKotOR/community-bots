@@ -16,9 +16,9 @@ compose_authority: docs/brainstorms/trask-rag-discord-compose-requirements.md
 
 ### Delta update (2026-05-24)
 
-- **Landed:** PR #9 merged (`6e982fb`) — full indexed-stack ops closure (queue worker, CI gates, discord sync stale health, Chroma backup/cron, production bot manifest, optional LLM keys in Holocron e2e).
-- **Partial:** VPS operator rollout (systemd bot, backup cron, Discord sync interval) is manual; `FileChunkStore` ingest merge deferred.
-- **Next:** Operator rollout on VPS; optional `FileChunkStore` merge in a future slice.
+- **Landed:** PR #9 merged (`6e982fb`); post-merge VPS indexer systemd templates + `trask_indexed_stack_health.sh` (2026-05-24 slice).
+- **Partial:** VPS operator rollout execution is manual; `FileChunkStore` ingest merge deferred.
+- **Next:** Optional `FileChunkStore` merge; production Worker deploy on VPS.
 
 ### Delta update (2026-05-19)
 
