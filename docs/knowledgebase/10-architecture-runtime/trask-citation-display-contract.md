@@ -37,6 +37,8 @@ pr_refs: [33, 34, 35, 36, 38]
 
 [REPO] Answer-shape parsing lives in `packages/trask/src/research-answer-split.ts` (`splitResearchAnswer`, `syncSourcesSectionToApproved`, `ResearchAnswerSource`). `grounded-evidence.ts` and `discord-reply-format.ts` import from there; `discord-reply-format.ts` re-exports split/sync for script compatibility. No `grounded-evidence` ↔ `discord-reply-format` cycle on answer parsing (PR #38).
 
+[REPO] Query anchoring (`BRIEF_DISCORD_MIN_CITATIONS`, `distinctiveAnchorTokens`, `claimMatchesQueryAnchor`) lives in `packages/trask/src/query-anchor.ts`. `discord-reply-format.ts` imports anchors from `query-anchor.ts` only — not from `grounded-evidence.ts` (PR #40). `grounded-evidence.ts` re-exports anchor APIs for compose callers.
+
 # Discord `/ask` display pipeline
 
 [REPO] `formatDiscordAskDisplay(rawAnswer, approvedSources, { query })` in `packages/trask/src/discord-reply-format.ts` runs in order:
@@ -90,6 +92,7 @@ pr_refs: [33, 34, 35, 36, 38]
 |--------|----------------|
 | `citation-markers.ts` | Regex + `parseCitationIndex` |
 | `research-answer-split.ts` | Body vs `Sources`/`References` split, `syncSourcesSectionToApproved` |
+| `query-anchor.ts` | Brief min citations, distinctive tokens, claim/passage anchor match |
 | `grounded-evidence.ts` | Claims, compose, sufficiency, `collectCitationIndicesFromAnswer` |
 | `discord-reply-format.ts` | Discord line surgery, inline embed, query line filters |
 | `discord-citation-url.ts` | `discord://` → jump URL when passages are Discord exports |
