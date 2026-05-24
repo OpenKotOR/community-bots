@@ -1,8 +1,9 @@
 ---
 title: "ship: close stale PR #22 ship plan and record merge authority"
 type: ship
-status: active
+status: completed
 date: 2026-05-24
+merged: e66d699
 origin: docs/plans/2026-05-24-031-ship-pr22-simplify-compose-plan.md
 pr: https://github.com/OpenKotOR/community-bots/pull/22
 ---
