@@ -4,7 +4,7 @@
  * (not deep dist path imports under packages). Fast gate before live verify or after pnpm install.
  */
 import { loadSharedAiConfig } from "@openkotor/config";
-import { traskApprovedResearchSources } from "@openkotor/retrieval";
+import { defaultSourceCatalog, traskApprovedResearchSources } from "@openkotor/retrieval";
 import {
   BRIEF_DISCORD_MIN_CITATIONS,
   citationIndicesInText,
@@ -16,7 +16,6 @@ import {
   loadTraskPolicy,
   verificationQueriesForSurface,
 } from "@openkotor/trask-config";
-import { defaultSourceCatalog } from "@openkotor/retrieval";
 
 const assert = (ok, message) => {
   if (!ok) {

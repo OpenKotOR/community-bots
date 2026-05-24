@@ -4,8 +4,10 @@ owner: trask-bot
 status: active
 lastUpdated: 2026-05-24
 related_solutions:
+  - docs/solutions/tooling-decisions/trask-citation-stack-closeout-2026-05-24.md
   - docs/solutions/tooling-decisions/trask-discord-dual-citation-line-filter-2026-05-24.md
   - docs/solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md
+  - docs/solutions/tooling-decisions/trask-root-script-package-imports-2026-05-24.md
 pr_refs: [33, 34, 35, 36, 38]
 ---
 
@@ -15,7 +17,7 @@ pr_refs: [33, 34, 35, 36, 38]
 
 - [trask-discord-slash-contract.md](trask-discord-slash-contract.md) — slash commands, permissions, SLA, embed size limits
 - [docs/solutions/tooling-decisions/trask-discord-dual-citation-line-filter-2026-05-24.md](../../solutions/tooling-decisions/trask-discord-dual-citation-line-filter-2026-05-24.md) — incident history and **`composite_score`** formula (authoritative for numeric gate floors)
-- [docs/solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md](../../solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md) — module map, dependency direction, local vs CI gates (PR #33–#42)
+- [docs/solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md](../../solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md) — module map, dependency direction, local vs CI gates (PR #33–#63)
 
 # Shared citation markers
 
@@ -72,7 +74,7 @@ pr_refs: [33, 34, 35, 36, 38]
 
 [REPO] `DISCORD_ASK_MAX_BODY_LINES`, `DISCORD_ASK_MAX_LINE_CHARS`, `DISCORD_ASK_DESCRIPTION_MAX_LENGTH` — loaded from Trask policy (`loadTraskPolicy().discord`).
 
-[REPO] `BRIEF_DISCORD_MIN_CITATIONS` — defined in `grounded-evidence.ts`, consumed by display filters and tests.
+[REPO] `BRIEF_DISCORD_MIN_CITATIONS` — defined in `query-anchor.ts`, exported via `@openkotor/trask` index; consumed by display filters and tests.
 
 # Verification
 
@@ -80,7 +82,7 @@ pr_refs: [33, 34, 35, 36, 38]
 
 | Order | Gate | Proves |
 |-------|------|--------|
-| 1 | `pnpm trask:gate` | `pnpm build` + full `optimize-measure` + `:ci` — both runs **`composite_score`** floor **165** (discord stress: 13 tests); see solutions doc |
+| 1 | `pnpm trask:gate` | one `pnpm build`, import smoke, full measure (`TRASK_SKIP_BUILD` + `TRASK_OPTIMIZE_SKIP_CHECK`), `:ci` — both measure runs **`composite_score`** floor **165** (discord stress: 13 tests); see [stack closeout](../../solutions/tooling-decisions/trask-citation-stack-closeout-2026-05-24.md) |
 | 2 | `pnpm verify:trask-discord` | Live LLM + indexer + embed contract (preflight runs `trask:gate`) |
 | 3 | `pnpm holocron:e2e` | Holocron UI + full research stack (preflight runs `trask:gate`) |
 
