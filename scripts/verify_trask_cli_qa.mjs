@@ -5,8 +5,12 @@
  * Exercises the same path as Discord `/ask` and trask-http-server — not the browser.
  * Validates non-empty answers, Sources block, https URLs, and inline [n] citations when RICH.
  *
- * Usage (repo root, after `pnpm build`):
+ * Usage (repo root):
+ *   pnpm verify:trask-cli
  *   node --import tsx/esm scripts/verify_trask_cli_qa.mjs
+ *
+ * Preflight: `pnpm verify:trask-cli` runs `pnpm trask:optimize-measure` first
+ * (build, faithfulness fixtures, discord citation stress tests) before live queries.
  *   node --import tsx/esm scripts/verify_trask_cli_qa.mjs --queries "What is TSLPatcher?"
  *
  * Environment:
