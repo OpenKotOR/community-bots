@@ -1,0 +1,28 @@
+# systemd unit template for always-on Trask Discord bot on a VPS.
+# Install:
+#   1. Clone community-bots to /opt/community-bots (or set WorkingDirectory below)
+#   2. Copy infra/trask-bot-stack/.env.production.example → /opt/community-bots/.env and fill secrets
+#   3. bash scripts/bootstrap_trask_indexer.sh (on indexer host)
+#   4. sudo cp infra/trask-bot-stack/trask-bot.service.example /etc/systemd/system/trask-bot.service
+#   5. Edit User= and paths if not using /opt/community-bots
+#   6. sudo systemctl daemon-reload && sudo systemctl enable --now trask-bot
+
+[Unit]
+Description=OpenKotOR Trask Discord bot (indexed RAG + Discord sync)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=trask
+Group=trask
+WorkingDirectory=/opt/community-bots
+EnvironmentFile=/opt/community-bots/.env
+ExecStart=/opt/community-bots/scripts/trask_bot_start.sh
+Restart=on-failure
+RestartSec=15
+# Discord sync subprocess can run up to TRASK_DISCORD_SYNC_TIMEOUT_MS (default 10m)
+TimeoutStopSec=120
+
+[Install]
+WantedBy=multi-user.target

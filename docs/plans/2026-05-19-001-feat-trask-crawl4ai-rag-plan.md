@@ -16,9 +16,9 @@ compose_authority: docs/brainstorms/trask-rag-discord-compose-requirements.md
 
 ### Delta update (2026-05-24)
 
-- **Landed (PR #9):** `trask-indexer drain-queue` + `run-queue-worker`; operator runbook; golden corpus script; `pnpm trask:indexer:test` + allowlist export + drain smoke in CI; `discord_sync_stale` on `/health`; Chroma backup/restore scripts; doc decommission of unused `TRASK_RESEARCH_BACKEND` flag.
-- **Partial:** Discord sync **off** unless `TRASK_DISCORD_SYNC_INTERVAL_MS` > 0 in production deploy; `FileChunkStore` ingest merge deferred.
-- **Next:** (1) production Discord sync interval in deploy manifests; (2) optional LLM keys in CI for richer compose; (3) scheduled off-site backup upload (cron/S3).
+- **Landed (PR #9):** `trask-indexer drain-queue` + `run-queue-worker`; operator runbook; golden corpus script; `pnpm trask:indexer:test` + allowlist export + drain smoke in CI; `discord_sync_stale` on `/health`; Chroma backup/restore scripts; **production bot deploy manifest** (`infra/trask-bot-stack/` with `TRASK_DISCORD_SYNC_INTERVAL_MS=1800000` template); doc decommission of unused `TRASK_RESEARCH_BACKEND` flag.
+- **Partial:** Operators must copy `.env.production.example` on VPS and set secrets; `FileChunkStore` ingest merge deferred.
+- **Next:** (1) optional LLM keys in CI for richer compose; (2) scheduled off-site Chroma backup upload (cron/S3).
 
 ### Delta update (2026-05-19)
 

@@ -71,7 +71,7 @@ Uses the same lock contract as ingest-worker (`reindex-queue.lock`). Do not run 
 python scripts/trask_discord_sync.py
 ```
 
-Enable periodic sync on trask-bot with `TRASK_DISCORD_SYNC_INTERVAL_MS` > 0. Indexer `GET /health` exposes `last_discord_sync`, `discord_sync_age_hours`, and `discord_sync_stale` (default stale threshold: 48h via `TRASK_DISCORD_SYNC_STALE_HOURS`).
+Enable periodic sync on trask-bot with `TRASK_DISCORD_SYNC_INTERVAL_MS` > 0 (production template: `infra/trask-bot-stack/.env.production.example`, default **1800000** = 30 min). Indexer `GET /health` exposes `last_discord_sync`, `discord_sync_age_hours`, and `discord_sync_stale` (default stale threshold: 48h via `TRASK_DISCORD_SYNC_STALE_HOURS`).
 
 ## Backup / restore (Chroma)
 
