@@ -34,8 +34,9 @@ Authoritative module map: [trask-citation-module-architecture-2026-05-24.md](tra
 
 ```bash
 pnpm trask:gate                    # build + full optimize-measure + :ci
-pnpm verify:trask-discord          # live Discord (after stack + token)
-pnpm holocron:e2e                  # browser + live research (after stack)
+pnpm verify:trask-discord          # trask:gate preflight, then live Discord (stack + token)
+pnpm verify:trask-cli              # trask:gate preflight, then CLI golden queries
+pnpm holocron:e2e                  # trask:gate preflight, then Playwright + live research (stack)
 ```
 
 Offline floor: **composite_score 165** = 13 discord stress × 10 + faithfulness 5 × 5 + check 10.

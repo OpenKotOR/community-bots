@@ -54,6 +54,7 @@ Formula: `composite_score` = (`citation_stress_pass_count` × 10) + (`faithfulne
 | #39 | `research-answer-split.test.ts` |
 | #40 | `query-anchor.ts` — display decoupled from grounded-evidence |
 | #41 | Split/anchor/markers tests in optimize-measure |
+| #50 | Live verify / holocron:e2e preflight via `pnpm trask:gate` |
 | #49 | `pnpm trask:gate` + citation stack closeout solutions doc |
 | #48 | PR template Trask citation gate checklist |
 | #47 | CONTRIBUTING + AGENTS learned facts for citation gates |
