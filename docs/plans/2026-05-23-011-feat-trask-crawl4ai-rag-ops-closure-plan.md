@@ -1,7 +1,7 @@
 ---
 title: "feat: Trask Crawl4AI RAG ops closure (queue bridge + runbook)"
 type: feat
-status: active
+status: completed
 date: 2026-05-23
 origin: docs/plans/2026-05-19-001-feat-trask-crawl4ai-rag-plan.md
 ---

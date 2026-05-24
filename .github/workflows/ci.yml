@@ -58,6 +58,9 @@ jobs:
       - name: Bootstrap Trask indexer venv
         run: bash scripts/bootstrap_trask_indexer.sh
 
+      - name: Trask indexer unit tests (Python)
+        run: pnpm trask:indexer:test
+
       - name: Seed Chroma golden fixtures for Holocron e2e
         run: .venv-trask-indexer/bin/python scripts/smoke_trask_indexed_stack.py --golden-fixtures --verify-retrieve
         env:

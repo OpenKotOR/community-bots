@@ -86,6 +86,7 @@ tar -czf trask-chroma-backup-$(date +%Y%m%d).tar.gz -C data/trask-indexer chroma
 
 | Gate | Command |
 |------|---------|
+| Indexer unit tests | `pnpm trask:indexer:test` (after `bootstrap_trask_indexer.sh`) |
 | Holocron e2e (5 queries) | `pnpm holocron:e2e` |
 | CLI QA | `pnpm verify:trask-cli` |
 | Offline faithfulness | `pnpm trask:faithfulness-eval` |

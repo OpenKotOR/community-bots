@@ -29,6 +29,7 @@
     "verify:trask-discord:post": "pnpm build && node --import tsx/esm scripts/verify_trask_discord_live.mjs --post",
     "trask:faithfulness-eval": "pnpm build && node scripts/trask_faithfulness_eval.mjs --fixtures",
     "trask:config-drift": "pnpm build && node scripts/check_trask_config_drift.mjs",
+    "trask:indexer:test": ".venv-trask-indexer/bin/python -m pytest infra/trask-indexer/tests/ -q",
     "discord:setup": "node scripts/discord_setup_wizard.mjs --write",
     "discord:smoke-bots": "node scripts/discord_bots_smoke.mjs",
     "dev:pazaak-nakama": "pnpm --filter @openkotor/pazaak-nakama build && docker compose -f infra/nakama/docker-compose.yml up",
