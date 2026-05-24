@@ -22,6 +22,11 @@ Expert phrasing (e.g. TSLPatcher toolchain questions) can score one cited line m
 
 PR #15 fixed this by backfilling from the cited pool after filtering.
 
+## Root cause
+
+1. **`filterDiscordLinesForQuery`** kept only the top-scoring cited line for expert phrasing, dropping the second citation before `embedInlineCitationLinks`.
+2. **`selectDistinctBriefClaims`** / **`claimsFromDistinctPassages`** could pad with off-topic token matches, causing catalog bleed on some queries.
+
 ## Solution
 
 1. **`ensureMinimumDistinctCitedLines`** — After query scoring selects lines, backfill from the cited pool until distinct `[n]` indices ≥ `BRIEF_DISCORD_MIN_CITATIONS` (2), preferring lines that add a new citation index.

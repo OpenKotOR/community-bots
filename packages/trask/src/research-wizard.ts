@@ -8,7 +8,6 @@ import {
   sourceUrlMatchesDescriptor,
   traskApprovedResearchBaseHosts,
   traskApprovedResearchSources,
-  type SearchProvider,
   type SourceDescriptor,
 } from "@openkotor/retrieval";
 import {
@@ -1157,7 +1156,6 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
     private readonly config: ResearchWizardRuntimeConfig,
     private readonly aiConfig: SharedAiConfig,
     private readonly approvedSources: readonly SourceDescriptor[] = traskApprovedResearchSources,
-    private readonly localSearchProvider?: SearchProvider,
   ) {
     this.openAiClient = aiConfig.openAiApiKey
       ? new OpenAI({
@@ -1302,24 +1300,6 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
     }
 
     return fallbackDiscordBrief(query, report, approvedSources);
-  }
-
-  private async searchLocalKnowledge(query: string): Promise<string> {
-    if (!this.localSearchProvider) return "";
-    try {
-      const hits = await this.localSearchProvider.search(query, 4);
-      const approved = hits.filter((hit) => isTraskApprovedBaseUrl(hit.url));
-      if (approved.length === 0) return "";
-      const lines = approved.map(
-        (hit) => `- ${hit.title}: ${hit.snippet} (${hit.url})`,
-      );
-      return [
-        "Local Knowledge Context (lower authority than live web research; never cite as https Sources):",
-        ...lines,
-      ].join("\n");
-    } catch {
-      return "";
-    }
   }
 
   private passagesSupportLlmRewrite(
@@ -1907,9 +1887,8 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
 export const createResearchWizardClient = (
   config: ResearchWizardRuntimeConfig,
   aiConfig: SharedAiConfig = loadSharedAiConfig(),
-  localSearchProvider?: SearchProvider,
 ): ResearchWizardClient => {
-  return new ResearchWizardClient(config, aiConfig, traskApprovedResearchSources, localSearchProvider);
+  return new ResearchWizardClient(config, aiConfig, traskApprovedResearchSources);
 };
 
 // ---------------------------------------------------------------------------
