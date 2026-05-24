@@ -1,9 +1,10 @@
 ---
 title: "feat: Trask Crawl4AI + Chroma CPU RAG migration"
 type: feat
-status: active
+status: completed
 date: 2026-05-19
 last_updated: 2026-05-24
+closed: 2026-05-24
 origin: docs/brainstorms/trask-crawl4ai-rag-requirements.md
 compose_authority: docs/brainstorms/trask-rag-discord-compose-requirements.md
 ---
@@ -13,6 +14,11 @@ compose_authority: docs/brainstorms/trask-rag-discord-compose-requirements.md
 ## Living plan status
 
 **Authority split:** This plan owns **indexer + crawl + VPS**. Product behavior for **Discord auto-index, grounded compose, question-last** is in `docs/brainstorms/trask-rag-discord-compose-requirements.md` (supersedes this plan’s stale “no LLM on compose” assumption).
+
+### Delta update (2026-05-24) — closure
+
+- **Complete:** Indexed crawl + Chroma + Worker retrieve + grounded compose + Holocron/Discord contracts + VPS ops (PR #9–#12). Authority: `docs/solutions/tooling-decisions/trask-vps-indexed-stack-rollout-2026-05-24.md`.
+- **Deferred (separate epic):** `FileChunkStore` → Chroma merge — see `docs/plans/2026-05-24-017-defer-filechunkstore-merge-plan.md`. Legacy `createChunkSearchProvider` remains for ingest-worker; **not** on the hot Holocron compose path.
 
 ### Delta update (2026-05-24)
 

@@ -13,12 +13,21 @@ tags:
   - "indexer"
   - "chroma"
   - "systemd"
-applies_when: "Deploying or validating the self-hosted Trask indexed stack on a VPS after PR #9–#11"
+applies_when: "Deploying or validating the self-hosted Trask indexed stack on a VPS after PR #9–#12"
 ---
 
 ## Context
 
-PR #9–#11 landed operator artifacts for the Crawl4AI + Chroma path: queue drain/worker, Discord sync health, Chroma backup/cron, bot deploy manifest, indexer + retrieve Worker systemd templates, and `pnpm trask:stack:health`. The detailed runbook remains at `docs/knowledgebase/50-execution/trask-indexed-stack-runbook.md`; this doc is the **ordered rollout checklist** agents and operators follow once.
+PR #9–#12 landed operator artifacts for the Crawl4AI + Chroma path: queue drain/worker, Discord sync health, Chroma backup/cron, bot deploy manifest, indexer + retrieve Worker systemd templates, and `pnpm trask:stack:health`. The detailed runbook remains at `docs/knowledgebase/50-execution/trask-indexed-stack-runbook.md`; this doc is the **ordered rollout checklist** agents and operators follow once.
+
+## Indexed vs legacy storage
+
+| Path | Authority | Notes |
+|------|-----------|--------|
+| **Chroma + Worker** | **Yes** — Holocron/Discord research | `TRASK_INDEXER_BASE_URL` → `:8787` Worker; Discord sync → Chroma |
+| **FileChunkStore** | Legacy / deferred | `INGEST_STATE_DIR/chunks`; ingest-worker only; **not** merged into compose (see `docs/plans/2026-05-24-017-defer-filechunkstore-merge-plan.md`) |
+
+Do not point new operators at ingest-worker chunk paths for Holocron answers — use the indexed stack checklist below.
 
 ## VPS rollout checklist
 
