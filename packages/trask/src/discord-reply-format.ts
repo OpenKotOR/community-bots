@@ -1,6 +1,7 @@
 import { loadTraskPolicy } from "@openkotor/trask-config";
 
 import {
+  BARE_CITATION_INDEX_CAPTURE_RE,
   CITATION_INDEX_CAPTURE_RE,
   CITATION_MARKER_RE,
   parseCitationIndex,
@@ -182,7 +183,7 @@ export const normalizeBodyCitationIndices = (body: string): string => {
 
 /** Turn bare [n] markers into Discord markdown links on the number only. */
 export const embedInlineCitationLinks = (body: string, citationUrls: ReadonlyMap<number, string>): string =>
-  body.replace(CITATION_INDEX_CAPTURE_RE, (_match, rawIndex: string) => {
+  body.replace(BARE_CITATION_INDEX_CAPTURE_RE, (_match, rawIndex: string) => {
     const index = Number(rawIndex);
     const url = citationUrls.get(index);
     return url ? `[${index}](${url})` : `[${index}]`;

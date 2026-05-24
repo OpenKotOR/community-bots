@@ -4,6 +4,9 @@ export const CITATION_MARKER_RE = /\[\d{1,3}\]/;
 /** Global: use only with `matchAll` / `replace` (do not call `.test()` on this instance). */
 export const CITATION_INDEX_CAPTURE_RE = /\[(\d{1,3})\]/g;
 
+/** Global: bare `[n]` only — skips `[n](url)` already embedded as markdown. */
+export const BARE_CITATION_INDEX_CAPTURE_RE = /\[(\d{1,3})\](?!\()/g;
+
 export const parseCitationIndex = (raw: string): number | null => {
   const index = Number(raw);
   return Number.isFinite(index) && index > 0 ? index : null;
