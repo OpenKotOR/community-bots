@@ -19,6 +19,7 @@ import {
   mergeCommunityAndWebSources,
   searchHitsToCommunitySources,
 } from "./community-knowledge.js";
+import { isRewriteComposeEnabled } from "./research-compose.js";
 
 import {
   listHeadlessWebResearchModels,
@@ -1417,7 +1418,10 @@ export class WebResearchClient implements WebResearchQueryHandler {
         answer = degradedAnswerFallback(query, approvedSources);
       } else if (isSynthesisFailureReport(report, payload)) {
         const webSources = resolveWebSourcesForFailedSynthesis(query, webEvidenceSources);
-        if (webSources.length >= MIN_HOLOCRON_WEB_CITATIONS) {
+        if (
+          webSources.length >= MIN_HOLOCRON_WEB_CITATIONS
+          && isRewriteComposeEnabled(this.config)
+        ) {
           const rewritePool = mergeCommunityAndWebSources(
             filterPublicWebCitationSources(webSources),
             communitySources,
@@ -1425,12 +1429,15 @@ export class WebResearchClient implements WebResearchQueryHandler {
           answer = this.openAiClient
             ? await this.rewriteForDiscord(query, report, rewritePool, options?.model, communityDigest)
             : fallbackDiscordRewrite(query, report, rewritePool);
-        } else if (webSources.length > 0 || communitySources.length > 0) {
-          answer = sourceOnlyFallbackAnswer(query, sourcesForRewrite);
+        } else if (webSources.length > 0) {
+          answer = sourceOnlyFallbackAnswer(
+            query,
+            filterPublicWebCitationSources(webSources),
+          );
         } else {
           answer = degradedAnswerFallback(query, approvedSources);
         }
-      } else if (this.openAiClient) {
+      } else if (isRewriteComposeEnabled(this.config) && this.openAiClient) {
         answer = await this.rewriteForDiscord(
           query,
           report,
@@ -1438,12 +1445,16 @@ export class WebResearchClient implements WebResearchQueryHandler {
           options?.model,
           communityDigest,
         );
-      } else {
+      } else if (isRewriteComposeEnabled(this.config)) {
         answer = fallbackDiscordRewrite(
           query,
           report,
           sourcesForRewrite,
         );
+      } else if (webSourcesForRewrite.length > 0) {
+        answer = sourceOnlyFallbackAnswer(query, webSourcesForRewrite);
+      } else {
+        answer = degradedAnswerFallback(query, approvedSources);
       }
 
       const webCitedSources = ensureMinimumWebCitations(
@@ -1493,7 +1504,12 @@ export class WebResearchClient implements WebResearchQueryHandler {
       const webEvidenceSources = collectWebEvidenceSources(query, report, approvedSources, payload);
       const retrievedSources = webEvidenceSources;
       const answer = retrievedSources.length > 0
-        ? await this.rewriteForDiscordBrief(query, report, retrievedSources)
+        ? isRewriteComposeEnabled(this.config) && this.openAiClient
+          ? await this.rewriteForDiscordBrief(query, report, retrievedSources)
+          : sourceOnlyFallbackAnswer(
+              query,
+              filterPublicWebCitationSources(retrievedSources),
+            )
         : degradedAnswerFallback(query, approvedSources);
 
       return {

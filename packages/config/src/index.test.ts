@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   loadSharedAiConfig,
   loadResearchWizardRuntimeConfig,
+  loadWebResearchRuntimeConfig,
   loadTraskHttpServerConfig,
   loadHkBotConfig,
   loadPazaakBotConfig,
@@ -180,6 +181,18 @@ test("loadResearchWizardRuntimeConfig enables rewrite compose mode when TRASK_RE
 
 test("loadResearchWizardRuntimeConfig disables grounded compose when TRASK_GROUNDED_COMPOSE=0", () => {
   const cfg = loadResearchWizardRuntimeConfig({ TRASK_GROUNDED_COMPOSE: "0" });
+  assert.equal(cfg.groundedComposeEnabled, false);
+});
+
+test("loadWebResearchRuntimeConfig inherits composeMode from wizard env", () => {
+  const cfg = loadWebResearchRuntimeConfig({});
+  assert.equal(cfg.composeMode, "grounded");
+  assert.equal(cfg.groundedComposeEnabled, true);
+});
+
+test("loadWebResearchRuntimeConfig inherits rewrite compose mode when TRASK_RESEARCH_COMPOSE_MODE=rewrite", () => {
+  const cfg = loadWebResearchRuntimeConfig({ TRASK_RESEARCH_COMPOSE_MODE: "rewrite" });
+  assert.equal(cfg.composeMode, "rewrite");
   assert.equal(cfg.groundedComposeEnabled, false);
 });
 

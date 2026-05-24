@@ -319,6 +319,8 @@ export interface WebResearchRuntimeConfig {
   headlessScriptPath: string | undefined;
   backendUrl: string | undefined;
   timeoutMs: number;
+  composeMode: ResearchComposeMode;
+  groundedComposeEnabled: boolean;
 }
 
 export const loadWebResearchRuntimeConfig = (env: NodeJS.ProcessEnv = process.env): WebResearchRuntimeConfig => {
@@ -334,6 +336,8 @@ export const loadWebResearchRuntimeConfig = (env: NodeJS.ProcessEnv = process.en
     headlessScriptPath: wizard.researchScriptPath ?? (scriptRaw ? resolve(scriptRaw) : undefined),
     backendUrl,
     timeoutMs: wizard.timeoutMs,
+    composeMode: wizard.composeMode,
+    groundedComposeEnabled: wizard.groundedComposeEnabled,
   };
 };
 
