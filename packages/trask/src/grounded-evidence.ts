@@ -26,13 +26,6 @@ import {
 } from "./query-anchor.js";
 import { splitResearchAnswer, syncSourcesSectionToApproved } from "./research-answer-split.js";
 
-export {
-  BRIEF_DISCORD_MIN_CITATIONS,
-  claimMatchesQueryAnchor,
-  distinctiveAnchorTokens,
-  passageMatchesQueryAnchor,
-} from "./query-anchor.js";
-
 const MIN_WEB_CITATIONS = loadTraskPolicy().minWebCitations;
 export const BRIEF_MAX_CLAIM_LINES = 2;
 /** Full Holocron answers: up to five bullets, at least `MIN_WEB_CITATIONS` distinct https URLs when available. */

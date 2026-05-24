@@ -24,7 +24,7 @@ Authoritative display contract: [trask-citation-display-contract.md](../../knowl
 
 ```
 citation-markers.ts          ← regex + parseCitationIndex (**internal** — not exported from `@openkotor/trask` index)
-query-anchor.ts              ← BRIEF_DISCORD_MIN_CITATIONS, distinctiveAnchorTokens, claimMatchesQueryAnchor (re-exported via `grounded-evidence`)
+query-anchor.ts              ← BRIEF_DISCORD_MIN_CITATIONS, distinctiveAnchorTokens, claimMatchesQueryAnchor (**exported** from `@openkotor/trask` index)
 research-answer-split.ts     ← splitResearchAnswer, syncSourcesSectionToApproved (**exported** from `@openkotor/trask` index)
 grounded-evidence.ts         ← compose, claims, sufficiency (imports split + anchor; re-exports anchor)
 discord-reply-format.ts      ← line filters, embedInlineCitationLinks (imports markers, anchor, split; NOT grounded-evidence)
@@ -55,6 +55,7 @@ Formula: `composite_score` = (`citation_stress_pass_count` × 10) + (`faithfulne
 | #39 | `research-answer-split.test.ts` |
 | #40 | `query-anchor.ts` — display decoupled from grounded-evidence |
 | #41 | Split/anchor/markers tests in optimize-measure |
+| #59 | Export `query-anchor` from `@openkotor/trask` index |
 | #58 | Config drift + allowlist export use `@openkotor/retrieval`; root import compound doc |
 | #57 | Root verify scripts import `@openkotor/config`; holocron browser verify uses package entries |
 | #56 | Root scripts import `@openkotor/trask-config` package entry |

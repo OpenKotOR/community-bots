@@ -36,6 +36,7 @@ Root `package.json` lists workspace packages as **devDependencies** so Node reso
 | #55 | Verify scripts import `@openkotor/trask` |
 | #56 | Scripts import `@openkotor/trask-config` |
 | #57 | Verify scripts import `@openkotor/config`; holocron browser verify uses package entries |
+| #59 | Export `query-anchor` from `@openkotor/trask` index |
 | #58 | Config drift + allowlist export import `@openkotor/retrieval` |
 
 ## Exceptions

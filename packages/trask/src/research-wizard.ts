@@ -33,6 +33,10 @@ import {
 } from "./web-research.js";
 import {
   BRIEF_DISCORD_MIN_CITATIONS,
+  claimMatchesQueryAnchor,
+  passageMatchesQueryAnchor,
+} from "./query-anchor.js";
+import {
   collectCitedSourcesFromAnswer,
   collectCitationIndicesFromAnswer,
   composeGroundedAnswerFromClaims,
@@ -40,8 +44,6 @@ import {
   hasMinimumDiscordBriefGroundedSupport,
   hasMinimumHolocronGroundedSupport,
   passagesSupportGroundedCompose,
-  claimMatchesQueryAnchor,
-  passageMatchesQueryAnchor,
   passagesAnchoredForQuery,
   selectQueryAnchoredClaims,
   selectDistinctBriefClaims,
