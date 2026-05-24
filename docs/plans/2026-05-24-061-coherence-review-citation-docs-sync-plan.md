@@ -2,6 +2,7 @@
 title: "docs: coherence sync for citation PRs #33–#35"
 type: docs
 status: completed
+merged: 88feab8
 date: 2026-05-24
 origin: ce-coherence-reviewer post-PR #35
 ---
