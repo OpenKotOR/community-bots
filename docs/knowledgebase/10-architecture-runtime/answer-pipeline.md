@@ -2,7 +2,7 @@
 title: Trask Answer Pipeline
 owner: trask-bot
 status: active
-lastUpdated: 2026-05-19
+lastUpdated: 2026-05-24
 ---
 
 # End-to-end flow
@@ -13,8 +13,8 @@ lastUpdated: 2026-05-19
 4. [SYNTH] Local chunk text is merged into the research report as lower-authority context for grounded compose or rewrite; public citations remain **`https://`** on approved hosts only.
 5. [REPO] Optional **`TRASK_GROUNDED_COMPOSE=1`** enables extract-then-compose over the report (`grounded-evidence.ts`); **`approvedSources`** are aligned to inline `[n]` citations (no padding).
 6. [REPO] Answers include a `Sources` block and **`groundingStatus`** on HTTP/Holocron records; UI shows provenance (cited vs consulted) per [holocron-web-trask-client.md](../30-product-ux/holocron-web-trask-client.md).
-7. [REPO] Discord uses embeds in `apps/trask-bot`; Holocron polls history per [trask-http-session-history-contract.md](trask-http-session-history-contract.md). Discord brief display (`formatDiscordAskDisplay`, citation markers) is specified in [trask-citation-display-contract.md](trask-citation-display-contract.md).
-8. [REPO] Offline citation gates: `pnpm trask:optimize-measure` (faithfulness + discord stress; see solutions doc for `composite_score` floor) then optional `pnpm trask:faithfulness-eval` for fixtures-only replay.
+7. [REPO] Discord uses embeds in `apps/trask-bot`; Holocron polls history per [trask-http-session-history-contract.md](trask-http-session-history-contract.md). Brief display runs `formatDiscordAskDisplay` after compose; modules: `citation-markers`, `research-answer-split`, `query-anchor`, `discord-reply-format` — see [trask-citation-display-contract.md](trask-citation-display-contract.md) and [trask-citation-module-architecture-2026-05-24.md](../../solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md).
+8. [REPO] Offline citation gates: local `pnpm trask:optimize-measure` (faithfulness + discord stress + citation unit suites + `pnpm check`; **composite_score** floor **165**); CI uses `TRASK_OPTIMIZE_CI_MODE=1` for faithfulness + discord stress + same floor. Optional `pnpm trask:faithfulness-eval` replays fixtures only.
 
 # Surfaces
 
@@ -37,3 +37,5 @@ lastUpdated: 2026-05-19
 - [trask-proactive-mode-contract.md](trask-proactive-mode-contract.md) — optional message listener.
 - [holocron-web-trask-client.md](../30-product-ux/holocron-web-trask-client.md) — Holocron `trask-api.ts` + Vite.
 - [pazaak-bot-trask-api-mount.md](pazaak-bot-trask-api-mount.md) — PazaakWorld `/api/trask` mount.
+- [trask-citation-display-contract.md](trask-citation-display-contract.md) — citation markers and Discord display pipeline.
+- [trask-citation-module-architecture-2026-05-24.md](../../solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md) — module map and gate table (PR #33–#42).
