@@ -39,9 +39,8 @@ jobs:
 
       - name: Trask config drift gate
         run: pnpm trask:config-drift
-
-      - name: Type check
-        run: pnpm check
+        env:
+          TRASK_SKIP_BUILD: "1"
 
       - name: Lint (pazaak-world)
         run: pnpm --filter pazaak-world lint
@@ -51,6 +50,10 @@ jobs:
 
       - name: Trask optimize measure gate (faithfulness + citation stress)
         run: pnpm trask:optimize-measure
+        env:
+          TRASK_SKIP_BUILD: "1"
+          TRASK_OPTIMIZE_SKIP_UNIT_TESTS: "1"
+          TRASK_OPTIMIZE_SKIP_CHECK: "1"
 
       - name: Install Playwright (Chromium)
         run: pnpm exec playwright install chromium --with-deps
@@ -112,6 +115,7 @@ jobs:
       - name: Holocron functional e2e (live Trask research in browser)
         run: pnpm holocron:e2e:playwright
         env:
+          TRASK_SKIP_BUILD: "1"
           TRASK_WEB_ALLOW_ANONYMOUS: "1"
           TRASK_INDEXER_BASE_URL: http://127.0.0.1:8787
           TRASK_WEB_RESEARCH_PYTHON: .venv-trask-indexer/bin/python

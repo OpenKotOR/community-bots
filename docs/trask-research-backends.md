@@ -64,6 +64,12 @@ pnpm verify:trask-discord             # optimize-measure preflight, then live Di
 
 CI runs `pnpm trask:optimize-measure` once, then `pnpm holocron:e2e:playwright` (local `pnpm holocron:e2e` includes the offline preflight).
 
+After the job’s authoritative `pnpm build`, CI sets:
+
+- `TRASK_SKIP_BUILD=1` — skip redundant `tsc -b` in config-drift, optimize-measure, and holocron e2e workspace build
+- `TRASK_OPTIMIZE_SKIP_UNIT_TESTS=1` — faithfulness-only in optimize-measure (full unit tests run earlier in the job)
+- `TRASK_OPTIMIZE_SKIP_CHECK=1` — skip duplicate `pnpm check` inside optimize-measure (`tsc -b` already ran in the build step)
+
 ## Explicitly rejected (do not implement)
 
 | Approach | Reason |

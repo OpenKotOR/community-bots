@@ -6,11 +6,14 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { defaultSourceCatalog } from "../packages/retrieval/dist/index.js";
-import { goldenFixtures, loadGoldenQueries } from "../packages/trask-config/dist/golden-queries.js";
+import { ensureWorkspaceBuilt } from "./lib/trask_skip_build.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const catalogIds = new Set(defaultSourceCatalog.map((source) => source.id));
+
+const CONFIG_DRIFT_BUILD_MARKERS = [
+  "packages/retrieval/dist/index.js",
+  "packages/trask-config/dist/golden-queries.js",
+];
 
 const ALLOWED_GOLDEN_LITERAL_PATHS = new Set([
   "data/trask/eval/golden-queries.json",
@@ -73,31 +76,44 @@ const isAllowedGoldenLiteral = (relPath) => {
   return false;
 };
 
-const errors = [];
+const main = async () => {
+  ensureWorkspaceBuilt(repoRoot, CONFIG_DRIFT_BUILD_MARKERS);
 
-for (const fixture of goldenFixtures()) {
-  if (!catalogIds.has(fixture.sourceId)) {
-    errors.push(`golden fixture ${fixture.id} uses sourceId "${fixture.sourceId}" not in catalog`);
-  }
-}
+  const { defaultSourceCatalog } = await import("../packages/retrieval/dist/index.js");
+  const { goldenFixtures, loadGoldenQueries } = await import("../packages/trask-config/dist/golden-queries.js");
 
-const goldenQuestions = loadGoldenQueries().map((entry) => entry.question);
-for (const relPath of walk(repoRoot)) {
-  if (isAllowedGoldenLiteral(relPath)) continue;
-  const text = readFileSync(join(repoRoot, relPath), "utf8");
-  for (const question of goldenQuestions) {
-    if (text.includes(question)) {
-      errors.push(`golden question duplicated in ${relPath}`);
+  const catalogIds = new Set(defaultSourceCatalog.map((source) => source.id));
+  const errors = [];
+
+  for (const fixture of goldenFixtures()) {
+    if (!catalogIds.has(fixture.sourceId)) {
+      errors.push(`golden fixture ${fixture.id} uses sourceId "${fixture.sourceId}" not in catalog`);
     }
   }
-}
 
-if (errors.length > 0) {
-  console.error("Trask config drift check failed:\n");
-  for (const error of errors) {
-    console.error(`  - ${error}`);
+  const goldenQuestions = loadGoldenQueries().map((entry) => entry.question);
+  for (const relPath of walk(repoRoot)) {
+    if (isAllowedGoldenLiteral(relPath)) continue;
+    const text = readFileSync(join(repoRoot, relPath), "utf8");
+    for (const question of goldenQuestions) {
+      if (text.includes(question)) {
+        errors.push(`golden question duplicated in ${relPath}`);
+      }
+    }
   }
-  process.exit(1);
-}
 
-console.log("Trask config drift check passed.");
+  if (errors.length > 0) {
+    console.error("Trask config drift check failed:\n");
+    for (const error of errors) {
+      console.error(`  - ${error}`);
+    }
+    process.exit(1);
+  }
+
+  console.log("Trask config drift check passed.");
+};
+
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

@@ -153,7 +153,7 @@ pnpm trask:optimize-measure   # faithfulness fixtures + discord citation stress 
 pnpm trask:faithfulness-eval  # faithfulness fixtures only
 ```
 
-`trask:faithfulness-eval` replays committed golden fixtures under `data/trask-eval/fixtures/` (no live web research). It does **not** replace Holocron e2e for end-to-end research validation. `pnpm holocron:e2e` runs `trask:optimize-measure` then `holocron:e2e:playwright`; CI runs optimize-measure once then `holocron:e2e:playwright` only. Product policy strings live under `data/trask/`; run `pnpm trask:config-drift` after changes to catch duplicated golden questions in code.
+`trask:faithfulness-eval` replays committed golden fixtures under `data/trask-eval/fixtures/` (no live web research). It does **not** replace Holocron e2e for end-to-end research validation. `pnpm holocron:e2e` runs `trask:optimize-measure` then `holocron:e2e:playwright`; CI runs optimize-measure once then `holocron:e2e:playwright` only (with `TRASK_SKIP_BUILD` / optimize skip envs after the job’s first `pnpm build`). Product policy strings live under `data/trask/`; run `pnpm trask:config-drift` after changes to catch duplicated golden questions in code.
 
 ### Trask Discord `/ask` — mandatory verification (agents)
 
