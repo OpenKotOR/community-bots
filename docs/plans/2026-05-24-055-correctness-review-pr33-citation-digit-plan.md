@@ -2,6 +2,7 @@
 title: "review: correctness pass on PR #33 citation digit policy"
 type: review
 status: completed
+merged: 99455eb
 date: 2026-05-24
 origin: docs/plans/2026-05-24-054-optimize-trask-citation-digit-policy-plan.md
 pr: 33
