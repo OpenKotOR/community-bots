@@ -14,7 +14,7 @@ import {
   CITATION_MARKER_RE,
   parseCitationIndex,
 } from "./citation-markers.js";
-import { splitResearchAnswer, syncSourcesSectionToApproved } from "./discord-reply-format.js";
+import { splitResearchAnswer, syncSourcesSectionToApproved } from "./research-answer-split.js";
 import {
   isDiscordJumpUrl,
   resolvePublicCitationUrl,

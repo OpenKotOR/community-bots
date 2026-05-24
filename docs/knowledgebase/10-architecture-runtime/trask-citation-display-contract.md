@@ -5,7 +5,7 @@ status: active
 lastUpdated: 2026-05-24
 related_solutions:
   - docs/solutions/tooling-decisions/trask-discord-dual-citation-line-filter-2026-05-24.md
-pr_refs: [33, 34, 35, 36]
+pr_refs: [33, 34, 35, 36, 38]
 ---
 
 # Purpose and authority
@@ -35,14 +35,14 @@ pr_refs: [33, 34, 35, 36]
 
 [SYNTH] The display layer assumes compose already emitted enough distinct citation markers when the source pool supports it; display code **backfills** lines (see solutions doc) when query filtering would otherwise drop a second citation.
 
-[OPEN] `grounded-evidence.ts` imports `splitResearchAnswer` and `syncSourcesSectionToApproved` from `discord-reply-format.ts` while `discord-reply-format.ts` imports query-anchoring helpers from `grounded-evidence.ts` — a known module cycle. Future refactor: extract answer-shape parsing to a neutral module (not scheduled in PR #33–#36).
+[REPO] Answer-shape parsing lives in `packages/trask/src/research-answer-split.ts` (`splitResearchAnswer`, `syncSourcesSectionToApproved`, `ResearchAnswerSource`). `grounded-evidence.ts` and `discord-reply-format.ts` import from there; `discord-reply-format.ts` re-exports split/sync for script compatibility. No `grounded-evidence` ↔ `discord-reply-format` cycle on answer parsing (PR #38).
 
 # Discord `/ask` display pipeline
 
 [REPO] `formatDiscordAskDisplay(rawAnswer, approvedSources, { query })` in `packages/trask/src/discord-reply-format.ts` runs in order:
 
-1. **`syncSourcesSectionToApproved`** — rewrites `Sources` lines to match `approvedSources` order (when sources provided)
-2. **`splitResearchAnswer`** — splits body vs numbered source lines
+1. **`syncSourcesSectionToApproved`** (`research-answer-split.ts`) — rewrites `Sources` lines to match `approvedSources` order (when sources provided)
+2. **`splitResearchAnswer`** (`research-answer-split.ts`) — splits body vs numbered source lines
 3. **`normalizeBodyCitationIndices`** — remaps body `[n]` to `1..N` in first-seen order (`CITATION_INDEX_CAPTURE_RE`)
 4. **`buildCitationUrlMap`** — maps index → URL from Sources block or catalog
 5. **`clampDiscordBodyLines`** — line cap (`DISCORD_ASK_MAX_BODY_LINES` from policy); may call **`filterDiscordLinesForQuery`** and **`ensureMinimumDistinctCitedLines`** to preserve ≥2 distinct citations for expert phrasing
