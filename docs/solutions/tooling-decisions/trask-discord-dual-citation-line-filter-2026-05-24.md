@@ -2,7 +2,7 @@
 title: "Trask Discord dual-citation line filter preservation"
 date: 2026-05-24
 last_refreshed: 2026-05-24
-last_gate: "composite_score 165 (13 discord stress tests, post PR #35)"
+last_gate: "composite_score 165; local pnpm trask:optimize-measure; CI pnpm trask:optimize-measure:ci"
 category: tooling-decisions
 problem_type: quality
 component: trask
@@ -61,6 +61,7 @@ Pass criteria (expert queries): ≥2 distinct inline `https://` links, ≤5 non-
 
 ## History
 
+- 2026-05-24 — PR #47 documents citation gates in CONTRIBUTING + AGENTS learned facts.
 - 2026-05-24 — PR #46 CI workflow invokes `pnpm trask:optimize-measure:ci` (drops manual env block).
 - 2026-05-24 — PR #45 adds `pnpm trask:optimize-measure:ci` script alias for CI-equivalent gate.
 - 2026-05-24 — PR #42 CI `TRASK_OPTIMIZE_CI_MODE=1` runs faithfulness + discord stress in GitHub Actions and enforces **composite_score ≥ 165** (replaces skip-unit-tests path that never ran discord stress).
