@@ -20,7 +20,7 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
   webServer: {
-    command: 'bash scripts/holocron-e2e-live-server.sh',
+    command: 'bash scripts/holocron-e2e-webserver.sh',
     cwd: repoRoot,
     url: process.env.HOLOCRON_E2E_BASE_URL ?? 'http://127.0.0.1:4010',
     reuseExistingServer: process.env.HOLOCRON_REUSE_SERVER === '1' || !process.env.CI,

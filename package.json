@@ -44,7 +44,7 @@
     "discord:install-links": "tsx scripts/discord-install-links.ts",
     "smoke:trask-research": "python scripts/smoke_trask_indexed_stack.py",
     "holocron:e2e": "pnpm trask:gate && pnpm holocron:e2e:playwright",
-    "holocron:e2e:playwright": "node scripts/holocron-e2e-live-build.mjs && pnpm exec playwright test --config apps/holocron-web/playwright.config.ts",
+    "holocron:e2e:playwright": "TRASK_WEB_ALLOW_ANONYMOUS=1 TRASK_INDEXER_BASE_URL=http://127.0.0.1:8787 TRASK_QA_GROUNDING=1 TRASK_LLM_PROFILE=free TRASK_WEB_RESEARCH_PYTHON=.venv-trask-indexer/bin/python node scripts/holocron-e2e-live-build.mjs && pnpm exec playwright test --config apps/holocron-web/playwright.config.ts",
     "discord:smoke-trask-commands": "node scripts/discord_trask_commands_smoke.mjs"
   },
   "devDependencies": {

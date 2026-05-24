@@ -240,10 +240,13 @@ test('completed remote thread clears stale persisted research job on reload', as
   await expect(reloadedAssistant.getByText(/^Thinking$/i)).toHaveCount(0, { timeout: 30_000 })
   await expect(page.getByText(/Querying Archives\.\.\./i)).toHaveCount(0, { timeout: 30_000 })
 
-  const persistedJobs = await page.evaluate(() => {
-    const raw = localStorage.getItem('holocron-research-jobs')
-    return raw ? JSON.parse(raw) : []
-  })
-  expect(persistedJobs, 'stale persisted research jobs should be removed after remote sync').toEqual([])
+  await expect
+    .poll(async () => {
+      return page.evaluate(() => {
+        const raw = localStorage.getItem('holocron-research-jobs')
+        return raw ? JSON.parse(raw) : []
+      })
+    })
+    .toEqual([])
   expect(bodyText).toMatch(/MDLOps|model/i)
 })
