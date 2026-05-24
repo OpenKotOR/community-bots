@@ -27,6 +27,8 @@ Discord `/ask` brief embeds could collapse to a single inline citation after agg
 | Module extraction | #38–#40 | `research-answer-split.ts`, `query-anchor.ts`; no display↔compose cycle on parsing/anchors |
 | Test + CI gates | #41–#46 | All citation unit suites in local measure; CI enforces discord stress + floor **165** |
 | Contributor docs | #47–#48 | CONTRIBUTING, AGENTS, PR template checklist |
+| Gate script + live preflight | #49–#50 | `pnpm trask:gate`; verify/holocron scripts preflight with gate |
+| Runbook sync | #51 | AGENTS.md + docs/trask.md ladder |
 
 Authoritative module map: [trask-citation-module-architecture-2026-05-24.md](trask-citation-module-architecture-2026-05-24.md). Line-filter incident: [trask-discord-dual-citation-line-filter-2026-05-24.md](trask-discord-dual-citation-line-filter-2026-05-24.md).
 
