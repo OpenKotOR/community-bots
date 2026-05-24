@@ -7,8 +7,9 @@ import { existsSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { ensureWorkspaceBuilt } from './lib/trask_skip_build.mjs'
+
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const tsc = resolve(repoRoot, 'node_modules/.bin/tsc')
 const vite = resolve(repoRoot, 'apps/holocron-web/node_modules/.bin/vite')
 
 function run(cmd, args, cwd = repoRoot) {
@@ -18,13 +19,13 @@ function run(cmd, args, cwd = repoRoot) {
   }
 }
 
-if (!existsSync(tsc)) {
-  console.error('Missing node_modules/.bin/tsc — run npm/pnpm install first.')
+if (!existsSync(vite)) {
+  console.error('Missing apps/holocron-web/node_modules/.bin/vite — run pnpm install first.')
   process.exit(1)
 }
 
 console.log('\n▶ Building workspace TypeScript (trask, trask-http, trask-http-server, …)\n')
-run(tsc, ['-b', 'tsconfig.workspace.json'])
+ensureWorkspaceBuilt(repoRoot)
 
 console.log('\n▶ Building Holocron web (Vite)\n')
 run(vite, ['build'], resolve(repoRoot, 'apps/holocron-web'))
