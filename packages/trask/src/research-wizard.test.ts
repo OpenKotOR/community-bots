@@ -519,7 +519,8 @@ test("emitResearchTraceLog is disabled when TRASK_RESEARCH_TRACE_LOG=0", () => {
 // ---------------------------------------------------------------------------
 
 test("createResearchWizardClient exposes no localSearchProvider wiring", () => {
-  assert.ok(createResearchWizardClient.length <= 2);
+  assert.equal(createResearchWizardClient.length, 1);
+  assert.doesNotMatch(createResearchWizardClient.toString(), /\blocalSearchProvider\b/);
   assert.equal("searchLocalKnowledge" in ResearchWizardClient.prototype, false);
   assert.equal("localSearchProvider" in ResearchWizardClient.prototype, false);
 });
