@@ -1,8 +1,9 @@
 ---
 title: "ship: finish LFG for PR #25 maintainability closeout"
 type: ship
-status: active
+status: completed
 date: 2026-05-24
+merged: 5455582
 origin: docs/plans/2026-05-24-035-ship-pr25-doc-review-plan.md
 pr: https://github.com/OpenKotOR/community-bots/pull/25
 ---
