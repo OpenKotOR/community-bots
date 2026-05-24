@@ -12,12 +12,8 @@ lastUpdated: 2026-05-19
 
 # `createResearchWizardClient`
 
-- [REPO] Factory in `packages/trask/src/research-wizard.ts`: `(config, aiConfig?, localSearchProvider?)` → client wired to **`traskApprovedResearchSources`** for live web research plus optional **`localSearchProvider`** (typically `createChunkSearchProvider(INGEST_STATE_DIR)` from hosts).
-
-# Local knowledge (`SearchProvider`)
-
-- [REPO] When `localSearchProvider` is set, **`searchLocalKnowledge`** runs `search(query, 4)`, drops hits whose URL passes **`isTraskApprovedBaseUrl`** (avoids double-counting catalog home URLs), and builds a **“Local Knowledge Context (lower authority…)”** digest string plus `SourceDescriptor[]` from `searchHitToSource`.
-- [REPO] On search throw, digest/sources are empty (silent degrade).
+- [REPO] **`createResearchWizardClient(config, aiConfig?)`** — no local chunk provider; answers use Python retrieve + Chroma only.
+- [REPO] **`createChunkSearchProvider`** on Trask bot/http hosts is for **`/queue-reindex`** / ingest-worker queue only (legacy FileChunkStore).
 
 # `ChunkSearchProvider` (`packages/retrieval`)
 
@@ -27,8 +23,7 @@ lastUpdated: 2026-05-19
 # `answerQuestion` (full Holocron / Discord `/ask`)
 
 - [REPO] Applies **`applySourcePreferences`** to `traskApprovedResearchSources` when `options.sourcePreferences` is present.
-- [REPO] Loads local digest via **`searchLocalKnowledge`**; emits **`onProgress`** `gather` when local hits exist. Local digest is appended to the web research report for passage extraction only — **`local://`** URLs are not emitted in public **Sources**.
-- [REPO] **`fetchResearchReport`** → `runTraskWebResearch` with `allowed_url_prefixes` from approved sources, optional `model`, and custom prompt **`buildCustomPrompt()`**.
+- [REPO] **`fetchResearchReport`** → `runTraskWebResearch` with `allowed_url_prefixes` from approved sources (no FileChunkStore merge on the hot path).
 - [REPO] When **`TRASK_GROUNDED_COMPOSE=1`** and an OpenAI-compatible client is configured, **`tryGroundedCompose`** (`grounded-evidence.ts`) splits the enriched report into passages, extracts claims (LLM with heuristic fallback), and composes an answer with inline `[n]` citations. **`approvedSources`** are **`alignCitedSourcesToAnswer`** — only URLs cited in the body; no URL-padding to meet **`MIN_HOLOCRON_WEB_CITATIONS`**.
 - [REPO] Otherwise: **`rewriteForDiscord`** when an LLM client exists, else **`fallbackDiscordRewrite`**; synthesis-failure reports may use **`sourceOnlyFallbackAnswer`**. Final **`approvedSources`** always pass through **`alignCitedSourcesToAnswer`** (except the grounded path, which already aligned).
 - [REPO] Returns **`groundingStatus`** (`grounded` | `partial` | `failed`) via **`inferGroundingStatus`** for Holocron provenance UX and persistence.
