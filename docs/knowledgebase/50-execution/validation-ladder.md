@@ -2,7 +2,7 @@
 title: Trask Knowledgebase Validation Ladder
 owner: trask-bot
 status: active
-lastUpdated: 2026-05-15
+lastUpdated: 2026-05-24
 ---
 
 [SYNTH] Narrowest checks first; widen only when needed (matches vertical-slice discipline).
@@ -16,18 +16,23 @@ lastUpdated: 2026-05-15
 
 - [REPO] From repo root: `npx tsc -b tsconfig.workspace.json --pretty false` (or `pnpm check` when pnpm is available).
 
-## 3. Package tests
+## 3. Citation offline gate
+
+- [REPO] `pnpm trask:optimize-measure` — faithfulness fixtures + discord-reply-format stress tests + `pnpm check`; see [trask-citation-display-contract.md](../10-architecture-runtime/trask-citation-display-contract.md) and [trask-discord-dual-citation-line-filter-2026-05-24.md](../../solutions/tooling-decisions/trask-discord-dual-citation-line-filter-2026-05-24.md) for `composite_score` floor (**165**).
+- [REPO] `pnpm verify:trask-discord` — live Discord expert queries (preflight: optimize-measure).
+
+## 4. Package tests
 
 - [REPO] `pnpm --filter @openkotor/trask test` or `node --test packages/trask/dist/*.test.js` after `tsc -b` for `@openkotor/trask`.
 - [REPO] Ingest Discord import: `node --test apps/ingest-worker/dist/discord-export-import.test.js` after workspace build (uses [fixtures/discord-export-minimal](../../../fixtures/discord-export-minimal)).
 
-## 4. Ingest importer (local)
+## 5. Ingest importer (local)
 
 - [SYNTH] `import-discord-export fixtures/discord-export-minimal --dry-run` (from repo root; see [fixtures/discord-export-minimal/README.md](../../../fixtures/discord-export-minimal/README.md)); confirm logged chunk counts and no throw.
 - [SYNTH] `show-indexed` lists `approved-discord-knowledge` with non-zero chunks after a real import.
 - [SYNTH] Catalog refresh: after **`queue-reindex`** (Discord or CLI), confirm **`ingest-worker drain-queue`** (or **`run-queue-worker`**) runs against the same **`INGEST_STATE_DIR`** and **`show-indexed`** / chunk mtimes move ([trask-reindex-queue-contract.md](../10-architecture-runtime/trask-reindex-queue-contract.md)).
 
-## 5. Runtime smoke (optional)
+## 6. Runtime smoke (optional)
 
 - [REPO] HTTP contracts for Holocron: [trask-http-ask-contract.md](../10-architecture-runtime/trask-http-ask-contract.md), [trask-http-session-history-contract.md](../10-architecture-runtime/trask-http-session-history-contract.md); host wiring: [trask-embedded-holocron-web.md](../10-architecture-runtime/trask-embedded-holocron-web.md), [trask-http-server-standalone-contract.md](../10-architecture-runtime/trask-http-server-standalone-contract.md).
 - [REPO] Env map: [trask-configuration-env-map.md](trask-configuration-env-map.md).
@@ -35,7 +40,7 @@ lastUpdated: 2026-05-15
 - [REPO] `bash scripts/bootstrap_trask_research.sh` and `pnpm smoke:trask-research` verify the research stack.
 - [SYNTH] Holocron E2E against built static + `trask-http-server` as documented in `docs/trask.md` (requires auth env as configured).
 
-## 6. Discord (manual)
+## 7. Discord (manual)
 
 - [SYNTH] `/ask` in an approved channel returns embed + sources.
 - [SYNTH] With welcome env set, a test join posts only in the configured channel with safe mentions.

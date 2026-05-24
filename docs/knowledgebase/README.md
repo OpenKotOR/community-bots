@@ -2,7 +2,7 @@
 title: Trask Knowledgebase Index
 owner: trask-bot
 status: active
-lastUpdated: 2026-05-15
+lastUpdated: 2026-05-24
 ---
 
 # Trask Q&A knowledgebase
@@ -16,7 +16,7 @@ Canonical operator narrative for commands and env remains [docs/trask.md](../tra
 | Layer | Doc |
 |-------|-----|
 | 00 Intent | [trask-kb-charter.md](00-intent/trask-kb-charter.md) |
-| 10 Architecture | [trask-runtime-map.md](10-architecture-runtime/trask-runtime-map.md), [trask-synthesis-and-chunk-retrieval.md](10-architecture-runtime/trask-synthesis-and-chunk-retrieval.md), [trask-reindex-queue-contract.md](10-architecture-runtime/trask-reindex-queue-contract.md), [discord-history-ingestion.md](10-architecture-runtime/discord-history-ingestion.md), [answer-pipeline.md](10-architecture-runtime/answer-pipeline.md), [trask-http-ask-contract.md](10-architecture-runtime/trask-http-ask-contract.md), [trask-http-session-history-contract.md](10-architecture-runtime/trask-http-session-history-contract.md), [trask-http-server-standalone-contract.md](10-architecture-runtime/trask-http-server-standalone-contract.md), [trask-embedded-holocron-web.md](10-architecture-runtime/trask-embedded-holocron-web.md), [trask-discord-slash-contract.md](10-architecture-runtime/trask-discord-slash-contract.md), [trask-proactive-mode-contract.md](10-architecture-runtime/trask-proactive-mode-contract.md), [pazaak-bot-trask-api-mount.md](10-architecture-runtime/pazaak-bot-trask-api-mount.md) |
+| 10 Architecture | [trask-runtime-map.md](10-architecture-runtime/trask-runtime-map.md), [trask-synthesis-and-chunk-retrieval.md](10-architecture-runtime/trask-synthesis-and-chunk-retrieval.md), [trask-reindex-queue-contract.md](10-architecture-runtime/trask-reindex-queue-contract.md), [discord-history-ingestion.md](10-architecture-runtime/discord-history-ingestion.md), [answer-pipeline.md](10-architecture-runtime/answer-pipeline.md), [trask-http-ask-contract.md](10-architecture-runtime/trask-http-ask-contract.md), [trask-http-session-history-contract.md](10-architecture-runtime/trask-http-session-history-contract.md), [trask-http-server-standalone-contract.md](10-architecture-runtime/trask-http-server-standalone-contract.md), [trask-embedded-holocron-web.md](10-architecture-runtime/trask-embedded-holocron-web.md), [trask-discord-slash-contract.md](10-architecture-runtime/trask-discord-slash-contract.md), [trask-citation-display-contract.md](10-architecture-runtime/trask-citation-display-contract.md), [trask-proactive-mode-contract.md](10-architecture-runtime/trask-proactive-mode-contract.md), [pazaak-bot-trask-api-mount.md](10-architecture-runtime/pazaak-bot-trask-api-mount.md) |
 | 20 Domain theory | [kotor-modding-source-map.md](20-domain-theory/kotor-modding-source-map.md) |
 | 30 Product UX | [trask-persona-and-welcome-style.md](30-product-ux/trask-persona-and-welcome-style.md), [holocron-web-trask-client.md](30-product-ux/holocron-web-trask-client.md) |
 | 40 Risk | [discord-privacy-and-source-authority.md](40-operational-risk/discord-privacy-and-source-authority.md) |
