@@ -149,10 +149,11 @@ Use only when debugging retrieval without the Holocron UI; it does **not** repla
 After code changes to answer formatting, citation alignment, or `grounded-evidence.ts`, run:
 
 ```bash
-pnpm trask:faithfulness-eval
+pnpm trask:optimize-measure   # faithfulness fixtures + discord citation stress (CI gate; preflight for holocron:e2e and verify:trask-*)
+pnpm trask:faithfulness-eval  # faithfulness fixtures only
 ```
 
-This replays committed golden fixtures under `data/trask-eval/fixtures/` (no live web research). It does **not** replace Holocron e2e for end-to-end research validation. Product policy strings live under `data/trask/`; run `pnpm trask:config-drift` after changes to catch duplicated golden questions in code.
+`trask:faithfulness-eval` replays committed golden fixtures under `data/trask-eval/fixtures/` (no live web research). It does **not** replace Holocron e2e for end-to-end research validation. `pnpm holocron:e2e` runs `trask:optimize-measure` before Playwright. Product policy strings live under `data/trask/`; run `pnpm trask:config-drift` after changes to catch duplicated golden questions in code.
 
 ### Trask Discord `/ask` — mandatory verification (agents)
 

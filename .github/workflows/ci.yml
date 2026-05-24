@@ -49,8 +49,8 @@ jobs:
       - name: Unit tests
         run: node --test packages/*/dist/*.test.js apps/*/dist/*.test.js
 
-      - name: Trask faithfulness eval (offline fixtures)
-        run: pnpm trask:faithfulness-eval
+      - name: Trask optimize measure gate (faithfulness + citation stress)
+        run: pnpm trask:optimize-measure
 
       - name: Install Playwright (Chromium)
         run: pnpm exec playwright install chromium --with-deps

@@ -55,11 +55,14 @@ TRASK_LITELLM_CONFIG=vendor/llm_fallbacks/configs/litellm_config_free.yaml bash 
 ### Verification ladder
 
 ```bash
-pnpm trask:faithfulness-eval          # offline compose alignment (fixtures)
+pnpm trask:optimize-measure           # offline gate: faithfulness + discord stress + trask unit suites
+pnpm trask:faithfulness-eval          # faithfulness fixtures only (subset of optimize-measure)
 pnpm verify:trask-cli                 # optimize-measure preflight, then CLI golden queries
-pnpm holocron:e2e                     # browser e2e (expert queries, live stack on :4010)
-pnpm verify:trask-discord             # Discord display contract
+pnpm holocron:e2e                     # optimize-measure preflight, then Playwright (expert queries, :4010)
+pnpm verify:trask-discord             # optimize-measure preflight, then live Discord expert queries
 ```
+
+CI runs `pnpm trask:optimize-measure` before Holocron Playwright (see `.github/workflows/ci.yml`).
 
 ## Explicitly rejected (do not implement)
 
