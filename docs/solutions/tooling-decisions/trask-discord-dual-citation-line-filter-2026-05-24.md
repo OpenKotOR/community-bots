@@ -53,6 +53,7 @@ Pass criteria (expert queries): ≥2 distinct inline `https://` links, ≤5 non-
 
 ## Related
 
+- [trask-citation-module-architecture-2026-05-24.md](trask-citation-module-architecture-2026-05-24.md) — module map, import direction, local vs CI optimize-measure gates
 - `docs/plans/2026-05-24-019-fix-discord-citation-line-filter-plan.md`
 - `docs/knowledgebase/10-architecture-runtime/trask-discord-slash-contract.md`
 - `docs/solutions/tooling-decisions/trask-discord-ask-defer-sla-2026-05-24.md`
