@@ -55,6 +55,7 @@ Formula: `composite_score` = (`citation_stress_pass_count` × 10) + (`faithfulne
 | #39 | `research-answer-split.test.ts` |
 | #40 | `query-anchor.ts` — display decoupled from grounded-evidence |
 | #41 | Split/anchor/markers tests in optimize-measure |
+| #53 | KB + trask-research-backends trask:gate ladder sync |
 | #52 | README + CONTRIBUTING + gate table trask:gate sync |
 | #51 | AGENTS.md + docs/trask.md trask:gate ladder sync |
 | #50 | Live verify / holocron:e2e preflight via `pnpm trask:gate` |
@@ -67,7 +68,7 @@ Formula: `composite_score` = (`citation_stress_pass_count` × 10) + (`faithfulne
 
 ## Related
 
-- [trask-citation-stack-closeout-2026-05-24.md](trask-citation-stack-closeout-2026-05-24.md) — PR #33–#48 arc summary and `pnpm trask:gate`
+- [trask-citation-stack-closeout-2026-05-24.md](trask-citation-stack-closeout-2026-05-24.md) — PR #33–#52 arc summary and `pnpm trask:gate`
 - `packages/trask/src/` — implementation
 - `scripts/trask_optimize_measure.mjs` — measurement harness
 - [validation-ladder.md](../../knowledgebase/50-execution/validation-ladder.md)

@@ -46,7 +46,8 @@ pnpm trask:optimize-measure   # composite_score ≥ 165, 13 discord stress tests
 pnpm trask:optimize-measure:ci   # CI-equivalent: faithfulness + discord stress + floor 165 (after build)
 node --test packages/trask/dist/discord-reply-format.test.js
 pnpm trask:stack:health
-pnpm verify:trask-discord   # optimize-measure preflight, then live queries (token + LLM + indexer)
+pnpm trask:gate             # recommended offline preflight (build + full + :ci, floor 165)
+pnpm verify:trask-discord   # trask:gate preflight, then live queries (token + LLM + indexer)
 ```
 
 Pass criteria (expert queries): ≥2 distinct inline `https://` links, ≤5 non-empty lines, no `Sources` heading in embed.
