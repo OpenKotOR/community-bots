@@ -1,0 +1,26 @@
+# systemd unit for continuous Chroma reindex queue drain.
+# Requires trask-indexer.service (or shared INGEST_STATE_DIR on same host).
+# Install after trask-indexer.service:
+#   sudo cp infra/trask-indexer/systemd/trask-indexer-queue-worker.service.example \
+#     /etc/systemd/system/trask-indexer-queue-worker.service
+#   sudo systemctl daemon-reload && sudo systemctl enable --now trask-indexer-queue-worker
+
+[Unit]
+Description=Trask indexer reindex queue worker (Chroma drain loop)
+After=network-online.target trask-indexer.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=trask
+Group=trask
+WorkingDirectory=/opt/community-bots
+EnvironmentFile=-/opt/community-bots/.env
+Environment=TRASK_INDEXER_DATA_DIR=/opt/community-bots/data/trask-indexer
+Environment=INGEST_STATE_DIR=/opt/community-bots/data/ingest-worker
+ExecStart=/opt/community-bots/scripts/trask_indexer_run_queue_worker.sh
+Restart=on-failure
+RestartSec=15
+
+[Install]
+WantedBy=multi-user.target

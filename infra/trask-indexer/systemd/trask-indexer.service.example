@@ -1,0 +1,26 @@
+# systemd unit for Trask Chroma indexer (FastEmbed + POST /retrieve).
+# Install:
+#   1. Clone community-bots to /opt/community-bots
+#   2. bash scripts/bootstrap_trask_indexer.sh
+#   3. sudo cp infra/trask-indexer/systemd/trask-indexer.service.example /etc/systemd/system/trask-indexer.service
+#   4. Edit User=, WorkingDirectory=, EnvironmentFile= if needed
+#   5. sudo systemctl daemon-reload && sudo systemctl enable --now trask-indexer
+
+[Unit]
+Description=Trask Chroma indexer (Crawl4AI + FastEmbed)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=trask
+Group=trask
+WorkingDirectory=/opt/community-bots
+EnvironmentFile=-/opt/community-bots/.env
+Environment=TRASK_INDEXER_DATA_DIR=/opt/community-bots/data/trask-indexer
+ExecStart=/opt/community-bots/.venv-trask-indexer/bin/trask-indexer serve --host 127.0.0.1 --port 8790
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

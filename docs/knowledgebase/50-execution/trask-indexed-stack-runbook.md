@@ -38,6 +38,8 @@ bash scripts/trask_live_stack.sh
 Verify:
 
 ```bash
+bash scripts/trask_indexed_stack_health.sh
+bash scripts/trask_indexed_stack_health.sh --check-http
 curl -sf http://127.0.0.1:4010/ >/dev/null && echo Holocron OK
 curl -sf http://127.0.0.1:8787/health
 curl -sf http://127.0.0.1:8790/health
@@ -100,6 +102,23 @@ Manual equivalent:
 tar -czf trask-chroma-backup-$(date +%Y%m%d).tar.gz -C data/trask-indexer chroma
 ```
 
+## VPS systemd (indexer + queue worker)
+
+Templates under `infra/trask-indexer/systemd/`:
+
+- `trask-indexer.service.example` — `trask-indexer serve` on `:8790`
+- `trask-indexer-queue-worker.service.example` — continuous `drain-queue` loop
+
+Bot deploy: `infra/trask-bot-stack/` (Discord sync interval, separate host or same VPS).
+
+After install:
+
+```bash
+bash scripts/trask_indexed_stack_health.sh
+bash scripts/trask_indexed_stack_health.sh --check-http   # when trask-http-server on :4010
+bash scripts/trask_indexed_stack_health.sh --strict-stale # fail if discord_sync_stale
+```
+
 ## Verification gates
 
 | Gate | Command |
@@ -108,7 +127,7 @@ tar -czf trask-chroma-backup-$(date +%Y%m%d).tar.gz -C data/trask-indexer chroma
 | Holocron e2e (5 queries) | `pnpm holocron:e2e` — CI passes optional `OPENROUTER_API_KEY` / `OPENAI_API_KEY` repo secrets for richer LLM compose |
 | CLI QA | `pnpm verify:trask-cli` |
 | Offline faithfulness | `pnpm trask:faithfulness-eval` |
-| Indexer smoke | `python scripts/smoke_trask_indexed_stack.py --golden-fixtures --verify-retrieve` |
+| Stack health (VPS) | `bash scripts/trask_indexed_stack_health.sh [--check-http]` |
 
 ## Key environment variables
 
