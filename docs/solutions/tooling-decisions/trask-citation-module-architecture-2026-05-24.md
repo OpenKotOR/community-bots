@@ -54,6 +54,7 @@ Formula: `composite_score` = (`citation_stress_pass_count` × 10) + (`faithfulne
 | #39 | `research-answer-split.test.ts` |
 | #40 | `query-anchor.ts` — display decoupled from grounded-evidence |
 | #41 | Split/anchor/markers tests in optimize-measure |
+| #49 | `pnpm trask:gate` + citation stack closeout solutions doc |
 | #48 | PR template Trask citation gate checklist |
 | #47 | CONTRIBUTING + AGENTS learned facts for citation gates |
 | #46 | CI workflow calls `pnpm trask:optimize-measure:ci` directly |
@@ -62,6 +63,7 @@ Formula: `composite_score` = (`citation_stress_pass_count` × 10) + (`faithfulne
 
 ## Related
 
+- [trask-citation-stack-closeout-2026-05-24.md](trask-citation-stack-closeout-2026-05-24.md) — PR #33–#48 arc summary and `pnpm trask:gate`
 - `packages/trask/src/` — implementation
 - `scripts/trask_optimize_measure.mjs` — measurement harness
 - [validation-ladder.md](../../knowledgebase/50-execution/validation-ladder.md)
