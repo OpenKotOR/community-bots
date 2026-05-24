@@ -25,6 +25,8 @@ import {
   _diagFromResearchPayload,
   _emitRetrieveSummary,
   _isGatherTimeoutResearchError,
+  createResearchWizardClient,
+  ResearchWizardClient,
 } from "./research-wizard.js";
 import type { SourceDescriptor } from "../../retrieval/src/index.js";
 
@@ -510,4 +512,14 @@ test("emitResearchTraceLog is disabled when TRASK_RESEARCH_TRACE_LOG=0", () => {
       process.env.TRASK_RESEARCH_TRACE_LOG = original;
     }
   }
+});
+
+// ---------------------------------------------------------------------------
+// FileChunkStore phase 0 — no local merge on indexed path
+// ---------------------------------------------------------------------------
+
+test("createResearchWizardClient exposes no localSearchProvider wiring", () => {
+  assert.ok(createResearchWizardClient.length <= 2);
+  assert.equal("searchLocalKnowledge" in ResearchWizardClient.prototype, false);
+  assert.equal("localSearchProvider" in ResearchWizardClient.prototype, false);
 });

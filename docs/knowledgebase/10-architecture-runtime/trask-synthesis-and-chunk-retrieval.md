@@ -45,6 +45,7 @@ lastUpdated: 2026-05-19
 
 # Related
 
+- [trask-filechunkstore-phase0-indexed-path-2026-05-24.md](../../solutions/tooling-decisions/trask-filechunkstore-phase0-indexed-path-2026-05-24.md) — phase 0: indexed path only; FileChunkStore queue-reindex role (PR #16).
 - [answer-pipeline.md](answer-pipeline.md) — surfaces using this client.
 - [discord-history-ingestion.md](discord-history-ingestion.md) — where Discord chunks enter `FileChunkStore`.
 - [trask-reindex-queue-contract.md](trask-reindex-queue-contract.md) — catalog `reindex-queue.json` + ingest-worker drain.
