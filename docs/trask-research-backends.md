@@ -62,7 +62,7 @@ pnpm holocron:e2e                     # optimize-measure preflight, then Playwri
 pnpm verify:trask-discord             # optimize-measure preflight, then live Discord expert queries
 ```
 
-CI runs `pnpm trask:optimize-measure` before Holocron Playwright (see `.github/workflows/ci.yml`).
+CI runs `pnpm trask:optimize-measure` once, then `pnpm holocron:e2e:playwright` (local `pnpm holocron:e2e` includes the offline preflight).
 
 ## Explicitly rejected (do not implement)
 
