@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  clampDiscordBodyLines,
   ensureMinimumDistinctCitedLines,
   filterDiscordLinesForQuery,
   formatDiscordAskDisplay,
@@ -22,6 +23,24 @@ const approvedSources = [
   { name: "github.com", homeUrl: "https://github.com/th3w1zard1/TSLPatcher" },
   { name: "Deadly Stream", homeUrl: "https://deadlystream.com/files/file/1982-tslpatcher" },
 ];
+
+const distinctCitationIndices = (text: string): Set<number> => {
+  const indices = new Set<number>();
+  for (const match of text.matchAll(/\[(\d{1,2})\]/g)) {
+    indices.add(Number(match[1]));
+  }
+  return indices;
+};
+
+const distinctCitationIndicesInLines = (lines: readonly string[]): Set<number> => {
+  const indices = new Set<number>();
+  for (const line of lines) {
+    for (const match of line.matchAll(/\[(\d{1,2})\]/g)) {
+      indices.add(Number(match[1]));
+    }
+  }
+  return indices;
+};
 
 test("formatDiscordAskDisplay keeps two https links for expert TSLPatcher query", () => {
   const display = formatDiscordAskDisplay(expertTslpatcherRaw, approvedSources, { query: expertQuery });
@@ -51,12 +70,7 @@ test("ensureMinimumDistinctCitedLines backfills second distinct citation", () =>
   );
 
   assert.equal(out.length, 2);
-  const indices = new Set<number>();
-  for (const line of out) {
-    for (const match of line.matchAll(/\[(\d{1,2})\]/g)) {
-      indices.add(Number(match[1]));
-    }
-  }
+  const indices = distinctCitationIndicesInLines(out);
   assert.equal(indices.size, BRIEF_DISCORD_MIN_CITATIONS);
   assert.ok(indices.has(1));
   assert.ok(indices.has(2));
@@ -84,15 +98,47 @@ test("filterDiscordLinesForQuery preserves two citations when pool supports it",
 
   const filtered = filterDiscordLinesForQuery([line1, line2, offTopic], expertQuery);
 
-  const indices = new Set<number>();
-  for (const line of filtered) {
-    for (const match of line.matchAll(/\[(\d{1,2})\]/g)) {
-      indices.add(Number(match[1]));
-    }
-  }
+  const indices = distinctCitationIndicesInLines(filtered);
   assert.ok(indices.size >= BRIEF_DISCORD_MIN_CITATIONS, filtered.join(" | "));
   assert.ok(
     !filtered.some((line) => line.includes("[3]")),
     "off-topic cited line should be dropped",
   );
+});
+
+test("clampDiscordBodyLines keeps two distinct citations when line cap truncates pool", () => {
+  const line1 =
+    "TSLPatcher on GitHub documents list-driven 2DA, GFF, and TLK changes for KotOR mod installs. [1]";
+  const line2 =
+    "TSLPatcher automates 2DA and TLK list patches so players do not copy files by hand. [2]";
+  const line3 = "Extra KotOR modding context about widescreen and resolution tweaks. [3]";
+  const body = [line1, line2, line3].join("\n");
+
+  const clamped = clampDiscordBodyLines(body, 2, expertQuery);
+  assert.ok(distinctCitationIndices(clamped).size >= BRIEF_DISCORD_MIN_CITATIONS, clamped);
+});
+
+test("clampDiscordBodyLines backfills missing citation when first capped lines share one index", () => {
+  const line1 = "TSLPatcher applies 2DA list patches for KotOR mod installs. [1]";
+  const line2 = "TSLPatcher also documents TLK list changes on GitHub for modding. [1]";
+  const line3 = "The TSLPatcher GitHub repo covers GFF and TLK install automation. [2]";
+  const body = [line1, line2, line3].join("\n");
+
+  const clamped = clampDiscordBodyLines(body, 2, expertQuery);
+  assert.equal(distinctCitationIndices(clamped).size, BRIEF_DISCORD_MIN_CITATIONS, clamped);
+});
+
+test("formatDiscordAskDisplay preserves two links when body has low-score second citation", () => {
+  const raw = `TSLPatcher applies 2DA and TLK list patches for KotOR modding workflows. [1]
+A brief note about unrelated widescreen HUD tweaks on PC without a citation marker.
+The TSLPatcher GitHub repository documents GFF and TLK list-driven install changes for mod patches. [2]
+
+Sources
+1. Deadly Stream - https://deadlystream.com/files/file/1982-tslpatcher
+2. github.com - https://github.com/th3w1zard1/TSLPatcher`;
+
+  const display = formatDiscordAskDisplay(raw, approvedSources, { query: expertQuery });
+  const links = [...display.matchAll(/\]\((https:\/\/[^)]+)\)/g)];
+  assert.ok(links.length >= BRIEF_DISCORD_MIN_CITATIONS, display);
+  assert.doesNotMatch(display, /widescreen/i);
 });

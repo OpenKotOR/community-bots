@@ -242,6 +242,72 @@ const citationIndicesInLines = (lines: readonly string[]): Set<number> => {
   return indices;
 };
 
+const swapWeakOffTopicCitedLines = (
+  selected: readonly string[],
+  pool: readonly string[],
+  query: string,
+  minDistinct: number,
+): string[] => {
+  let out = [...selected];
+  for (let i = 0; i < out.length; i += 1) {
+    const line = out[i]!;
+    const lineScore = scoreLineForQuery(line, query);
+    if (lineMatchesQueryAnchor(line, query)) {
+      continue;
+    }
+    const replacement = pool
+      .filter((candidate) => candidate !== line && !out.includes(candidate))
+      .map((candidate) => ({ candidate, score: scoreLineForQuery(candidate, query) }))
+      .filter(({ candidate, score }) => score > lineScore && (score > 0 || lineMatchesQueryAnchor(candidate, query)))
+      .sort((left, right) => right.score - left.score)[0]?.candidate;
+    if (!replacement) {
+      continue;
+    }
+    const trial = [...out];
+    trial[i] = replacement;
+    if (citationIndicesInLines(trial).size >= minDistinct) {
+      out = trial;
+    }
+  }
+  return out;
+};
+
+const sliceLinesPreservingDistinctCitations = (
+  lines: readonly string[],
+  maxLines: number,
+  minDistinct: number,
+): string[] => {
+  if (lines.length <= maxLines) {
+    return [...lines];
+  }
+  const out: string[] = [];
+  const indices = new Set<number>();
+  for (const line of lines) {
+    if (!/\[\d{1,2}\]/.test(line)) {
+      continue;
+    }
+    const lineIndices = citationIndicesInLines([line]);
+    const addsDistinct = [...lineIndices].some((index) => !indices.has(index));
+    if (!addsDistinct) {
+      continue;
+    }
+    out.push(line);
+    for (const index of lineIndices) {
+      indices.add(index);
+    }
+    if (indices.size >= minDistinct && out.length >= maxLines) {
+      return out.slice(0, maxLines);
+    }
+  }
+  for (const line of lines) {
+    if (out.includes(line) || out.length >= maxLines) {
+      continue;
+    }
+    out.push(line);
+  }
+  return out.slice(0, maxLines);
+};
+
 /** After query scoring, keep ≥minDistinct citation markers when the pool supports it. */
 export const ensureMinimumDistinctCitedLines = (
   selected: readonly string[],
@@ -253,7 +319,7 @@ export const ensureMinimumDistinctCitedLines = (
   let indices = citationIndicesInLines(out);
 
   if (indices.size >= minDistinct) {
-    return out.slice(0, DISCORD_ASK_MAX_BODY_LINES);
+    return swapWeakOffTopicCitedLines(out, pool, query, minDistinct).slice(0, DISCORD_ASK_MAX_BODY_LINES);
   }
 
   const scored = pool
@@ -275,7 +341,7 @@ export const ensureMinimumDistinctCitedLines = (
     }
   }
 
-  return out.slice(0, DISCORD_ASK_MAX_BODY_LINES);
+  return swapWeakOffTopicCitedLines(out, pool, query, minDistinct).slice(0, DISCORD_ASK_MAX_BODY_LINES);
 };
 
 /** Keep only lines that match the user question; avoids catalog dumps in Discord embeds. */
@@ -315,13 +381,16 @@ export const clampDiscordBodyLines = (body: string, maxLines: number, query?: st
   if (lines.length > maxLines) {
     const cited = lines.filter((line) => /\[\d{1,2}\]/.test(line));
     const uncited = lines.filter((line) => !/\[\d{1,2}\]/.test(line));
-    if (cited.length >= maxLines) {
-      lines = cited.slice(0, maxLines);
+    if (query?.trim() && cited.length >= BRIEF_DISCORD_MIN_CITATIONS) {
+      lines = ensureMinimumDistinctCitedLines([], cited, query, BRIEF_DISCORD_MIN_CITATIONS);
     } else if (cited.length > 0) {
-      lines = [...cited, ...uncited].slice(0, maxLines);
-    } else {
-      lines = lines.slice(0, maxLines);
+      lines = [...cited, ...uncited];
     }
+    lines = sliceLinesPreservingDistinctCitations(
+      lines,
+      maxLines,
+      query?.trim() ? BRIEF_DISCORD_MIN_CITATIONS : 1,
+    );
   }
 
   if (lines.length === 1 && lines[0]!.length > DISCORD_ASK_MAX_LINE_CHARS * 2) {
