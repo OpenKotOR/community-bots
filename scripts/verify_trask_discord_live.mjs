@@ -22,8 +22,7 @@ import {
   formatDiscordAskDisplay,
   DISCORD_ASK_MAX_BODY_LINES,
 } from "@openkotor/trask";
-import { verificationQueriesForSurface } from "../packages/trask-config/dist/verification-queries.js";
-import { degradedAnswerRegexes } from "../packages/trask-config/dist/policy.js";
+import { degradedAnswerRegexes, verificationQueriesForSurface } from "@openkotor/trask-config";
 import { isHttpsCitationReachable } from "./lib/url-verify.mjs";
 import { loadEnvFiles, repoRoot } from "./lib/trask-env.mjs";
 

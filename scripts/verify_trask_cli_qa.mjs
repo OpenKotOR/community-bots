@@ -29,8 +29,7 @@ import {
   splitResearchAnswer,
   DISCORD_ASK_MAX_BODY_LINES,
 } from "@openkotor/trask";
-import { goldenQueriesForSurface } from "../packages/trask-config/dist/golden-queries.js";
-import { degradedAnswerRegexes } from "../packages/trask-config/dist/policy.js";
+import { degradedAnswerRegexes, goldenQueriesForSurface } from "@openkotor/trask-config";
 import { loadEnvFiles, repoRoot } from "./lib/trask-env.mjs";
 
 const DEFAULT_QUERIES = goldenQueriesForSurface("cli").map((entry) => ({

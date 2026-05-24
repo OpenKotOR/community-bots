@@ -47,6 +47,7 @@
   },
   "devDependencies": {
     "@openkotor/trask": "workspace:*",
+    "@openkotor/trask-config": "workspace:*",
     "@playwright/test": "^1.58.0",
     "@types/node": "^24.12.3",
     "tsx": "^4.20.6",

@@ -13,7 +13,7 @@ import {
   formatDiscordAskDisplay,
   DISCORD_ASK_MAX_BODY_LINES,
 } from "@openkotor/trask";
-import { goldenQueriesForSurface } from "../packages/trask-config/dist/golden-queries.js";
+import { goldenQueriesForSurface } from "@openkotor/trask-config";
 import { loadEnvFiles, repoRoot } from "./lib/trask-env.mjs";
 
 const GOLDEN_QUERIES = goldenQueriesForSurface("discord").map((entry) => entry.question);
