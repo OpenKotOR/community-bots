@@ -1,6 +1,6 @@
 # Discord /ask live verify
 
-Generated: 2026-05-24T01:13:43.814Z
+Generated: 2026-05-24T01:33:43.118Z
 
 Queries: 5 (expert verification set; URL reachability enforced)
 Passed: 5/5

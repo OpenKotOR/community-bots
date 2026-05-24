@@ -24,7 +24,7 @@ Indexed-stack ops are complete (Chroma + Worker authoritative), but `ResearchWiz
 
 - R1. Remove unused `searchLocalKnowledge` and any now-unused `localSearchProvider` field wiring if nothing references it on the wizard hot path.
 - R2. Clarify in `apps/trask-bot` and `apps/trask-http-server` that chunk search provider serves reindex queue only when indexer is configured.
-- R3. Add `docs/solutions/tooling-decisions/trask-discord-dual-citation-filter-2026-05-24.md`.
+- R3. Cross-link compound doc `docs/solutions/tooling-decisions/trask-discord-dual-citation-line-filter-2026-05-24.md`.
 - R4. Update defer plan `2026-05-24-017` with phase 0 landed note.
 - R5. `pnpm build` + trask unit tests pass; `pnpm verify:trask-discord` still 5/5.
 
@@ -64,7 +64,7 @@ Indexed-stack ops are complete (Chroma + Worker authoritative), but `ResearchWiz
 **Files:**
 - Modify: `apps/trask-bot/src/main.ts`
 - Modify: `apps/trask-http-server/src/main.ts`
-- Create: `docs/solutions/tooling-decisions/trask-discord-dual-citation-filter-2026-05-24.md`
+- Create: `docs/solutions/tooling-decisions/trask-discord-dual-citation-line-filter-2026-05-24.md`
 - Modify: `docs/plans/2026-05-24-017-defer-filechunkstore-merge-plan.md`
 
 **Test expectation:** none — documentation.
