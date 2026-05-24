@@ -149,7 +149,7 @@ Use only when debugging retrieval without the Holocron UI; it does **not** repla
 After code changes to answer formatting, citation alignment, or `grounded-evidence.ts`, run:
 
 ```bash
-pnpm trask:optimize-measure   # faithfulness fixtures + discord citation stress (CI gate; preflight for holocron:e2e and verify:trask-*). Current floor: composite_score 165 (13 discord stress tests) — see docs/solutions/tooling-decisions/trask-discord-dual-citation-line-filter-2026-05-24.md
+pnpm trask:optimize-measure   # faithfulness + discord stress + all Trask citation unit suites locally; CI uses TRASK_OPTIMIZE_CI_MODE=1 (faithfulness + discord stress, composite_score floor 165). See docs/solutions/tooling-decisions/trask-discord-dual-citation-line-filter-2026-05-24.md
 pnpm trask:faithfulness-eval  # faithfulness fixtures only
 ```
 

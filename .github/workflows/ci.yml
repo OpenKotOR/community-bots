@@ -52,8 +52,7 @@ jobs:
         run: pnpm trask:optimize-measure
         env:
           TRASK_SKIP_BUILD: "1"
-          TRASK_OPTIMIZE_SKIP_UNIT_TESTS: "1"
-          TRASK_OPTIMIZE_SKIP_CHECK: "1"
+          TRASK_OPTIMIZE_CI_MODE: "1"
 
       - name: Install Playwright (Chromium)
         run: pnpm exec playwright install chromium --with-deps
