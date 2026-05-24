@@ -10,7 +10,7 @@ import {
   BRIEF_DISCORD_MIN_CITATIONS,
   claimMatchesQueryAnchor,
   distinctiveAnchorTokens,
-} from "./grounded-evidence.js";
+} from "./query-anchor.js";
 import {
   splitResearchAnswer,
   syncSourcesSectionToApproved,
@@ -141,17 +141,7 @@ export const dedupeLeadingTopicLabel = (line: string): string => {
 };
 
 const lineMatchesQueryAnchor = (line: string, query: string): boolean =>
-  claimMatchesQueryAnchor(
-    {
-      claim: line,
-      quote: line,
-      url: "https://example.invalid",
-      citationUrl: "https://example.invalid",
-      sourceIndex: 1,
-      authority: "web",
-    },
-    query,
-  );
+  claimMatchesQueryAnchor({ claim: line, quote: line }, query);
 
 const tokenBoundaryRe = (token: string): RegExp => {
   const escaped = token.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");

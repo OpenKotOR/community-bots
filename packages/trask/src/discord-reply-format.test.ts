@@ -10,7 +10,7 @@ import {
   filterDiscordLinesForQuery,
   formatDiscordAskDisplay,
 } from "./discord-reply-format.js";
-import { BRIEF_DISCORD_MIN_CITATIONS } from "./grounded-evidence.js";
+import { BRIEF_DISCORD_MIN_CITATIONS } from "./query-anchor.js";
 
 const expertTslpatcherRaw = `TSLPatcher on GitHub The TSLPatcher project documents how mod authors ship list-driven 2DA, GFF, and TLK changes for KotOR and TSL installs. [1]
 TSLPatcher is a mod installation tool for Knights of the Old Republic and The Sith Lords. It applies 2DA, GFF, and TLK patches from list files so players do not copy files by hand. [2]
