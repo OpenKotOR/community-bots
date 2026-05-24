@@ -1,6 +1,6 @@
 # Discord /ask live verify
 
-Generated: 2026-05-19T20:40:34.058Z
+Generated: 2026-05-24T00:54:58.468Z
 
 Queries: 5 (expert verification set; URL reachability enforced)
 Passed: 5/5
@@ -32,7 +32,7 @@ Widescreen support When the HUD or menus look stretched after a widescreen patch
 KOTOR widescreen resolutions Widescreen support adjusts aspect ratio and HUD layout on PC. Resolution issues usually trace to the graphics ini, aspect patch, and matching desktop resolution. [2](https://deadlystream.com/files/file/1313-kotor-widescreen-resolutions)
 ```
 
-## I need to back up before installing TSL mods — where does Knights of the Old Republic store saves per Windows user profile?
+## Before modding on Windows, where does Knights of the Old Republic store save games per user profile?
 
 PASS
 

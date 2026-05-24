@@ -232,6 +232,52 @@ const scoreAndFilterLines = (pool: readonly string[], query: string): string[] =
     .map((entry) => entry.line);
 };
 
+const citationIndicesInLines = (lines: readonly string[]): Set<number> => {
+  const indices = new Set<number>();
+  for (const line of lines) {
+    for (const match of line.matchAll(/\[(\d{1,2})\]/g)) {
+      indices.add(Number(match[1]));
+    }
+  }
+  return indices;
+};
+
+/** After query scoring, keep ≥minDistinct citation markers when the pool supports it. */
+export const ensureMinimumDistinctCitedLines = (
+  selected: readonly string[],
+  pool: readonly string[],
+  query: string,
+  minDistinct: number,
+): string[] => {
+  const out: string[] = [...selected];
+  let indices = citationIndicesInLines(out);
+
+  if (indices.size >= minDistinct) {
+    return out.slice(0, DISCORD_ASK_MAX_BODY_LINES);
+  }
+
+  const scored = pool
+    .filter((line) => !out.includes(line))
+    .map((line) => ({ line, score: scoreLineForQuery(line, query) }))
+    .filter(({ line, score }) => score > 0 || lineMatchesQueryAnchor(line, query))
+    .sort((left, right) => right.score - left.score);
+
+  for (const { line } of scored) {
+    const lineIndices = citationIndicesInLines([line]);
+    const addsDistinct = [...lineIndices].some((index) => !indices.has(index));
+    if (!addsDistinct && indices.size >= minDistinct) {
+      continue;
+    }
+    out.push(line);
+    indices = citationIndicesInLines(out);
+    if (indices.size >= minDistinct) {
+      break;
+    }
+  }
+
+  return out.slice(0, DISCORD_ASK_MAX_BODY_LINES);
+};
+
 /** Keep only lines that match the user question; avoids catalog dumps in Discord embeds. */
 export const filterDiscordLinesForQuery = (lines: readonly string[], query: string): string[] => {
   if (lines.length <= 1 || !query.trim()) {
@@ -241,7 +287,7 @@ export const filterDiscordLinesForQuery = (lines: readonly string[], query: stri
   if (cited.length >= BRIEF_DISCORD_MIN_CITATIONS) {
     const onTopic = scoreAndFilterLines(cited, query);
     if (onTopic.length > 0) {
-      return onTopic;
+      return ensureMinimumDistinctCitedLines(onTopic, cited, query, BRIEF_DISCORD_MIN_CITATIONS);
     }
   }
   return scoreAndFilterLines(lines, query);
