@@ -26,7 +26,8 @@ pnpm check
 When you change Trask answer formatting, Discord `/ask` display, or citation modules under `packages/trask/src/` (`citation-markers.ts`, `research-answer-split.ts`, `query-anchor.ts`, `discord-reply-format.ts`, `grounded-evidence.ts`):
 
 ```bash
-pnpm trask:gate                  # build + full + CI-equivalent optimize-measure (recommended)
+pnpm trask:smoke-imports         # build + workspace package import smoke (trask, trask-config, config, retrieval)
+pnpm trask:gate                  # smoke-imports + full + CI-equivalent optimize-measure (recommended)
 # or individually:
 pnpm build
 pnpm trask:optimize-measure      # full local gate: faithfulness + discord stress + citation unit suites + check
