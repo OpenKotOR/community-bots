@@ -3,8 +3,9 @@ title: "feat: Trask VPS indexer systemd units and stack health verifier"
 type: feat
 status: completed
 date: 2026-05-24
+merged: fbc6533
+pr: https://github.com/OpenKotOR/community-bots/pull/10
 origin: docs/plans/2026-05-19-001-feat-trask-crawl4ai-rag-plan.md
-predecessor: docs/plans/2026-05-24-009-ship-pr9-trask-ops-closure-plan.md
 ---
 
 # Trask VPS Indexer Systemd + Stack Health Verifier
