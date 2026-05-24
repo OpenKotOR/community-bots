@@ -2,6 +2,7 @@
 title: "docs: KB Trask citation display architecture"
 type: docs
 status: completed
+merged: 0ed3eea
 date: 2026-05-24
 origin: ai-architect + ce-architecture-strategist + kb-orchestrator synthesis
 ---
