@@ -1,7 +1,7 @@
 ---
 title: "ship: merge PR #25 + doc review closeout"
 type: ship
-status: active
+status: completed
 date: 2026-05-24
 origin: docs/plans/2026-05-24-034-maintainability-closeout-pr24-plan.md
 pr: https://github.com/OpenKotOR/community-bots/pull/25
