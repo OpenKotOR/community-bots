@@ -3,6 +3,8 @@ title: "feat: align CI and holocron:e2e with trask:optimize-measure"
 type: feat
 status: completed
 date: 2026-05-24
+merged: 342cb6f
+pr: https://github.com/OpenKotOR/community-bots/pull/30
 origin: docs/plans/2026-05-24-046-wire-optimize-measure-cli-verify-plan.md
 ---
 
