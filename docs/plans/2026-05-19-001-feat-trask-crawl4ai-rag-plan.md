@@ -16,9 +16,9 @@ compose_authority: docs/brainstorms/trask-rag-discord-compose-requirements.md
 
 ### Delta update (2026-05-24)
 
-- **Landed (PR #9):** `trask-indexer drain-queue` + `run-queue-worker`; operator runbook; golden corpus script; `pnpm trask:indexer:test` + allowlist export + drain smoke in CI; `discord_sync_stale` on `/health`; Chroma backup/restore scripts; **scheduled backup wrapper** + cron example; production bot deploy manifest (`infra/trask-bot-stack/`); doc decommission of unused `TRASK_RESEARCH_BACKEND` flag.
-- **Partial:** Operators must copy `.env.production.example` on VPS and set secrets; off-site upload requires operator `TRASK_CHROMA_BACKUP_UPLOAD_CMD`; `FileChunkStore` ingest merge deferred.
-- **Next:** optional LLM keys in CI for richer Holocron compose when repository secrets are configured.
+- **Landed (PR #9):** Full indexed-stack ops closure — queue worker, CI pytest/drain smoke, discord sync stale health, Chroma backup/restore/scheduled cron, production bot manifest, **optional LLM keys in CI Holocron e2e**; doc decommission of unused `TRASK_RESEARCH_BACKEND` flag.
+- **Partial:** Operators must deploy VPS `.env` and backup upload hooks; `FileChunkStore` ingest merge deferred.
+- **Next:** Merge PR #9 when CI green; post-merge VPS operator rollout (bot systemd, backup cron, Discord sync interval).
 
 ### Delta update (2026-05-19)
 

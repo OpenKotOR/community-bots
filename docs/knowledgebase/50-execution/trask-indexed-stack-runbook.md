@@ -105,7 +105,7 @@ tar -czf trask-chroma-backup-$(date +%Y%m%d).tar.gz -C data/trask-indexer chroma
 | Gate | Command |
 |------|---------|
 | Indexer unit tests | `pnpm trask:indexer:test` (after `bootstrap_trask_indexer.sh`) |
-| Holocron e2e (5 queries) | `pnpm holocron:e2e` |
+| Holocron e2e (5 queries) | `pnpm holocron:e2e` — CI passes optional `OPENROUTER_API_KEY` / `OPENAI_API_KEY` repo secrets for richer LLM compose |
 | CLI QA | `pnpm verify:trask-cli` |
 | Offline faithfulness | `pnpm trask:faithfulness-eval` |
 | Indexer smoke | `python scripts/smoke_trask_indexed_stack.py --golden-fixtures --verify-retrieve` |
