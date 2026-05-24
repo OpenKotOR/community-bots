@@ -1,7 +1,7 @@
 ---
 title: "feat: wire citation module tests into optimize-measure"
 type: feat
-status: active
+status: completed
 date: 2026-05-24
 origin: docs/plans/2026-05-24-067-extract-query-anchor-plan.md
 ---
