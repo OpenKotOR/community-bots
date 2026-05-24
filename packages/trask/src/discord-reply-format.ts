@@ -239,7 +239,7 @@ const scoreAndFilterLines = (pool: readonly string[], query: string): string[] =
     .map((entry) => entry.line);
 };
 
-const citationIndicesInLines = (lines: readonly string[]): Set<number> => {
+export const citationIndicesInLines = (lines: readonly string[]): Set<number> => {
   const indices = new Set<number>();
   for (const line of lines) {
     for (const match of line.matchAll(CITATION_INDEX_CAPTURE_RE)) {
@@ -248,6 +248,10 @@ const citationIndicesInLines = (lines: readonly string[]): Set<number> => {
   }
   return indices;
 };
+
+/** Distinct `[n]` indices in a multi-line body (splits on `\n` for line-scoped matching). */
+export const citationIndicesInText = (text: string): Set<number> =>
+  citationIndicesInLines(text.split("\n"));
 
 const swapWeakOffTopicCitedLines = (
   selected: readonly string[],

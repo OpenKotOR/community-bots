@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  citationIndicesInLines,
+  citationIndicesInText,
   clampDiscordBodyLines,
   ensureMinimumDistinctCitedLines,
   filterDiscordLinesForQuery,
@@ -23,24 +25,6 @@ const approvedSources = [
   { name: "github.com", homeUrl: "https://github.com/th3w1zard1/TSLPatcher" },
   { name: "Deadly Stream", homeUrl: "https://deadlystream.com/files/file/1982-tslpatcher" },
 ];
-
-const distinctCitationIndices = (text: string): Set<number> => {
-  const indices = new Set<number>();
-  for (const match of text.matchAll(/\[(\d{1,2})\]/g)) {
-    indices.add(Number(match[1]));
-  }
-  return indices;
-};
-
-const distinctCitationIndicesInLines = (lines: readonly string[]): Set<number> => {
-  const indices = new Set<number>();
-  for (const line of lines) {
-    for (const match of line.matchAll(/\[(\d{1,2})\]/g)) {
-      indices.add(Number(match[1]));
-    }
-  }
-  return indices;
-};
 
 test("formatDiscordAskDisplay keeps two https links for expert TSLPatcher query", () => {
   const display = formatDiscordAskDisplay(expertTslpatcherRaw, approvedSources, { query: expertQuery });
@@ -70,7 +54,7 @@ test("ensureMinimumDistinctCitedLines backfills second distinct citation", () =>
   );
 
   assert.equal(out.length, 2);
-  const indices = distinctCitationIndicesInLines(out);
+  const indices = citationIndicesInLines(out);
   assert.equal(indices.size, BRIEF_DISCORD_MIN_CITATIONS);
   assert.ok(indices.has(1));
   assert.ok(indices.has(2));
@@ -98,7 +82,7 @@ test("filterDiscordLinesForQuery preserves two citations when pool supports it",
 
   const filtered = filterDiscordLinesForQuery([line1, line2, offTopic], expertQuery);
 
-  const indices = distinctCitationIndicesInLines(filtered);
+  const indices = citationIndicesInLines(filtered);
   assert.ok(indices.size >= BRIEF_DISCORD_MIN_CITATIONS, filtered.join(" | "));
   assert.ok(
     !filtered.some((line) => line.includes("[3]")),
@@ -115,7 +99,7 @@ test("clampDiscordBodyLines keeps two distinct citations when line cap truncates
   const body = [line1, line2, line3].join("\n");
 
   const clamped = clampDiscordBodyLines(body, 2, expertQuery);
-  assert.ok(distinctCitationIndices(clamped).size >= BRIEF_DISCORD_MIN_CITATIONS, clamped);
+  assert.ok(citationIndicesInText(clamped).size >= BRIEF_DISCORD_MIN_CITATIONS, clamped);
 });
 
 test("clampDiscordBodyLines backfills missing citation when first capped lines share one index", () => {
@@ -125,7 +109,7 @@ test("clampDiscordBodyLines backfills missing citation when first capped lines s
   const body = [line1, line2, line3].join("\n");
 
   const clamped = clampDiscordBodyLines(body, 2, expertQuery);
-  assert.equal(distinctCitationIndices(clamped).size, BRIEF_DISCORD_MIN_CITATIONS, clamped);
+  assert.equal(citationIndicesInText(clamped).size, BRIEF_DISCORD_MIN_CITATIONS, clamped);
 });
 
 test("formatDiscordAskDisplay preserves two links when body has low-score second citation", () => {
