@@ -9,8 +9,8 @@
  *   pnpm verify:trask-cli
  *   node --import tsx/esm scripts/verify_trask_cli_qa.mjs
  *
- * Preflight: `pnpm verify:trask-cli` runs `pnpm trask:optimize-measure` first
- * (build, faithfulness fixtures, discord citation stress tests) before live queries.
+ * Preflight: `pnpm verify:trask-cli` runs `pnpm trask:gate` first
+ * (build, full + CI optimize-measure) before live queries.
  *   node --import tsx/esm scripts/verify_trask_cli_qa.mjs --queries "What is TSLPatcher?"
  *
  * Environment:
@@ -28,7 +28,7 @@ import {
   formatDiscordAskDisplay,
   splitResearchAnswer,
   DISCORD_ASK_MAX_BODY_LINES,
-} from "../packages/trask/dist/index.js";
+} from "@openkotor/trask";
 import { goldenQueriesForSurface } from "../packages/trask-config/dist/golden-queries.js";
 import { degradedAnswerRegexes } from "../packages/trask-config/dist/policy.js";
 import { loadEnvFiles, repoRoot } from "./lib/trask-env.mjs";

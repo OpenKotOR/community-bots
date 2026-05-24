@@ -7,8 +7,8 @@
  *   pnpm verify:trask-discord
  *   node --import tsx/esm scripts/verify_trask_discord_live.mjs
  *
- * Preflight: `pnpm verify:trask-discord` runs `pnpm trask:optimize-measure` first
- * (build, faithfulness fixtures, discord citation stress tests) before live LLM calls.
+ * Preflight: `pnpm verify:trask-discord` runs `pnpm trask:gate` first
+ * (build, full + CI optimize-measure) before live LLM calls.
  *   node --import tsx/esm scripts/verify_trask_discord_live.mjs --post
  *   node --import tsx/esm scripts/verify_trask_discord_live.mjs --skip-url-check
  */
@@ -21,7 +21,7 @@ import {
   createResearchWizardClient,
   formatDiscordAskDisplay,
   DISCORD_ASK_MAX_BODY_LINES,
-} from "../packages/trask/dist/index.js";
+} from "@openkotor/trask";
 import { verificationQueriesForSurface } from "../packages/trask-config/dist/verification-queries.js";
 import { degradedAnswerRegexes } from "../packages/trask-config/dist/policy.js";
 import { isHttpsCitationReachable } from "./lib/url-verify.mjs";
