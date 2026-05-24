@@ -29,6 +29,7 @@
     "verify:trask-discord:post": "pnpm build && node --import tsx/esm scripts/verify_trask_discord_live.mjs --post",
     "trask:faithfulness-eval": "pnpm build && node scripts/trask_faithfulness_eval.mjs --fixtures",
     "trask:config-drift": "pnpm build && node scripts/check_trask_config_drift.mjs",
+    "trask:optimize-measure": "node scripts/trask_optimize_measure.mjs",
     "trask:indexer:test": ".venv-trask-indexer/bin/python -m pytest infra/trask-indexer/tests/ -q",
     "trask:stack:health": "bash scripts/trask_indexed_stack_health.sh",
     "discord:setup": "node scripts/discord_setup_wizard.mjs --write",

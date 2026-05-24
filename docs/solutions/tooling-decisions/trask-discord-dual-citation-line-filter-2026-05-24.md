@@ -33,12 +33,13 @@ PR #15 fixed this by backfilling from the cited pool after filtering.
 2. **`filterDiscordLinesForQuery`** — When ≥2 cited lines exist, run scoring on cited lines only, then call `ensureMinimumDistinctCitedLines` so anti-dump filtering does not collapse citation count.
 3. **Upstream compose** — `selectDistinctBriefClaims` in `grounded-evidence.ts` prefers query-anchored claims before lines reach the formatter (reduces off-topic padding).
 
-Implementation: `packages/trask/src/discord-reply-format.ts`, tests in `packages/trask/src/discord-reply-format.test.ts`.
+Implementation: `packages/trask/src/discord-reply-format.ts` (`ensureMinimumDistinctCitedLines`, `sliceLinesPreservingDistinctCitations`, exported `citationIndicesInLines` / `citationIndicesInText` for tests). Tests: `packages/trask/src/discord-reply-format.test.ts` (import production helpers — no duplicate citation regex).
 
 ## Verification
 
 ```bash
 pnpm build
+pnpm trask:optimize-measure   # composite_score ≥ 115, 8 discord stress tests, faithfulness 5/5
 node --test packages/trask/dist/discord-reply-format.test.js
 pnpm trask:stack:health
 pnpm verify:trask-discord   # when TRASK_DISCORD_BOT_TOKEN + LLM + indexer up
@@ -55,5 +56,7 @@ Pass criteria (expert queries): ≥2 distinct inline `https://` links, ≤5 non-
 
 ## History
 
-- 2026-05-24 — PR #24 (`85a66fd`) added `swapWeakOffTopicCitedLines`, `sliceLinesPreservingDistinctCitations`, clamp backfill when line caps drop a second citation, and `scripts/trask_optimize_measure.mjs` for ce-optimize gates (`composite_score` 115, 8 discord stress tests).
+- 2026-05-24 — PR #26 (`4935482`) exported `citationIndicesInLines` / `citationIndicesInText`; tests use production `CITATION_INDEX_CAPTURE_RE` (no duplicate helpers).
+- 2026-05-24 — PR #25 (`5455582`) maintainability: `CITATION_MARKER_IN_LINE_RE` vs `CITATION_INDEX_CAPTURE_RE` split; `sliceLinesPreservingDistinctCitations` uses `citationIndicesInLines` for distinctness.
+- 2026-05-24 — PR #24 (`85a66fd`) added `swapWeakOffTopicCitedLines`, `sliceLinesPreservingDistinctCitations`, clamp backfill when line caps drop a second citation, and `scripts/trask_optimize_measure.mjs` (+ `pnpm trask:optimize-measure`) for ce-optimize gates (`composite_score` 115, 8 discord stress tests).
 - 2026-05-24 — Documented after PR #15 merge (`ensureMinimumDistinctCitedLines` + claim selection hardening).
