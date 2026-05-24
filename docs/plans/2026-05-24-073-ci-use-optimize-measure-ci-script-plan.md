@@ -1,7 +1,7 @@
 ---
 title: "ci: use pnpm trask:optimize-measure:ci in workflow"
 type: fix
-status: active
+status: completed
 date: 2026-05-24
 origin: docs/plans/2026-05-24-072-trask-optimize-measure-ci-script-plan.md
 ---
