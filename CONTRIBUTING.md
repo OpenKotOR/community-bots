@@ -33,7 +33,7 @@ pnpm trask:optimize-measure:ci   # CI-equivalent (faithfulness + discord stress 
 
 Both must reach **composite_score 165** (13 discord stress tests × 10 + faithfulness 5 × 5 + check 10). GitHub Actions runs `trask:optimize-measure:ci` in [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
-Architecture and module map: [`docs/solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md`](docs/solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md). Live Discord/Holocron validation: [`AGENTS.md`](AGENTS.md) (not replaced by offline gates alone).
+Architecture and module map: [`docs/solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md`](docs/solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md). Pull requests use the checklist in [`.github/pull_request_template.md`](.github/pull_request_template.md). Live Discord/Holocron validation: [`AGENTS.md`](AGENTS.md) (not replaced by offline gates alone).
 
 ## Lint
 
