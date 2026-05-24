@@ -1,7 +1,7 @@
 ---
 title: "docs: CONTRIBUTING Trask citation gates + AGENTS learned facts"
 type: docs
-status: active
+status: completed
 date: 2026-05-24
 origin: docs/solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md
 ---
