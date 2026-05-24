@@ -89,8 +89,9 @@ pr_refs: [33, 34, 35, 36, 38]
 | Module | Responsibility |
 |--------|----------------|
 | `citation-markers.ts` | Regex + `parseCitationIndex` |
+| `research-answer-split.ts` | Body vs `Sources`/`References` split, `syncSourcesSectionToApproved` |
 | `grounded-evidence.ts` | Claims, compose, sufficiency, `collectCitationIndicesFromAnswer` |
-| `discord-reply-format.ts` | Body/Sources split, Discord line surgery, inline embed |
+| `discord-reply-format.ts` | Discord line surgery, inline embed, query line filters |
 | `discord-citation-url.ts` | `discord://` → jump URL when passages are Discord exports |
 | `apps/trask-bot` | `/ask` → `answerForSurface('discord')` → embed |
 
