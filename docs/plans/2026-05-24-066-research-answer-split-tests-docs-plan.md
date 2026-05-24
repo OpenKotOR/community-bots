@@ -1,7 +1,7 @@
 ---
 title: "test+docs: research-answer-split unit tests and KB sync"
 type: test
-status: active
+status: completed
 date: 2026-05-24
 origin: docs/plans/2026-05-24-065-extract-research-answer-split-plan.md
 ---
