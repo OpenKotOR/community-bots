@@ -82,7 +82,7 @@ pr_refs: [33, 34, 35, 36, 38]
 
 | Order | Gate | Proves |
 |-------|------|--------|
-| 1 | `pnpm trask:gate` | one `pnpm build`, import smoke, full measure (`TRASK_SKIP_BUILD` + `TRASK_OPTIMIZE_SKIP_CHECK`), `:ci` — both measure runs **`composite_score`** floor **165** (discord stress: 13 tests); see [stack closeout](../../solutions/tooling-decisions/trask-citation-stack-closeout-2026-05-24.md) |
+| 1 | `pnpm trask:gate` | one `pnpm build`, import smoke, `trask:config-drift`, full measure (`TRASK_SKIP_BUILD` + `TRASK_OPTIMIZE_SKIP_CHECK`), `:ci` — both measure runs **`composite_score`** floor **165** (discord stress: 13 tests); see [stack closeout](../../solutions/tooling-decisions/trask-citation-stack-closeout-2026-05-24.md) |
 | 2 | `pnpm verify:trask-discord` | Live LLM + indexer + embed contract (preflight runs `trask:gate`) |
 | 3 | `pnpm holocron:e2e` | Holocron UI + full research stack (preflight runs `trask:gate`) |
 

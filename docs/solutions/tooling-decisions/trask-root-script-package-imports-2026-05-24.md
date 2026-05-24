@@ -53,8 +53,8 @@ Root `package.json` lists workspace packages as **devDependencies** so Node reso
 ```bash
 pnpm trask:smoke-imports     # build + resolves trask, trask-config, config, retrieval (+ holocron/drift symbols)
 pnpm trask:smoke-imports:ci  # smoke only after build (CI uses this)
-pnpm trask:gate              # one build, then smoke + optimize-measure (full + :ci)
-pnpm trask:config-drift
+pnpm trask:gate              # one build, smoke, config-drift, optimize-measure (full + :ci)
+pnpm trask:config-drift    # standalone quick check (also runs inside trask:gate)
 ```
 
 See also [trask-citation-stack-closeout-2026-05-24.md](trask-citation-stack-closeout-2026-05-24.md).

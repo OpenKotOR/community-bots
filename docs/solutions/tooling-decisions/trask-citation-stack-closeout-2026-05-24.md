@@ -1,5 +1,5 @@
 ---
-title: "Trask citation stack closeout (PR #33–#63)"
+title: "Trask citation stack closeout (PR #33–#64)"
 date: 2026-05-24
 category: tooling-decisions
 problem_type: quality
@@ -33,6 +33,7 @@ Discord `/ask` brief embeds could collapse to a single inline citation after agg
 | Config imports | #56–#58 | `@openkotor/trask-config`, `@openkotor/config`, `@openkotor/retrieval` for root scripts |
 | Import smoke in gate | #60–#62 | `trask:smoke-imports` in gate; CI `trask:smoke-imports:ci`; holocron e2e package entry (#61); single-build gate (#62) |
 | Gate skip-check | #63 | Full measure in gate uses `TRASK_OPTIMIZE_SKIP_CHECK=1` after build |
+| Config drift in gate | #64 | `pnpm trask:config-drift` inside `trask:gate` (matches CI) |
 
 Authoritative module map: [trask-citation-module-architecture-2026-05-24.md](trask-citation-module-architecture-2026-05-24.md). Line-filter incident: [trask-discord-dual-citation-line-filter-2026-05-24.md](trask-discord-dual-citation-line-filter-2026-05-24.md).
 
@@ -49,7 +50,7 @@ Offline floor: **composite_score 165** = 13 discord stress × 10 + faithfulness 
 
 ## One-command preflight
 
-`pnpm trask:gate` runs one `pnpm build`, then import smoke (`TRASK_SKIP_BUILD=1`), full `optimize-measure` with `TRASK_SKIP_BUILD` and `TRASK_OPTIMIZE_SKIP_CHECK`, then `trask:optimize-measure:ci`. Use before opening a PR that touches citation modules.
+`pnpm trask:gate` runs one `pnpm build`, import smoke, `trask:config-drift`, full `optimize-measure` with skip-build and skip-check, then `trask:optimize-measure:ci`. Use before opening a PR that touches citation modules or golden/policy data.
 
 ## Related
 

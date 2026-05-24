@@ -1,5 +1,5 @@
 ---
-title: "Trask citation module architecture (PR #33–#63)"
+title: "Trask citation module architecture (PR #33–#64)"
 date: 2026-05-24
 category: tooling-decisions
 problem_type: architecture
@@ -36,7 +36,7 @@ discord-reply-format.ts      ← line filters, embedInlineCitationLinks (imports
 
 | Gate | Command | Proves |
 |------|---------|--------|
-| Recommended preflight | `pnpm trask:gate` | one build + smoke + full measure (skip-check) + `:ci`; both measure runs **composite_score 165** |
+| Recommended preflight | `pnpm trask:gate` | one build + smoke + config-drift + full measure (skip-check) + `:ci`; both measure runs **composite_score 165** |
 | Local offline (full) | `pnpm trask:optimize-measure` | Faithfulness 5/5 + 13 discord stress tests + all citation unit suites + `pnpm check`; **composite_score 165** |
 | CI offline (narrow) | `pnpm trask:optimize-measure:ci` (`TRASK_OPTIMIZE_CI_MODE=1`; same as `.github/workflows/ci.yml`) | Faithfulness + discord stress + **composite_score ≥ 165** without re-running full Trask unit matrix (unit step runs all packages separately) |
 | Live Discord | `pnpm verify:trask-discord` | Preflight `trask:gate`, then LLM + indexer embed contract |
@@ -59,6 +59,7 @@ Formula: `composite_score` = (`citation_stress_pass_count` × 10) + (`faithfulne
 | #61 | Holocron e2e imports `@openkotor/trask-config` |
 | #62 | Single-build `trask:gate`; `trask:smoke-imports:ci`; extended smoke symbols |
 | #63 | Gate full measure uses `TRASK_OPTIMIZE_SKIP_CHECK=1` after build |
+| #64 | `pnpm trask:config-drift` wired into `trask:gate` |
 | #59 | Export `query-anchor` from `@openkotor/trask` index |
 | #58 | Config drift + allowlist export use `@openkotor/retrieval`; root import compound doc |
 | #57 | Root verify scripts import `@openkotor/config`; holocron browser verify uses package entries |
