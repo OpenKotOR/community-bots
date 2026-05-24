@@ -36,10 +36,11 @@ discord-reply-format.ts      ← line filters, embedInlineCitationLinks (imports
 
 | Gate | Command | Proves |
 |------|---------|--------|
+| Recommended preflight | `pnpm trask:gate` | `pnpm build` + full `optimize-measure` + `:ci`; both runs **composite_score 165** |
 | Local offline (full) | `pnpm trask:optimize-measure` | Faithfulness 5/5 + 13 discord stress tests + all citation unit suites + `pnpm check`; **composite_score 165** |
 | CI offline (narrow) | `pnpm trask:optimize-measure:ci` (`TRASK_OPTIMIZE_CI_MODE=1`; same as `.github/workflows/ci.yml`) | Faithfulness + discord stress + **composite_score ≥ 165** without re-running full Trask unit matrix (unit step runs all packages separately) |
-| Live Discord | `pnpm verify:trask-discord` | Preflight full optimize-measure, then LLM + indexer embed contract |
-| Holocron UI | `pnpm holocron:e2e` | Full optimize-measure + Playwright on live stack |
+| Live Discord | `pnpm verify:trask-discord` | Preflight `trask:gate`, then LLM + indexer embed contract |
+| Holocron UI | `pnpm holocron:e2e` | Preflight `trask:gate`, then Playwright on live stack |
 
 Formula: `composite_score` = (`citation_stress_pass_count` × 10) + (`faithfulness_pass_count` × 5) + (`check_pass` × 10). Only **discord-reply-format.test.js** passes count toward `citation_stress_pass_count`.
 
@@ -54,6 +55,7 @@ Formula: `composite_score` = (`citation_stress_pass_count` × 10) + (`faithfulne
 | #39 | `research-answer-split.test.ts` |
 | #40 | `query-anchor.ts` — display decoupled from grounded-evidence |
 | #41 | Split/anchor/markers tests in optimize-measure |
+| #52 | README + CONTRIBUTING + gate table trask:gate sync |
 | #51 | AGENTS.md + docs/trask.md trask:gate ladder sync |
 | #50 | Live verify / holocron:e2e preflight via `pnpm trask:gate` |
 | #49 | `pnpm trask:gate` + citation stack closeout solutions doc |
