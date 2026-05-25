@@ -50,3 +50,8 @@ lastUpdated: 2026-05-24
 
 - [SYNTH] `/ask` in an approved channel returns embed + sources.
 - [SYNTH] With welcome env set, a test join posts only in the configured channel with safe mentions.
+
+## 8. Public Holocron (GitHub Pages)
+
+- [REPO] After deploy: open **`https://openkotor.github.io/community-bots/qa-webui/?thread=<fresh-uuid>`** with live **`VITE_TRASK_API_BASE`** / worker research backend — see [holocron-web-trask-client.md](../30-product-ux/holocron-web-trask-client.md).
+- [SYNTH] Spot-check **one** query with **≥2** `https://` sources; full five-query matrix remains **`pnpm holocron:e2e`** on **:4010** and Cursor browser MCP per **`AGENTS.md`**.

@@ -11,6 +11,8 @@ import {
   splitResearchAnswer,
 } from "@openkotor/trask";
 import {
+  getGoldenQuery,
+  goldenFixtures,
   goldenQueriesForSurface,
   loadGoldenQueries,
   loadTraskPolicy,
@@ -27,6 +29,8 @@ const assert = (ok, message) => {
 assert(goldenQueriesForSurface("cli").length >= 5, "goldenQueriesForSurface(cli)");
 assert(verificationQueriesForSurface("holocron").length >= 5, "verificationQueriesForSurface(holocron)");
 assert(loadGoldenQueries().length >= 5, "loadGoldenQueries");
+assert(getGoldenQuery("tslpatcher")?.companionFixture?.host === "github.com", "getGoldenQuery companionFixture");
+assert(goldenFixtures().length === 10, "goldenFixtures primary+companion");
 assert(loadTraskPolicy().holocron.minHttpsSources >= 2, "loadTraskPolicy holocron.minHttpsSources");
 assert(BRIEF_DISCORD_MIN_CITATIONS === 2, "BRIEF_DISCORD_MIN_CITATIONS");
 const { body } = splitResearchAnswer("Answer line.\n\n## Sources\n- [1] https://example.com/foo");

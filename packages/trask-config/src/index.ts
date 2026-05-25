@@ -7,6 +7,7 @@ export {
   loadGoldenQueries,
   loadGoldenQueriesFile,
   type GoldenFixture,
+  type GoldenFixtureEntry,
   type GoldenQueriesFile,
   type GoldenQuery,
   type GoldenQueryRuntime,

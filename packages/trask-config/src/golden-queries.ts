@@ -22,6 +22,7 @@ const GoldenQuerySchema = z.object({
   intent: z.enum(["tooling", "technical", "lore", "general"]).optional(),
   surfaces: z.array(z.string()).optional(),
   fixture: GoldenFixtureSchema.optional(),
+  companionFixture: GoldenFixtureSchema.optional(),
 });
 
 const GoldenQueriesFileSchema = z.object({
@@ -72,14 +73,33 @@ export const goldenQueriesForSurface = (surface: string): GoldenQueryRuntime[] =
   return loadGoldenQueries().filter((entry) => !entry.surfaces?.length || entry.surfaces.includes(surface));
 };
 
-export const goldenFixtures = (): Array<GoldenFixture & { query: string; id: string }> => {
-  return loadGoldenQueries()
-    .filter((entry): entry is GoldenQueryRuntime & { fixture: GoldenFixture } => Boolean(entry.fixture))
-    .map((entry) => ({
-      ...entry.fixture,
-      query: entry.question,
-      id: entry.id,
-    }));
+export type GoldenFixtureEntry = GoldenFixture & {
+  query: string;
+  id: string;
+  role: "primary" | "companion";
+};
+
+export const goldenFixtures = (): GoldenFixtureEntry[] => {
+  const out: GoldenFixtureEntry[] = [];
+  for (const entry of loadGoldenQueries()) {
+    if (entry.fixture) {
+      out.push({
+        ...entry.fixture,
+        query: entry.question,
+        id: entry.id,
+        role: "primary",
+      });
+    }
+    if (entry.companionFixture) {
+      out.push({
+        ...entry.companionFixture,
+        query: entry.question,
+        id: `${entry.id}:companion`,
+        role: "companion",
+      });
+    }
+  }
+  return out;
 };
 
 /** Legacy path for scripts still pointing at data/trask-eval/golden-queries.json */

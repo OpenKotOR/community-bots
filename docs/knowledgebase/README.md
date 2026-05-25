@@ -38,5 +38,5 @@ Canonical operator narrative for commands and env remains [docs/trask.md](../tra
 - [REPO] Import into chunks: `apps/ingest-worker` command `import-discord-export` (see runbook); minimal layout: [fixtures/discord-export-minimal/README.md](../../../fixtures/discord-export-minimal/README.md).
 - [REPO] Env map (Trask bot, HTTP server, ingest): [trask-configuration-env-map.md](50-execution/trask-configuration-env-map.md).
 - [REPO] Research failures, timeouts, chunk path mismatches: [trask-research-troubleshooting.md](50-execution/trask-research-troubleshooting.md).
-- [REPO] Holocron browser client (`VITE_TRASK_*`, polling): [holocron-web-trask-client.md](30-product-ux/holocron-web-trask-client.md).
+- [REPO] Holocron browser client (`VITE_TRASK_*`, polling, public **qa-webui** Pages URL): [holocron-web-trask-client.md](30-product-ux/holocron-web-trask-client.md).
 - [REPO] Holocron HTTP hosts: [trask-embedded-holocron-web.md](10-architecture-runtime/trask-embedded-holocron-web.md) (bot + `TRASK_WEB_PORT`) vs [trask-http-server-standalone-contract.md](10-architecture-runtime/trask-http-server-standalone-contract.md) (`pnpm dev:trask-http`).

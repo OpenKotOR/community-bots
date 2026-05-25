@@ -1,5 +1,5 @@
 ---
-title: "Trask citation stack closeout (PR #33–#71)"
+title: "Trask citation stack closeout (PR #33–#72)"
 date: 2026-05-24
 category: tooling-decisions
 problem_type: quality
@@ -40,6 +40,7 @@ Discord `/ask` brief embeds could collapse to a single inline citation after agg
 | QA bootstrap compound doc | #69 | `trask-qa-stack-bootstrap-2026-05-24.md` + KB cross-links |
 | Stack bootstrap + Discord CI smoke | #70 | `pnpm trask:smoke:stack-bootstrap`; `verify:trask-discord:ci`; CI steps |
 | CLI CI import smoke + arc sync | #71 | `verify:trask-cli:ci`; PR template QA scripts; arc **#33–#70** completion |
+| Golden companionFixture + qa-webui KB | #72 | Zod schema parity; `goldenFixtures()` ×10; public Pages validation ladder |
 
 Authoritative module map: [trask-citation-module-architecture-2026-05-24.md](trask-citation-module-architecture-2026-05-24.md). Line-filter incident: [trask-discord-dual-citation-line-filter-2026-05-24.md](trask-discord-dual-citation-line-filter-2026-05-24.md).
 
