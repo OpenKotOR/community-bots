@@ -14,10 +14,10 @@ pr: 73
 
 ## Solution
 
-`scripts/lib/compose_golden_cli_answer.mjs` builds answers from `getGoldenQuery(id)` (primary + companion markdown, `Sources` block, host labels). CI import-smoke:
+`scripts/lib/compose_golden_cli_answer.mjs` builds answers from `getGoldenQuery(id)` (primary + companion markdown, `Sources` block, host labels). CI import-smoke covers **all five** canonical queries:
 
-- CLI: `GOLDEN_IMPORT_SMOKE_IDS` (`tslpatcher`, `mdlops`)
-- Discord: `DISCORD_IMPORT_SMOKE_SPECS` maps verification ids to golden ids with expert question overrides
+- CLI: `GOLDEN_IMPORT_SMOKE_IDS` from `goldenQueriesForSurface("cli")`
+- Discord: `DISCORD_IMPORT_SMOKE_SPECS` from `verificationQueriesForSurface("discord")` + `goldenQueryId` in `verification-queries.json`
 
 `trask_smoke_package_imports.mjs` asserts compose output shape.
 

@@ -1,11 +1,16 @@
 /**
  * Build CLI-shaped research answers from golden-queries.json fixtures (primary + companion).
  */
-import { getGoldenQuery } from "@openkotor/trask-config";
+import {
+  getGoldenQuery,
+  goldenQueriesForSurface,
+  verificationQueriesForSurface,
+} from "@openkotor/trask-config";
 
 const HOST_LABELS = {
   "github.com": "github.com",
   "deadlystream.com": "Deadly Stream",
+  "steamcommunity.com": "steamcommunity.com",
 };
 
 /** @param {string} host */
@@ -53,10 +58,12 @@ export function composeGoldenCliAnswer(goldenId, options = {}) {
   };
 }
 
-export const GOLDEN_IMPORT_SMOKE_IDS = ["tslpatcher", "mdlops"];
+/** All CLI-surface golden ids (canonical five). */
+export const GOLDEN_IMPORT_SMOKE_IDS = goldenQueriesForSurface("cli").map((entry) => entry.id);
 
 /** Discord CI import-smoke: expert verification wording + golden fixture bodies. */
-export const DISCORD_IMPORT_SMOKE_SPECS = [
-  { verificationId: "expert-tslpatcher-2da", goldenId: "tslpatcher", expectPattern: "TSLPatcher|2DA|TLK" },
-  { verificationId: "expert-mdlops-blender", goldenId: "mdlops", expectPattern: "MDLOps|MDL" },
-];
+export const DISCORD_IMPORT_SMOKE_SPECS = verificationQueriesForSurface("discord").map((entry) => ({
+  verificationId: entry.id,
+  goldenId: entry.goldenQueryId,
+  expectPattern: entry.expectPattern,
+}));
