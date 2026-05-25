@@ -5,6 +5,7 @@ import { traskDataPath } from "./repo-root.js";
 
 const VerificationQuerySchema = z.object({
   id: z.string().min(1),
+  goldenQueryId: z.string().min(1),
   question: z.string().min(1),
   expectPattern: z.string().min(1),
   sourcePattern: z.string().min(1),

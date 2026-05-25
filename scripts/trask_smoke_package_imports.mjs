@@ -18,7 +18,7 @@ import {
   loadTraskPolicy,
   verificationQueriesForSurface,
 } from "@openkotor/trask-config";
-import { composeGoldenCliAnswer } from "./lib/compose_golden_cli_answer.mjs";
+import { composeGoldenCliAnswer, GOLDEN_IMPORT_SMOKE_IDS } from "./lib/compose_golden_cli_answer.mjs";
 
 const assert = (ok, message) => {
   if (!ok) {
@@ -41,9 +41,12 @@ assert(traskApprovedResearchSources.length > 0, "traskApprovedResearchSources");
 assert(defaultSourceCatalog.length > 0, "defaultSourceCatalog");
 assert(typeof loadSharedAiConfig === "function", "loadSharedAiConfig");
 
-const tslpatcherSmoke = composeGoldenCliAnswer("tslpatcher");
-assert(tslpatcherSmoke.approvedSources.length === 2, "composeGoldenCliAnswer approvedSources");
-assert(tslpatcherSmoke.answer.includes("[1]") && tslpatcherSmoke.answer.includes("[2]"), "composeGoldenCliAnswer citations");
-assert(/\nSources\n/i.test(tslpatcherSmoke.answer), "composeGoldenCliAnswer Sources block");
+assert(GOLDEN_IMPORT_SMOKE_IDS.length === 5, "GOLDEN_IMPORT_SMOKE_IDS canonical five");
+for (const goldenId of GOLDEN_IMPORT_SMOKE_IDS) {
+  const smoke = composeGoldenCliAnswer(goldenId);
+  assert(smoke.approvedSources.length === 2, `composeGoldenCliAnswer(${goldenId}) approvedSources`);
+  assert(smoke.answer.includes("[1]") && smoke.answer.includes("[2]"), `composeGoldenCliAnswer(${goldenId}) citations`);
+  assert(/\nSources\n/i.test(smoke.answer), `composeGoldenCliAnswer(${goldenId}) Sources block`);
+}
 
 console.log("trask_smoke_package_imports: OK");

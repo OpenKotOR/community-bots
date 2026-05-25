@@ -81,7 +81,8 @@ const main = async () => {
   ensureWorkspaceBuilt(repoRoot, CONFIG_DRIFT_BUILD_MARKERS);
 
   const { defaultSourceCatalog } = await import("@openkotor/retrieval");
-  const { goldenFixtures, loadGoldenQueries } = await import("@openkotor/trask-config");
+  const { getGoldenQuery, goldenFixtures, loadGoldenQueries, loadVerificationQueries } =
+    await import("@openkotor/trask-config");
 
   const catalogIds = new Set(defaultSourceCatalog.map((source) => source.id));
   const errors = [];
@@ -89,6 +90,15 @@ const main = async () => {
   for (const fixture of goldenFixtures()) {
     if (!catalogIds.has(fixture.sourceId)) {
       errors.push(`golden fixture ${fixture.id} uses sourceId "${fixture.sourceId}" not in catalog`);
+    }
+  }
+
+  for (const verification of loadVerificationQueries()) {
+    const golden = getGoldenQuery(verification.goldenQueryId);
+    if (!golden?.fixture || !golden.companionFixture) {
+      errors.push(
+        `verification ${verification.id} goldenQueryId "${verification.goldenQueryId}" missing fixture pair`,
+      );
     }
   }
 

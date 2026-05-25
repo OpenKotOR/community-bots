@@ -3,6 +3,7 @@
   "queries": [
     {
       "id": "expert-tslpatcher-2da",
+      "goldenQueryId": "tslpatcher",
       "question": "When a KotOR mod ships 2DA and TLK changes, what does TSLPatcher automate that manual file copying cannot?",
       "expectPattern": "TSLPatcher|2DA|GFF|TLK|list",
       "sourcePattern": "tslpatcher|deadlystream|github",
@@ -12,6 +13,7 @@
     },
     {
       "id": "expert-mdlops-blender",
+      "goldenQueryId": "mdlops",
       "question": "For a custom MDL exported from Blender, which MDLOps workflow step turns it back into game-ready KotOR models?",
       "expectPattern": "MDLOps|MDL|MDX|model|export",
       "sourcePattern": "mdlops|deadlystream|github|model",
@@ -21,6 +23,7 @@
     },
     {
       "id": "expert-widescreen-hud",
+      "goldenQueryId": "widescreen",
       "question": "On Windows 10, KOTOR HUD is stretched after a widescreen patch — which ini or aspect settings should I verify first?",
       "expectPattern": "widescreen|aspect|HUD|resolution|ini",
       "sourcePattern": "widescreen|resolution|deadlystream|aspect|ini",
@@ -30,6 +33,7 @@
     },
     {
       "id": "expert-saves-backup",
+      "goldenQueryId": "saves",
       "question": "Before modding on Windows, where does Knights of the Old Republic store save games per user profile?",
       "expectPattern": "save|Saves|Documents|Windows|profile",
       "sourcePattern": "save|windows|deadlystream|documents|steam",
@@ -39,6 +43,7 @@
     },
     {
       "id": "expert-reone-runtime",
+      "goldenQueryId": "reone",
       "question": "What runtime and scripting capabilities does the reone Odyssey reimplementation expose for engine research?",
       "expectPattern": "reone|Odyssey|engine|open.?source|runtime|script",
       "sourcePattern": "reone|github|engine|odyssey",
