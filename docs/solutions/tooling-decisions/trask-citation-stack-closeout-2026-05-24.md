@@ -57,6 +57,7 @@ Offline floor: **composite_score 165** = 13 discord stress × 10 + faithfulness 
 
 ## Related
 
+- [trask-qa-stack-bootstrap-2026-05-24.md](trask-qa-stack-bootstrap-2026-05-24.md) — shared live QA stack bootstrap (#66–#68)
 - [trask-citation-display-contract.md](../../knowledgebase/10-architecture-runtime/trask-citation-display-contract.md)
 - [validation-ladder.md](../../knowledgebase/50-execution/validation-ladder.md)
 - [CONTRIBUTING.md](../../../CONTRIBUTING.md)
