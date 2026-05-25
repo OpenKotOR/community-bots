@@ -1,5 +1,5 @@
 ---
-title: "Trask QA stack auto-bootstrap (PR #66–#68)"
+title: "Trask QA stack auto-bootstrap (PR #66–#71)"
 date: 2026-05-24
 category: tooling-decisions
 problem_type: workflow
@@ -71,6 +71,7 @@ Delete stale local branch `feat/your-next-change` when no longer needed: `git br
 pnpm trask:gate
 pnpm trask:smoke:stack-bootstrap   # bootstrap + health (CI uses this)
 pnpm verify:trask-discord:ci         # static Discord embed smoke (CI, no token)
+pnpm verify:trask-cli:ci            # static CLI golden import-smoke (CI, no LLM)
 pnpm holocron:e2e                    # gate preflight + Playwright
 ```
 

@@ -1,5 +1,5 @@
 ---
-title: "Trask citation module architecture (PR #33–#69)"
+title: "Trask citation module architecture (PR #33–#71)"
 date: 2026-05-24
 category: tooling-decisions
 problem_type: architecture
@@ -63,7 +63,9 @@ Formula: `composite_score` = (`citation_stress_pass_count` × 10) + (`faithfulne
 | #66 | Holocron e2e webServer bootstraps indexer+Worker (`holocron-e2e-webserver.mjs`) |
 | #67 | CLI verify auto-bootstrap (`trask_qa_stack_bootstrap.mjs`) |
 | #68 | Discord verify auto-bootstrap; holocron webServer dedupes shared env |
-| #69 | Compound bootstrap doc; `trask:smoke:stack-bootstrap`; `verify:trask-discord:ci` |
+| #69 | Compound bootstrap doc + KB cross-links |
+| #70 | `trask:smoke:stack-bootstrap`; `verify:trask-discord:ci` |
+| #71 | `verify:trask-cli:ci`; PR template QA scripts checklist |
 | #59 | Export `query-anchor` from `@openkotor/trask` index |
 | #58 | Config drift + allowlist export use `@openkotor/retrieval`; root import compound doc |
 | #57 | Root verify scripts import `@openkotor/config`; holocron browser verify uses package entries |
@@ -83,7 +85,7 @@ Formula: `composite_score` = (`citation_stress_pass_count` × 10) + (`faithfulne
 
 ## Related
 
-- [trask-citation-stack-closeout-2026-05-24.md](trask-citation-stack-closeout-2026-05-24.md) — PR #33–#68 arc summary and `pnpm trask:gate`
+- [trask-citation-stack-closeout-2026-05-24.md](trask-citation-stack-closeout-2026-05-24.md) — PR #33–#71 arc summary and `pnpm trask:gate`
 - [trask-qa-stack-bootstrap-2026-05-24.md](trask-qa-stack-bootstrap-2026-05-24.md) — `trask_qa_stack_bootstrap.mjs` and `ensure_trask_indexed_stack_for_e2e.sh`
 - [trask-root-script-package-imports-2026-05-24.md](trask-root-script-package-imports-2026-05-24.md) — root `scripts/` workspace package imports
 - `packages/trask/src/` — implementation

@@ -170,6 +170,7 @@ pnpm trask:smoke-imports:ci     # smoke only after build
 pnpm trask:gate                 # one build, smoke, config-drift, full measure (skip-check), :ci (floor 165)
 pnpm holocron:e2e               # trask:gate, then Playwright: 5 live KOTOR research queries on :4010
 pnpm verify:trask-cli           # trask:gate, then 5 golden CLI queries (grounded-source gate)
+pnpm verify:trask-cli:ci        # CI: golden import-smoke (no LLM)
 pnpm verify:trask-discord       # trask:gate, then live Discord expert embeds (token only for :post)
 pnpm verify:trask-discord:ci    # CI: embed import smoke (no token, no LLM)
 pnpm trask:smoke:stack-bootstrap  # bootstrap indexer+Worker + stack health
