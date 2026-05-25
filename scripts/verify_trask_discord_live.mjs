@@ -9,6 +9,7 @@
  *
  * Preflight: `pnpm verify:trask-discord` runs `pnpm trask:gate` first
  * (build, full + CI optimize-measure) before live LLM calls.
+ * Live path auto-bootstraps indexer + retrieve Worker (8787) when unhealthy.
  *   node --import tsx/esm scripts/verify_trask_discord_live.mjs --post
  *   node --import tsx/esm scripts/verify_trask_discord_live.mjs --skip-url-check
  */
@@ -25,6 +26,7 @@ import {
 import { degradedAnswerRegexes, verificationQueriesForSurface } from "@openkotor/trask-config";
 import { isHttpsCitationReachable } from "./lib/url-verify.mjs";
 import { loadEnvFiles, repoRoot } from "./lib/trask-env.mjs";
+import { bootstrapTraskIndexedStack } from "./lib/trask_qa_stack_bootstrap.mjs";
 
 const DEFAULT_CHANNEL_ID = "1497410480208216306";
 
@@ -71,6 +73,7 @@ const auditDisplay = (question, answer, approvedSources) => {
 };
 
 loadEnvFiles();
+bootstrapTraskIndexedStack(repoRoot);
 loadSharedAiConfig();
 const wizard = createResearchWizardClient(loadResearchWizardRuntimeConfig());
 

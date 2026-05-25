@@ -1,5 +1,5 @@
 ---
-title: "Trask citation stack closeout (PR #33–#66)"
+title: "Trask citation stack closeout (PR #33–#68)"
 date: 2026-05-24
 category: tooling-decisions
 problem_type: quality
@@ -36,6 +36,7 @@ Discord `/ask` brief embeds could collapse to a single inline citation after agg
 | Config drift in gate | #64 | `pnpm trask:config-drift` inside `trask:gate` (matches CI) |
 | Holocron e2e bootstrap | #66 | Playwright webServer auto-starts indexer+Worker; CI-parity env |
 | CLI verify bootstrap | #67 | `verify_trask_cli_qa.mjs` shares `trask_qa_stack_bootstrap.mjs` + `ensure_trask_indexed_stack_for_e2e.sh` |
+| Discord verify bootstrap | #68 | `verify_trask_discord_live.mjs` + `holocron-e2e-webserver.mjs` dedupe shared bootstrap |
 
 Authoritative module map: [trask-citation-module-architecture-2026-05-24.md](trask-citation-module-architecture-2026-05-24.md). Line-filter incident: [trask-discord-dual-citation-line-filter-2026-05-24.md](trask-discord-dual-citation-line-filter-2026-05-24.md).
 
@@ -43,7 +44,7 @@ Authoritative module map: [trask-citation-module-architecture-2026-05-24.md](tra
 
 ```bash
 pnpm trask:gate                    # one build, smoke, full measure (skip-check), :ci
-pnpm verify:trask-discord          # trask:gate preflight, then live Discord (stack + token)
+pnpm verify:trask-discord          # trask:gate preflight, then live Discord embed gate (auto-bootstrap 8787/8790; token only for --post)
 pnpm verify:trask-cli              # trask:gate preflight, then CLI golden queries (auto-bootstrap 8787/8790)
 pnpm holocron:e2e                  # trask:gate preflight, then Playwright + live research (auto-bootstrap)
 ```

@@ -23,7 +23,7 @@ lastUpdated: 2026-05-24
 - [REPO] **Full local measure:** `pnpm trask:optimize-measure` — faithfulness + discord stress + citation helper unit suites (`research-answer-split`, `query-anchor`, `citation-markers`, `grounded-evidence`, `research-compose`) + `pnpm check`.
 - [REPO] **CI measure:** `pnpm trask:optimize-measure:ci` — faithfulness + discord stress only; enforces **composite_score ≥ 165** without duplicating the full Trask unit matrix (see [trask-citation-module-architecture-2026-05-24.md](../../solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md)).
 - [SYNTH] Authoritative formula and incident history: [trask-citation-display-contract.md](../10-architecture-runtime/trask-citation-display-contract.md), [trask-discord-dual-citation-line-filter-2026-05-24.md](../../solutions/tooling-decisions/trask-discord-dual-citation-line-filter-2026-05-24.md).
-- [REPO] `pnpm verify:trask-discord`, `pnpm verify:trask-cli`, and `pnpm holocron:e2e` preflight with `pnpm trask:gate` before live or browser steps.
+- [REPO] `pnpm verify:trask-discord`, `pnpm verify:trask-cli`, and `pnpm holocron:e2e` preflight with `pnpm trask:gate` before live or browser steps; live verify scripts and Holocron Playwright `webServer` auto-bootstrap indexer+Worker (**8787**/**8790**) via `trask_qa_stack_bootstrap.mjs` when unhealthy.
 
 ## 4. Package tests
 

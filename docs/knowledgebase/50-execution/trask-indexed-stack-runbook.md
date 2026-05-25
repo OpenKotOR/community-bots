@@ -134,7 +134,7 @@ bash scripts/trask_indexed_stack_health.sh --strict-stale # fail if discord_sync
 | Gate | Command |
 |------|---------|
 | Citation offline (Discord stress + faithfulness) | `pnpm trask:gate` (recommended: one build, smoke, full measure with skip-check, `:ci`); floor `composite_score` **165** — see [stack closeout](../../solutions/tooling-decisions/trask-citation-stack-closeout-2026-05-24.md), [module architecture](../../solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md), [display contract](../10-architecture-runtime/trask-citation-display-contract.md) |
-| Discord `/ask` live | `pnpm verify:trask-discord` (preflight `pnpm trask:gate`) |
+| Discord `/ask` live | `pnpm verify:trask-discord` (preflight `pnpm trask:gate`; script auto-bootstraps indexer+Worker when unhealthy) |
 | Indexer unit tests | `pnpm trask:indexer:test` (after `bootstrap_trask_indexer.sh`) |
 | Holocron e2e (5 queries) | `pnpm holocron:e2e` — CI passes optional `OPENROUTER_API_KEY` / `OPENAI_API_KEY` repo secrets for richer LLM compose |
 | CLI QA | `pnpm verify:trask-cli` (preflight `pnpm trask:gate`; script auto-bootstraps indexer+Worker when unhealthy) |
