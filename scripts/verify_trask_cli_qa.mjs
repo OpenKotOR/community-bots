@@ -11,6 +11,7 @@
  *
  * Preflight: `pnpm verify:trask-cli` runs `pnpm trask:gate` first
  * (build, full + CI optimize-measure) before live queries.
+ * Live path auto-bootstraps indexer + retrieve Worker (8787) when unhealthy.
  *   node --import tsx/esm scripts/verify_trask_cli_qa.mjs --queries "What is TSLPatcher?"
  *
  * Environment:
@@ -31,6 +32,7 @@ import {
 } from "@openkotor/trask";
 import { degradedAnswerRegexes, goldenQueriesForSurface } from "@openkotor/trask-config";
 import { loadEnvFiles, repoRoot } from "./lib/trask-env.mjs";
+import { bootstrapTraskIndexedStack } from "./lib/trask_qa_stack_bootstrap.mjs";
 
 const DEFAULT_QUERIES = goldenQueriesForSurface("cli").map((entry) => ({
   question: entry.question,
@@ -290,6 +292,7 @@ const scoreAnswer = (query, answer, approvedSources) => {
 
 const main = async () => {
   loadEnvFiles();
+  bootstrapTraskIndexedStack(repoRoot);
 
   const queryArg = argValue("queries", "");
   const queries = queryArg
