@@ -18,6 +18,7 @@ import {
   loadTraskPolicy,
   verificationQueriesForSurface,
 } from "@openkotor/trask-config";
+import { composeGoldenCliAnswer } from "./lib/compose_golden_cli_answer.mjs";
 
 const assert = (ok, message) => {
   if (!ok) {
@@ -39,5 +40,10 @@ assert(citationIndicesInText("See [1] and [2] here.").size === 2, "citationIndic
 assert(traskApprovedResearchSources.length > 0, "traskApprovedResearchSources");
 assert(defaultSourceCatalog.length > 0, "defaultSourceCatalog");
 assert(typeof loadSharedAiConfig === "function", "loadSharedAiConfig");
+
+const tslpatcherSmoke = composeGoldenCliAnswer("tslpatcher");
+assert(tslpatcherSmoke.approvedSources.length === 2, "composeGoldenCliAnswer approvedSources");
+assert(tslpatcherSmoke.answer.includes("[1]") && tslpatcherSmoke.answer.includes("[2]"), "composeGoldenCliAnswer citations");
+assert(/\nSources\n/i.test(tslpatcherSmoke.answer), "composeGoldenCliAnswer Sources block");
 
 console.log("trask_smoke_package_imports: OK");
