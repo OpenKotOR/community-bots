@@ -100,6 +100,13 @@ jobs:
           echo "Retrieve Worker failed to start" >&2
           exit 1
 
+      # Idempotent smoke: same script local Holocron/verify gates use (PR #66–#68).
+      # CI already started indexer+Worker above; this must exit 0 when healthy.
+      - name: Trask QA stack bootstrap smoke (ensure script)
+        run: bash scripts/ensure_trask_indexed_stack_for_e2e.sh
+        env:
+          TRASK_INDEXER_BASE_URL: http://127.0.0.1:8787
+
       - name: Holocron e2e LLM config (optional repository secrets)
         run: |
           if [ -n "${OPENROUTER_API_KEY:-}" ] || [ -n "${OPENAI_API_KEY:-}" ]; then
@@ -111,6 +118,7 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
+      # Playwright webServer: holocron-e2e-webserver.mjs (shared bootstrap for local parity).
       - name: Holocron functional e2e (live Trask research in browser)
         run: pnpm holocron:e2e:playwright
         env:

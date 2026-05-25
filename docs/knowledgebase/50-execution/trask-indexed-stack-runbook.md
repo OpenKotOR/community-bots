@@ -49,6 +49,12 @@ curl -sf http://127.0.0.1:8790/health
 
 Open Holocron at http://127.0.0.1:4010 (not Vite :5174 alone for research validation).
 
+## QA auto-bootstrap (live gates)
+
+Holocron e2e, `pnpm verify:trask-cli`, and `pnpm verify:trask-discord` call **`scripts/lib/trask_qa_stack_bootstrap.mjs`**, which applies CI-parity env and runs **`bash scripts/ensure_trask_indexed_stack_for_e2e.sh`** when indexer (**8790**) or Worker (**8787**) is unhealthy. Playwright uses **`scripts/holocron-e2e-webserver.mjs`** (does not bind **4010** until the live server step).
+
+Compound reference: [trask-qa-stack-bootstrap-2026-05-24.md](../../solutions/tooling-decisions/trask-qa-stack-bootstrap-2026-05-24.md).
+
 ## Batch crawl (full allowlist)
 
 ```bash
