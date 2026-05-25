@@ -11,14 +11,28 @@ describe("verification-queries", () => {
     assert.ok(queries.every((entry) => entry.expectRe instanceof RegExp));
   });
 
-  it("links discord verification queries to golden fixture pairs", () => {
-    const discord = verificationQueriesForSurface("discord");
-    assert.equal(discord.length, 5);
-    for (const entry of discord) {
+  const assertGoldenQueryLinks = (surface: string) => {
+    const rows = verificationQueriesForSurface(surface);
+    assert.equal(rows.length, 5, `${surface} verification count`);
+    for (const entry of rows) {
       const golden = getGoldenQuery(entry.goldenQueryId);
       assert.ok(golden?.fixture, `${entry.id} goldenQueryId fixture`);
       assert.ok(golden?.companionFixture, `${entry.id} goldenQueryId companionFixture`);
     }
+  };
+
+  it("links discord verification queries to golden fixture pairs", () => {
+    assertGoldenQueryLinks("discord");
+  });
+
+  it("links holocron verification queries to golden fixture pairs", () => {
+    assertGoldenQueryLinks("holocron");
+  });
+
+  it("uses unique goldenQueryId values across verification queries", () => {
+    const ids = loadVerificationQueries().map((entry) => entry.goldenQueryId);
+    assert.equal(new Set(ids).size, ids.length);
+    assert.equal(ids.length, 5);
   });
 
   it("excludes golden literal wording for holocron surface", () => {

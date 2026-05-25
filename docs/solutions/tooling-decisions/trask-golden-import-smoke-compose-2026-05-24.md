@@ -3,7 +3,7 @@ module: trask
 tags: [trask, qa, golden-queries, ci, import-smoke]
 problem_type: tooling-decision
 date: 2026-05-24
-pr: 73
+pr: 74
 ---
 
 # Golden import-smoke compose helper
@@ -19,7 +19,7 @@ pr: 73
 - CLI: `GOLDEN_IMPORT_SMOKE_IDS` from `goldenQueriesForSurface("cli")`
 - Discord: `DISCORD_IMPORT_SMOKE_SPECS` from `verificationQueriesForSurface("discord")` + `goldenQueryId` in `verification-queries.json`
 
-`trask_smoke_package_imports.mjs` asserts compose output shape.
+`trask_smoke_package_imports.mjs` asserts compose output shape for all five CLI and Discord paths. `check_trask_config_drift.mjs` scans expert verification question literals and enforces a 1:1 match between CLI golden ids and `goldenQueryId` (PR #75).
 
 ## Verification
 

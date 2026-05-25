@@ -22,6 +22,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) and [trask-citation-module-architecture](
 - [ ] New or changed gate script registered in `package.json` (`verify:trask-cli:ci`, `verify:trask-discord:ci`, `trask:smoke:stack-bootstrap`, etc.)
 - [ ] CI wired in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) when the script is a merge gate
 - [ ] [trask-qa-stack-bootstrap](docs/solutions/tooling-decisions/trask-qa-stack-bootstrap-2026-05-24.md) updated if bootstrap behavior changed
+- [ ] Edits to `data/trask/eval/golden-queries.json` or `verification-queries.json` → `pnpm trask:config-drift` + `pnpm verify:trask-cli:ci` + `pnpm verify:trask-discord:ci` (or `pnpm trask:verify-import-smoke:ci`)
 
 ## Web Audio / persistence (check if applicable)
 

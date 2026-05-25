@@ -81,8 +81,13 @@ const main = async () => {
   ensureWorkspaceBuilt(repoRoot, CONFIG_DRIFT_BUILD_MARKERS);
 
   const { defaultSourceCatalog } = await import("@openkotor/retrieval");
-  const { getGoldenQuery, goldenFixtures, loadGoldenQueries, loadVerificationQueries } =
-    await import("@openkotor/trask-config");
+  const {
+    getGoldenQuery,
+    goldenFixtures,
+    goldenQueriesForSurface,
+    loadGoldenQueries,
+    loadVerificationQueries,
+  } = await import("@openkotor/trask-config");
 
   const catalogIds = new Set(defaultSourceCatalog.map((source) => source.id));
   const errors = [];
@@ -93,25 +98,46 @@ const main = async () => {
     }
   }
 
-  for (const verification of loadVerificationQueries()) {
+  const verificationRows = loadVerificationQueries();
+  const linkedGoldenIds = [];
+
+  for (const verification of verificationRows) {
     const golden = getGoldenQuery(verification.goldenQueryId);
     if (!golden?.fixture || !golden.companionFixture) {
       errors.push(
         `verification ${verification.id} goldenQueryId "${verification.goldenQueryId}" missing fixture pair`,
       );
     }
+    linkedGoldenIds.push(verification.goldenQueryId);
   }
 
-  const goldenQuestions = loadGoldenQueries().map((entry) => entry.question);
-  for (const relPath of walk(repoRoot)) {
-    if (isAllowedGoldenLiteral(relPath)) continue;
-    const text = readFileSync(join(repoRoot, relPath), "utf8");
-    for (const question of goldenQuestions) {
-      if (text.includes(question)) {
-        errors.push(`golden question duplicated in ${relPath}`);
+  const cliGoldenIds = goldenQueriesForSurface("cli")
+    .map((entry) => entry.id)
+    .sort();
+  const uniqueLinkedIds = [...new Set(linkedGoldenIds)].sort();
+  if (uniqueLinkedIds.length !== linkedGoldenIds.length) {
+    errors.push("duplicate goldenQueryId across verification queries");
+  }
+  if (cliGoldenIds.join(",") !== uniqueLinkedIds.join(",")) {
+    errors.push(
+      `goldenQueryId set mismatch: cli golden ids [${cliGoldenIds.join(", ")}] vs verification [${uniqueLinkedIds.join(", ")}]`,
+    );
+  }
+
+  const scanQuestionLiterals = (questions, label) => {
+    for (const relPath of walk(repoRoot)) {
+      if (isAllowedGoldenLiteral(relPath)) continue;
+      const text = readFileSync(join(repoRoot, relPath), "utf8");
+      for (const question of questions) {
+        if (text.includes(question)) {
+          errors.push(`${label} duplicated in ${relPath}`);
+        }
       }
     }
-  }
+  };
+
+  scanQuestionLiterals(loadGoldenQueries().map((entry) => entry.question), "golden question");
+  scanQuestionLiterals(verificationRows.map((entry) => entry.question), "verification question");
 
   if (errors.length > 0) {
     console.error("Trask config drift check failed:\n");
