@@ -45,6 +45,7 @@ Versioned Trask policy lives under `data/trask/` and loads via `@openkotor/trask
 | Path | Purpose |
 |------|---------|
 | `data/trask/eval/golden-queries.json` | Canonical five eval questions (e2e, CLI, smoke fixtures, faithfulness) |
+| `data/trask/eval/verification-queries.json` | Expert phrasing for Holocron/Discord/browser gates; each row links to golden via **`goldenQueryId`** |
 | `data/trask/profiles/surfaces.json` | Holocron / Discord / CLI compose profiles |
 | `data/trask/policy.json` | Min citations, Discord line caps, degraded-answer patterns |
 | `data/trask/linguistics.json` | Intent terms + anchor tokens (wizard + retrieval) |

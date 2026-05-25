@@ -16,9 +16,14 @@ import {
   goldenQueriesForSurface,
   loadGoldenQueries,
   loadTraskPolicy,
+  loadVerificationQueries,
   verificationQueriesForSurface,
 } from "@openkotor/trask-config";
-import { composeGoldenCliAnswer, GOLDEN_IMPORT_SMOKE_IDS } from "./lib/compose_golden_cli_answer.mjs";
+import {
+  composeGoldenCliAnswer,
+  DISCORD_IMPORT_SMOKE_SPECS,
+  GOLDEN_IMPORT_SMOKE_IDS,
+} from "./lib/compose_golden_cli_answer.mjs";
 
 const assert = (ok, message) => {
   if (!ok) {
@@ -47,6 +52,17 @@ for (const goldenId of GOLDEN_IMPORT_SMOKE_IDS) {
   assert(smoke.approvedSources.length === 2, `composeGoldenCliAnswer(${goldenId}) approvedSources`);
   assert(smoke.answer.includes("[1]") && smoke.answer.includes("[2]"), `composeGoldenCliAnswer(${goldenId}) citations`);
   assert(/\nSources\n/i.test(smoke.answer), `composeGoldenCliAnswer(${goldenId}) Sources block`);
+}
+
+assert(DISCORD_IMPORT_SMOKE_SPECS.length === 5, "DISCORD_IMPORT_SMOKE_SPECS canonical five");
+const verificationById = new Map(loadVerificationQueries().map((entry) => [entry.id, entry]));
+for (const spec of DISCORD_IMPORT_SMOKE_SPECS) {
+  const verification = verificationById.get(spec.verificationId);
+  assert(verification, `verification query ${spec.verificationId}`);
+  const smoke = composeGoldenCliAnswer(spec.goldenId, { question: verification.question });
+  assert(smoke.approvedSources.length === 2, `discord compose(${spec.goldenId}) approvedSources`);
+  assert(smoke.answer.includes("[1]") && smoke.answer.includes("[2]"), `discord compose(${spec.goldenId}) citations`);
+  assert(/\nSources\n/i.test(smoke.answer), `discord compose(${spec.goldenId}) Sources block`);
 }
 
 console.log("trask_smoke_package_imports: OK");

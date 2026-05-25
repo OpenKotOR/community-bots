@@ -32,6 +32,7 @@
     "trask:smoke:stack-bootstrap": "node scripts/smoke_trask_qa_stack_bootstrap.mjs",
     "trask:faithfulness-eval": "pnpm build && node scripts/trask_faithfulness_eval.mjs --fixtures",
     "trask:config-drift": "node scripts/check_trask_config_drift.mjs",
+    "trask:verify-import-smoke:ci": "TRASK_SKIP_BUILD=1 pnpm verify:trask-discord:ci && TRASK_SKIP_BUILD=1 pnpm verify:trask-cli:ci",
     "trask:optimize-measure": "node scripts/trask_optimize_measure.mjs",
     "trask:optimize-measure:ci": "TRASK_OPTIMIZE_CI_MODE=1 TRASK_SKIP_BUILD=1 node scripts/trask_optimize_measure.mjs",
     "trask:smoke-imports": "pnpm build && node scripts/trask_smoke_package_imports.mjs",
