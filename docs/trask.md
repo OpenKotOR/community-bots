@@ -166,6 +166,9 @@ CLI debug gate:
 pnpm verify:trask-cli   # pnpm trask:gate preflight, then live CLI golden queries
 ```
 
+`verify_trask_cli_qa.mjs` auto-bootstraps the indexer (**8790**) and retrieve Worker (**8787**) when unhealthy
+(same `ensure_trask_indexed_stack_for_e2e.sh` path as Holocron e2e), with CI-parity env via `trask_qa_stack_bootstrap.mjs`.
+
 That script mirrors the same canonical five technical queries as Holocron e2e. It is for subprocess/retrieval
 debugging only and does **not** replace browser or Playwright verification of real `https://` citations.
 
