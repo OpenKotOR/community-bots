@@ -1,5 +1,5 @@
 ---
-title: "Trask citation stack closeout (PR #33–#64)"
+title: "Trask citation stack closeout (PR #33–#65)"
 date: 2026-05-24
 category: tooling-decisions
 problem_type: quality
@@ -34,6 +34,7 @@ Discord `/ask` brief embeds could collapse to a single inline citation after agg
 | Import smoke in gate | #60–#62 | `trask:smoke-imports` in gate; CI `trask:smoke-imports:ci`; holocron e2e package entry (#61); single-build gate (#62) |
 | Gate skip-check | #63 | Full measure in gate uses `TRASK_OPTIMIZE_SKIP_CHECK=1` after build |
 | Config drift in gate | #64 | `pnpm trask:config-drift` inside `trask:gate` (matches CI) |
+| Holocron e2e bootstrap | #66 | Playwright webServer auto-starts indexer+Worker; CI-parity env |
 
 Authoritative module map: [trask-citation-module-architecture-2026-05-24.md](trask-citation-module-architecture-2026-05-24.md). Line-filter incident: [trask-discord-dual-citation-line-filter-2026-05-24.md](trask-discord-dual-citation-line-filter-2026-05-24.md).
 

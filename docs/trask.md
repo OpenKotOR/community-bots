@@ -153,7 +153,7 @@ queries in Chromium (202 → thread poll → answer + grounded **Sources** / cit
 pnpm exec playwright install chromium --with-deps   # once per machine (repo root)
 pnpm trask:smoke-imports:ci   # import smoke after build (CI uses this)
 pnpm trask:gate               # one build, smoke, full measure (skip-check), :ci — floor 165
-pnpm holocron:e2e             # trask:gate preflight, then Playwright
+pnpm holocron:e2e             # trask:gate preflight, then Playwright (auto-starts indexer+Worker via holocron-e2e-webserver.sh)
 ```
 
 Requires repo **`.env`** with **at least one working LLM provider** (`OPENROUTER_API_KEY` or `OPENAI_API_KEY`)

@@ -27,7 +27,7 @@ Canonical operator narrative for commands and env remains [docs/trask.md](../tra
 
 | Doc | Use when |
 |-----|----------|
-| [trask-citation-stack-closeout-2026-05-24.md](../solutions/tooling-decisions/trask-citation-stack-closeout-2026-05-24.md) | Citation refactor arc **PR #33–#63** and `pnpm trask:gate` ladder |
+| [trask-citation-stack-closeout-2026-05-24.md](../solutions/tooling-decisions/trask-citation-stack-closeout-2026-05-24.md) | Citation refactor arc **PR #33–#65** and `pnpm trask:gate` ladder |
 | [trask-citation-module-architecture-2026-05-24.md](../solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md) | Module map, exports, local vs CI gates |
 | [trask-root-script-package-imports-2026-05-24.md](../solutions/tooling-decisions/trask-root-script-package-imports-2026-05-24.md) | Root script `@openkotor/*` imports and smoke |
 
