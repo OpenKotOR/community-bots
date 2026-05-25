@@ -72,7 +72,7 @@ After editing golden questions or fixtures, run `pnpm trask:config-drift`. Env o
 
 Module map: [trask-citation-module-architecture-2026-05-24.md](solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md).
 
-Gate: `pnpm verify:trask-discord` runs full `pnpm trask:optimize-measure` first, then live expert queries (requires indexer + LLM; use `--skip-url-check` only offline).
+Gate: `pnpm verify:trask-discord` runs **`pnpm trask:gate`** first, then live expert queries (auto-bootstraps indexer+Worker; token only for `--post`). CI uses `pnpm verify:trask-discord:ci` (static embed smoke, no LLM/token).
 
 ### 3. Configure Discord credentials
 

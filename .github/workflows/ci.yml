@@ -100,12 +100,17 @@ jobs:
           echo "Retrieve Worker failed to start" >&2
           exit 1
 
-      # Idempotent smoke: same script local Holocron/verify gates use (PR #66–#68).
-      # CI already started indexer+Worker above; this must exit 0 when healthy.
-      - name: Trask QA stack bootstrap smoke (ensure script)
-        run: bash scripts/ensure_trask_indexed_stack_for_e2e.sh
+      # Idempotent smoke: same path as local `pnpm trask:smoke:stack-bootstrap` (PR #69).
+      - name: Trask QA stack bootstrap smoke
+        run: pnpm trask:smoke:stack-bootstrap
         env:
           TRASK_INDEXER_BASE_URL: http://127.0.0.1:8787
+
+      - name: Trask Discord verify import smoke (no token)
+        run: pnpm verify:trask-discord:ci
+        env:
+          TRASK_INDEXER_BASE_URL: http://127.0.0.1:8787
+          TRASK_SKIP_BUILD: "1"
 
       - name: Holocron e2e LLM config (optional repository secrets)
         run: |
