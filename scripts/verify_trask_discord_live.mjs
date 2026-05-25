@@ -24,44 +24,13 @@ import {
   formatDiscordAskDisplay,
   DISCORD_ASK_MAX_BODY_LINES,
 } from "@openkotor/trask";
-import { degradedAnswerRegexes, verificationQueriesForSurface } from "@openkotor/trask-config";
+import { degradedAnswerRegexes, loadVerificationQueries, verificationQueriesForSurface } from "@openkotor/trask-config";
 import { isHttpsCitationReachable } from "./lib/url-verify.mjs";
 import { loadEnvFiles, repoRoot } from "./lib/trask-env.mjs";
 import { bootstrapTraskIndexedStack } from "./lib/trask_qa_stack_bootstrap.mjs";
+import { composeGoldenCliAnswer, DISCORD_IMPORT_SMOKE_SPECS } from "./lib/compose_golden_cli_answer.mjs";
 
 const DEFAULT_CHANNEL_ID = "1497410480208216306";
-
-const IMPORT_SMOKE_FIXTURES = [
-  {
-    question:
-      "When a KotOR mod ships 2DA and TLK changes, what does TSLPatcher automate that manual file copying cannot?",
-    raw: `TSLPatcher on GitHub The TSLPatcher project documents how mod authors ship list-driven 2DA, GFF, and TLK changes for KotOR and TSL installs. [1]
-TSLPatcher is a mod installation tool for Knights of the Old Republic and The Sith Lords. It applies 2DA, GFF, and TLK patches from list files so players do not copy files by hand. [2]
-
-Sources
-1. github.com - https://github.com/th3w1zard1/TSLPatcher
-2. Deadly Stream - https://deadlystream.com/files/file/1982-tslpatcher`,
-    approvedSources: [
-      { name: "github.com", homeUrl: "https://github.com/th3w1zard1/TSLPatcher" },
-      { name: "Deadly Stream", homeUrl: "https://deadlystream.com/files/file/1982-tslpatcher" },
-    ],
-    expectPattern: "TSLPatcher|2DA|TLK",
-  },
-  {
-    question: "For a custom MDL exported from Blender, which MDLOps workflow step turns it back into game-ready KotOR models?",
-    raw: `MDLOps repository MDLOps is used in the KotOR toolchain to import and export MDL/MDX assets between the game and DCC tools. [1]
-MDLOps converts KotOR MDL and MDX for Blender and other DCC pipelines. [2]
-
-Sources
-1. github.com - https://github.com/ndixUR/MDLOps
-2. Deadly Stream - https://deadlystream.com/files/file/1198-mdlops`,
-    approvedSources: [
-      { name: "github.com", homeUrl: "https://github.com/ndixUR/MDLOps" },
-      { name: "Deadly Stream", homeUrl: "https://deadlystream.com/files/file/1198-mdlops" },
-    ],
-    expectPattern: "MDLOps|MDL",
-  },
-];
 
 const QUERIES = verificationQueriesForSurface("discord").map((entry) => ({
   question: entry.question,
@@ -106,15 +75,28 @@ const auditDisplay = (question, answer, approvedSources) => {
   return { display, lines: lines.length, linked: linked.length, urls: extractInlineHttpsUrls(display) };
 };
 
+const verificationById = () =>
+  new Map(loadVerificationQueries().map((entry) => [entry.id, entry]));
+
 const runImportSmoke = () => {
   loadEnvFiles();
   bootstrapTraskIndexedStack(repoRoot);
 
+  const byId = verificationById();
   let failed = 0;
-  for (const spec of IMPORT_SMOKE_FIXTURES) {
-    const audit = auditDisplay(spec.question, spec.raw, spec.approvedSources);
+  for (const spec of DISCORD_IMPORT_SMOKE_SPECS) {
+    const verification = byId.get(spec.verificationId);
+    if (!verification) {
+      console.error(`import-smoke FAIL: missing verification query ${spec.verificationId}`);
+      failed += 1;
+      continue;
+    }
+    const { question, answer, approvedSources } = composeGoldenCliAnswer(spec.goldenId, {
+      question: verification.question,
+    });
+    const audit = auditDisplay(question, answer, approvedSources);
     if (typeof audit === "string") {
-      console.error(`import-smoke FAIL: ${audit}`);
+      console.error(`import-smoke FAIL (${spec.verificationId}): ${audit}`);
       failed += 1;
       continue;
     }
@@ -124,13 +106,15 @@ const runImportSmoke = () => {
       failed += 1;
       continue;
     }
-    console.log(`import-smoke OK: ${spec.question.slice(0, 60)}… (${audit.linked} links)`);
+    console.log(`import-smoke OK: ${question.slice(0, 60)}… (${audit.linked} links)`);
   }
 
   if (failed > 0) {
     process.exit(1);
   }
-  console.log(`\nDiscord verify import-smoke: ${IMPORT_SMOKE_FIXTURES.length}/${IMPORT_SMOKE_FIXTURES.length} passed.`);
+  console.log(
+    `\nDiscord verify import-smoke: ${DISCORD_IMPORT_SMOKE_SPECS.length}/${DISCORD_IMPORT_SMOKE_SPECS.length} passed.`,
+  );
 };
 
 const runLive = async () => {

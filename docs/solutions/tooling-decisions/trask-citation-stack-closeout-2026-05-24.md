@@ -1,5 +1,5 @@
 ---
-title: "Trask citation stack closeout (PR #33–#72)"
+title: "Trask citation stack closeout (PR #33–#73)"
 date: 2026-05-24
 category: tooling-decisions
 problem_type: quality
@@ -41,6 +41,7 @@ Discord `/ask` brief embeds could collapse to a single inline citation after agg
 | Stack bootstrap + Discord CI smoke | #70 | `pnpm trask:smoke:stack-bootstrap`; `verify:trask-discord:ci`; CI steps |
 | CLI CI import smoke + arc sync | #71 | `verify:trask-cli:ci`; PR template QA scripts; arc **#33–#70** completion |
 | Golden companionFixture + qa-webui KB | #72 | Zod schema parity; `goldenFixtures()` ×10; public Pages validation ladder |
+| Golden import-smoke compose | #73 | `composeGoldenCliAnswer`; verify scripts deduped; drift allowlist narrowed |
 
 Authoritative module map: [trask-citation-module-architecture-2026-05-24.md](trask-citation-module-architecture-2026-05-24.md). Line-filter incident: [trask-discord-dual-citation-line-filter-2026-05-24.md](trask-discord-dual-citation-line-filter-2026-05-24.md).
 
@@ -64,6 +65,7 @@ Offline floor: **composite_score 165** = 13 discord stress × 10 + faithfulness 
 
 ## Related
 
+- [trask-golden-import-smoke-compose-2026-05-24.md](trask-golden-import-smoke-compose-2026-05-24.md) — `composeGoldenCliAnswer` (#73)
 - [trask-qa-stack-bootstrap-2026-05-24.md](trask-qa-stack-bootstrap-2026-05-24.md) — shared live QA stack bootstrap (#66–#68)
 - [trask-citation-display-contract.md](../../knowledgebase/10-architecture-runtime/trask-citation-display-contract.md)
 - [validation-ladder.md](../../knowledgebase/50-execution/validation-ladder.md)
