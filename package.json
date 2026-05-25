@@ -27,6 +27,8 @@
     "verify:trask-cli": "pnpm trask:gate && node --import tsx/esm scripts/verify_trask_cli_qa.mjs",
     "verify:trask-discord": "pnpm trask:gate && node --import tsx/esm scripts/verify_trask_discord_live.mjs",
     "verify:trask-discord:post": "pnpm trask:gate && node --import tsx/esm scripts/verify_trask_discord_live.mjs --post",
+    "verify:trask-discord:ci": "TRASK_SKIP_BUILD=1 node --import tsx/esm scripts/verify_trask_discord_live.mjs --import-smoke",
+    "trask:smoke:stack-bootstrap": "node scripts/smoke_trask_qa_stack_bootstrap.mjs",
     "trask:faithfulness-eval": "pnpm build && node scripts/trask_faithfulness_eval.mjs --fixtures",
     "trask:config-drift": "node scripts/check_trask_config_drift.mjs",
     "trask:optimize-measure": "node scripts/trask_optimize_measure.mjs",

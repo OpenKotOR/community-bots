@@ -1,5 +1,5 @@
 ---
-title: "Trask citation stack closeout (PR #33–#68)"
+title: "Trask citation stack closeout (PR #33–#69)"
 date: 2026-05-24
 category: tooling-decisions
 problem_type: quality
@@ -37,6 +37,7 @@ Discord `/ask` brief embeds could collapse to a single inline citation after agg
 | Holocron e2e bootstrap | #66 | Playwright webServer auto-starts indexer+Worker; CI-parity env |
 | CLI verify bootstrap | #67 | `verify_trask_cli_qa.mjs` shares `trask_qa_stack_bootstrap.mjs` + `ensure_trask_indexed_stack_for_e2e.sh` |
 | Discord verify bootstrap | #68 | `verify_trask_discord_live.mjs` + `holocron-e2e-webserver.mjs` dedupe shared bootstrap |
+| QA bootstrap compound + CI smoke | #69 | `trask-qa-stack-bootstrap` doc; `pnpm trask:smoke:stack-bootstrap`; `verify:trask-discord:ci` |
 
 Authoritative module map: [trask-citation-module-architecture-2026-05-24.md](trask-citation-module-architecture-2026-05-24.md). Line-filter incident: [trask-discord-dual-citation-line-filter-2026-05-24.md](trask-discord-dual-citation-line-filter-2026-05-24.md).
 

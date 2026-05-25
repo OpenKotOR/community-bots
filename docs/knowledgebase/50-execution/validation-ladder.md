@@ -38,6 +38,8 @@ lastUpdated: 2026-05-24
 
 ## 6. Runtime smoke (optional)
 
+- [REPO] `pnpm trask:smoke:stack-bootstrap` — shared QA env + `ensure_trask_indexed_stack_for_e2e.sh` + `pnpm trask:stack:health` (see [trask-qa-stack-bootstrap-2026-05-24.md](../../solutions/tooling-decisions/trask-qa-stack-bootstrap-2026-05-24.md)).
+- [REPO] CI: after indexer+Worker start → `trask:smoke:stack-bootstrap` → `verify:trask-discord:ci` → `holocron:e2e:playwright`.
 - [REPO] HTTP contracts for Holocron: [trask-http-ask-contract.md](../10-architecture-runtime/trask-http-ask-contract.md), [trask-http-session-history-contract.md](../10-architecture-runtime/trask-http-session-history-contract.md); host wiring: [trask-embedded-holocron-web.md](../10-architecture-runtime/trask-embedded-holocron-web.md), [trask-http-server-standalone-contract.md](../10-architecture-runtime/trask-http-server-standalone-contract.md).
 - [REPO] Env map: [trask-configuration-env-map.md](trask-configuration-env-map.md).
 - [REPO] Holocron Vite dev client: [holocron-web-trask-client.md](../30-product-ux/holocron-web-trask-client.md) (`TRASK_HTTP_PROXY_TARGET`, optional `VITE_TRASK_API_BASE`).

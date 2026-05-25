@@ -69,9 +69,9 @@ Delete stale local branch `feat/your-next-change` when no longer needed: `git br
 
 ```bash
 pnpm trask:gate
-bash scripts/ensure_trask_indexed_stack_for_e2e.sh
-pnpm trask:stack:health
-pnpm holocron:e2e          # gate preflight + Playwright
+pnpm trask:smoke:stack-bootstrap   # bootstrap + health (CI uses this)
+pnpm verify:trask-discord:ci         # static Discord embed smoke (CI, no token)
+pnpm holocron:e2e                    # gate preflight + Playwright
 ```
 
 ## Related
