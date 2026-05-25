@@ -1,5 +1,5 @@
 ---
-title: "Trask citation stack closeout (PR #33–#69)"
+title: "Trask citation stack closeout (PR #33–#71)"
 date: 2026-05-24
 category: tooling-decisions
 problem_type: quality
@@ -37,7 +37,9 @@ Discord `/ask` brief embeds could collapse to a single inline citation after agg
 | Holocron e2e bootstrap | #66 | Playwright webServer auto-starts indexer+Worker; CI-parity env |
 | CLI verify bootstrap | #67 | `verify_trask_cli_qa.mjs` shares `trask_qa_stack_bootstrap.mjs` + `ensure_trask_indexed_stack_for_e2e.sh` |
 | Discord verify bootstrap | #68 | `verify_trask_discord_live.mjs` + `holocron-e2e-webserver.mjs` dedupe shared bootstrap |
-| QA bootstrap compound + CI smoke | #69 | `trask-qa-stack-bootstrap` doc; `pnpm trask:smoke:stack-bootstrap`; `verify:trask-discord:ci` |
+| QA bootstrap compound doc | #69 | `trask-qa-stack-bootstrap-2026-05-24.md` + KB cross-links |
+| Stack bootstrap + Discord CI smoke | #70 | `pnpm trask:smoke:stack-bootstrap`; `verify:trask-discord:ci`; CI steps |
+| CLI CI import smoke + arc sync | #71 | `verify:trask-cli:ci`; PR template QA scripts; arc **#33–#70** completion |
 
 Authoritative module map: [trask-citation-module-architecture-2026-05-24.md](trask-citation-module-architecture-2026-05-24.md). Line-filter incident: [trask-discord-dual-citation-line-filter-2026-05-24.md](trask-discord-dual-citation-line-filter-2026-05-24.md).
 
@@ -47,6 +49,9 @@ Authoritative module map: [trask-citation-module-architecture-2026-05-24.md](tra
 pnpm trask:gate                    # one build, smoke, full measure (skip-check), :ci
 pnpm verify:trask-discord          # trask:gate preflight, then live Discord embed gate (auto-bootstrap 8787/8790; token only for --post)
 pnpm verify:trask-cli              # trask:gate preflight, then CLI golden queries (auto-bootstrap 8787/8790)
+pnpm verify:trask-cli:ci         # CI: golden import-smoke (no LLM)
+pnpm verify:trask-discord:ci     # CI: Discord embed import-smoke (no token)
+pnpm trask:smoke:stack-bootstrap # bootstrap + stack health
 pnpm holocron:e2e                  # trask:gate preflight, then Playwright + live research (auto-bootstrap)
 ```
 

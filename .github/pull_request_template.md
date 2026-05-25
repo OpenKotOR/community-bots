@@ -16,6 +16,13 @@
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [trask-citation-module-architecture](docs/solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md). Live Discord/Holocron validation is separate ([AGENTS.md](AGENTS.md)).
 
+## Trask QA scripts (check if applicable)
+
+- [ ] N/A — no changes to `scripts/verify_trask_*`, `scripts/smoke_trask_*`, or `scripts/lib/trask_qa_stack_bootstrap.mjs`
+- [ ] New or changed gate script registered in `package.json` (`verify:trask-cli:ci`, `verify:trask-discord:ci`, `trask:smoke:stack-bootstrap`, etc.)
+- [ ] CI wired in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) when the script is a merge gate
+- [ ] [trask-qa-stack-bootstrap](docs/solutions/tooling-decisions/trask-qa-stack-bootstrap-2026-05-24.md) updated if bootstrap behavior changed
+
 ## Web Audio / persistence (check if applicable)
 
 - [ ] N/A — no audio, `localStorage` migration, or sound prefs touched

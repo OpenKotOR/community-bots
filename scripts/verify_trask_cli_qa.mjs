@@ -13,6 +13,7 @@
  * (build, full + CI optimize-measure) before live queries.
  * Live path auto-bootstraps indexer + retrieve Worker (8787) when unhealthy.
  *   node --import tsx/esm scripts/verify_trask_cli_qa.mjs --queries "What is TSLPatcher?"
+ *   node --import tsx/esm scripts/verify_trask_cli_qa.mjs --import-smoke  # CI: no LLM
  *
  * Environment:
  *   INGEST_STATE_DIR — must match ingest-worker / Docker volume (default data/ingest-worker)
@@ -160,6 +161,59 @@ const argValue = (name, fallback) => {
 };
 
 const expectationForQuery = (query) => DEFAULT_QUERIES.find((entry) => entry.question === query) ?? null;
+
+const importSmoke = process.argv.includes("--import-smoke");
+
+/** Static CLI-shaped answers (golden-queries.json parity; no live LLM). */
+const IMPORT_SMOKE_FIXTURES = [
+  {
+    question: "What is TSLPatcher used for in KOTOR modding?",
+    answer: `The TSLPatcher project documents how mod authors ship list-driven 2DA, GFF, and TLK changes for KotOR and TSL installs. [1]
+TSLPatcher is a mod installation tool for Knights of the Old Republic and The Sith Lords. It applies 2DA, GFF, and TLK patches from list files so players do not copy files by hand. [2]
+
+Sources
+1. github.com - https://github.com/th3w1zard1/TSLPatcher
+2. Deadly Stream - https://deadlystream.com/files/file/1982-tslpatcher/`,
+    approvedSources: [
+      { name: "github.com", homeUrl: "https://github.com/th3w1zard1/TSLPatcher" },
+      { name: "Deadly Stream", homeUrl: "https://deadlystream.com/files/file/1982-tslpatcher/" },
+    ],
+  },
+  {
+    question: "What is MDLOps used for in the KOTOR toolchain?",
+    answer: `MDLOps repository MDLOps is used in the KotOR toolchain to import and export MDL/MDX assets between the game and DCC tools. [1]
+MDLOps converts KotOR MDL and MDX models for editing in 3ds Max or Blender pipelines and exports them back to game-ready formats. [2]
+
+Sources
+1. github.com - https://github.com/ndixUR/MDLOps
+2. Deadly Stream - https://deadlystream.com/files/file/1198-mdlops/`,
+    approvedSources: [
+      { name: "github.com", homeUrl: "https://github.com/ndixUR/MDLOps" },
+      { name: "Deadly Stream", homeUrl: "https://deadlystream.com/files/file/1198-mdlops/" },
+    ],
+  },
+];
+
+const runImportSmoke = () => {
+  loadEnvFiles();
+  bootstrapTraskIndexedStack(repoRoot);
+
+  let failed = 0;
+  for (const spec of IMPORT_SMOKE_FIXTURES) {
+    const scored = scoreAnswer(spec.question, spec.answer, spec.approvedSources);
+    if (scored.grade !== "RICH") {
+      console.error(`import-smoke FAIL: grade=${scored.grade}`, scored);
+      failed += 1;
+      continue;
+    }
+    console.log(`import-smoke OK: ${spec.question.slice(0, 60)}… [RICH]`);
+  }
+
+  if (failed > 0) {
+    process.exit(1);
+  }
+  console.log(`\nCLI verify import-smoke: ${IMPORT_SMOKE_FIXTURES.length}/${IMPORT_SMOKE_FIXTURES.length} passed.`);
+};
 
 const isBareCatalogHost = (url) => {
   try {
@@ -385,4 +439,8 @@ const main = async () => {
   process.exit(1);
 };
 
-await main();
+if (importSmoke) {
+  runImportSmoke();
+} else {
+  await main();
+}

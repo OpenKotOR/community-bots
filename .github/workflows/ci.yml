@@ -112,6 +112,12 @@ jobs:
           TRASK_INDEXER_BASE_URL: http://127.0.0.1:8787
           TRASK_SKIP_BUILD: "1"
 
+      - name: Trask CLI verify import smoke (no LLM)
+        run: pnpm verify:trask-cli:ci
+        env:
+          TRASK_INDEXER_BASE_URL: http://127.0.0.1:8787
+          TRASK_SKIP_BUILD: "1"
+
       - name: Holocron e2e LLM config (optional repository secrets)
         run: |
           if [ -n "${OPENROUTER_API_KEY:-}" ] || [ -n "${OPENAI_API_KEY:-}" ]; then
