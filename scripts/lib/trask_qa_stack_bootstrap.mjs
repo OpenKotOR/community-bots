@@ -1,5 +1,6 @@
 /**
- * CI-parity env + indexer/Worker bootstrap for live Trask QA (Holocron e2e, CLI verify).
+ * CI-parity env + indexer/Worker bootstrap for live Trask QA.
+ * Consumers: holocron-e2e-webserver.mjs, verify_trask_cli_qa.mjs, verify_trask_discord_live.mjs.
  */
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";

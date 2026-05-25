@@ -153,7 +153,7 @@ queries in Chromium (202 → thread poll → answer + grounded **Sources** / cit
 pnpm exec playwright install chromium --with-deps   # once per machine (repo root)
 pnpm trask:smoke-imports:ci   # import smoke after build (CI uses this)
 pnpm trask:gate               # one build, smoke, full measure (skip-check), :ci — floor 165
-pnpm holocron:e2e             # trask:gate preflight, then Playwright (auto-starts indexer+Worker via holocron-e2e-webserver.sh)
+pnpm holocron:e2e             # trask:gate preflight, then Playwright (auto-starts indexer+Worker via holocron-e2e-webserver.mjs)
 ```
 
 Requires repo **`.env`** with **at least one working LLM provider** (`OPENROUTER_API_KEY` or `OPENAI_API_KEY`)
@@ -171,6 +171,16 @@ pnpm verify:trask-cli   # pnpm trask:gate preflight, then live CLI golden querie
 
 That script mirrors the same canonical five technical queries as Holocron e2e. It is for subprocess/retrieval
 debugging only and does **not** replace browser or Playwright verification of real `https://` citations.
+
+Discord embed live gate (no bot token unless `--post`):
+
+```bash
+pnpm verify:trask-discord        # trask:gate preflight, then expert verification queries
+pnpm verify:trask-discord:post   # same + post each passing embed to #discord-bot-testing
+```
+
+`verify_trask_discord_live.mjs` auto-bootstraps indexer+Worker when unhealthy (shared `trask_qa_stack_bootstrap.mjs`).
+Does **not** replace in-client `/ask` UX proof when a token is available.
 
 ### Discord bot slash commands (REST smoke)
 
