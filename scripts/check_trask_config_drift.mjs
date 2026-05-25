@@ -32,6 +32,8 @@ const ALLOWED_GOLDEN_LITERAL_PATHS = new Set([
   "packages/trask/src",
   "infra/trask-retrieve-worker",
   "scripts/smoke_trask_web_research.py",
+  "scripts/verify_trask_cli_qa.mjs",
+  "scripts/verify_trask_discord_live.mjs",
   ".cursor/plans",
 ]);
 
