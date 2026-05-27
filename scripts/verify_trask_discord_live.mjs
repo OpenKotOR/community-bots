@@ -22,7 +22,6 @@ import { loadResearchWizardRuntimeConfig, loadSharedAiConfig } from "@openkotor/
 import {
   createResearchWizardClient,
   formatDiscordAskDisplay,
-  formatDiscordProvenanceFooter,
   DISCORD_ASK_MAX_BODY_LINES,
 } from "@openkotor/trask";
 import { degradedAnswerRegexes, loadVerificationQueries, verificationQueriesForSurface } from "@openkotor/trask-config";
@@ -30,6 +29,10 @@ import { isHttpsCitationReachable } from "./lib/url-verify.mjs";
 import { loadEnvFiles, repoRoot } from "./lib/trask-env.mjs";
 import { bootstrapTraskIndexedStack } from "./lib/trask_qa_stack_bootstrap.mjs";
 import { composeGoldenCliAnswer, DISCORD_IMPORT_SMOKE_SPECS } from "./lib/compose_golden_cli_answer.mjs";
+import {
+  assertProvenanceFooter,
+  defaultIndexerUrlForSmoke,
+} from "./lib/discord_provenance_footer.mjs";
 
 const DEFAULT_CHANNEL_ID = "1497410480208216306";
 
@@ -44,29 +47,9 @@ const postToDiscord = process.argv.includes("--post");
 const skipUrlCheck = process.argv.includes("--skip-url-check");
 const importSmoke = process.argv.includes("--import-smoke");
 const MIN_INLINE_LINKS = 2;
-const PROVENANCE_FOOTER_RE = /^\d+ passages? · indexer /u;
 const SYNTHESIS_FAILURE_SNIPPET = "could not complete live archive synthesis";
 
 const extractInlineHttpsUrls = (display) => [...display.matchAll(/\]\((https:\/\/[^)]+)\)/g)].map((m) => m[1]);
-
-const assertProvenanceFooter = (provenance) => {
-  if (!provenance || typeof provenance !== "object") {
-    return "missing provenance on brief answer";
-  }
-  const passagesCount = Number(provenance.passagesCount);
-  const indexerUrl = String(provenance.indexerUrl ?? "").trim();
-  if (!Number.isFinite(passagesCount) || passagesCount < 1) {
-    return `provenance.passagesCount must be ≥1 (got ${provenance.passagesCount})`;
-  }
-  if (!indexerUrl.startsWith("http")) {
-    return `provenance.indexerUrl must be http(s) (got ${indexerUrl || "(empty)"})`;
-  }
-  const footer = formatDiscordProvenanceFooter({ passagesCount, indexerUrl });
-  if (!PROVENANCE_FOOTER_RE.test(footer)) {
-    return `invalid provenance footer: ${footer}`;
-  }
-  return { footer };
-};
 
 const auditDisplay = (question, answer, approvedSources) => {
   const display = formatDiscordAskDisplay(answer, approvedSources, { query: question });
@@ -128,10 +111,9 @@ const runImportSmoke = () => {
       failed += 1;
       continue;
     }
-    const indexerUrl = process.env.TRASK_INDEXER_BASE_URL?.trim() || "http://127.0.0.1:8787";
     const footerAudit = assertProvenanceFooter({
       passagesCount: Math.max(approvedSources.length, MIN_INLINE_LINKS),
-      indexerUrl,
+      indexerUrl: defaultIndexerUrlForSmoke(),
     });
     if (typeof footerAudit === "string") {
       console.error(`import-smoke FAIL (${spec.verificationId}) footer: ${footerAudit}`);

@@ -78,5 +78,5 @@ Holocron and Discord research often **looks** like RAG (Thinking → answer → 
 
 ## Open questions
 
-- Whether Discord should show a **one-line** trace footer (passage count + indexer host) in v1 or stay answer-only.
-- Whether `partial` grounding status should be **removed entirely** from Holocron UI in favor of `grounded` | `failed` only.
+- ~~Whether Discord should show a **one-line** trace footer (passage count + indexer host) in v1 or stay answer-only.~~ **Resolved (PR #80–#81):** embed footer via `formatDiscordProvenanceFooter`; enforced in `verify_trask_discord` and `trask:gate` smoke.
+- ~~Whether `partial` grounding status should be **removed entirely** from Holocron UI in favor of `grounded` | `failed` only.~~ **Resolved (PR #79):** inference returns `failed` for abstention; Holocron maps legacy `partial` to failed UX.
