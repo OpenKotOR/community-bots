@@ -1,0 +1,5 @@
+{
+  "id": "widescreen",
+  "question": "How do I troubleshoot KOTOR widescreen resolution issues on PC?",
+  "answer": "Widescreen fixes usually start with a supported resolution and an aspect-aware HUD mod: verify your display mode in the launcher, then install a widescreen patch that adjusts menus and cutscene framing [1]. If the HUD or minimap is misaligned, check PCGamingWiki notes on supported resolutions and ini tweaks before chasing graphics-driver scaling [2].\n\nSources\n[1] https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic\n[2] https://deadlystream.com/topic/5849-widescreen-support/"
+}

@@ -66,7 +66,7 @@ async function assertLiveTraceHasIndexerDiagnostics(
   expect(
     completed?.groundingStatus,
     'completed query should record groundingStatus',
-  ).toMatch(/^(grounded|failed|partial)$/)
+  ).toMatch(/^(grounded|failed)$/)
   const trace = completed?.liveTrace ?? []
   expect(trace.length, 'liveTrace should include multiple steps').toBeGreaterThanOrEqual(4)
   const hasIndexer =

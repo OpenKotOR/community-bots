@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 export const DEFAULT_WORKSPACE_BUILD_MARKERS = [
   "packages/trask/dist/discord-reply-format.js",
+  "packages/trask/dist/discord-reply-format.test.js",
   "packages/trask-config/dist/golden-queries.js",
   "apps/trask-http-server/dist/main.js",
 ];

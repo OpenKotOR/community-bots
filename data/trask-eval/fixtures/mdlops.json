@@ -1,0 +1,5 @@
+{
+  "id": "mdlops",
+  "question": "What is MDLOps used for in the KOTOR toolchain?",
+  "answer": "MDLOps converts and inspects KotOR MDL/MDX model assets for modding: you can decompile models to ASCII, edit meshes and nodes, and rebuild binaries for in-game use [1]. It sits alongside MDLEdit and Blender pipelines when authors need reliable MDL round-trips without breaking animations [2].\n\nSources\n[1] https://github.com/ndixUR/MDLOps\n[2] https://kotor.neocities.org/tutorials/mdlops"
+}

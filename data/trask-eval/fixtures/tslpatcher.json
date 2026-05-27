@@ -1,0 +1,5 @@
+{
+  "id": "tslpatcher",
+  "question": "What is TSLPatcher used for in KOTOR modding?",
+  "answer": "TSLPatcher is the standard patcher for KotOR and TSL mods: it applies 2DA, GFF, TLK, and related table edits so installers can ship incremental changes without replacing whole game archives [1]. Mod authors use it to list file targets, row changes, and conflict-safe install order on Deadly Stream and similar hubs [2].\n\nSources\n[1] https://deadlystream.com/files/file/1252-tslpatcher/\n[2] https://kotor.neocities.org/tutorials/tslpatcher"
+}

@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { CaretDown, CaretUp, Link as LinkIcon, Copy, Check, Clock, MagnifyingGlass, CheckCircle, XCircle, ListDashes, Download, Database, PencilSimple, ArrowsClockwise, ArrowClockwise } from '@phosphor-icons/react'
+import { CaretDown, CaretUp, Link as LinkIcon, Copy, Check, Clock, MagnifyingGlass, CheckCircle, XCircle, Download, Database, PencilSimple, ArrowsClockwise, ArrowClockwise } from '@phosphor-icons/react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { toast } from 'sonner'
 
@@ -654,8 +654,13 @@ function MessageView({
 
   const researchTraceOutcome = useMemo(() => {
     if (message.researchStatus === 'pending') return 'pending'
-    if (message.researchStatus === 'failed' || message.groundingStatus === 'failed') return 'failed'
-    if (message.groundingStatus === 'partial') return 'partial'
+    if (
+      message.researchStatus === 'failed'
+      || message.groundingStatus === 'failed'
+      || message.groundingStatus === 'partial'
+    ) {
+      return 'failed'
+    }
     return 'complete'
   }, [message.groundingStatus, message.researchStatus])
 
@@ -737,8 +742,6 @@ function MessageView({
                   </motion.div>
                 ) : researchTraceOutcome === 'failed' ? (
                   <XCircle size={14} weight="fill" className="text-destructive" />
-                ) : researchTraceOutcome === 'partial' ? (
-                  <ListDashes size={14} weight="bold" className="text-yellow-500" />
                 ) : (
                   <CheckCircle size={14} weight="fill" className="text-accent" />
                 )}
@@ -853,13 +856,14 @@ function MessageView({
     if (isUser || message.researchStatus === 'pending') return null
     const cited = answerPresentation.sources.length
     const consulted = message.consultedSourceCount ?? (cited + relatedSources.length)
-    const status =
+    const rawStatus =
       message.groundingStatus
       ?? (message.researchStatus === 'failed'
         ? 'failed'
         : cited >= 2
           ? 'grounded'
           : 'failed')
+    const status = rawStatus === 'partial' ? 'failed' : rawStatus
     return (
       <p
         className="mb-3 text-xs text-muted-foreground"
@@ -871,7 +875,13 @@ function MessageView({
   }
 
   const renderFailedBanner = () => {
-    if (message.researchStatus !== 'failed' && message.groundingStatus !== 'failed') return null
+    if (
+      message.researchStatus !== 'failed'
+      && message.groundingStatus !== 'failed'
+      && message.groundingStatus !== 'partial'
+    ) {
+      return null
+    }
     const reason = traceFailureReason
     return (
       <p
@@ -885,18 +895,6 @@ function MessageView({
     )
   }
 
-  const renderPartialBanner = () => {
-    if (message.groundingStatus !== 'partial') return null
-    return (
-      <p
-        className="mb-3 rounded-md border border-yellow-500/50 bg-yellow-500/15 px-3 py-2 text-sm text-yellow-100"
-        role="status"
-      >
-        Answer used limited grounded citations. Expand Thought process or rephrase for stronger sources.
-      </p>
-    )
-  }
-
   const renderAnswerBody = () => {
     if (!answerPresentation.hasAnswerText) {
       return (
@@ -906,7 +904,6 @@ function MessageView({
           {...answerRegionA11y}
         >
           {renderFailedBanner()}
-          {renderPartialBanner()}
           {renderProvenanceStrip()}
           <p className="rounded-md border border-primary/25 bg-background/55 px-3 py-2 text-sm leading-6 text-muted-foreground">
             {fallbackVisibleText}
@@ -927,7 +924,6 @@ function MessageView({
         {...answerRegionA11y}
       >
         {renderFailedBanner()}
-        {renderPartialBanner()}
         {renderProvenanceStrip()}
         {blocks.length > 0 ? blocks.map((block, idx) => (
           <p key={`${idx}:${block.slice(0, 24)}`} className="whitespace-pre-wrap">
