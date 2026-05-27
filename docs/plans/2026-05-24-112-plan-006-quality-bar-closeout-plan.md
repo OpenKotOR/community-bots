@@ -19,7 +19,7 @@ origin: docs/plans/2026-05-19-006-feat-trask-research-quality-bar-v1-plan.md
 
 - **R1.** Extend `trask-citation-stack-closeout-2026-05-24.md` through **#83–#84**.
 - **R2.** Mark quality-bar brainstorm `status: completed`.
-- **R3.** Plan 006 closure note: U2 v1.1 Python→liveTrace deferred; AE3 gated in `trask:gate`.
+- **R3.** Plan 006 closure note: AE3 gated in `trask:gate` (#84); U2 v1.1 `research_done` liveTrace shipped later (#87).
 - **R4.** `pnpm trask:config-drift` pass (doc-only).
 
 ## Verification
