@@ -25,6 +25,8 @@ import {
   _diagFromResearchPayload,
   _emitRetrieveSummary,
   _isGatherTimeoutResearchError,
+  _isComposeTimeoutResearchError,
+  _timeoutDiagForResearchError,
   createResearchWizardClient,
   ResearchWizardClient,
 } from "./research-wizard.js";
@@ -480,6 +482,49 @@ test("_isGatherTimeoutResearchError matches subprocess gather budget message", (
     true,
   );
   assert.equal(_isGatherTimeoutResearchError("rewrite timed out after 120000ms"), false);
+});
+
+test("_isComposeTimeoutResearchError matches rewrite budget message", () => {
+  assert.equal(_isComposeTimeoutResearchError("rewrite timed out after 120000ms"), true);
+  assert.equal(
+    _isComposeTimeoutResearchError("Trask web research runner timed out after 90000ms (gather)"),
+    false,
+  );
+});
+
+test("_timeoutDiagForResearchError surfaces gather timeout phase and limits", () => {
+  const diag = _timeoutDiagForResearchError(
+    "Trask web research runner timed out after 90000ms (gather)",
+    91_234,
+    90_000,
+    120_000,
+  );
+  assert.equal(diag.elapsed_ms, 91_234);
+  assert.equal(diag.timeout_phase, "gather");
+  assert.equal(diag.timeout_limit_ms, 90_000);
+  assert.equal(diag.gather_timeout_ms, 90_000);
+});
+
+test("_timeoutDiagForResearchError surfaces compose timeout phase and limits", () => {
+  const diag = _timeoutDiagForResearchError("rewrite timed out after 120000ms", 121_000, 90_000, 120_000);
+  assert.equal(diag.timeout_phase, "compose");
+  assert.equal(diag.timeout_limit_ms, 120_000);
+  assert.equal(diag.gather_timeout_ms, undefined);
+});
+
+test("_diagFromResearchPayload includes retrieve_elapsed_ms when present", () => {
+  const diag = _diagFromResearchPayload(
+    {
+      passages: [{ quote: "x", url: "https://example.com/a", host: "example.com" }],
+      research_information: {
+        indexer_url: "http://127.0.0.1:8787",
+        passages_count: 1,
+        retrieve_elapsed_ms: 432,
+      },
+    },
+    "http://127.0.0.1:8787",
+  );
+  assert.equal(diag.retrieve_elapsed_ms, 432);
 });
 
 test("_emitRetrieveSummary no-ops without onProgress", async () => {

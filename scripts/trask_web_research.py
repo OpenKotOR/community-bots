@@ -378,6 +378,7 @@ def run_research(payload: dict[str, Any]) -> dict[str, Any]:
         _indexer_base_url(),
     )
 
+    retrieve_started = time.monotonic()
     passages = _retrieve_via_http(query, limit)
     allow_local_chroma = os.environ.get("TRASK_WEB_RESEARCH_LOCAL_CHROMA", "").strip().lower() in (
         "1",
@@ -513,6 +514,7 @@ def run_research(payload: dict[str, Any]) -> dict[str, Any]:
             "ddg_fallback_enabled": ddg_fallback,
             "live_crawl_attempted": live_crawl_attempted,
             "live_crawl_passages": len(live_crawl_passages),
+            "retrieve_elapsed_ms": int((time.monotonic() - retrieve_started) * 1000),
         },
     }
 
