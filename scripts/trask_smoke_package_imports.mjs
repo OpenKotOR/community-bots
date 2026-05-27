@@ -28,6 +28,7 @@ import {
   assertProvenanceFooter,
   defaultIndexerUrlForSmoke,
 } from "./lib/discord_provenance_footer.mjs";
+import { assertAe3ResearchTraceFailureClasses } from "./lib/trask_research_trace_assert.mjs";
 
 const assert = (ok, message) => {
   if (!ok) {
@@ -76,5 +77,7 @@ for (const spec of DISCORD_IMPORT_SMOKE_SPECS) {
     `discord compose(${spec.goldenId}) provenance footer: ${footerAudit}`,
   );
 }
+
+assertAe3ResearchTraceFailureClasses();
 
 console.log("trask_smoke_package_imports: OK");

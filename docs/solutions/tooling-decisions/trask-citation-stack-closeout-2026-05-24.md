@@ -1,5 +1,5 @@
 ---
-title: "Trask citation stack closeout (PR #33–#80)"
+title: "Trask citation stack closeout (PR #33–#84)"
 date: 2026-05-24
 category: tooling-decisions
 problem_type: quality
@@ -49,8 +49,10 @@ Discord `/ask` brief embeds could collapse to a single inline citation after agg
 | Arc #33–#77 doc closeout | #78 | README `trask:gate:ci`; module-arch gate table; Holocron CI retries in ladder |
 | Holocron honest grounding UX | #79 | `partial`→`failed` inference/UI; faithfulness fixtures tracked; Node 24 test reporter in gate |
 | Discord provenance footer | #80 | `ResearchWizardBriefAnswer.provenance`; embed footer via `formatDiscordProvenanceFooter` |
-| Discord verify footer assert | #81 | `verify_trask_discord_live.mjs` import-smoke + live provenance checks; arc doc **#33–#80** |
+| Discord verify footer assert | #81 | `verify_trask_discord_live.mjs` import-smoke + live provenance checks |
 | Gate smoke provenance footer | #82 | `discord_provenance_footer.mjs` shared assert; `trask_smoke_package_imports` enforces footer in `trask:gate` |
+| liveTrace timeout timing (Plan 006 U4) | #83 | `timeoutDiagForResearchError`; Python `retrieve_elapsed_ms`; Holocron e2e timing assert |
+| AE3 trace failure-class gate smoke | #84 | `trask_research_trace_assert.mjs`; `trask:gate` asserts `index_miss` / `rejected_urls` / `timeout_phase` in stderr JSON |
 
 Authoritative module map: [trask-citation-module-architecture-2026-05-24.md](trask-citation-module-architecture-2026-05-24.md). Line-filter incident: [trask-discord-dual-citation-line-filter-2026-05-24.md](trask-discord-dual-citation-line-filter-2026-05-24.md).
 
