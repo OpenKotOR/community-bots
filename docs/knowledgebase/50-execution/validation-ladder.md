@@ -19,7 +19,7 @@ lastUpdated: 2026-05-24
 ## 3. Citation offline gate
 
 - [REPO] **Recommended preflight:** `pnpm trask:gate` — one `pnpm build`, import smoke (`trask:smoke-imports:ci`), **`pnpm trask:config-drift`**, full `optimize-measure` with `TRASK_SKIP_BUILD` and `TRASK_OPTIMIZE_SKIP_CHECK`, then `trask:optimize-measure:ci`; both measure runs must reach **composite_score** **165**.
-- [REPO] **CI:** after `pnpm build`, GitHub Actions runs `pnpm trask:smoke-imports:ci`, `pnpm trask:config-drift`, then `trask:optimize-measure:ci`.
+- [REPO] **CI offline (after build):** `pnpm trask:gate:ci` — same as smoke-imports + config-drift + `trask:optimize-measure:ci` (no full local measure). Run locally as `pnpm build && pnpm trask:gate:ci`.
 - [REPO] **Full local measure:** `pnpm trask:optimize-measure` — faithfulness + discord stress + citation helper unit suites (`research-answer-split`, `query-anchor`, `citation-markers`, `grounded-evidence`, `research-compose`) + `pnpm check`.
 - [REPO] **CI measure:** `pnpm trask:optimize-measure:ci` — faithfulness + discord stress only; enforces **composite_score ≥ 165** without duplicating the full Trask unit matrix (see [trask-citation-module-architecture-2026-05-24.md](../../solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md)).
 - [SYNTH] Authoritative formula and incident history: [trask-citation-display-contract.md](../10-architecture-runtime/trask-citation-display-contract.md), [trask-discord-dual-citation-line-filter-2026-05-24.md](../../solutions/tooling-decisions/trask-discord-dual-citation-line-filter-2026-05-24.md).

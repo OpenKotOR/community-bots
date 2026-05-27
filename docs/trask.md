@@ -151,8 +151,9 @@ queries in Chromium (202 → thread poll → answer + grounded **Sources** / cit
 
 ```bash
 pnpm exec playwright install chromium --with-deps   # once per machine (repo root)
-pnpm trask:smoke-imports:ci   # import smoke after build (CI uses this)
-pnpm trask:gate               # one build, smoke, full measure (skip-check), :ci — floor 165
+pnpm trask:smoke-imports:ci   # import smoke after build
+pnpm trask:gate:ci            # CI offline gate after build: smoke + config-drift + optimize-measure:ci
+pnpm trask:gate               # local preflight: build + smoke + config-drift + full measure (skip-check) + :ci — floor 165
 pnpm holocron:e2e             # trask:gate preflight, then Playwright (auto-starts indexer+Worker via holocron-e2e-webserver.mjs)
 ```
 

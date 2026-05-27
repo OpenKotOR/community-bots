@@ -1,7 +1,7 @@
 ---
 title: "feat(verify): composeGoldenCliAnswer from golden fixtures"
 type: feat
-status: active
+status: completed
 date: 2026-05-24
 origin: docs/plans/2026-05-24-099-trask-config-companion-fixture-qa-webui-plan.md
 ---

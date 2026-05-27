@@ -35,7 +35,7 @@ pnpm trask:optimize-measure      # full local gate: faithfulness + discord stres
 pnpm trask:optimize-measure:ci   # CI-equivalent (faithfulness + discord stress only; run after build)
 ```
 
-Both measure runs in `pnpm trask:gate` must reach **composite_score 165** (13 discord stress tests × 10 + faithfulness 5 × 5 + check 10). GitHub Actions runs `pnpm build`, `trask:smoke-imports:ci`, `trask:config-drift`, then `trask:optimize-measure:ci` in [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+Both measure runs in `pnpm trask:gate` must reach **composite_score 165** (13 discord stress tests × 10 + faithfulness 5 × 5 + check 10). GitHub Actions runs `pnpm build`, then `pnpm trask:gate:ci` (smoke-imports + config-drift + optimize-measure:ci) in [`.github/workflows/ci.yml`](.github/workflows/ci.yml). For CI parity after a local build: `pnpm trask:gate:ci`.
 
 `pnpm verify:trask-cli`, `pnpm verify:trask-discord`, and `pnpm holocron:e2e` preflight with **`pnpm trask:gate`** before live or browser steps.
 

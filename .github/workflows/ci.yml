@@ -37,11 +37,8 @@ jobs:
       - name: TypeScript build
         run: pnpm build
 
-      - name: Trask package import smoke
-        run: pnpm trask:smoke-imports:ci
-
-      - name: Trask config drift gate
-        run: pnpm trask:config-drift
+      - name: Trask offline gate (CI parity)
+        run: pnpm trask:gate:ci
         env:
           TRASK_SKIP_BUILD: "1"
 
@@ -50,9 +47,6 @@ jobs:
 
       - name: Unit tests
         run: node --test packages/*/dist/*.test.js apps/*/dist/*.test.js
-
-      - name: Trask optimize measure gate (faithfulness + citation stress)
-        run: pnpm trask:optimize-measure:ci
 
       - name: Install Playwright (Chromium)
         run: pnpm exec playwright install chromium --with-deps
