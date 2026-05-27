@@ -28,8 +28,10 @@ import {
 import {
   createResearchWizardClient,
   formatDiscordAskDisplay,
+  formatDiscordProvenanceFooter,
   setTraskResearchLogSink,
   type ResearchWizardBriefAnswer,
+  type ResearchWizardResearchProvenance,
 } from "@openkotor/trask";
 import { isTraskThreadId } from "@openkotor/trask-http";
 
@@ -199,16 +201,22 @@ const buildResearchEmbed = (
   rawAnswer: string,
   approvedSources: readonly SourceDescriptor[],
   query: string,
+  provenance?: ResearchWizardResearchProvenance,
 ) => {
   const title = `${personaProfiles.trask.displayName} Briefing`;
   const description =
     rawAnswer === DISCORD_ASK_SYNTHESIS_FAILURE_MESSAGE
       ? rawAnswer
       : formatDiscordAskDisplay(rawAnswer, approvedSources, { query });
+  const footer =
+    provenance && rawAnswer !== DISCORD_ASK_SYNTHESIS_FAILURE_MESSAGE
+      ? formatDiscordProvenanceFooter(provenance)
+      : undefined;
 
   return buildInfoEmbed({
     title,
     description: truncateForDiscord(description, 4000),
+    ...(footer ? { footer } : {}),
   });
 };
 
@@ -320,7 +328,7 @@ const handleAskCommand = async (interaction: ChatInputCommandInteraction): Promi
       createdAt,
       completedAt,
     });
-    let embed = buildResearchEmbed(result.answer, result.approvedSources, query);
+    let embed = buildResearchEmbed(result.answer, result.approvedSources, query, result.provenance);
     const holocronBase = config.holocronPublicUrl?.trim();
     if (holocronBase) {
       const url = `${trimTrailingSlashes(holocronBase)}?thread=${encodeURIComponent(threadId)}`;

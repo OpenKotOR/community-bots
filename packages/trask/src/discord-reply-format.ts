@@ -350,6 +350,32 @@ export const clampDiscordBodyLines = (body: string, maxLines: number, query?: st
     .join("\n");
 };
 
+export type DiscordProvenanceFooterInput = {
+  passagesCount: number;
+  indexerUrl: string;
+};
+
+const indexerFooterLabel = (indexerUrl: string): string => {
+  const trimmed = indexerUrl.trim();
+  if (!trimmed) return "unknown";
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.hostname === "127.0.0.1" || parsed.hostname === "localhost") {
+      return parsed.port || parsed.hostname;
+    }
+    return parsed.host;
+  } catch {
+    return trimmed.replace(/^https?:\/\//iu, "").replace(/\/$/u, "").slice(0, 48);
+  }
+};
+
+/** One-line embed footer for Discord /ask (passage count + indexer host; not part of the 5-line body). */
+export const formatDiscordProvenanceFooter = (input: DiscordProvenanceFooterInput): string => {
+  const count = Math.max(0, Math.floor(input.passagesCount));
+  const passageLabel = `${count} passage${count === 1 ? "" : "s"}`;
+  return `${passageLabel} · indexer ${indexerFooterLabel(input.indexerUrl)}`;
+};
+
 /** Discord /ask display: short body, inline linked [n] citations, no visible Sources block. */
 export const formatDiscordAskDisplay = (
   rawAnswer: string,
