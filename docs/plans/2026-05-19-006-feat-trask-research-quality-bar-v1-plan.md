@@ -386,7 +386,7 @@ sequenceDiagram
 | U3 verified bus | Python `verified: true`; Node trusts indexer passages |
 | U4 timeouts | #83 — `elapsed_ms`, `timeout_phase`, `retrieve_elapsed_ms` |
 | U5 lexical merge | Removed from live Q&A |
-| U6 trace e2e | Holocron five-query spec + `grounded\|failed` |
+| U6 trace e2e | Holocron five-query spec + `grounded\|failed`; failure-path spec (#85 `holocron-research-failure.spec.ts`) |
 | U7 provenance UX | #79–#82 Discord footer + honest grounding |
 
-**Deferred:** U2 v1.1 Python `research_done` → extra `liveTrace` row (stderr + gate sufficient for v1). Brainstorm: `docs/brainstorms/2026-05-19-trask-research-quality-bar-requirements.md` (`status: completed`). Arc: `trask-citation-stack-closeout-2026-05-24.md` through **#84**.
+**Deferred:** U2 v1.1 Python `research_done` → extra `liveTrace` row (stderr + gate sufficient for v1). Brainstorms: quality-bar (`docs/brainstorms/2026-05-19-trask-research-quality-bar-requirements.md`, `status: completed`); fidelity (`docs/brainstorms/2026-05-19-trask-rag-fidelity-requirements.md`, `status: completed`, superseded in spirit by quality-bar). Arc: `trask-citation-stack-closeout-2026-05-24.md` through **#85**.
