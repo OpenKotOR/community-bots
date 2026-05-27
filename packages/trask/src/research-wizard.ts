@@ -189,6 +189,7 @@ interface ResearchWizardResponsePayload {
     ddg_fallback_enabled?: boolean | null;
     live_crawl_attempted?: boolean | null;
     live_crawl_passages?: number | null;
+    retrieve_elapsed_ms?: number | null;
   };
 }
 
@@ -331,6 +332,9 @@ const diagFromResearchPayload = (
     ddg_fallback: Boolean(info?.ddg_fallback_enabled),
     live_crawl_attempted: Boolean(info?.live_crawl_attempted),
     live_crawl_passages: Number(info?.live_crawl_passages ?? 0),
+    ...(typeof info?.retrieve_elapsed_ms === "number" && info.retrieve_elapsed_ms > 0
+      ? { retrieve_elapsed_ms: info.retrieve_elapsed_ms }
+      : {}),
   };
 };
 
@@ -593,6 +597,34 @@ const countPayloadWebUrls = (payload: ResearchWizardResponsePayload): number => 
 
 export const isGatherTimeoutResearchError = (detail: string): boolean =>
   /timed out after \d+ms \(gather\)/i.test(detail);
+
+export const isComposeTimeoutResearchError = (detail: string): boolean =>
+  /rewrite timed out after \d+ms/i.test(detail);
+
+/** Build `liveTrace` diag for research failures (Plan 006 U4). */
+export const timeoutDiagForResearchError = (
+  detail: string,
+  elapsedMs: number,
+  gatherTimeoutMs: number,
+  composeTimeoutMs: number,
+): Readonly<Record<string, ResearchWizardDiagValue>> => {
+  const gatherTimedOut = isGatherTimeoutResearchError(detail);
+  const composeTimedOut = isComposeTimeoutResearchError(detail);
+  const timeoutPhase = gatherTimedOut ? "gather" : composeTimedOut ? "compose" : undefined;
+  const timeoutLimitMs = gatherTimedOut
+    ? gatherTimeoutMs
+    : composeTimedOut
+      ? composeTimeoutMs
+      : undefined;
+  return {
+    elapsed_ms: elapsedMs,
+    ...(timeoutPhase !== undefined && timeoutLimitMs !== undefined
+      ? { timeout_phase: timeoutPhase, timeout_limit_ms: timeoutLimitMs }
+      : {}),
+    ...(gatherTimedOut ? { gather_timeout_ms: gatherTimeoutMs } : {}),
+    error: detail.slice(0, 200),
+  };
+};
 
 const isSynthesisFailureReport = (report: string, payload: ResearchWizardResponsePayload): boolean => {
   const normalized = report.trim();
@@ -1549,6 +1581,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
       query,
       applySourcePreferences(this.approvedSources, options?.sourcePreferences),
     );
+    const queryStartedAt = Date.now();
     try {
       const allowedDomains = researchDomainsForSources(approvedSources);
       await reportProgress({
@@ -1747,15 +1780,18 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
     } catch (error: unknown) {
       const detail = error instanceof Error ? error.message : String(error);
       const gatherTimedOut = isGatherTimeoutResearchError(detail);
+      const elapsedMs = Date.now() - queryStartedAt;
       await reportProgress({
         phase: "compose",
         detail: gatherTimedOut
           ? `Gather timed out (${this.config.gatherTimeoutMs}ms budget)`
           : `Live web research failed: ${detail.slice(0, 240)}`,
-        diag: {
-          ...(gatherTimedOut ? { gather_timeout_ms: this.config.gatherTimeoutMs } : {}),
-          error: detail.slice(0, 200),
-        },
+        diag: timeoutDiagForResearchError(
+          detail,
+          elapsedMs,
+          this.config.gatherTimeoutMs,
+          this.config.composeTimeoutMs,
+        ),
       });
       const topic = stripTrailingQuestionMarks(query) || "this question";
       return {
@@ -1934,4 +1970,6 @@ export {
   diagFromResearchPayload as _diagFromResearchPayload,
   emitRetrieveSummary as _emitRetrieveSummary,
   isGatherTimeoutResearchError as _isGatherTimeoutResearchError,
+  isComposeTimeoutResearchError as _isComposeTimeoutResearchError,
+  timeoutDiagForResearchError as _timeoutDiagForResearchError,
 };

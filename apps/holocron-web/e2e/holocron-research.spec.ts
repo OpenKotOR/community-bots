@@ -85,6 +85,15 @@ async function assertLiveTraceHasIndexerDiagnostics(
       || (step.urls?.length ?? 0) > 0,
   )
   expect(hasPassageSignal, 'liveTrace should record passage or URL retrieve detail').toBeTruthy()
+  const hasRetrieveTiming = trace.some(
+    (step) =>
+      typeof step.diag?.retrieve_elapsed_ms === 'number'
+      && (step.diag.retrieve_elapsed_ms as number) > 0,
+  )
+  expect(
+    hasRetrieveTiming,
+    'liveTrace should record retrieve_elapsed_ms from research_information',
+  ).toBeTruthy()
 }
 
 async function submitQueryAndAwaitAnswer(page: Page, question: string) {
