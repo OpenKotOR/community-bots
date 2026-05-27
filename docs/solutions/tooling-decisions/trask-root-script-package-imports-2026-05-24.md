@@ -1,5 +1,5 @@
 ---
-title: "Trask root script package imports (PR #54–#76)"
+title: "Trask root script package imports (PR #54–#77)"
 date: 2026-05-24
 category: tooling-decisions
 problem_type: tooling
@@ -47,6 +47,7 @@ Root `package.json` lists workspace packages as **devDependencies** so Node reso
 | #71–#74 | CLI/Discord `:ci` + five-query golden import-smoke |
 | #75 | goldenQueryId drift hardening |
 | #76 | `pnpm trask:gate:ci` |
+| #77 | `trask:verify-import-smoke:ci` in CI |
 
 ## Exceptions
 

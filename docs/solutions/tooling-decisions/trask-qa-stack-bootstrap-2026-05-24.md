@@ -1,5 +1,5 @@
 ---
-title: "Trask QA stack auto-bootstrap (PR #66–#76)"
+title: "Trask QA stack auto-bootstrap (PR #66–#77)"
 date: 2026-05-24
 category: tooling-decisions
 problem_type: workflow
@@ -77,7 +77,7 @@ pnpm holocron:e2e                    # gate preflight + Playwright
 
 ## Related
 
-- [trask-citation-stack-closeout-2026-05-24.md](trask-citation-stack-closeout-2026-05-24.md) — PR #66–#76 rows (stack bootstrap + import-smoke + `trask:gate:ci`)
+- [trask-citation-stack-closeout-2026-05-24.md](trask-citation-stack-closeout-2026-05-24.md) — PR #66–#77 rows (stack bootstrap + import-smoke + CI gates)
 - [trask-golden-import-smoke-compose-2026-05-24.md](trask-golden-import-smoke-compose-2026-05-24.md) — `composeGoldenCliAnswer` + `goldenQueryId`
 - [trask-indexed-stack-runbook.md](../../knowledgebase/50-execution/trask-indexed-stack-runbook.md)
 - [validation-ladder.md](../../knowledgebase/50-execution/validation-ladder.md)

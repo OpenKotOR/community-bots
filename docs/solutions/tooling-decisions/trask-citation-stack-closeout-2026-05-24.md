@@ -1,5 +1,5 @@
 ---
-title: "Trask citation stack closeout (PR #33–#77)"
+title: "Trask citation stack closeout (PR #33–#78)"
 date: 2026-05-24
 category: tooling-decisions
 problem_type: quality
@@ -46,6 +46,7 @@ Discord `/ask` brief embeds could collapse to a single inline citation after agg
 | goldenQueryId drift hardening | #75 | Expert question drift scan; CLI↔verification bijection; Discord compose smoke |
 | trask:gate:ci | #76 | CI offline gate alias; single workflow step after build |
 | CI import-smoke consolidation | #77 | `trask:verify-import-smoke:ci` in Actions; ladder doc sync |
+| Arc #33–#77 doc closeout | #78 | README `trask:gate:ci`; module-arch gate table; Holocron CI retries in ladder |
 
 Authoritative module map: [trask-citation-module-architecture-2026-05-24.md](trask-citation-module-architecture-2026-05-24.md). Line-filter incident: [trask-discord-dual-citation-line-filter-2026-05-24.md](trask-discord-dual-citation-line-filter-2026-05-24.md).
 

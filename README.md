@@ -167,9 +167,9 @@ See [`docs/trask-ops.md`](docs/trask-ops.md#hk-86-reaction-role-setup) for full 
 ```bash
 pnpm trask:smoke-imports        # build + workspace package import smoke
 pnpm trask:smoke-imports:ci     # smoke only after build
+pnpm trask:gate:ci              # CI offline after build: smoke + config-drift + optimize-measure:ci
 pnpm trask:gate                 # one build, smoke, config-drift, full measure (skip-check), :ci (floor 165)
 pnpm holocron:e2e               # trask:gate, then Playwright: 5 live KOTOR research queries on :4010
-pnpm verify:trask-cli           # trask:gate, then 5 golden CLI queries (grounded-source gate)
 pnpm trask:verify-import-smoke:ci  # CI: Discord + CLI import-smoke (no token/LLM; needs indexed stack)
 pnpm verify:trask-cli           # trask:gate, then 5 golden CLI queries (grounded-source gate)
 pnpm verify:trask-discord       # trask:gate, then live Discord expert embeds (token only for :post)

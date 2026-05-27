@@ -21,11 +21,14 @@ pr: 74
 
 `trask_smoke_package_imports.mjs` asserts compose output shape for all five CLI and Discord paths. `check_trask_config_drift.mjs` scans expert verification question literals and enforces a 1:1 match between CLI golden ids and `goldenQueryId` (PR #75).
 
+**PR #77:** CI runs both import-smoke scripts via **`pnpm trask:verify-import-smoke:ci`** (Discord then CLI). Individual `verify:trask-*:ci` remain for debugging.
+
 ## Verification
 
 ```bash
 pnpm trask:smoke-imports:ci
-pnpm verify:trask-cli:ci
+pnpm trask:verify-import-smoke:ci   # preferred CI/local indexed path
+pnpm verify:trask-cli:ci          # debug single surface
 pnpm verify:trask-discord:ci
 pnpm trask:config-drift
 ```
