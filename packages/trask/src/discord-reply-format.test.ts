@@ -9,6 +9,7 @@ import {
   ensureMinimumDistinctCitedLines,
   filterDiscordLinesForQuery,
   formatDiscordAskDisplay,
+  formatDiscordProvenanceFooter,
 } from "./discord-reply-format.js";
 import { BRIEF_DISCORD_MIN_CITATIONS } from "./query-anchor.js";
 
@@ -26,6 +27,22 @@ const approvedSources = [
   { name: "github.com", homeUrl: "https://github.com/th3w1zard1/TSLPatcher" },
   { name: "Deadly Stream", homeUrl: "https://deadlystream.com/files/file/1982-tslpatcher" },
 ];
+
+test("formatDiscordProvenanceFooter shows passage count and localhost indexer port", () => {
+  const footer = formatDiscordProvenanceFooter({
+    passagesCount: 12,
+    indexerUrl: "http://127.0.0.1:8787",
+  });
+  assert.equal(footer, "12 passages · indexer 8787");
+});
+
+test("formatDiscordProvenanceFooter uses host for non-local indexer", () => {
+  const footer = formatDiscordProvenanceFooter({
+    passagesCount: 1,
+    indexerUrl: "https://trask.example.com/retrieve",
+  });
+  assert.equal(footer, "1 passage · indexer trask.example.com");
+});
 
 test("formatDiscordAskDisplay keeps two https links for expert TSLPatcher query", () => {
   const display = formatDiscordAskDisplay(expertTslpatcherRaw, approvedSources, { query: expertQuery });

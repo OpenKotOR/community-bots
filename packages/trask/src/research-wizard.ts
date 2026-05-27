@@ -83,9 +83,16 @@ export interface ResearchWizardAnswer {
   groundingStatus?: GroundingStatus;
 }
 
+export interface ResearchWizardResearchProvenance {
+  passagesCount: number;
+  indexerUrl: string;
+}
+
 export interface ResearchWizardBriefAnswer extends ResearchWizardAnswer {
   /** Normalized research report text used for proactive semantic gating. */
   researchReport: string;
+  /** Retrieve metadata for Discord embed footer (not counted in ≤5-line body). */
+  provenance?: ResearchWizardResearchProvenance;
 }
 
 export type ResearchWizardDiagValue = string | number | boolean;
@@ -1864,6 +1871,13 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
         ? grounded.approvedSources
         : alignCitedSourcesToAnswer(answer, candidatePool);
 
+      const passagesCount = Number(
+        payload.research_information?.passages_count ?? payload.passages?.length ?? 0,
+      );
+      const indexerUrl = String(
+        payload.research_information?.indexer_url ?? this.config.indexerBaseUrl,
+      );
+
       return {
         answer,
         approvedSources: citedSources,
@@ -1871,6 +1885,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
         visitedUrls: collectVisitedUrlsFromPayload(payload, approvedSources),
         researchReport: enrichedReport,
         groundingStatus: inferGroundingStatus(answer, citedSources.length),
+        provenance: { passagesCount, indexerUrl },
       };
     } catch {
       const topic = stripTrailingQuestionMarks(query) || "this question";
