@@ -20,6 +20,7 @@ import os
 import re
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -29,6 +30,45 @@ from urllib.request import Request, urlopen
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_INDEXER_URL = "http://127.0.0.1:8790"
 LOG = logging.getLogger("trask.research")
+
+
+def _emit_research_done_trace(
+    *,
+    passages: int,
+    urls: int,
+    index_miss: bool,
+    rejected: int,
+    retrieve_elapsed_ms: int | None = None,
+) -> None:
+    """stderr JSON for AE3 log grep parity with Holocron `liveTrace` (Plan 006 U2 v1.1)."""
+    diag: dict[str, Any] = {
+        "research_done": True,
+        "passages": passages,
+        "urls": urls,
+        "index_miss": index_miss,
+        "rejected_urls": rejected,
+    }
+    if retrieve_elapsed_ms is not None and retrieve_elapsed_ms > 0:
+        diag["retrieve_elapsed_ms"] = retrieve_elapsed_ms
+    detail_parts = [f"research_done · {passages} passages · {urls} URLs"]
+    if index_miss:
+        detail_parts.append("index miss")
+    if rejected > 0:
+        detail_parts.append(f"{rejected} rejected")
+    print(
+        json.dumps(
+            {
+                "type": "trask_research_trace",
+                "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "phase": "gather",
+                "detail": " · ".join(detail_parts),
+                "diag": diag,
+            },
+            ensure_ascii=False,
+        ),
+        file=sys.stderr,
+        flush=True,
+    )
 
 
 def _load_retrieval_defaults() -> dict[str, Any]:
@@ -480,6 +520,13 @@ def run_research(payload: dict[str, Any]) -> dict[str, Any]:
         len(urls),
         index_miss,
         len(rejected_urls),
+    )
+    _emit_research_done_trace(
+        passages=len(passages),
+        urls=len(urls),
+        index_miss=index_miss,
+        rejected=len(rejected_urls),
+        retrieve_elapsed_ms=int((time.monotonic() - retrieve_started) * 1000),
     )
 
     return {

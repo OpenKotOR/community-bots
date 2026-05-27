@@ -358,6 +358,49 @@ const emitRetrieveSummary = async (
   });
 };
 
+const countResearchDoneUrls = (payload: ResearchWizardResponsePayload): number => {
+  const info = payload.research_information;
+  const fromInfo = uniqueUrlsPreserveOrder([
+    ...payloadUrls(info?.source_urls),
+    ...payloadUrls(info?.cited_urls),
+    ...payloadUrls(info?.retrieved_urls),
+  ]);
+  if (fromInfo.length > 0) return fromInfo.length;
+  return uniqueUrlsPreserveOrder(
+    (payload.passages ?? []).map((row) => row.url.trim()).filter((url) => url.length > 0),
+  ).length;
+};
+
+/** Plan 006 U2 v1.1: mirror Python `research_done` log as an extra gather `liveTrace` row. */
+export const emitResearchDoneSummary = async (
+  payload: ResearchWizardResponsePayload,
+  onProgress?: (event: ResearchWizardProgressEvent) => void | Promise<void>,
+): Promise<void> => {
+  if (!onProgress) return;
+  const info = payload.research_information;
+  const passages = Number(info?.passages_count ?? payload.passages?.length ?? 0);
+  const urls = countResearchDoneUrls(payload);
+  const rejected = collectRejectedUrlsFromPayload(payload).length;
+  const indexMiss = Boolean(info?.index_miss);
+  const detailParts = [`research_done · ${passages} passages · ${urls} URLs`];
+  if (indexMiss) detailParts.push("index miss");
+  if (rejected > 0) detailParts.push(`${rejected} rejected`);
+  await onProgress({
+    phase: "gather",
+    detail: detailParts.join(" · "),
+    diag: {
+      research_done: true,
+      passages,
+      urls,
+      index_miss: indexMiss,
+      rejected_urls: rejected,
+      ...(typeof info?.retrieve_elapsed_ms === "number" && info.retrieve_elapsed_ms > 0
+        ? { retrieve_elapsed_ms: info.retrieve_elapsed_ms }
+        : {}),
+    },
+  });
+};
+
 const emitArchiveProbeEvents = async (
   payload: ResearchWizardResponsePayload,
   approvedSources: readonly SourceDescriptor[],
@@ -1608,6 +1651,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
       );
       const enrichedReport = report;
       await emitRetrieveSummary(payload, this.config.indexerBaseUrl, reportProgress);
+      await emitResearchDoneSummary(payload, reportProgress);
       const rejectedUrls = collectRejectedUrlsFromPayload(payload);
       if (rejectedUrls.length > 0) {
         await reportProgress({
@@ -1971,6 +2015,7 @@ export {
   isGroundedComposeEnabled as _isGroundedComposeEnabled,
   diagFromResearchPayload as _diagFromResearchPayload,
   emitRetrieveSummary as _emitRetrieveSummary,
+  emitResearchDoneSummary as _emitResearchDoneSummary,
   isGatherTimeoutResearchError as _isGatherTimeoutResearchError,
   isComposeTimeoutResearchError as _isComposeTimeoutResearchError,
   timeoutDiagForResearchError as _timeoutDiagForResearchError,
