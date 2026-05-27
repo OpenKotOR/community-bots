@@ -1,0 +1,5 @@
+{
+  "id": "reone",
+  "question": "What does the reone project provide for Odyssey engine work?",
+  "answer": "reone is an open-source reimplementation effort for the Odyssey engine family, aimed at modern builds, tooling, and research-friendly engine behavior [1]. It complements related projects like xoreos when you need engine-level study rather than only asset or script mods [2].\n\nSources\n[1] https://github.com/seedhartha/reone\n[2] https://github.com/xoreos/xoreos"
+}

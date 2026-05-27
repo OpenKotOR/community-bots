@@ -168,6 +168,9 @@ infra/matchmaking-inducer/matchmaking-ci.env
 data/*
 !data/trask/
 !data/trask/**
+!data/trask-eval/
+!data/trask-eval/fixtures/
+!data/trask-eval/fixtures/**
 dist/
 exports/
 node_modules/

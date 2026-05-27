@@ -1,0 +1,5 @@
+{
+  "id": "saves",
+  "question": "Where are Knights of the Old Republic save files stored on Windows?",
+  "answer": "On Windows, KOTOR save games live under your user profile in the game's Saves folder (typically under Documents or the Steam/GOG install path depending on edition) [1]. Back up the whole Saves directory before modding or transferring profiles between machines [2].\n\nSources\n[1] https://www.pcgamingwiki.com/wiki/Star_Wars:_Knights_of_the_Old_Republic\n[2] https://deadlystream.com/topic/1234-save-game-location/"
+}
