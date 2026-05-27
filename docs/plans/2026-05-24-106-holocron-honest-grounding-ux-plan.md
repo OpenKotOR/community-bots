@@ -21,6 +21,7 @@ origin: docs/brainstorms/2026-05-19-trask-research-quality-bar-requirements.md
 - **R3.** Holocron e2e expects `groundingStatus` ∈ `{ grounded, failed }` only.
 - **R4.** `scripts/lib/url-verify.mjs` re-exports reachability helpers from `@openkotor/trask`; `assertAllUrlsReachable` lives in one place (`citation-url-verify.ts`).
 - **R5.** Doc: module-arch related link cites **PR #33–#78**.
+- **R6.** Track `data/trask-eval/fixtures/*.json` in git (`.gitignore` exception) so CI `trask:gate:ci` faithfulness passes.
 
 ## Verification
 
