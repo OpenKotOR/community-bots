@@ -1,7 +1,7 @@
 ---
 title: "feat(trask): liveTrace timeout timing diagnostics (Plan 006 U4)"
 type: feat
-status: active
+status: completed
 date: 2026-05-24
 origin: docs/plans/2026-05-19-006-feat-trask-research-quality-bar-v1-plan.md
 ---
