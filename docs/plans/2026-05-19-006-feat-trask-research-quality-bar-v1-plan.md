@@ -193,7 +193,7 @@ sequenceDiagram
 **Approach:**
 - Default: Node `trask_research_trace` JSON on stderr (already in wizard).
 - HTTP server logs sink at INFO when `TRASK_RESEARCH_LOG_VERBOSE=1`.
-- Optional v1.1: map Python `research_done` fields into one additional `liveTrace` row (only if needed for AE3 without log scraping).
+- v1.1 (shipped #87): `emitResearchDoneSummary` + Python `_emit_research_done_trace` — `research_done` gather row on `liveTrace` and stderr JSON for AE3 grep.
 
 **Test scenarios:**
 - Happy path: one Holocron ask produces ≥ 3 `trask_research_trace` lines in server log.
