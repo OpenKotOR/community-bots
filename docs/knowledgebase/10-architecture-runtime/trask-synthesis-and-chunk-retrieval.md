@@ -26,7 +26,7 @@ lastUpdated: 2026-05-19
 - [REPO] **`fetchResearchReport`** → `runTraskWebResearch` with `allowed_url_prefixes` from approved sources (no FileChunkStore merge on the hot path).
 - [REPO] When **`TRASK_GROUNDED_COMPOSE=1`** and an OpenAI-compatible client is configured, **`tryGroundedCompose`** (`grounded-evidence.ts`) splits the enriched report into passages, extracts claims (LLM with heuristic fallback), and composes an answer with inline `[n]` citations. **`approvedSources`** are **`alignCitedSourcesToAnswer`** — only URLs cited in the body; no URL-padding to meet **`MIN_HOLOCRON_WEB_CITATIONS`**.
 - [REPO] Otherwise: **`rewriteForDiscord`** when an LLM client exists, else **`fallbackDiscordRewrite`**; synthesis-failure reports may use **`sourceOnlyFallbackAnswer`**. Final **`approvedSources`** always pass through **`alignCitedSourcesToAnswer`** (except the grounded path, which already aligned).
-- [REPO] Returns **`groundingStatus`** (`grounded` | `partial` | `failed`) via **`inferGroundingStatus`** for Holocron provenance UX and persistence.
+- [REPO] Returns **`groundingStatus`** (`grounded` | `failed`; legacy `partial` stored values display as failed in Holocron) via **`inferGroundingStatus`** for provenance UX and persistence.
 - [REPO] **Catch path**: research/timeout errors return a user-visible failure string with empty sources (no fake citations).
 
 # `answerQuestionBrief` (proactive)

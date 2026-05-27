@@ -32,8 +32,13 @@ const run = (command, args, { allowFail = false } = {}) => {
 };
 
 const countTests = (output) => {
-  const pass = Number(output.match(/# pass (\d+)/)?.[1] ?? 0);
-  const fail = Number(output.match(/# fail (\d+)/)?.[1] ?? 0);
+  // Node 22 uses "# pass N"; Node 24+ uses "ℹ pass N" in the default reporter summary.
+  const pass = Number(
+    output.match(/# pass (\d+)/)?.[1] ?? output.match(/ℹ pass (\d+)/u)?.[1] ?? 0,
+  );
+  const fail = Number(
+    output.match(/# fail (\d+)/)?.[1] ?? output.match(/ℹ fail (\d+)/u)?.[1] ?? 0,
+  );
   return { pass, fail, total: pass + fail };
 };
 
