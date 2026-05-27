@@ -13,7 +13,14 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 process.env.TRASK_WEB_ALLOW_ANONYMOUS ??= "1";
 process.env.TRASK_HTTP_PORT ??= "4010";
 
-bootstrapTraskIndexedStack(repoRoot);
+if (process.env.HOLOCRON_E2E_FAILURE_MODE === "1") {
+  process.env.TRASK_INDEXER_BASE_URL = "http://127.0.0.1:1";
+  process.env.TRASK_QA_GROUNDING ??= "1";
+  process.env.TRASK_WEB_RESEARCH_LOCAL_CHROMA = "0";
+  process.env.TRASK_WEB_RESEARCH_DDG_FALLBACK = "0";
+} else {
+  bootstrapTraskIndexedStack(repoRoot);
+}
 
 const result = spawnSync("bash", ["scripts/holocron-e2e-live-server.sh"], {
   cwd: repoRoot,

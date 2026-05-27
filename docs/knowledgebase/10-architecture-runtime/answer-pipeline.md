@@ -38,5 +38,5 @@ lastUpdated: 2026-05-24
 - [holocron-web-trask-client.md](../30-product-ux/holocron-web-trask-client.md) — Holocron `trask-api.ts` + Vite.
 - [pazaak-bot-trask-api-mount.md](pazaak-bot-trask-api-mount.md) — PazaakWorld `/api/trask` mount.
 - [trask-citation-display-contract.md](trask-citation-display-contract.md) — citation markers and Discord display pipeline.
-- [trask-citation-stack-closeout-2026-05-24.md](../../solutions/tooling-decisions/trask-citation-stack-closeout-2026-05-24.md) — citation arc **PR #33–#80**.
-- [trask-citation-module-architecture-2026-05-24.md](../../solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md) — module map and gate table (PR #33–#80).
+- [trask-citation-stack-closeout-2026-05-24.md](../../solutions/tooling-decisions/trask-citation-stack-closeout-2026-05-24.md) — citation arc **PR #33–#85**.
+- [trask-citation-module-architecture-2026-05-24.md](../../solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md) — module map and gate table (PR #33–#85).

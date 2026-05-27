@@ -1794,11 +1794,13 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
         ),
       });
       const topic = stripTrailingQuestionMarks(query) || "this question";
+      const answer = `I could not complete live web research for "${topic}" right now (${detail}). Ensure the Trask indexer or research venv is running (TRASK_INDEXER_BASE_URL, TRASK_WEB_RESEARCH_PYTHON, bootstrap via scripts/bootstrap_trask_research.sh), then retry.`;
       return {
-        answer: `I could not complete live web research for "${topic}" right now (${detail}). Ensure the Trask indexer or research venv is running (TRASK_INDEXER_BASE_URL, TRASK_WEB_RESEARCH_PYTHON, bootstrap via scripts/bootstrap_trask_research.sh), then retry.`,
+        answer,
         approvedSources: [],
         retrievedSources: [],
         visitedUrls: [],
+        groundingStatus: inferGroundingStatus(answer, 0),
       };
     }
   }

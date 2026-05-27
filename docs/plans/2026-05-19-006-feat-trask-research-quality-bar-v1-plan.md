@@ -306,7 +306,7 @@ sequenceDiagram
 
 **Test scenarios:**
 - Covers AE4: full e2e expert list passes with trace assertions.
-- Error path: deliberately broken indexer URL in test env → trace shows failure class (manual or integration fixture).
+- Error path: `playwright.failure.config.ts` + `holocron-research-failure.spec.ts` — unreachable indexer (`HOLOCRON_E2E_FAILURE_MODE=1`) → `groundingStatus: failed` + classifiable `liveTrace`.
 
 **Verification:**
 - `pnpm holocron:e2e` green; browser MCP all expert queries when available per `AGENTS.md`.
