@@ -48,6 +48,21 @@ export const isHttpsCitationReachable = async (url: string): Promise<boolean> =>
   return false;
 };
 
+export const assertAllUrlsReachable = async (
+  urls: readonly string[],
+  label = "citation",
+): Promise<void> => {
+  const unreachable: string[] = [];
+  for (const url of urls) {
+    if (!(await isHttpsCitationReachable(url))) unreachable.push(url);
+  }
+  if (unreachable.length > 0) {
+    throw new Error(
+      `${label} URL(s) not reachable (404 or network error): ${unreachable.join(", ")}`,
+    );
+  }
+};
+
 export const filterReachableByUrl = async <T extends { url: string; verified?: boolean }>(
   rows: readonly T[],
 ): Promise<T[]> => {

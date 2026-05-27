@@ -302,9 +302,9 @@ test("passagesFromRetrieveRows preserves verified flag", () => {
   assert.equal(passages[0]?.verified, true);
 });
 
-test("inferGroundingStatus marks partial abstention", () => {
+test("inferGroundingStatus marks abstention as failed", () => {
   const answer = "I found candidate sources for TSLPatcher, but I could not support a grounded answer from the retrieved evidence.";
-  assert.equal(inferGroundingStatus(answer, 2), "partial");
+  assert.equal(inferGroundingStatus(answer, 2), "failed");
 });
 
 test("inferGroundingStatus returns grounded with enough citations", () => {

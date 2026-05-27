@@ -785,7 +785,7 @@ export const inferGroundingStatus = (
     return "failed";
   }
   if (/could not support a grounded answer/i.test(answer)) {
-    return "partial";
+    return "failed";
   }
   const indices = collectCitationIndicesFromAnswer(answer);
   if (indices.length >= MIN_WEB_CITATIONS && citedSourceCount >= MIN_WEB_CITATIONS) {
