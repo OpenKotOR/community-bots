@@ -63,7 +63,7 @@ pnpm holocron:e2e                     # trask:gate preflight, then Playwright (e
 pnpm verify:trask-discord             # trask:gate preflight, then live Discord expert queries
 ```
 
-CI runs `pnpm build`, package import smoke, `pnpm trask:config-drift`, `pnpm trask:optimize-measure:ci`, indexer+Worker bootstrap, `verify:trask-discord:ci` + `verify:trask-cli:ci` (five-query import-smoke), then `pnpm holocron:e2e:playwright` with `TRASK_SKIP_BUILD=1` (local `pnpm holocron:e2e` runs full `trask:gate` first).
+CI runs `pnpm build`, **`pnpm trask:gate:ci`**, indexer+Worker bootstrap, **`pnpm trask:verify-import-smoke:ci`**, then `pnpm holocron:e2e:playwright` with `TRASK_SKIP_BUILD=1` (local `pnpm holocron:e2e` runs full `trask:gate` first).
 
 ## Explicitly rejected (do not implement)
 

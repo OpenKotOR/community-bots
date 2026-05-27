@@ -1,5 +1,5 @@
 ---
-title: "Trask root script package imports (PR #54–#63)"
+title: "Trask root script package imports (PR #54–#76)"
 date: 2026-05-24
 category: tooling-decisions
 problem_type: tooling
@@ -42,6 +42,11 @@ Root `package.json` lists workspace packages as **devDependencies** so Node reso
 | #61 | Holocron Playwright e2e imports `@openkotor/trask-config` |
 | #62 | Single-build gate, `trask:smoke-imports:ci`, extended smoke |
 | #63 | Gate full measure uses `TRASK_OPTIMIZE_SKIP_CHECK=1` after build |
+| #64 | `pnpm trask:config-drift` wired into `trask:gate` |
+| #66–#70 | QA stack bootstrap + CI import-smoke steps |
+| #71–#74 | CLI/Discord `:ci` + five-query golden import-smoke |
+| #75 | goldenQueryId drift hardening |
+| #76 | `pnpm trask:gate:ci` |
 
 ## Exceptions
 
@@ -52,9 +57,11 @@ Root `package.json` lists workspace packages as **devDependencies** so Node reso
 
 ```bash
 pnpm trask:smoke-imports     # build + resolves trask, trask-config, config, retrieval (+ holocron/drift symbols)
-pnpm trask:smoke-imports:ci  # smoke only after build (CI uses this)
+pnpm trask:smoke-imports:ci  # smoke only after build (included in trask:gate:ci)
+pnpm trask:gate:ci           # CI offline after build: smoke + config-drift + optimize-measure:ci
 pnpm trask:gate              # one build, smoke, config-drift, optimize-measure (full + :ci)
-pnpm trask:config-drift    # standalone quick check (also runs inside trask:gate)
+pnpm trask:config-drift      # standalone quick check (also runs inside trask:gate)
+pnpm trask:verify-import-smoke:ci  # Discord + CLI import-smoke (indexed stack required)
 ```
 
 See also [trask-citation-stack-closeout-2026-05-24.md](trask-citation-stack-closeout-2026-05-24.md).

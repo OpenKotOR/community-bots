@@ -1,5 +1,5 @@
 ---
-title: "Trask citation stack closeout (PR #33–#76)"
+title: "Trask citation stack closeout (PR #33–#77)"
 date: 2026-05-24
 category: tooling-decisions
 problem_type: quality
@@ -45,6 +45,7 @@ Discord `/ask` brief embeds could collapse to a single inline citation after agg
 | Five-query import-smoke | #74 | `goldenQueryId` wiring; CLI/Discord CI cover all five canonical queries |
 | goldenQueryId drift hardening | #75 | Expert question drift scan; CLI↔verification bijection; Discord compose smoke |
 | trask:gate:ci | #76 | CI offline gate alias; single workflow step after build |
+| CI import-smoke consolidation | #77 | `trask:verify-import-smoke:ci` in Actions; ladder doc sync |
 
 Authoritative module map: [trask-citation-module-architecture-2026-05-24.md](trask-citation-module-architecture-2026-05-24.md). Line-filter incident: [trask-discord-dual-citation-line-filter-2026-05-24.md](trask-discord-dual-citation-line-filter-2026-05-24.md).
 
@@ -55,8 +56,8 @@ pnpm trask:gate                    # one build, smoke, config-drift, full measur
 pnpm trask:gate:ci                 # after build: smoke-imports:ci + config-drift + optimize-measure:ci (CI parity)
 pnpm verify:trask-discord          # trask:gate preflight, then live Discord embed gate (auto-bootstrap 8787/8790; token only for --post)
 pnpm verify:trask-cli              # trask:gate preflight, then CLI golden queries (auto-bootstrap 8787/8790)
-pnpm verify:trask-cli:ci         # CI: golden import-smoke (no LLM)
-pnpm verify:trask-discord:ci     # CI: Discord embed import-smoke (no token)
+pnpm trask:verify-import-smoke:ci  # CI: Discord + CLI import-smoke (no token/LLM)
+# debug: pnpm verify:trask-cli:ci | pnpm verify:trask-discord:ci
 pnpm trask:smoke:stack-bootstrap # bootstrap + stack health
 pnpm holocron:e2e                  # trask:gate preflight, then Playwright + live research (auto-bootstrap)
 ```
