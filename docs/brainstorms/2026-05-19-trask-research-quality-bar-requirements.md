@@ -1,6 +1,6 @@
 ---
 title: Trask research quality bar (holistic)
-status: active
+status: completed
 date: 2026-05-19
 supersedes_notes: |
   Carries forward intent from docs/brainstorms/2026-05-19-trask-rag-fidelity-requirements.md

@@ -376,3 +376,17 @@ sequenceDiagram
 - **Solution:** `docs/solutions/tooling-decisions/trask-crawl4ai-research-cutover-2026-05-19.md`
 - **E2E:** `apps/holocron-web/e2e/holocron-research.spec.ts`
 - **Expert queries:** `data/trask/eval/verification-queries.json`
+
+## Closure (2026-05-27)
+
+| Unit | Shipped |
+|------|---------|
+| U1 trace density | Holocron `liveTrace` diag + e2e indexer/passage asserts |
+| U2 log parity | `trask_research_trace` stderr JSON; HTTP server log sink; **AE3 gated** in `trask:gate` via #84 (`trask_research_trace_assert.mjs`) |
+| U3 verified bus | Python `verified: true`; Node trusts indexer passages |
+| U4 timeouts | #83 — `elapsed_ms`, `timeout_phase`, `retrieve_elapsed_ms` |
+| U5 lexical merge | Removed from live Q&A |
+| U6 trace e2e | Holocron five-query spec + `grounded\|failed` |
+| U7 provenance UX | #79–#82 Discord footer + honest grounding |
+
+**Deferred:** U2 v1.1 Python `research_done` → extra `liveTrace` row (stderr + gate sufficient for v1). Brainstorm: `docs/brainstorms/2026-05-19-trask-research-quality-bar-requirements.md` (`status: completed`). Arc: `trask-citation-stack-closeout-2026-05-24.md` through **#84**.
