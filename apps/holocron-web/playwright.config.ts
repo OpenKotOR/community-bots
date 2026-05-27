@@ -8,6 +8,7 @@ const repoRoot = path.resolve(appDir, '..', '..')
 /** Functional e2e: real trask-http-server + Holocron dist (no /api/trask mocks). */
 export default defineConfig({
   testDir: './e2e',
+  testMatch: 'holocron-research.spec.ts',
   timeout: 240_000,
   expect: { timeout: 30_000 },
   fullyParallel: false,
