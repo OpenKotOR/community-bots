@@ -50,6 +50,7 @@ Discord `/ask` brief embeds could collapse to a single inline citation after agg
 | Holocron honest grounding UX | #79 | `partial`→`failed` inference/UI; faithfulness fixtures tracked; Node 24 test reporter in gate |
 | Discord provenance footer | #80 | `ResearchWizardBriefAnswer.provenance`; embed footer via `formatDiscordProvenanceFooter` |
 | Discord verify footer assert | #81 | `verify_trask_discord_live.mjs` import-smoke + live provenance checks; arc doc **#33–#80** |
+| Gate smoke provenance footer | #82 | `discord_provenance_footer.mjs` shared assert; `trask_smoke_package_imports` enforces footer in `trask:gate` |
 
 Authoritative module map: [trask-citation-module-architecture-2026-05-24.md](trask-citation-module-architecture-2026-05-24.md). Line-filter incident: [trask-discord-dual-citation-line-filter-2026-05-24.md](trask-discord-dual-citation-line-filter-2026-05-24.md).
 

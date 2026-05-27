@@ -24,6 +24,10 @@ import {
   DISCORD_IMPORT_SMOKE_SPECS,
   GOLDEN_IMPORT_SMOKE_IDS,
 } from "./lib/compose_golden_cli_answer.mjs";
+import {
+  assertProvenanceFooter,
+  defaultIndexerUrlForSmoke,
+} from "./lib/discord_provenance_footer.mjs";
 
 const assert = (ok, message) => {
   if (!ok) {
@@ -63,6 +67,14 @@ for (const spec of DISCORD_IMPORT_SMOKE_SPECS) {
   assert(smoke.approvedSources.length === 2, `discord compose(${spec.goldenId}) approvedSources`);
   assert(smoke.answer.includes("[1]") && smoke.answer.includes("[2]"), `discord compose(${spec.goldenId}) citations`);
   assert(/\nSources\n/i.test(smoke.answer), `discord compose(${spec.goldenId}) Sources block`);
+  const footerAudit = assertProvenanceFooter({
+    passagesCount: Math.max(smoke.approvedSources.length, 2),
+    indexerUrl: defaultIndexerUrlForSmoke(),
+  });
+  assert(
+    typeof footerAudit !== "string",
+    `discord compose(${spec.goldenId}) provenance footer: ${footerAudit}`,
+  );
 }
 
 console.log("trask_smoke_package_imports: OK");
