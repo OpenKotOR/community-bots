@@ -61,6 +61,7 @@ After editing golden questions or fixtures, run `pnpm trask:config-drift`. Env o
 | `TRASK_RESEARCH_LOG_LEVEL` | Python `trask.research` logger level (`INFO` default, `DEBUG` for full retrieve/verify trail) |
 | `TRASK_RESEARCH_LOG_VERBOSE=1` | Node forwards DEBUG stderr lines into `trask-bot` logs |
 | `TRASK_RESEARCH_TRACE_LOG=0` | Disable Node JSON `trask_research_trace` lines on stderr (enabled by default; mirrors Holocron `liveTrace`) |
+| `TRASK_DISCORD_SYNC_INTERVAL_MS` | When &gt; 0, `trask-bot` runs `scripts/trask_discord_sync.py` on startup and on interval (recommended 15–60 min in production) |
 
 Classify failures from server logs (AE3): each line is JSON with `"type":"trask_research_trace"`. Grep examples:
 
@@ -74,7 +75,6 @@ grep trask_research_trace trask-http.log | grep '"timeout_phase":"gather"\|"time
 ```
 
 `pnpm trask:smoke-imports:ci` asserts these diag keys stay present (see `scripts/lib/trask_research_trace_assert.mjs`).
-| `TRASK_DISCORD_SYNC_INTERVAL_MS` | When &gt; 0, `trask-bot` runs `scripts/trask_discord_sync.py` on startup and on interval (recommended 15–60 min in production) |
 
 **Citation offline gates**
 

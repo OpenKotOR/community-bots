@@ -17,6 +17,8 @@ const assert = (ok, message) => {
 export const captureResearchTraceLine = (event) => {
   const lines = [];
   const originalError = console.error;
+  const priorTraceLogEnv = process.env.TRASK_RESEARCH_TRACE_LOG;
+  delete process.env.TRASK_RESEARCH_TRACE_LOG;
   console.error = (...args) => {
     lines.push(String(args[0] ?? ""));
   };
@@ -24,6 +26,11 @@ export const captureResearchTraceLine = (event) => {
     emitResearchTraceLog(event);
   } finally {
     console.error = originalError;
+    if (priorTraceLogEnv === undefined) {
+      delete process.env.TRASK_RESEARCH_TRACE_LOG;
+    } else {
+      process.env.TRASK_RESEARCH_TRACE_LOG = priorTraceLogEnv;
+    }
   }
   assert(lines.length === 1, "expected exactly one trask_research_trace line");
   const parsed = JSON.parse(lines[0]);

@@ -1,7 +1,7 @@
 ---
 title: "feat(trask): AE3 trask_research_trace failure-class gate smoke"
 type: feat
-status: active
+status: completed
 date: 2026-05-24
 origin: docs/plans/2026-05-19-006-feat-trask-research-quality-bar-v1-plan.md
 ---
