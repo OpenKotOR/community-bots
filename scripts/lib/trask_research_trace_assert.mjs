@@ -78,6 +78,22 @@ export const assertAe3ResearchTraceFailureClasses = () => {
     "trace rejected_urls diag",
   );
 
+  const researchDoneTrace = captureResearchTraceLine({
+    phase: "gather",
+    detail: "research_done · 3 passages · 2 URLs · index miss",
+    diag: {
+      research_done: true,
+      passages: 3,
+      urls: 2,
+      index_miss: true,
+      rejected_urls: 0,
+      retrieve_elapsed_ms: 900,
+    },
+  });
+  assert(researchDoneTrace.diag?.research_done === true, "trace research_done flag");
+  assert(researchDoneTrace.diag?.passages === 3, "trace research_done passages");
+  assert(researchDoneTrace.diag?.index_miss === true, "trace research_done index_miss");
+
   const timeoutTrace = captureResearchTraceLine({
     phase: "compose",
     detail: "Gather timed out (90000ms budget)",

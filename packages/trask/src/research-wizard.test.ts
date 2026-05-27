@@ -24,6 +24,7 @@ import {
   wrapResearchProgress,
   _diagFromResearchPayload,
   _emitRetrieveSummary,
+  _emitResearchDoneSummary,
   _isGatherTimeoutResearchError,
   _isComposeTimeoutResearchError,
   _timeoutDiagForResearchError,
@@ -532,6 +533,33 @@ test("_emitRetrieveSummary no-ops without onProgress", async () => {
     { passages: [], research_information: { indexer_url: "http://127.0.0.1:8787" } },
     "http://127.0.0.1:8787",
   );
+});
+
+test("_emitResearchDoneSummary emits research_done gather row with diag", async () => {
+  const events: Array<{ phase?: string; detail?: string; diag?: Record<string, unknown> }> = [];
+  await _emitResearchDoneSummary(
+    {
+      passages: [{ url: "https://example.com/a", quote: "a" }],
+      research_information: {
+        passages_count: 1,
+        source_urls: ["https://example.com/a", "https://example.com/b"],
+        index_miss: true,
+        retrieve_elapsed_ms: 512,
+      },
+    },
+    async (event) => {
+      events.push(event);
+    },
+  );
+  assert.equal(events.length, 1);
+  assert.equal(events[0]?.phase, "gather");
+  assert.match(String(events[0]?.detail), /research_done/);
+  assert.match(String(events[0]?.detail), /index miss/);
+  assert.equal(events[0]?.diag?.research_done, true);
+  assert.equal(events[0]?.diag?.passages, 1);
+  assert.equal(events[0]?.diag?.urls, 2);
+  assert.equal(events[0]?.diag?.index_miss, true);
+  assert.equal(events[0]?.diag?.retrieve_elapsed_ms, 512);
 });
 
 test("emitResearchTraceLog is disabled when TRASK_RESEARCH_TRACE_LOG=0", () => {
