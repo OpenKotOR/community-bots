@@ -1,7 +1,7 @@
 ---
 title: "feat(verify): five-query golden import-smoke"
 type: feat
-status: active
+status: completed
 date: 2026-05-24
 origin: docs/plans/2026-05-24-100-golden-import-smoke-compose-plan.md
 ---

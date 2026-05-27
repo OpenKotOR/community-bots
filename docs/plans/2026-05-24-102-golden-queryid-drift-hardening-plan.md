@@ -1,7 +1,7 @@
 ---
 title: "feat(trask-config): harden goldenQueryId drift + arc #74 doc closeout"
 type: feat
-status: active
+status: completed
 date: 2026-05-24
 origin: docs/plans/2026-05-24-101-five-query-import-smoke-plan.md
 ---
