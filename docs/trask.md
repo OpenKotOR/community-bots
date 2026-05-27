@@ -155,7 +155,10 @@ pnpm trask:smoke-imports:ci   # import smoke after build
 pnpm trask:gate:ci            # CI offline gate after build: smoke + config-drift + optimize-measure:ci
 pnpm trask:gate               # local preflight: build + smoke + config-drift + full measure (skip-check) + :ci — floor 165
 pnpm holocron:e2e             # trask:gate preflight, then Playwright (auto-starts indexer+Worker via holocron-e2e-webserver.mjs)
+pnpm trask:verify-import-smoke:ci  # indexed stack: five-query Discord + CLI import-smoke (no LLM/token)
 ```
+
+GitHub Actions runs `pnpm holocron:e2e:playwright` with **`retries: 1`** on CI (`apps/holocron-web/playwright.config.ts`) for live-research timing flakes.
 
 Requires repo **`.env`** with **at least one working LLM provider** (`OPENROUTER_API_KEY` or `OPENAI_API_KEY`)
 and **`TRASK_WEB_RESEARCH_PYTHON`** from bootstrap. Answers are **LLM-synthesized** from scraped main content.

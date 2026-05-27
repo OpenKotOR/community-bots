@@ -1,5 +1,5 @@
 ---
-title: "Trask citation module architecture (PR #33–#76)"
+title: "Trask citation module architecture (PR #33–#78)"
 date: 2026-05-24
 category: tooling-decisions
 problem_type: architecture
@@ -38,6 +38,7 @@ discord-reply-format.ts      ← line filters, embedInlineCitationLinks (imports
 |------|---------|--------|
 | Recommended preflight | `pnpm trask:gate` | one build + smoke + config-drift + full measure (skip-check) + `:ci`; both measure runs **composite_score 165** |
 | CI offline (after build) | `pnpm trask:gate:ci` | smoke-imports:ci + config-drift + optimize-measure:ci (`.github/workflows/ci.yml`) |
+| CI indexed import-smoke | `pnpm trask:verify-import-smoke:ci` | Five-query Discord + CLI embed/CLI smoke (no LLM/token); needs indexer+Worker |
 | Local offline (full) | `pnpm trask:optimize-measure` | Faithfulness 5/5 + 13 discord stress tests + all citation unit suites + `pnpm check`; **composite_score 165** |
 | CI measure only | `pnpm trask:optimize-measure:ci` (`TRASK_OPTIMIZE_CI_MODE=1`) | Faithfulness + discord stress + **composite_score ≥ 165** (included in `trask:gate:ci`) |
 | Live Discord | `pnpm verify:trask-discord` | Preflight `trask:gate`, then LLM + indexer embed contract |
@@ -72,6 +73,7 @@ Formula: `composite_score` = (`citation_stress_pass_count` × 10) + (`faithfulne
 | #74 | Five-query import-smoke via `goldenQueryId` |
 | #75 | goldenQueryId drift hardening + expert question scan |
 | #76 | `pnpm trask:gate:ci`; CI single offline step |
+| #77 | `trask:verify-import-smoke:ci` in Actions; ladder doc sync |
 | #59 | Export `query-anchor` from `@openkotor/trask` index |
 | #58 | Config drift + allowlist export use `@openkotor/retrieval`; root import compound doc |
 | #57 | Root verify scripts import `@openkotor/config`; holocron browser verify uses package entries |
@@ -91,7 +93,7 @@ Formula: `composite_score` = (`citation_stress_pass_count` × 10) + (`faithfulne
 
 ## Related
 
-- [trask-citation-stack-closeout-2026-05-24.md](trask-citation-stack-closeout-2026-05-24.md) — PR #33–#76 arc summary and `pnpm trask:gate`
+- [trask-citation-stack-closeout-2026-05-24.md](trask-citation-stack-closeout-2026-05-24.md) — PR #33–#77 arc summary and `pnpm trask:gate`
 - [trask-qa-stack-bootstrap-2026-05-24.md](trask-qa-stack-bootstrap-2026-05-24.md) — `trask_qa_stack_bootstrap.mjs` and `ensure_trask_indexed_stack_for_e2e.sh`
 - [trask-root-script-package-imports-2026-05-24.md](trask-root-script-package-imports-2026-05-24.md) — root `scripts/` workspace package imports
 - `packages/trask/src/` — implementation
