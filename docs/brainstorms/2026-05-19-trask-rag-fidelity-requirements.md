@@ -1,10 +1,13 @@
 ---
 title: Trask RAG fidelity and edge retrieve
-status: active
+status: completed
 date: 2026-05-19
+supersedes_note: "R1–R5 shipped via Plan 006 and citation arc #33–#85; authoritative product policy in docs/brainstorms/2026-05-19-trask-research-quality-bar-requirements.md"
 ---
 
 # Trask RAG fidelity and edge retrieve
+
+> **Closed 2026-05-27.** Requirements R1–R5 are implemented in the shared retrieve → grounded compose path (Holocron, Discord, CLI). For ongoing quality-bar work, use `docs/brainstorms/2026-05-19-trask-research-quality-bar-requirements.md` and `docs/plans/2026-05-19-006-feat-trask-research-quality-bar-v1-plan.md`.
 
 ## Problem
 

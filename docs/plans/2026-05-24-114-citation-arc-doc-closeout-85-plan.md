@@ -1,7 +1,7 @@
 ---
 title: "docs(trask): citation arc closeout PR #33–#85"
 type: docs
-status: active
+status: completed
 date: 2026-05-24
 origin: docs/solutions/tooling-decisions/trask-citation-stack-closeout-2026-05-24.md
 ---
