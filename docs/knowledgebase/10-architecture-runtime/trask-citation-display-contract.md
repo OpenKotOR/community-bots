@@ -17,7 +17,7 @@ pr_refs: [33, 34, 35, 36, 38]
 
 - [trask-discord-slash-contract.md](trask-discord-slash-contract.md) — slash commands, permissions, SLA, embed size limits
 - [docs/solutions/tooling-decisions/trask-discord-dual-citation-line-filter-2026-05-24.md](../../solutions/tooling-decisions/trask-discord-dual-citation-line-filter-2026-05-24.md) — incident history and **`composite_score`** formula (authoritative for numeric gate floors)
-- [docs/solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md](../../solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md) — module map, dependency direction, local vs CI gates (PR #33–#85)
+- [docs/solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md](../../solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md) — module map, dependency direction, local vs CI gates (PR #33–#88)
 
 # Shared citation markers
 

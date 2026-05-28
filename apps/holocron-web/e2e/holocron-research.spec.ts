@@ -94,6 +94,19 @@ async function assertLiveTraceHasIndexerDiagnostics(
     hasRetrieveTiming,
     'liveTrace should record retrieve_elapsed_ms from research_information',
   ).toBeTruthy()
+  if (completed?.groundingStatus === 'grounded') {
+    const hasResearchDone = trace.some(
+      (step) =>
+        step.phase === 'gather'
+        && step.diag?.research_done === true
+        && typeof step.diag?.passages === 'number'
+        && typeof step.diag?.urls === 'number',
+    )
+    expect(
+      hasResearchDone,
+      'grounded liveTrace should include research_done gather row (Plan 006 U2 v1.1)',
+    ).toBeTruthy()
+  }
 }
 
 async function submitQueryAndAwaitAnswer(page: Page, question: string) {
@@ -215,7 +228,7 @@ for (const [index, querySpec] of RESEARCH_QUERIES.entries()) {
   })
 }
 
-test('completed remote thread clears stale persisted research job on reload', async ({ page }) => {
+test('completed remote thread clears stale persisted research job on reload', async ({ page, request, baseURL }) => {
   const threadId = randomUUID()
   const question =
     'For a custom MDL exported from Blender, which MDLOps workflow step turns it back into game-ready KotOR models?'
@@ -224,19 +237,33 @@ test('completed remote thread clears stale persisted research job on reload', as
   const { assistantArticle, bodyText } = await submitQueryAndAwaitAnswer(page, question)
   await expect(assistantArticle).toContainText(/MDLOps|model|export/i)
 
+  const threadRes = await request.get(`${baseURL}/api/trask/thread/${encodeURIComponent(threadId)}`)
+  expect(threadRes.ok()).toBeTruthy()
+  const threadBody = (await threadRes.json()) as {
+    history?: Array<{ query?: string; queryId?: string; status?: string; createdAt?: string }>
+  }
+  const completedRecord = (threadBody.history ?? [])
+    .filter((row) => row.status === 'complete')
+    .find((row) => (row.query ?? '').trim() === question.trim())
+  expect(completedRecord?.queryId, 'expected completed server record for reload job test').toBeTruthy()
+
+  const recordCreatedAt = Date.parse(completedRecord!.createdAt ?? '')
+  const jobCreatedAt =
+    Number.isFinite(recordCreatedAt) && recordCreatedAt > 0 ? recordCreatedAt - 1_000 : Date.now() - 120_000
   const staleJob = {
     clientId: 'stale-job-mdlops',
     conversationId: `holocron-${threadId}`,
     threadId,
     question,
+    serverQueryId: completedRecord!.queryId,
     assistantMessageId: 'pending-stale-job-a',
     queryType: 'general',
     state: 'submitted',
     attemptCount: 0,
     pollFailures: 0,
-    createdAt: Date.now() - 2_000,
-    updatedAt: Date.now() - 1_000,
-    nextAttemptAt: Date.now() - 1_000,
+    createdAt: jobCreatedAt,
+    updatedAt: jobCreatedAt + 1_000,
+    nextAttemptAt: jobCreatedAt + 2_000,
   }
 
   await page.evaluate((job) => {
@@ -250,12 +277,15 @@ test('completed remote thread clears stale persisted research job on reload', as
   await expect(page.getByText(/Querying Archives\.\.\./i)).toHaveCount(0, { timeout: 30_000 })
 
   await expect
-    .poll(async () => {
-      return page.evaluate(() => {
-        const raw = localStorage.getItem('holocron-research-jobs')
-        return raw ? JSON.parse(raw) : []
-      })
-    })
+    .poll(
+      async () => {
+        return page.evaluate(() => {
+          const raw = localStorage.getItem('holocron-research-jobs')
+          return raw ? JSON.parse(raw) : []
+        })
+      },
+      { timeout: 60_000 },
+    )
     .toEqual([])
   expect(bodyText).toMatch(/MDLOps|model/i)
 })
