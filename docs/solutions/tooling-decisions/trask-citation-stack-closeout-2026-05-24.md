@@ -1,5 +1,5 @@
 ---
-title: "Trask citation stack closeout (PR #33–#85)"
+title: "Trask citation stack closeout (PR #33–#88)"
 date: 2026-05-24
 category: tooling-decisions
 problem_type: quality
@@ -54,6 +54,9 @@ Discord `/ask` brief embeds could collapse to a single inline citation after agg
 | liveTrace timeout timing (Plan 006 U4) | #83 | `timeoutDiagForResearchError`; Python `retrieve_elapsed_ms`; Holocron e2e timing assert |
 | AE3 trace failure-class gate smoke | #84 | `trask_research_trace_assert.mjs`; `trask:gate` asserts `index_miss` / `rejected_urls` / `timeout_phase` in stderr JSON |
 | Holocron failure-path e2e (Plan 006 U6) | #85 | `playwright.failure.config.ts`; `groundingStatus` on gather failure; happy config `testMatch` excludes failure spec |
+| Plan 006 post-#85 doc drift | #86 | Plan 114 KB arc #33–#85; fidelity brainstorm completed |
+| research_done liveTrace (Plan 006 U2 v1.1) | #87 | `emitResearchDoneSummary` + Python `_emit_research_done_trace`; AE3 gate |
+| Plan 006/112 U2 v1.1 doc alignment | #88 | Remove stale “U2 v1.1 deferred” from plan 112 R3 |
 
 Authoritative module map: [trask-citation-module-architecture-2026-05-24.md](trask-citation-module-architecture-2026-05-24.md). Line-filter incident: [trask-discord-dual-citation-line-filter-2026-05-24.md](trask-discord-dual-citation-line-filter-2026-05-24.md).
 
