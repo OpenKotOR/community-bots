@@ -1,9 +1,9 @@
 # Discord /ask live verify
 
-Generated: 2026-05-24T01:33:43.118Z
+Generated: 2026-05-28T19:02:52.107Z
 
 Queries: 5 (expert verification set; URL reachability enforced)
-Passed: 5/5
+Passed: 4/5
 
 ## When a KotOR mod ships 2DA and TLK changes, what does TSLPatcher automate that manual file copying cannot?
 
@@ -14,6 +14,8 @@ TSLPatcher on GitHub The TSLPatcher project documents how mod authors ship list-
 TSLPatcher is a mod installation tool for Knights of the Old Republic and The Sith Lords. It applies 2DA, GFF, and TLK patches from list files so players do not copy files by hand. [2](https://deadlystream.com/files/file/1982-tslpatcher)
 ```
 
+Footer: `12 passages · indexer 8787`
+
 ## For a custom MDL exported from Blender, which MDLOps workflow step turns it back into game-ready KotOR models?
 
 PASS
@@ -22,6 +24,8 @@ PASS
 MDLOps converts KotOR MDL and MDX models for editing in 3ds Max or Blender pipelines and exports them back to game-ready formats. [1](https://deadlystream.com/files/file/1198-mdlops)
 MDLOps repository MDLOps is used in the KotOR toolchain to import and export MDL/MDX assets between the game and DCC tools. [2](https://github.com/ndixUR/MDLOps)
 ```
+
+Footer: `12 passages · indexer 8787`
 
 ## On Windows 10, KOTOR HUD is stretched after a widescreen patch — which ini or aspect settings should I verify first?
 
@@ -32,14 +36,11 @@ Widescreen support When the HUD or menus look stretched after a widescreen patch
 KOTOR widescreen resolutions Widescreen support adjusts aspect ratio and HUD layout on PC. Resolution issues usually trace to the graphics ini, aspect patch, and matching desktop resolution. [2](https://deadlystream.com/files/file/1313-kotor-widescreen-resolutions)
 ```
 
+Footer: `12 passages · indexer 8787`
+
 ## Before modding on Windows, where does Knights of the Old Republic store save games per user profile?
 
-PASS
-
-```
-Primary KOTOR modding hub for releases, forum threads, and troubleshooting context. [1](https://deadlystream.com/topic/5844-kotor-save-game-location)
-Primary KOTOR modding hub for releases, forum threads, and troubleshooting context. [2](https://deadlystream.com/files/file/1982-tslpatcher)
-```
+FAIL: only 1 inline https link(s); need ≥2
 
 ## What runtime and scripting capabilities does the reone Odyssey reimplementation expose for engine research?
 
@@ -49,3 +50,5 @@ PASS
 reone Odyssey engine The reone project is an open-source reimplementation of the Odyssey engine for KotOR and TSL. It provides runtime, rendering, and scripting surfaces for engine research. [1](https://github.com/seedhartha/reone)
 reone wiki reone exposes Odyssey runtime and scripting capabilities so researchers can experiment with KotOR and TSL behavior outside the retail executable. [2](https://github.com/seedhartha/reone/wiki)
 ```
+
+Footer: `12 passages · indexer 8787`

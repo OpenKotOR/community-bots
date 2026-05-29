@@ -8,6 +8,7 @@ cd "$ROOT"
 export TRASK_WEB_ALLOW_ANONYMOUS="${TRASK_WEB_ALLOW_ANONYMOUS:-1}"
 export TRASK_HTTP_PORT="${TRASK_HTTP_PORT:-4010}"
 export TRASK_RESEARCHWIZARD_TIMEOUT_MS="${TRASK_RESEARCHWIZARD_TIMEOUT_MS:-900000}"
+export TRASK_LLM_PROFILE="${TRASK_LLM_PROFILE:-free}"
 
 for envfile in ".env" ".env.local"; do
   if [[ -f "$envfile" ]]; then

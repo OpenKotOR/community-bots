@@ -53,6 +53,18 @@ const defaultFreeModelFallbacks = [
   paidOpenRouterChatModel,
 ] as const;
 
+/** Quality-first OpenRouter `:free` ids (tried before scanning vendor list order). */
+export const CURATED_OPENROUTER_FREE_PRIORITY = [
+  "meta-llama/llama-3.3-70b-instruct:free",
+  "qwen/qwen3-coder:free",
+  "qwen/qwen3-next-80b-a3b-instruct:free",
+  "minimax/minimax-m2.5:free",
+  "google/gemma-4-26b-a4b-it:free",
+  "google/gemma-4-31b-it:free",
+  "openai/gpt-oss-120b:free",
+  "nousresearch/hermes-3-llama-3.1-405b:free",
+] as const;
+
 /** Providers in free_models_ids.txt that need non-OpenRouter credentials — skip for direct OR API. */
 const NON_OPENROUTER_FREE_PREFIXES = [
   "chatgpt/",
@@ -94,6 +106,12 @@ const loadVendorOpenRouterFreeFallbacks = (maxModels = 8): readonly string[] => 
 
   const seen = new Set<string>();
   const ordered: string[] = [];
+  for (const id of CURATED_OPENROUTER_FREE_PRIORITY) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    ordered.push(id);
+    if (ordered.length >= maxModels) break;
+  }
   for (const line of raw.split("\n")) {
     const id = line.trim();
     if (!id || seen.has(id)) continue;

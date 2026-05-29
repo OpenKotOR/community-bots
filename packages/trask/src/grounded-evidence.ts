@@ -360,6 +360,7 @@ export const selectDistinctBriefClaims = (
   claims: readonly EvidenceClaim[],
   query: string,
   maxLines: number,
+  backfillUnanchored = false,
 ): EvidenceClaim[] => {
   const ranked = rankClaimsForQuery(assignSourceIndices([...claims]), query);
   const anchored = ranked.filter((claim) => claimMatchesQueryAnchor(claim, query));
@@ -379,11 +380,14 @@ export const selectDistinctBriefClaims = (
   };
 
   tryPick(pool, true);
+  if (backfillUnanchored && picked.length < maxLines) {
+    tryPick(pool, false);
+  }
   return picked;
 };
 
 const selectBriefClaims = (claims: readonly EvidenceClaim[], query: string): EvidenceClaim[] =>
-  selectDistinctBriefClaims(claims, query, BRIEF_MAX_CLAIM_LINES);
+  selectDistinctBriefClaims(claims, query, BRIEF_MAX_CLAIM_LINES, true);
 
 export const selectHolocronFullClaims = (
   claims: readonly EvidenceClaim[],

@@ -38,7 +38,7 @@ Fedora/RHEL hosts need `libxml2-devel` and `libxslt-devel` before the first boot
 | `TRASK_RESEARCH_GATHER_MS` / `TRASK_RESEARCH_COMPOSE_MS` | Tiered timeouts (see env map); legacy `TRASK_RESEARCHWIZARD_TIMEOUT_MS` still honored |
 | `OPENROUTER_API_KEY` | Free-tier compose via OpenRouter (`openrouter/free` default) |
 | `TRASK_LLM_PROFILE` | `free` (default) or `paid` — `@openkotor/config` |
-| `TRASK_REWRITE_MODEL_FALLBACKS` | Override; else loaded from `vendor/llm_fallbacks/configs/free_models_ids.txt` |
+| `TRASK_REWRITE_MODEL_FALLBACKS` | Override; else **curated quality-first** `:free` models from `@openkotor/config` `CURATED_OPENROUTER_FREE_PRIORITY`, then `vendor/llm_fallbacks/configs/free_models_ids.txt`, then `openrouter/auto` |
 | `LITELLM_PROXY_URL` | Optional LiteLLM proxy (`bash scripts/trask_litellm_proxy.sh`) |
 | `TRASK_QA_GROUNDING` | `1` only for QA seed — allows 1-URL sufficiency escape (not production default) |
 

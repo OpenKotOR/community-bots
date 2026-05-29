@@ -89,6 +89,12 @@ test("loadSharedAiConfig free profile uses OpenRouter free model when only OPENR
   assert.ok(cfg.chatModelFallbacks.includes("openrouter/auto"));
 });
 
+test("loadSharedAiConfig free profile lists quality-first fallbacks before vendor scan order", () => {
+  const cfg = loadSharedAiConfig({ OPENROUTER_API_KEY: "sk-or-test" });
+  assert.equal(cfg.chatModelFallbacks[0], "meta-llama/llama-3.3-70b-instruct:free");
+  assert.ok(cfg.chatModelFallbacks.includes("qwen/qwen3-coder:free"));
+});
+
 test("loadSharedAiConfig wires LiteLLM proxy URL and placeholder key", () => {
   const cfg = loadSharedAiConfig({ LITELLM_PROXY_URL: "http://127.0.0.1:4000" });
   assert.equal(cfg.openAiBaseUrl, "http://127.0.0.1:4000/v1");

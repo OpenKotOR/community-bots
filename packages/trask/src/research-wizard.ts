@@ -724,7 +724,7 @@ const sourceOnlyFallbackAnswer = (query: string, sources: readonly SourceDescrip
   ].join("\n");
 };
 
-const MAX_REWRITE_ATTEMPTS = 6;
+const MAX_REWRITE_ATTEMPTS = 8;
 
 const normalizePreferredRewriteModel = (model: string | undefined): string | undefined => {
   const trimmed = model?.trim();
@@ -1435,9 +1435,13 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
       query,
     );
     if (!hasMinimumGroundedSupport(claims) && this.openAiClient) {
-      const llmClaims = await extractClaimsWithLlm(this.openAiClient, model, query, passages);
-      if (hasMinimumGroundedSupport(llmClaims)) {
-        claims = llmClaims;
+      try {
+        const llmClaims = await extractClaimsWithLlm(this.openAiClient, model, query, passages);
+        if (hasMinimumGroundedSupport(llmClaims)) {
+          claims = llmClaims;
+        }
+      } catch {
+        /* optional LLM claim extraction — heuristic / passage claims remain */
       }
     }
     if (!hasMinimumGroundedSupport(claims)) {
@@ -1914,6 +1918,17 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
           && webSources.length >= BRIEF_DISCORD_MIN_CITATIONS
         ) {
           answer = composeGroundedAnswerFromClaims(query, briefClaims, webSources, "brief");
+        } else if (
+          claims.length >= BRIEF_DISCORD_MIN_CITATIONS
+          && hasMinimumGroundedSupport(claims)
+          && webSources.length >= BRIEF_DISCORD_MIN_CITATIONS
+        ) {
+          answer = composeGroundedAnswerFromClaims(
+            query,
+            selectDistinctBriefClaims(claims, query, BRIEF_MAX_CLAIM_LINES, true),
+            webSources,
+            "brief",
+          );
         } else if (retrievedSources.length > 0) {
           const ranked = filterPublicWebCitationSources(
             rerankEvidenceSources(query, retrievedSources).slice(0, 5),
@@ -1929,7 +1944,15 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
         isRewriteComposeEnabled(this.config)
         && retrievedSources.length > 0
       ) {
-        answer = await this.rewriteForDiscordBrief(query, enrichedReport, retrievedSources);
+        try {
+          answer = await this.rewriteForDiscordBrief(query, enrichedReport, retrievedSources);
+        } catch {
+          const ranked = filterPublicWebCitationSources(retrievedSources);
+          answer =
+            ranked.length >= BRIEF_DISCORD_MIN_CITATIONS
+              ? briefDualSourceAnswer(query, ranked)
+              : sourceOnlyFallbackAnswer(query, ranked);
+        }
       } else if (retrievedSources.length > 0) {
         const ranked = filterPublicWebCitationSources(retrievedSources);
         answer =
