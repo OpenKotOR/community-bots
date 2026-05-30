@@ -2,7 +2,7 @@
 title: Trask Configuration Environment Map
 owner: trask-bot
 status: active
-lastUpdated: 2026-05-19
+lastUpdated: 2026-05-29
 ---
 
 [SYNTH] Quick map of **Trask-related** process env vars to loaders in `packages/config/src/index.ts`. For narrative setup, see [docs/trask.md](../../trask.md).
@@ -37,15 +37,20 @@ lastUpdated: 2026-05-19
 | `TRASK_INDEXER_BASE_URL` | [REPO] Retrieve Worker or Chroma indexer API (local stack default: `http://127.0.0.1:8787` via Worker; raw indexer `:8790`). Consumed by `scripts/trask_web_research.py`. |
 | `TRASK_WEB_RESEARCH_PYTHON` | [REPO] Override Python; else `.venv-trask-research` from `scripts/bootstrap_trask_research.sh`. |
 | `TRASK_WEB_RESEARCH_SCRIPT` | [REPO] Optional explicit path to `scripts/trask_web_research.py`. |
-| `TRASK_RESEARCH_TIMEOUT_MS` | [REPO] Legacy overall budget (aliases `TRASK_RESEARCHWIZARD_TIMEOUT_MS`, default **900000**). |
-| `TRASK_RESEARCH_GATHER_MS` | [REPO] Python gather subprocess wall clock (default **120000**). Discord clamps to **90s** SLA. |
-| `TRASK_RESEARCH_COMPOSE_MS` | [REPO] Node LLM rewrite compose ceiling (default **60000**). |
+| `TRASK_RESEARCH_TIMEOUT_MS` | [REPO] Legacy overall subprocess ceiling (aliases `TRASK_RESEARCHWIZARD_TIMEOUT_MS`, default **900000**). **Not the product SLA** — use `TRASK_RESEARCH_BUDGET_MS` (REQ-C) for the ~30s soft budget. |
+| `TRASK_RESEARCH_BUDGET_MS` | [REPO] **Soft end-to-end research budget (default 30000, REQ-C).** Clamps both `TRASK_RESEARCH_GATHER_MS` and `TRASK_RESEARCH_COMPOSE_MS` and deadline-bounds grounded-compose LLM calls; set `0` to disable clamping. Cached-index answers stay <30s; stalls honest-degrade to the grounded template. |
+| `TRASK_RESEARCH_GATHER_MS` | [REPO] Python gather subprocess wall clock (raw default **120000**, but **clamped to `TRASK_RESEARCH_BUDGET_MS`** → effective **30000**). Discord additionally clamps to **90s** SLA. |
+| `TRASK_RESEARCH_COMPOSE_MS` | [REPO] Node LLM compose ceiling per attempt (raw default **60000**, **clamped to `TRASK_RESEARCH_BUDGET_MS`** → effective **30000**). |
 | `TRASK_RESEARCHWIZARD_TIMEOUT_MS` | [REPO] Alias for `TRASK_RESEARCH_TIMEOUT_MS`. |
 | `TRASK_FORCE_URL_VERIFY` | [REPO] When `1`, Node re-HEADs passages even if Python set `verified: true`. |
 | `TRASK_GROUNDED_COMPOSE` | [REPO] When `0` / `false` / `no`, disables grounded compose. Default **on** (`groundedComposeEnabled` in `loadResearchWizardRuntimeConfig`). |
 | `TRASK_RESEARCH_COMPOSE_MODE` | [REPO] `rewrite` enables legacy digest rewrite fallbacks; default `grounded`. |
 | `TRASK_WEB_RESEARCH_DDG_FALLBACK` | [REPO] When `1` / `true`, Python runner may use DuckDuckGo only after empty Chroma retrieve (operator bootstrap; not used for compose when index miss). |
+| `TRASK_WEB_RESEARCH_LIVE_CRAWL` | [REPO] **REQ-B:** When `1`, bounded allowlisted Crawl4AI recovery on weak retrieve. **`trask_live_stack.sh` default `0`** — served stack answers from weekly-refreshed Chroma only. |
 | `TRASK_INDEXER_DATA_DIR` | [REPO] Chroma persist dir (default `data/trask-indexer`). |
+| `TRASK_REINDEX_TOKEN` | [REPO] Shared bearer for token-guarded `POST /reindex` on indexer **:8790** (REQ-A). Set on indexer and on Cloudflare scheduler / GitHub Actions secrets. |
+| `TRASK_INDEXER_REINDEX_URL` | [REPO] Indexer origin for weekly refresh (e.g. `https://indexer.example.com` or local `http://127.0.0.1:8790`). Used by `infra/trask-reindex-scheduler` and `.github/workflows/trask-weekly-reindex.yml`. |
+| `TRASK_REINDEX_LIMIT` | [REPO] Optional crawl cap per weekly run; empty = full approved catalog. |
 | `TRASK_DISCORD_SYNC_STALE_HOURS` | [REPO] Indexer `/health` marks `discord_sync_stale` when `last_discord_sync` is older than this many hours (default **48**; `0` disables stale flag). |
 | `TRASK_DISCORD_SYNC_TIMEOUT_MS` | [REPO] Kill `trask_discord_sync.py` subprocess after N ms (default **600000**; `0` = no timeout). |
 

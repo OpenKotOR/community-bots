@@ -18,8 +18,9 @@ lastUpdated: 2026-05-24
 # Storage And Retrieval
 
 - [REPO] Query history persists as JSON via `JsonTraskQueryRepository`.
-- [REPO] Source chunks persist via `FileChunkStore` under `INGEST_STATE_DIR/chunks`.
-- [REPO] Catalog reindex jobs persist as **`reindex-queue.json`** (+ lock) under the same **`INGEST_STATE_DIR`**; **`apps/ingest-worker`** drains them ([trask-reindex-queue-contract.md](trask-reindex-queue-contract.md)).
+- [REPO] **Indexed research corpus:** Chroma on indexer host **:8790**; clients retrieve via Cloudflare Worker **:8787** only ([answer-pipeline.md](answer-pipeline.md), [trask-indexed-stack-runbook.md](../50-execution/trask-indexed-stack-runbook.md)).
+- [REPO] Source chunks persist via `FileChunkStore` under `INGEST_STATE_DIR/chunks` (legacy/operator path; not merged on indexed hot path).
+- [REPO] Catalog reindex jobs persist as **`reindex-queue.json`** (+ lock) under the same **`INGEST_STATE_DIR`**; drained by **`trask-indexer`** (Chroma) or **`ingest-worker`** (FileChunkStore) ([trask-reindex-queue-contract.md](trask-reindex-queue-contract.md)).
 - [REPO] Source catalog includes `approved-discord-knowledge` but live research currently excludes `kind=discord`.
 
 # Current Data Flow

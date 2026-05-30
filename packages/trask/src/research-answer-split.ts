@@ -69,19 +69,54 @@ export const splitResearchAnswer = (value: string): { body: string; sourceLines:
   return { body, sourceLines };
 };
 
+/** Numbered `Sources` lines → citation index to deep URL (when present). */
+export const extractNumberedSourceUrls = (sourceLines: readonly string[]): Map<number, string> => {
+  const map = new Map<number, string>();
+  for (const line of sourceLines) {
+    const match = line.match(/^\s*(\d+)\.\s+.+\s-\s+(https?:\S+)/u);
+    if (!match) continue;
+    const url = match[2]!.replace(/[.,;:!?)]+$/u, "");
+    map.set(Number(match[1]), url);
+  }
+  return map;
+};
+
 /** Rewrite the Sources block so numbered lines match approved source order (deep URLs). */
 export const syncSourcesSectionToApproved = (
   rawAnswer: string,
   approvedSources: readonly ResearchAnswerSource[],
 ): string => {
-  const { body } = splitResearchAnswer(rawAnswer);
+  const { body, sourceLines } = splitResearchAnswer(rawAnswer);
   if (approvedSources.length === 0) {
     return body;
   }
 
+  const existingUrls = extractNumberedSourceUrls(sourceLines);
+  const preferExistingCitationUrl = (citationIndex: number, approvedUrl: string): string => {
+    const existing = existingUrls.get(citationIndex);
+    if (!existing) return approvedUrl;
+    try {
+      const existingParsed = new URL(existing);
+      const approvedParsed = new URL(approvedUrl);
+      const sameHost =
+        existingParsed.hostname.replace(/^www\./iu, "")
+        === approvedParsed.hostname.replace(/^www\./iu, "");
+      const existingPath = existingParsed.pathname.replace(/\/+$/u, "");
+      const approvedPath = approvedParsed.pathname.replace(/\/+$/u, "");
+      if (sameHost && existingPath.length > approvedPath.length) {
+        return existing;
+      }
+    } catch {
+      /* use approved */
+    }
+    return approvedUrl;
+  };
+
   const lines = approvedSources.map((source, index) => {
+    const citationIndex = index + 1;
     const label = source.name?.trim() || source.homeUrl;
-    return `${index + 1}. ${label} - ${source.homeUrl}`;
+    const url = preferExistingCitationUrl(citationIndex, source.homeUrl);
+    return `${citationIndex}. ${label} - ${url}`;
   });
 
   return `${body}\n\nSources\n${lines.join("\n")}`;

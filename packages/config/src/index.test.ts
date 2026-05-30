@@ -141,17 +141,44 @@ test("loadResearchWizardRuntimeConfig respects TRASK_RESEARCHWIZARD_TIMEOUT_MS o
   assert.equal(cfg.timeoutMs, 120000);
 });
 
-test("loadResearchWizardRuntimeConfig tiered gather and compose timeouts", () => {
-  const defaults = loadResearchWizardRuntimeConfig({});
+test("loadResearchWizardRuntimeConfig tiered gather and compose timeouts (budget disabled)", () => {
+  // Disable the soft budget to inspect the raw tiered ceilings.
+  const defaults = loadResearchWizardRuntimeConfig({ TRASK_RESEARCH_BUDGET_MS: "0" });
   assert.equal(defaults.gatherTimeoutMs, 120_000);
   assert.equal(defaults.composeTimeoutMs, 60_000);
 
   const cfg = loadResearchWizardRuntimeConfig({
+    TRASK_RESEARCH_BUDGET_MS: "0",
     TRASK_RESEARCH_GATHER_MS: "85000",
     TRASK_RESEARCH_COMPOSE_MS: "45000",
   });
   assert.equal(cfg.gatherTimeoutMs, 85_000);
   assert.equal(cfg.composeTimeoutMs, 45_000);
+});
+
+test("loadResearchWizardRuntimeConfig defaults research budget to 30s and clamps both phases", () => {
+  const cfg = loadResearchWizardRuntimeConfig({});
+  assert.equal(cfg.researchBudgetMs, 30_000);
+  // Default gather (120s) and compose (60s) are clamped down to the 30s budget.
+  assert.equal(cfg.gatherTimeoutMs, 30_000);
+  assert.equal(cfg.composeTimeoutMs, 30_000);
+});
+
+test("loadResearchWizardRuntimeConfig budget never raises phase ceilings above their own value", () => {
+  const cfg = loadResearchWizardRuntimeConfig({
+    TRASK_RESEARCH_BUDGET_MS: "30000",
+    TRASK_RESEARCH_GATHER_MS: "12000",
+    TRASK_RESEARCH_COMPOSE_MS: "8000",
+  });
+  assert.equal(cfg.gatherTimeoutMs, 12_000);
+  assert.equal(cfg.composeTimeoutMs, 8_000);
+});
+
+test("loadResearchWizardRuntimeConfig respects a custom research budget override", () => {
+  const cfg = loadResearchWizardRuntimeConfig({ TRASK_RESEARCH_BUDGET_MS: "20000" });
+  assert.equal(cfg.researchBudgetMs, 20_000);
+  assert.equal(cfg.gatherTimeoutMs, 20_000);
+  assert.equal(cfg.composeTimeoutMs, 20_000);
 });
 
 test("loadResearchWizardRuntimeConfig sets researchScriptPath to undefined when TRASK_WEB_RESEARCH_SCRIPT is absent", () => {

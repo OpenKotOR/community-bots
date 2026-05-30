@@ -239,9 +239,15 @@ export interface ResearchWizardRuntimeConfig {
   researchScriptPath: string | undefined;
   /** Legacy overall budget; subprocess gather uses {@link gatherTimeoutMs}. */
   timeoutMs: number;
-  /** Python `trask_web_research.py` subprocess wall clock (Holocron ~2m default). */
+  /**
+   * Soft end-to-end research budget (ms). When > 0 it clamps both
+   * {@link gatherTimeoutMs} and {@link composeTimeoutMs} so cached-index queries
+   * stay fast (`TRASK_RESEARCH_BUDGET_MS`, default 30000). 0 disables clamping.
+   */
+  researchBudgetMs: number;
+  /** Python `trask_web_research.py` subprocess wall clock (clamped to {@link researchBudgetMs}). */
   gatherTimeoutMs: number;
-  /** Node rewrite / LLM compose ceiling per query. */
+  /** Node rewrite / LLM compose ceiling per query (clamped to {@link researchBudgetMs}). */
   composeTimeoutMs: number;
   /** When true (default), use question-last grounded compose when passages exist. */
   groundedComposeEnabled: boolean;
@@ -324,6 +330,10 @@ export const loadResearchWizardRuntimeConfig = (env: NodeJS.ProcessEnv = process
     readOptionalEnv("TRASK_RESEARCH_COMPOSE_MS", env) ??
     readOptionalEnv("TRASK_WEB_RESEARCH_COMPOSE_MS", env) ??
     "60000";
+  const researchBudgetRaw =
+    readOptionalEnv("TRASK_RESEARCH_BUDGET_MS", env) ??
+    readOptionalEnv("TRASK_WEB_RESEARCH_BUDGET_MS", env) ??
+    "30000";
 
   const composeMode = resolveResearchComposeMode(
     readOptionalEnv("TRASK_RESEARCH_COMPOSE_MODE", env),
@@ -334,13 +344,22 @@ export const loadResearchWizardRuntimeConfig = (env: NodeJS.ProcessEnv = process
 
   const syncTimeoutRaw = readOptionalEnv("TRASK_DISCORD_SYNC_TIMEOUT_MS", env) ?? "600000";
 
+  const researchBudgetMs = Math.max(0, integerish.parse(researchBudgetRaw));
+  const gatherTimeoutMs = integerish.parse(gatherTimeoutRaw);
+  const composeTimeoutMs = integerish.parse(composeTimeoutRaw);
+  // Soft budget keeps cached-index queries fast: clamp each phase so a single
+  // request cannot exceed the budget (honest-degrade beyond it per R6/F3).
+  const clampToBudget = (value: number): number =>
+    researchBudgetMs > 0 ? Math.min(value, researchBudgetMs) : value;
+
   return {
     indexerBaseUrl: (readOptionalEnv("TRASK_INDEXER_BASE_URL", env) ?? "http://127.0.0.1:8787").trim(),
     pythonExecutable: resolveTraskResearchPythonExecutable(repoRoot, env),
     researchScriptPath: scriptRaw ? resolve(scriptRaw.trim()) : undefined,
     timeoutMs: integerish.parse(timeoutRaw),
-    gatherTimeoutMs: integerish.parse(gatherTimeoutRaw),
-    composeTimeoutMs: integerish.parse(composeTimeoutRaw),
+    researchBudgetMs,
+    gatherTimeoutMs: clampToBudget(gatherTimeoutMs),
+    composeTimeoutMs: clampToBudget(composeTimeoutMs),
     groundedComposeEnabled,
     composeMode,
     discordSyncTimeoutMs: integerish.parse(syncTimeoutRaw),

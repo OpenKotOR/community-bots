@@ -15,6 +15,8 @@
 |----------|--------|
 | `TRASK_INDEXER_BASE_URL` | `http://127.0.0.1:8787` (Worker), not `:8790` |
 | `TRASK_WEB_RESEARCH_PYTHON` | `.venv-trask-research/bin/python` or indexer venv |
+| `TRASK_WEB_RESEARCH_LIVE_CRAWL` | `0` (REQ-B; `trask_live_stack.sh` default) — opt-in `1` for bounded recovery only |
+| `TRASK_RESEARCH_BUDGET_MS` | `30000` (REQ-C) |
 | `TRASK_RESEARCH_COMPOSE_MODE` | `grounded` |
 | `TRASK_GROUNDED_COMPOSE` | on (default) |
 
@@ -24,12 +26,22 @@
 bash scripts/trask_live_stack.sh   # indexer 8790 + Worker 8787 + Holocron 4010
 ```
 
+## Product requirements (REQ-A / REQ-B / REQ-C)
+
+| ID | Summary |
+|----|---------|
+| REQ-A | Weekly `POST /reindex` batch crawl into Chroma ([trask-indexed-stack-runbook.md](../50-execution/trask-indexed-stack-runbook.md)) |
+| REQ-B | Query-time answers from cached index; `TRASK_WEB_RESEARCH_LIVE_CRAWL=0` default |
+| REQ-C | `TRASK_RESEARCH_BUDGET_MS=30000` end-to-end soft budget |
+
 ## Verification (agents)
 
 1. `pnpm holocron:e2e` with Worker URL
 2. Five expert queries in `data/trask/eval/verification-queries.json` via browser on `http://127.0.0.1:4010`
 3. `pnpm verify:trask-discord` when bot token available
 4. `pnpm trask:faithfulness-eval` after compose/citation changes
+
+Full matrix: [validation-ladder.md](../50-execution/validation-ladder.md) §8.
 
 ## Retrieve quality (indexer)
 

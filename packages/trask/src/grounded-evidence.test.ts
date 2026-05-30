@@ -15,6 +15,8 @@ import {
   selectDistinctBriefClaims,
   inferGroundingStatus,
   passagesFromRetrieveRows,
+  passagesAnchoredForQuery,
+  passagesSupportGroundedCompose,
   splitReportIntoPassages,
 } from "./grounded-evidence.js";
 import { _collectCitedSourcesFromText } from "./research-wizard.js";
@@ -90,6 +92,36 @@ test("composeGroundedAnswerFromClaims emits Sources for cited indices", () => {
   assert.match(answer, /\[1\]/);
   assert.match(answer, /\[2\]/);
   assert.match(answer, /\nSources\n/);
+});
+
+test("composeGroundedAnswerFromClaims Sources use passage citation URLs not catalog roots", () => {
+  const deepA = "https://deadlystream.com/files/file/1982-tslpatcher/";
+  const deepB = "https://github.com/th3w1zard1/TSLPatcher";
+  const catalog = [
+    { ...sources[0]!, homeUrl: "https://deadlystream.com" },
+    { ...sources[1]!, homeUrl: "https://github.com" },
+  ];
+  const claims = [
+    {
+      claim: "TSLPatcher applies 2DA patches.",
+      quote: "TSLPatcher applies 2DA patches.",
+      url: deepA,
+      citationUrl: deepA,
+      sourceIndex: 1,
+      authority: "web" as const,
+    },
+    {
+      claim: "TSLPatcher on GitHub documents list-driven 2DA and GFF installs.",
+      quote: "TSLPatcher on GitHub documents list-driven 2DA and GFF installs.",
+      url: deepB,
+      citationUrl: deepB,
+      sourceIndex: 2,
+      authority: "web" as const,
+    },
+  ];
+  const answer = composeGroundedAnswerFromClaims("What is TSLPatcher?", claims, catalog);
+  assert.match(answer, new RegExp(deepA.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(answer, new RegExp(deepB.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 });
 
 test("composeGroundedAnswerFromClaims brief profile emits two citation lines", () => {
@@ -178,6 +210,58 @@ test("claimsFromDistinctPassages keeps two distinct save URLs when only one is a
   );
   assert.equal(claims.length, 2);
   assert.equal(new Set(claims.map((c) => c.url)).size, 2);
+});
+
+test("claimsFromDistinctPassages backfills a second URL when only one passage is query-anchored", () => {
+  const passages = [
+    {
+      text: "# KOTOR save game location\n\nSave games on Windows are stored under Documents in a KOTOR Saves folder.",
+      url: "https://deadlystream.com/topic/5844-kotor-save-game-location/",
+      host: "deadlystream.com",
+      authority: "web" as const,
+    },
+    {
+      text: "## Quick Info\nLooking for mods on KOTOR Neocities.",
+      url: "https://kotor.neocities.org",
+      host: "kotor.neocities.org",
+      authority: "web" as const,
+    },
+  ];
+  const claims = claimsFromDistinctPassages(
+    passages,
+    4,
+    "Before modding on Windows, where does Knights of the Old Republic store save games per user profile?",
+    { preserveDistinctPassagePool: true },
+  );
+  assert.equal(claims.length, 2);
+});
+
+test("passagesAnchoredForQuery backfills distinct URLs when only one passage is anchored", () => {
+  const query =
+    "Before modding on Windows, where does Knights of the Old Republic store save games per user profile?";
+  const passages = [
+    {
+      text: "# KOTOR save game location\n\nSave games on Windows are stored under Documents in a KOTOR Saves folder.",
+      url: "https://deadlystream.com/topic/5844-kotor-save-game-location/",
+      host: "deadlystream.com",
+      authority: "web" as const,
+    },
+    {
+      text: "# Save file paths\n\nKOTOR save files on Windows live under the user Documents Saves directory.",
+      url: "https://steamcommunity.com/sharedfiles/filedetails/?id=128193866",
+      host: "steamcommunity.com",
+      authority: "web" as const,
+    },
+    {
+      text: "PyKotor library for KotOR file formats.",
+      url: "https://github.com/NickHugi/PyKotor",
+      host: "github.com",
+      authority: "web" as const,
+    },
+  ];
+  const anchored = passagesAnchoredForQuery(passages, query);
+  assert.equal(anchored.length, 2);
+  assert.equal(passagesSupportGroundedCompose(anchored, query), true);
 });
 
 test("claimsFromDistinctPassages prefers query-anchored passages", () => {

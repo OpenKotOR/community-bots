@@ -51,12 +51,12 @@ The repo already invested in Crawl4AI indexing, Chroma hybrid retrieve, and grou
   - **Outcome:** Assistant-quality answer with ≥2 distinct `https://` citations when corpus supports it.
   - **Covered by:** R6, R8, R11
 
-- **F2. Weak retrieve recovery**
-  - **Trigger:** Retrieve returns empty or below-quality passages.
+- **F2. Weak retrieve recovery (opt-in)**
+  - **Trigger:** Retrieve returns empty or below-quality passages **and** live crawl is explicitly enabled (`TRASK_WEB_RESEARCH_LIVE_CRAWL=1`). On the default served stack live crawl is **off** (R1a; see runbook **REQ-B**) so this flow does not run; the query honest-degrades (F3) instead.
   - **Actors:** A3 stack
   - **Steps:** Bounded allowlisted live Crawl4AI crawl (cap ~5 URLs) → upsert to Chroma → re-retrieve → proceed to F1 or abstain if still insufficient.
-  - **Outcome:** `live_crawl_passages` logged; no unbounded open-web loop.
-  - **Covered by:** R1, R3
+  - **Outcome:** `live_crawl_passages` logged; no unbounded open-web loop. Default path relies on the weekly batch refresh (R1a), not per-query crawl.
+  - **Covered by:** R1, R1a, R3
 
 - **F3. Insufficient evidence (honest degrade)**
   - **Trigger:** After retrieve (+ optional recovery), sufficiency gate fails.
@@ -76,15 +76,25 @@ The repo already invested in Crawl4AI indexing, Chroma hybrid retrieve, and grou
 
 ## Requirements
 
+**Product requirement crosswalk** (operator runbook IDs; see [trask-indexed-stack-runbook.md](../knowledgebase/50-execution/trask-indexed-stack-runbook.md)):
+
+| ID | Maps to | Summary |
+|----|---------|---------|
+| **REQ-A** | R1a | Weekly cached-corpus refresh (Cloudflare cron Worker or GitHub Actions → `POST /reindex`) |
+| **REQ-B** | R1, R1a | Query-time answers from weekly Chroma index; live crawl off by default |
+| **REQ-C** | R4a | Soft ≤30s research budget (`TRASK_RESEARCH_BUDGET_MS`) |
+
 **Corpus and crawl**
 
 - R1. **Index-first authority:** Scheduled batch crawl of approved hosts is the primary corpus; query-time live crawl is recovery-only, allowlist-bound, and capped.
+- R1a. **Weekly scheduled refresh (implemented):** The approved catalog is re-crawled on a **weekly** cadence (Mondays 06:00 UTC). A **Cloudflare cron Worker** (`infra/trask-reindex-scheduler`, `crons = ["0 6 * * 1"]`) — or the credential-free **GitHub Actions** schedule (`.github/workflows/trask-weekly-reindex.yml`) — POSTs the token-guarded `POST /reindex` trigger on the indexer, which runs `crawl-seeds` in the background. Chroma stays on the indexer host (a Worker/Durable Object cannot host an ANN index); "in Cloudflare" means **scheduling**, not storage. Per-query live crawl is **off by default** on the served stack so answers come from the cached weekly corpus.
 - R2. **Unified collection:** Discord-indexed content lands in the same Chroma collection as web sources when sync is enabled.
 
 **Retrieval**
 
-- R3. **Hybrid retrieve (CPU):** Dense embeddings plus sparse/BM25-style signal, fused (RRF); heading-aware markdown chunking at ingest; optional CPU rerank on top fused hits.
+- R3. **Hybrid retrieve (CPU):** Dense Chroma embedding query plus **lexical token-overlap** rank, fused (RRF k=60) with optional URL anchor boost; heading-aware markdown chunking at ingest. Cross-encoder rerank and true BM25 index are **deferred** (see open questions).
 - R4. **Retrieve observability:** Expert queries should log `passages_count`, `index_miss`, and live-crawl recovery in research diagnostics.
+- R4a. **Bounded latency (≤30s, implemented):** A soft end-to-end research budget (`TRASK_RESEARCH_BUDGET_MS`, default **30000**) clamps the gather subprocess and each compose LLM call, and bounds grounded-compose by a deadline. Cached-index answers return well under 30s; if a free-LLM compose stalls past the budget it falls back to the instant grounded template (R6/F3 honest-degrade) rather than exceeding the budget. Legacy `TRASK_RESEARCH_TIMEOUT_MS` (900s) is a parent subprocess ceiling, not the product SLA.
 
 **Grounding**
 
@@ -116,7 +126,7 @@ The repo already invested in Crawl4AI indexing, Chroma hybrid retrieve, and grou
 
 - AE1. **Covers R6, R10.** Given retrieve returns one URL and weak anchor match for a two-source-capable query, when compose runs, then the user gets an honest insufficient-evidence response—not a multi-citation essay.
 - AE2. **Covers R8, R12.** Given `OPENROUTER_API_KEY` set and primary `:free` model rate-limited, when compose runs, then a subsequent model in the vendored fallback list is tried before failing.
-- AE3. **Covers R1, R2.** Given empty Chroma hit for an allowlisted URL on an expert query, when live crawl recovery runs, then passages are upserted, re-retrieve returns `index_miss=false`, and compose may proceed if R6 passes.
+- AE3. **Covers R1, R2 (opt-in).** Given empty Chroma hit for an allowlisted URL on an expert query **and live crawl enabled** (`TRASK_WEB_RESEARCH_LIVE_CRAWL=1`), when live crawl recovery runs, then passages are upserted, re-retrieve returns `index_miss=false`, and compose may proceed if R6 passes. On the default served stack (live crawl off) the same gap honest-degrades (F3) and is closed by the next weekly refresh (R1a).
 - AE4. **Covers R5, R11.** Given compose succeeds, when the user opens Sources, then every `[n]` in the body appears in Sources with an approved `https://` URL from retrieved passages.
 
 ---
@@ -125,7 +135,7 @@ The repo already invested in Crawl4AI indexing, Chroma hybrid retrieve, and grou
 
 - Expert verification queries return **assistant-quality** prose with **≥2 distinct `https://` citations** when the batch corpus supports them, using **OpenRouter free (or LiteLLM proxy over the same catalog)**—not local LLM.
 - Operators can explain any answer as: **which passages were retrieved → whether sufficiency passed → how compose cited them → which model tier responded**.
-- `index_miss=false` on expert queries after batch crawl + seed; live crawl recovery is the exception, not the norm.
+- `index_miss=false` on expert queries after the weekly batch crawl + seed; per-query live crawl is **off by default** on the served stack (opt-in recovery only), so the cached corpus must carry expert coverage.
 - Planning handoff: `ce-plan` can implement retrieval/grounding/LLM wiring **without inventing product behavior or LLM policy**.
 
 ---
@@ -171,7 +181,7 @@ The repo already invested in Crawl4AI indexing, Chroma hybrid retrieve, and grou
 ### Deferred to Planning
 
 - [Affects R3][Technical] True BM25 vs Chroma sparse-only: smallest change that meets hybrid bar.
-- [Affects R1][Technical] Batch crawl operator CLI shape and schedule (cron vs one-shot catalog job).
+- ~~[Affects R1][Technical] Batch crawl operator CLI shape and schedule (cron vs one-shot catalog job).~~ **Resolved (R1a):** weekly Cloudflare cron Worker + GitHub Actions schedule both call the token-guarded indexer `POST /reindex`.
 - [Affects R9][Technical] Default `TRASK_LITELLM_CONFIG` to minimal sample vs full `litellm_config_free.yaml` in `trask_litellm_proxy.sh`.
 - [Affects R15][Needs research] HF supervisor + baked Chroma volume layout for public deploy.
 - [Affects R7][Technical] Exact env flag to disable DDG in grounded path everywhere (Python gather vs Node).

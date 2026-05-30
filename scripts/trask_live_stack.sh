@@ -13,12 +13,18 @@ HTTP_PORT="${TRASK_HTTP_PORT:-4010}"
 export TRASK_INDEXER_BASE_URL="http://127.0.0.1:${WORKER_PORT}"
 export TRASK_WEB_ALLOW_ANONYMOUS="${TRASK_WEB_ALLOW_ANONYMOUS:-1}"
 export TRASK_INDEXER_DATA_DIR="${TRASK_INDEXER_DATA_DIR:-$ROOT/data/trask-indexer}"
-export TRASK_WEB_RESEARCH_LIVE_CRAWL="${TRASK_WEB_RESEARCH_LIVE_CRAWL:-1}"
+# Cached-resource contract (REQ-B): answer from the weekly-refreshed Chroma index only.
+# Per-query live crawl mutates the index and makes retrieval non-deterministic; keep it
+# OFF by default (R1: live crawl is recovery, not the default path). Set =1 to opt back in.
+export TRASK_WEB_RESEARCH_LIVE_CRAWL="${TRASK_WEB_RESEARCH_LIVE_CRAWL:-0}"
 export TRASK_TRUST_INDEXER_CITATION_URLS="${TRASK_TRUST_INDEXER_CITATION_URLS:-1}"
 export TRASK_WEB_RESEARCH_LOCAL_CHROMA="${TRASK_WEB_RESEARCH_LOCAL_CHROMA:-0}"
 export TRASK_WEB_RESEARCH_DDG_FALLBACK="${TRASK_WEB_RESEARCH_DDG_FALLBACK:-0}"
 export TRASK_RESEARCH_COMPOSE_MODE="${TRASK_RESEARCH_COMPOSE_MODE:-grounded}"
 export TRASK_LLM_PROFILE="${TRASK_LLM_PROFILE:-free}"
+# Fast cached-index answers: soft end-to-end budget clamps gather + compose so a
+# query stays under ~30s and honest-degrades instead of stalling on live crawl.
+export TRASK_RESEARCH_BUDGET_MS="${TRASK_RESEARCH_BUDGET_MS:-30000}"
 
 for envfile in ".env" ".env.local"; do
   if [[ -f "$envfile" ]]; then

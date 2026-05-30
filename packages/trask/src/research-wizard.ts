@@ -33,7 +33,6 @@ import {
 } from "./web-research.js";
 import {
   BRIEF_DISCORD_MIN_CITATIONS,
-  claimMatchesQueryAnchor,
   passageMatchesQueryAnchor,
 } from "./query-anchor.js";
 import {
@@ -45,7 +44,6 @@ import {
   hasMinimumHolocronGroundedSupport,
   passagesSupportGroundedCompose,
   passagesAnchoredForQuery,
-  selectQueryAnchoredClaims,
   selectDistinctBriefClaims,
   selectHolocronFullClaims,
   claimsFromDistinctPassages,
@@ -1406,10 +1404,18 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
     preferredModel?: string,
     composeProfile: "full" | "brief" = "full",
     surfaceProfileId = "holocron",
+    deadlineMs?: number,
   ): Promise<{ answer: string; approvedSources: readonly SourceDescriptor[] } | null> {
     if (!isGroundedComposeEnabled(this.config)) {
       return null;
     }
+    // Keep cached-index answers within the soft research budget: bound each LLM
+    // compose call by the time remaining before the deadline (R6/F3 honest-degrade).
+    const remainingComposeMs = (): number => {
+      if (deadlineMs === undefined) return this.config.composeTimeoutMs;
+      const remaining = deadlineMs - Date.now();
+      return Math.max(2000, Math.min(this.config.composeTimeoutMs, remaining));
+    };
 
     if (isIndexMissPayload(payload)) {
       return null;
@@ -1431,17 +1437,25 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
 
     let claims = claimsFromDistinctPassages(
       passages,
-      composeProfile === "brief" ? 4 : 6,
+      composeProfile === "brief" ? BRIEF_MAX_CLAIM_LINES : 6,
       query,
+      { preserveDistinctPassagePool: true },
     );
     if (!hasMinimumGroundedSupport(claims) && this.openAiClient) {
       try {
-        const llmClaims = await extractClaimsWithLlm(this.openAiClient, model, query, passages);
+        const llmClaims = await withTimeout(
+          extractClaimsWithLlm(this.openAiClient, model, query, passages),
+          remainingComposeMs(),
+        );
         if (hasMinimumGroundedSupport(llmClaims)) {
-          claims = llmClaims;
+          const passageUrls = new Set(claims.map((claim) => publicCitationUrlForClaim(claim)));
+          const llmUrls = new Set(llmClaims.map((claim) => publicCitationUrlForClaim(claim)));
+          if (llmUrls.size >= passageUrls.size) {
+            claims = llmClaims;
+          }
         }
       } catch {
-        /* optional LLM claim extraction — heuristic / passage claims remain */
+        /* optional LLM claim extraction (or budget timeout) — heuristic / passage claims remain */
       }
     }
     if (!hasMinimumGroundedSupport(claims)) {
@@ -1467,15 +1481,6 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
       surfaceProfileId,
     );
 
-    const maxComposeClaims = composeProfile === "brief" ? 3 : 5;
-    const claimsForCompose = claims
-      .filter((claim) => claimMatchesQueryAnchor(claim, query))
-      .slice(0, maxComposeClaims);
-    const composeClaims =
-      claimsForCompose.length > 0
-        ? claimsForCompose
-        : selectQueryAnchoredClaims(claims, query, maxComposeClaims);
-
     const claimsForComposeGrounded =
       composeProfile === "brief"
         ? selectDistinctBriefClaims(claims, query, BRIEF_MAX_CLAIM_LINES)
@@ -1487,17 +1492,60 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
       composeProfile,
     );
     let answer = templateAnswer;
-    if (this.openAiClient && composeProfile !== "brief") {
-      answer =
-        (await composeGroundedAnswerWithLlm(
-          this.openAiClient,
-          model,
-          query,
-          claimsForComposeGrounded,
-          webSources,
-          composeProfile,
-        ))
-        ?? templateAnswer;
+    const minCitationsForProfile =
+      composeProfile === "brief" ? BRIEF_DISCORD_MIN_CITATIONS : MIN_HOLOCRON_WEB_CITATIONS;
+    const templateCitationCount = collectCitationIndicesFromAnswer(templateAnswer).length;
+    const templateAligned = alignCitedSourcesToAnswer(templateAnswer, webSources);
+    const templateMeetsCitationBar =
+      templateCitationCount >= minCitationsForProfile
+      && templateAligned.length >= minCitationsForProfile;
+
+    // REQ-C: when the instant grounded template already satisfies citation bars, skip LLM retries.
+    if (this.openAiClient && !templateMeetsCitationBar) {
+      const modelsToTry = [
+        ...new Set(
+          [
+            normalizePreferredRewriteModel(preferredModel),
+            this.aiConfig.chatModel,
+            ...this.aiConfig.chatModelFallbacks,
+          ].filter((entry): entry is string => Boolean(entry?.trim())),
+        ),
+      ].slice(0, MAX_REWRITE_ATTEMPTS);
+
+      let bestLlmAnswer: string | null = null;
+      let bestCitationCount = templateCitationCount;
+
+      for (const tryModel of modelsToTry) {
+        if (deadlineMs !== undefined && Date.now() >= deadlineMs) break;
+        const composeMs = remainingComposeMs();
+        if (composeMs < 3000) break;
+        try {
+          const llmAnswer =
+            (await withTimeout(
+              composeGroundedAnswerWithLlm(
+                this.openAiClient,
+                tryModel,
+                query,
+                claimsForComposeGrounded,
+                webSources,
+                composeProfile,
+              ),
+              composeMs,
+            )) ?? null;
+          if (!llmAnswer) continue;
+          const llmCitationCount = collectCitationIndicesFromAnswer(llmAnswer).length;
+          if (llmCitationCount >= minCitationsForProfile && llmCitationCount >= bestCitationCount) {
+            bestLlmAnswer = llmAnswer;
+            bestCitationCount = llmCitationCount;
+          }
+        } catch {
+          continue;
+        }
+      }
+
+      if (bestLlmAnswer) {
+        answer = bestLlmAnswer;
+      }
     }
 
     let approvedSources = alignCitedSourcesToAnswer(answer, webSources);
@@ -1510,35 +1558,39 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
       if (usedLlmCompose && approvedSources.length > 0) {
         answer = syncSourcesSectionToApproved(answer, approvedSources);
         approvedSources = alignCitedSourcesToAnswer(answer, webSources);
-      } else {
-      const templateAligned = alignCitedSourcesToAnswer(templateAnswer, webSources);
-      const templateCitationCount = collectCitationIndicesFromAnswer(templateAnswer).length;
-      if (
-        templateAligned.length >= MIN_HOLOCRON_WEB_CITATIONS
-        && templateCitationCount >= MIN_HOLOCRON_WEB_CITATIONS
-      ) {
-        answer = templateAnswer;
-        approvedSources = templateAligned;
-      } else if (webSources.length >= MIN_HOLOCRON_WEB_CITATIONS) {
-        const forcedAnswer = composeGroundedAnswerFromClaims(
-          query,
-          selectHolocronFullClaims(claims, query),
-          webSources,
-          composeProfile,
-        );
-        const forcedAligned = alignCitedSourcesToAnswer(forcedAnswer, webSources);
-        const forcedCitationCount = collectCitationIndicesFromAnswer(forcedAnswer).length;
-        if (
-          forcedAligned.length >= MIN_HOLOCRON_WEB_CITATIONS
-          && forcedCitationCount >= MIN_HOLOCRON_WEB_CITATIONS
-        ) {
-          answer = forcedAnswer;
-          approvedSources = forcedAligned;
-        }
-      } else if (approvedSources.length === 0) {
-        answer = sourceOnlyFallbackAnswer(query, webSources.slice(0, 5));
-        approvedSources = alignCitedSourcesToAnswer(answer, webSources);
       }
+      const stillNeedsMoreHolocronCitations =
+        approvedSources.length < MIN_HOLOCRON_WEB_CITATIONS
+        || collectCitationIndicesFromAnswer(answer).length < MIN_HOLOCRON_WEB_CITATIONS;
+      if (stillNeedsMoreHolocronCitations) {
+        const templateAligned = alignCitedSourcesToAnswer(templateAnswer, webSources);
+        const templateCitationCount = collectCitationIndicesFromAnswer(templateAnswer).length;
+        if (
+          templateAligned.length >= MIN_HOLOCRON_WEB_CITATIONS
+          && templateCitationCount >= MIN_HOLOCRON_WEB_CITATIONS
+        ) {
+          answer = templateAnswer;
+          approvedSources = templateAligned;
+        } else if (webSources.length >= MIN_HOLOCRON_WEB_CITATIONS) {
+          const forcedAnswer = composeGroundedAnswerFromClaims(
+            query,
+            selectHolocronFullClaims(claims, query),
+            webSources,
+            composeProfile,
+          );
+          const forcedAligned = alignCitedSourcesToAnswer(forcedAnswer, webSources);
+          const forcedCitationCount = collectCitationIndicesFromAnswer(forcedAnswer).length;
+          if (
+            forcedAligned.length >= MIN_HOLOCRON_WEB_CITATIONS
+            && forcedCitationCount >= MIN_HOLOCRON_WEB_CITATIONS
+          ) {
+            answer = forcedAnswer;
+            approvedSources = forcedAligned;
+          }
+        } else if (approvedSources.length === 0) {
+          answer = sourceOnlyFallbackAnswer(query, webSources.slice(0, 5));
+          approvedSources = alignCitedSourcesToAnswer(answer, webSources);
+        }
       }
     }
 
@@ -1547,12 +1599,36 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
         return null;
       }
       const minCitations = minWebCitationsForProfile(surfaceProfileId);
-      if (
-        approvedSources.length < minCitations
-        || collectCitationIndicesFromAnswer(answer).length < minCitations
-      ) {
-        return null;
+      const citationIndexCountBrief = collectCitationIndicesFromAnswer(answer).length;
+      if (approvedSources.length < minCitations || citationIndexCountBrief < minCitations) {
+        const templateAligned = alignCitedSourcesToAnswer(templateAnswer, webSources);
+        const templateCitationCount = collectCitationIndicesFromAnswer(templateAnswer).length;
+        if (
+          templateAligned.length >= minCitations
+          && templateCitationCount >= minCitations
+        ) {
+          answer = templateAnswer;
+          approvedSources = templateAligned;
+        } else if (webSources.length >= minCitations) {
+          const forcedAnswer = composeGroundedAnswerFromClaims(
+            query,
+            selectDistinctBriefClaims(claims, query, BRIEF_MAX_CLAIM_LINES, true),
+            webSources,
+            composeProfile,
+          );
+          const forcedAligned = alignCitedSourcesToAnswer(forcedAnswer, webSources);
+          const forcedCitationCount = collectCitationIndicesFromAnswer(forcedAnswer).length;
+          if (forcedAligned.length >= minCitations && forcedCitationCount >= minCitations) {
+            answer = forcedAnswer;
+            approvedSources = forcedAligned;
+          } else {
+            return null;
+          }
+        } else {
+          return null;
+        }
       }
+      return { answer, approvedSources };
     }
 
     return { answer, approvedSources };
@@ -1709,7 +1785,16 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
       let answer: string;
       const grounded =
         !isIndexMissPayload(payload) && !isSynthesisFailureReport(enrichedReport, payload)
-          ? await this.tryGroundedCompose(query, enrichedReport, payload, retrievedSources, options?.model)
+          ? await this.tryGroundedCompose(
+              query,
+              enrichedReport,
+              payload,
+              retrievedSources,
+              options?.model,
+              "full",
+              "holocron",
+              this.config.researchBudgetMs > 0 ? queryStartedAt + this.config.researchBudgetMs : undefined,
+            )
           : null;
 
       if (grounded) {
@@ -1860,6 +1945,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
     promptTemplateId = "discord-brief-compose",
     surfaceProfileId = "discord",
   ): Promise<ResearchWizardBriefAnswer> {
+    const queryStartedAt = Date.now();
     try {
       const approvedSources = routeSourcesForQuery(
         query,
@@ -1884,6 +1970,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
               options?.model,
               "brief",
               surfaceProfileId,
+              this.config.researchBudgetMs > 0 ? queryStartedAt + this.config.researchBudgetMs : undefined,
             )
           : null;
 
@@ -1898,11 +1985,16 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
             : degradedAnswerFallback(query, approvedSources);
       } else if ((payload.passages?.length ?? 0) > 0) {
         const passages = await filterReachableByUrl(
-          rankPassagesForQuery(resolveEvidencePassages(enrichedReport, payload), query),
+          rankPassagesForQuery(
+            passagesAnchoredForQuery(resolveEvidencePassages(enrichedReport, payload), query),
+            query,
+          ),
         );
         let claims = extractClaimsHeuristic(query, passages);
         if (!hasMinimumDiscordBriefGroundedSupport(claims, query)) {
-          claims = claimsFromDistinctPassages(passages, 3, query);
+          claims = claimsFromDistinctPassages(passages, BRIEF_MAX_CLAIM_LINES, query, {
+            preserveDistinctPassagePool: true,
+          });
         }
         const webSources = filterCitationSourcesForSurface(
           materializeSourcesFromCitationUrls(

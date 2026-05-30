@@ -14,6 +14,7 @@ const baseConfig = (): ResearchWizardRuntimeConfig => ({
   pythonExecutable: "python3",
   researchScriptPath: undefined,
   timeoutMs: 900_000,
+  researchBudgetMs: 30_000,
   gatherTimeoutMs: 120_000,
   composeTimeoutMs: 60_000,
   groundedComposeEnabled: true,

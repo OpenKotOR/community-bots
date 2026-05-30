@@ -1,0 +1,19 @@
+name = "trask-reindex-scheduler"
+main = "src/index.ts"
+compatibility_date = "2026-05-19"
+workers_dev = true
+
+# Weekly refresh of the cached Trask/Holocron corpus (REQ-A).
+# Mondays 06:00 UTC. The scheduled() handler POSTs /reindex to the indexer origin,
+# which crawls the approved catalog into Chroma in the background.
+[triggers]
+crons = ["0 6 * * 1"]
+
+[vars]
+# Persistent indexer origin that exposes POST /reindex (not the retrieve Worker).
+TRASK_INDEXER_REINDEX_URL = "http://127.0.0.1:8790"
+# Optional crawl cap per run; empty = full approved catalog.
+TRASK_REINDEX_LIMIT = ""
+
+# Production secret (shared with the indexer's TRASK_REINDEX_TOKEN):
+#   pnpm dlx wrangler secret put TRASK_REINDEX_TOKEN --config infra/trask-reindex-scheduler/wrangler.toml
