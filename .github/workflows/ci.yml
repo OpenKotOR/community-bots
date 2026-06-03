@@ -67,7 +67,7 @@ jobs:
           path: |
             ~/.cache/fastembed
             ~/.cache/huggingface
-          key: fastembed-bge-small-${{ runner.os }}-v1
+          key: fastembed-bge-small-${{ runner.os }}-v2
           restore-keys: |
             fastembed-bge-small-${{ runner.os }}-
 
@@ -75,10 +75,12 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
           HUGGINGFACE_HUB_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
+          HF_HUB_ENABLE_HF_TRANSFER: "1"
         run: |
           set -euo pipefail
+          PY=.venv-trask-indexer/bin/python
           warmup() {
-            .venv-trask-indexer/bin/python -c "from trask_indexer.embed import embed_texts; embed_texts(['ci warmup'])"
+            "$PY" -c "from trask_indexer.embed import embed_texts; embed_texts(['ci warmup']); print('embed ok')"
           }
           if [ -d "${HOME}/.cache/fastembed" ] && find "${HOME}/.cache/fastembed" -type f -print -quit 2>/dev/null | grep -q .; then
             echo "FastEmbed cache present; probing embedder..."
@@ -87,17 +89,28 @@ jobs:
               exit 0
             fi
           fi
-          for attempt in 1 2 3 4 5 6 7 8; do
-            if warmup; then
-              echo "Embedding model ready on attempt ${attempt}"
-              exit 0
-            fi
-            delay=$((attempt * 20))
-            echo "Embed warmup attempt ${attempt} failed; sleeping ${delay}s..."
-            sleep "${delay}"
-          done
-          echo "Could not download embedding model after 8 attempts (HF 429? set HUGGINGFACE_TOKEN repo secret)" >&2
-          exit 1
+          # One hub download pass (auth + backoff). Avoid 8× fastembed init retry storms that trigger HF 429.
+          "$PY" - <<'PY'
+          import os
+          import time
+          from huggingface_hub import snapshot_download
+
+          token = os.environ.get("HUGGINGFACE_HUB_TOKEN") or os.environ.get("HF_TOKEN") or None
+          repos = ["qdrant/bge-small-en-v1.5-onnx-q", "BAAI/bge-small-en-v1.5"]
+          for repo in repos:
+              for attempt in range(1, 6):
+                  try:
+                      snapshot_download(repo_id=repo, token=token)
+                      print(f"OK snapshot_download {repo}", flush=True)
+                      break
+                  except Exception as exc:
+                      if attempt >= 5:
+                          raise
+                      wait = 30 * attempt
+                      print(f"{repo} attempt {attempt} failed: {exc}; sleep {wait}s", flush=True)
+                      time.sleep(wait)
+          PY
+          warmup
 
       - name: Export Trask allowlist catalog
         run: node scripts/export_trask_allowlist_catalog.mjs
