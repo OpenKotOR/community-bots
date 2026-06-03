@@ -343,7 +343,7 @@ export const selectQueryAnchoredClaims = (
 ): EvidenceClaim[] => {
   const ranked = rankClaimsForQuery(assignSourceIndices([...claims]), query);
   const anchored = ranked.filter((claim) => claimMatchesQueryAnchor(claim, query));
-  const pool = anchored.length >= 2 ? anchored : anchored.length > 0 ? anchored : ranked;
+  const pool = anchored.length > 0 ? anchored : ranked;
   return pool.slice(0, maxClaims);
 };
 

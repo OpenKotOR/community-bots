@@ -93,6 +93,8 @@ test("loadSharedAiConfig free profile lists quality-first fallbacks before vendo
   const cfg = loadSharedAiConfig({ OPENROUTER_API_KEY: "sk-or-test" });
   assert.equal(cfg.chatModelFallbacks[0], "meta-llama/llama-3.3-70b-instruct:free");
   assert.ok(cfg.chatModelFallbacks.includes("qwen/qwen3-coder:free"));
+  assert.equal(cfg.chatModelFallbacks.at(-1), "openrouter/auto");
+  assert.ok(cfg.chatModelFallbacks.length <= 7, "primary + fallbacks must fit MAX_REWRITE_ATTEMPTS=8");
 });
 
 test("loadSharedAiConfig wires LiteLLM proxy URL and placeholder key", () => {

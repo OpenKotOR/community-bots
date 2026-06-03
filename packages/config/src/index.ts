@@ -92,7 +92,7 @@ const resolveRepoRoot = (startDir: string = process.cwd()): string | undefined =
 };
 
 /** Ordered OpenRouter-routable `:free` models from vendored bolabaden/llm_fallbacks. */
-const loadVendorOpenRouterFreeFallbacks = (maxModels = 8): readonly string[] => {
+const loadVendorOpenRouterFreeFallbacks = (maxModels = 7): readonly string[] => {
   const root = resolveRepoRoot();
   if (!root) return [...defaultFreeModelFallbacks];
 
@@ -106,16 +106,19 @@ const loadVendorOpenRouterFreeFallbacks = (maxModels = 8): readonly string[] => 
 
   const seen = new Set<string>();
   const ordered: string[] = [];
+  // Reserve the final slot for openrouter/auto (R1) when truncating.
+  const fillLimit = Math.max(1, maxModels - 1);
   for (const id of CURATED_OPENROUTER_FREE_PRIORITY) {
     if (seen.has(id)) continue;
     seen.add(id);
     ordered.push(id);
-    if (ordered.length >= maxModels) break;
+    if (ordered.length >= fillLimit) break;
   }
   for (const line of raw.split("\n")) {
     const id = line.trim();
     if (!id || seen.has(id)) continue;
     if (id === freeDefaultOpenRouterChatModel) continue;
+    if (ordered.length >= fillLimit) break;
     const lower = id.toLowerCase();
     if (NON_OPENROUTER_FREE_PREFIXES.some((prefix) => lower.startsWith(prefix))) continue;
     const openRouterRoutable =
@@ -123,12 +126,16 @@ const loadVendorOpenRouterFreeFallbacks = (maxModels = 8): readonly string[] => 
     if (!openRouterRoutable) continue;
     seen.add(id);
     ordered.push(id);
-    if (ordered.length >= maxModels) break;
   }
 
   if (ordered.length === 0) return [...defaultFreeModelFallbacks];
   if (!ordered.includes(paidOpenRouterChatModel)) {
     ordered.push(paidOpenRouterChatModel);
+  }
+  if (ordered.length > maxModels) {
+    const trimmed = ordered.filter((id) => id !== paidOpenRouterChatModel).slice(0, maxModels - 1);
+    trimmed.push(paidOpenRouterChatModel);
+    return trimmed;
   }
   return ordered;
 };
