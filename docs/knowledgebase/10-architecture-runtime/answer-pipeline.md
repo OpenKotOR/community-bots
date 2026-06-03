@@ -13,7 +13,7 @@ lastUpdated: 2026-05-29
 |-------|----------------|-----------|
 | Corpus refresh (REQ-A) | Mondays 06:00 UTC: Cloudflare cron Worker or GitHub Actions → `POST /reindex` on indexer **:8790** → `crawl-seeds` batch into Chroma | [REPO] `infra/trask-reindex-scheduler`, `infra/trask-indexer/trask_indexer/retrieve_api.py` |
 | Query retrieve | `scripts/trask_web_research.py` → `POST {TRASK_INDEXER_BASE_URL}/retrieve` on Worker **:8787** (not raw Chroma) | [REPO] `infra/trask-retrieve-worker`, `trask_live_stack.sh` |
-| Hybrid ranking | Dense Chroma embedding query + lexical token overlap fused via RRF (k=60) + URL anchor boost → passage hits | [REPO] `infra/trask-indexer/trask_indexer/chroma_store.py` |
+| Hybrid ranking | Dense Chroma embedding query + lexical token overlap fused via RRF (k=60) + URL anchor boost → **bounded top-k** passage hits (`recall ≈ min(max(limit×3, 15), 30)`; not a full-corpus scan) | [REPO] `infra/trask-indexer/trask_indexer/chroma_store.py` |
 | Live crawl (opt-in) | Only when `TRASK_WEB_RESEARCH_LIVE_CRAWL=1`; **off** on served stack (REQ-B) | [REPO] `scripts/trask_web_research.py`, `trask_live_stack.sh` default `0` |
 | Budget (REQ-C) | `TRASK_RESEARCH_BUDGET_MS=30000` clamps gather subprocess + each compose LLM call | [REPO] `packages/config`, `trask_live_stack.sh` |
 | Compose | Sufficiency gate → grounded compose with inline `[n]`; on fail or timeout → honest degrade | [REPO] `packages/trask` `grounded-evidence.ts` |
