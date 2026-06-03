@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hmac
 import logging
 import os
 import threading
@@ -118,7 +119,7 @@ def create_app() -> FastAPI:
         presented = ""
         if authorization and authorization.lower().startswith("bearer "):
             presented = authorization[len("bearer "):].strip()
-        if presented != token:
+        if not hmac.compare_digest(presented or "", token):
             raise HTTPException(status_code=401, detail="invalid or missing reindex token")
         with _reindex_lock:
             if _reindex_running:

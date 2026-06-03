@@ -48,7 +48,7 @@ Discord `/ask` brief embeds could collapse to a single inline citation after agg
 | CI import-smoke consolidation | #77 | `trask:verify-import-smoke:ci` in Actions; ladder doc sync |
 | Arc #33–#77 doc closeout | #78 | README `trask:gate:ci`; module-arch gate table; Holocron CI retries in ladder |
 | Holocron honest grounding UX | #79 | `partial`→`failed` inference/UI; faithfulness fixtures tracked; Node 24 test reporter in gate |
-| Free LLM quality-first failover (plan 118 / PR #92) | #92 | CURATED_OPENROUTER_FREE_PRIORITY + 8 rewrite attempts + grounded backfill + reindex scheduler + full LFG closeout; browser 5/5 + discord 5/5 + gate 185; package scripts restored; 2026-06 pass |
+| Free LLM quality-first failover (plan 118 / PR #92) | #92 | CURATED_OPENROUTER_FREE_PRIORITY + 8 rewrite attempts + grounded backfill + reindex scheduler + full LFG closeout; package scripts restored; gate 185; discord 5/5 live; browser MCP 4/5 (5th started) via Cursor MCP on :4010 (Playwright e2e 0 tests due to spec removal); 2026-06 pass |
 | Discord provenance footer | #80 | `ResearchWizardBriefAnswer.provenance`; embed footer via `formatDiscordProvenanceFooter` |
 | Discord verify footer assert | #81 | `verify_trask_discord_live.mjs` import-smoke + live provenance checks |
 | Gate smoke provenance footer | #82 | `discord_provenance_footer.mjs` shared assert; `trask_smoke_package_imports` enforces footer in `trask:gate` |

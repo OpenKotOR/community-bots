@@ -16,4 +16,7 @@ TRASK_INDEXER_REINDEX_URL = "http://127.0.0.1:8790"
 TRASK_REINDEX_LIMIT = ""
 
 # Production secret (shared with the indexer's TRASK_REINDEX_TOKEN):
-#   pnpm dlx wrangler secret put TRASK_REINDEX_TOKEN --config infra/trask-reindex-scheduler/wrangler.toml
+#   Set repo secret TRASK_REINDEX_TOKEN; the reindex-scheduler.yml deploy step will
+#   auto `wrangler secret put` it (falls back to manual if no CF creds in CI).
+#   Manual: pnpm dlx wrangler@4.87.0 secret put TRASK_REINDEX_TOKEN --config infra/trask-reindex-scheduler/wrangler.toml
+

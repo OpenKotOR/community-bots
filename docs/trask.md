@@ -167,10 +167,10 @@ E2E requires **at least two** distinct `https://` sources. Set `HOLOCRON_REUSE_S
 CLI debug gate:
 
 ```bash
-pnpm verify:trask-cli   # pnpm trask:gate preflight, then live CLI golden queries
+pnpm verify:trask-cli   # (alias; impl mjs deleted — use smoke-imports:ci / gate for CLI parity)
 ```
 
-`verify_trask_cli_qa.mjs` auto-bootstraps the indexer (**8790**) and retrieve Worker (**8787**) when unhealthy
+`verify_trask_cli_qa.mjs` (deleted on branch; not present) — CLI golden now via `trask:smoke-imports:ci` in gate + stack bootstrap. Discord verify and browser MCP cover live.
 (same `ensure_trask_indexed_stack_for_e2e.sh` path as Holocron e2e), with CI-parity env via `trask_qa_stack_bootstrap.mjs`.
 
 That script mirrors the same canonical five technical queries as Holocron e2e. It is for subprocess/retrieval

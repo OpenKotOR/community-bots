@@ -44,8 +44,9 @@ See [AGENTS.md](../../AGENTS.md) (mandatory Holocron browser gate, stack restart
 
 ## Files (changed or verified in this pass)
 - Edit: `package.json` (restore 5 scripts at root level).
-- Verify/touch (post-edit): `scripts/trask_live_stack.sh`, `apps/holocron-web/playwright.config.ts`, `scripts/verify_trask_discord_live.mjs`, `scripts/verify_trask_cli_qa.mjs`, `apps/holocron-web/e2e/holocron-research.spec.ts`.
-- Docs: this plan, `docs/solutions/tooling-decisions/trask-citation-stack-closeout-2026-05-24.md` (add row), `docs/evidence/2026-05-19-discord-ask-live-verify.md` (if re-run), PR #92 body (via gh edit).
+- Verify/touch (post-edit): `scripts/trask_live_stack.sh`, `apps/holocron-web/playwright.config.ts`, `scripts/verify_trask_discord_live.mjs` (restored earlier on branch).
+- Note: `scripts/verify_trask_cli_qa.mjs` and `apps/holocron-web/e2e/holocron-research.spec.ts` (plus failure.config and webui-browser verify) were deleted in c47c52f and not present at completion; package.json and plan still reference (see residuals below).
+- Docs: this plan, `docs/solutions/tooling-decisions/trask-citation-stack-closeout-2026-05-24.md` (add row; 5/5 browser claim aligned to actual 4/5 MCP record), `docs/evidence/2026-05-19-discord-ask-live-verify.md` (re-run for discord), PR #92 body (via gh edit).
 - No new runtime changes expected; if any, restart stack mandatory.
 
 ## Verification (mandatory, in order, full initiative)
@@ -53,9 +54,9 @@ See [AGENTS.md](../../AGENTS.md) (mandatory Holocron browser gate, stack restart
 2. `bash scripts/trask_live_stack.sh` (kills 4010/8787/8790, rebuilds, starts; wait health).
 3. `curl -sf http://127.0.0.1:4010/ && curl -sf http://127.0.0.1:8787/health && curl -sf http://127.0.0.1:8790/health`
 4. `pnpm trask:gate` (or `pnpm trask:gate:ci` if post-build).
-5. `HOLOCRON_REUSE_SERVER=1 pnpm holocron:e2e` (full 6 tests, all 5 queries; must pass).
+5. `HOLOCRON_REUSE_SERVER=1 pnpm holocron:e2e` (intended full 6 tests, all 5 queries; currently 0 tests matched due to missing spec — see residuals).
 6. `pnpm verify:trask-discord` (5/5 expert, URL reach unless skip; evidence updated).
-7. `pnpm verify:trask-cli` (if tokenless path).
+7. `pnpm verify:trask-cli` (script file missing; skipped; import-smoke + gate cover CLI golden).
 8. **Browser MCP (5 fresh threads, per AGENTS exact workflow):**
    - For each of 5 (from data/trask/eval/verification-queries.json expert):
      - `browser_navigate` `http://127.0.0.1:4010/?thread=<fresh-uuid>`
@@ -65,6 +66,7 @@ See [AGENTS.md](../../AGENTS.md) (mandatory Holocron browser gate, stack restart
      - Poll (cdp/snapshot) until no "Thinking", assistant visible, >=2 https:// cites on approved, substantive on-topic, `research_done` or grounded.
      - `browser_unlock`
    - Report PASS/FAIL + key snippet per query.
+   - Actual in c1f4021: 4/5 PASS (reone 5th started); confirmed 1 live query (TSLPatcher) grounded with sources post-commit via MCP.
 9. `gh pr checks 92 --watch` (or manual); fix real failures (≤3 iters), commit "fix(ci): ...", push.
 10. Update closeout + this plan + evidence.
 11. `gh pr edit 92 --body-file ...` for residual/CI notes if needed.
