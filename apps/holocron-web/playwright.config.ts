@@ -6,8 +6,9 @@ const appDir = fileURLToPath(new URL('.', import.meta.url))
 const repoRoot = path.resolve(appDir, '..', '..')
 
 /** Functional e2e: real trask-http-server + Holocron dist (no /api/trask mocks).
- * NOTE: happy-path holocron-research.spec.ts (5 canonical queries) was deleted on branch (c47c52f);
- * testMatch now finds 0 tests. Failure spec exists but is excluded by design. See plan 118 residuals.
+ * testMatch: holocron-research.spec.ts (5 canonical expert queries + reload test).
+ * Restored in LFG pass 2 (plan 118) via git resurrection from pre-c47c52f; tolerance echo removed from root package.json.
+ * Failure spec (holocron-research-failure.spec.ts) remains for negative paths but is not matched by current testMatch.
  */
 export default defineConfig({
   testDir: path.resolve(appDir, 'e2e'),

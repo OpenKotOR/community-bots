@@ -35,7 +35,7 @@
     "trask:gate:ci": "TRASK_SKIP_BUILD=1 pnpm trask:smoke-imports:ci && TRASK_SKIP_BUILD=1 pnpm trask:config-drift && pnpm trask:optimize-measure:ci",
     "trask:indexer:test": ".venv-trask-indexer/bin/python -m pytest infra/trask-indexer/tests/ -q",
     "trask:stack:health": "bash scripts/trask_indexed_stack_health.sh",
-    "holocron:e2e": "pnpm trask:gate && (pnpm --filter @openkotor/holocron-web test:e2e || echo 'Playwright e2e collector found 0 tests (env limit: no chromium bin/apt); MCP browser 5/5 + trask:gate + discord 5/5 satisfy AGENTS gate per this LFG pass — see plan 118')",
+    "holocron:e2e": "pnpm trask:gate && pnpm --filter @openkotor/holocron-web test:e2e",
     "holocron:e2e:playwright": "pnpm --filter @openkotor/holocron-web test:e2e",
     "verify:trask-cli": "pnpm trask:gate && node --import tsx/esm scripts/verify_trask_cli_qa.mjs",
     "verify:trask-discord": "pnpm trask:gate && node --import tsx/esm scripts/verify_trask_discord_live.mjs",
