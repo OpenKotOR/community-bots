@@ -74,18 +74,29 @@ jobs:
       - name: Pre-warm Trask embedding model
         env:
           HF_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
+          HUGGINGFACE_HUB_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
         run: |
           set -euo pipefail
-          for attempt in 1 2 3 4 5; do
-            if .venv-trask-indexer/bin/python -c "from trask_indexer.embed import embed_texts; embed_texts(['ci warmup'])"; then
+          warmup() {
+            .venv-trask-indexer/bin/python -c "from trask_indexer.embed import embed_texts; embed_texts(['ci warmup'])"
+          }
+          if [ -d "${HOME}/.cache/fastembed" ] && find "${HOME}/.cache/fastembed" -type f -print -quit 2>/dev/null | grep -q .; then
+            echo "FastEmbed cache present; probing embedder..."
+            if warmup; then
+              echo "Embedding model ready from cache"
+              exit 0
+            fi
+          fi
+          for attempt in 1 2 3 4 5 6 7 8; do
+            if warmup; then
               echo "Embedding model ready on attempt ${attempt}"
               exit 0
             fi
-            delay=$((attempt * 15))
+            delay=$((attempt * 20))
             echo "Embed warmup attempt ${attempt} failed; sleeping ${delay}s..."
             sleep "${delay}"
           done
-          echo "Could not download embedding model after 5 attempts" >&2
+          echo "Could not download embedding model after 8 attempts (HF 429? set HUGGINGFACE_TOKEN repo secret)" >&2
           exit 1
 
       - name: Export Trask allowlist catalog
