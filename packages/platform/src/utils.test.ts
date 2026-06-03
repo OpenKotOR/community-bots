@@ -330,7 +330,7 @@ test("buildSocialAuthAuthorizeUrl builds a valid Google URL", () => {
 
 test("buildSocialAuthAuthorizeUrl builds a valid Discord URL", () => {
   const url = buildSocialAuthAuthorizeUrl("discord", baseInput);
-  assert.ok(url.includes("discord.com"));
+  assert.equal(new URL(url).hostname, "discord.com");
   const parsed = new URL(url);
   assert.equal(parsed.searchParams.get("client_id"), "client-123");
   assert.ok(parsed.searchParams.get("scope")?.includes("identify"));
@@ -348,7 +348,7 @@ test("buildSocialAuthAuthorizeUrl respects custom discordApiBase", () => {
   const url = buildSocialAuthAuthorizeUrl("discord", baseInput, {
     discordApiBase: "https://discord.example.com/api/v10",
   });
-  assert.ok(url.startsWith("https://discord.example.com"));
+  assert.equal(new URL(url).origin, "https://discord.example.com");
 });
 
 // ---------------------------------------------------------------------------
@@ -427,12 +427,29 @@ import { buildBrowserCorsAllowedOrigins, resolveCorsHeaders } from "./cors.js";
 
 test("buildBrowserCorsAllowedOrigins includes discordsays.com when discordAppId is set", () => {
   const origins = buildBrowserCorsAllowedOrigins({ discordAppId: "123456789" });
-  assert.ok(origins.some((o) => o.includes("123456789") && o.includes("discordsays.com")));
+  assert.ok(
+    origins.some((origin) => {
+      try {
+        const host = new URL(origin).hostname;
+        return host.includes("123456789") && host.endsWith("discordsays.com");
+      } catch {
+        return false;
+      }
+    }),
+  );
 });
 
 test("buildBrowserCorsAllowedOrigins omits discordsays.com when discordAppId is absent", () => {
   const origins = buildBrowserCorsAllowedOrigins({});
-  assert.ok(!origins.some((o) => o.includes("discordsays.com")));
+  assert.ok(
+    !origins.some((origin) => {
+      try {
+        return new URL(origin).hostname.endsWith("discordsays.com");
+      } catch {
+        return false;
+      }
+    }),
+  );
 });
 
 test("buildBrowserCorsAllowedOrigins includes publicWebOrigin when provided", () => {

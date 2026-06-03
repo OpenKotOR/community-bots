@@ -1,5 +1,8 @@
 name: Docker Builds CI
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
@@ -36,9 +39,6 @@ on:
       - "data/trask/**"
       - ".github/workflows/docker-builds.yml"
   workflow_dispatch:
-
-permissions:
-  contents: read
 
 jobs:
   docker-builds:
