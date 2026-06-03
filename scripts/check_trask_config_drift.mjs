@@ -39,6 +39,7 @@ const ALLOWED_GOLDEN_LITERAL_PATHS = new Set([
 const shouldScanFile = (relPath) => {
   if (relPath.includes("node_modules/")) return false;
   if (relPath.includes("/dist/")) return false;
+  if (relPath.includes("/test-results/")) return false;
   if (relPath.startsWith(".cursor/")) return false;
   if (relPath.includes("agent-transcripts/")) return false;
   if (relPath.endsWith(".png") || relPath.endsWith(".webm")) return false;
