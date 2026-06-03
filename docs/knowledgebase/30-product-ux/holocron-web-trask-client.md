@@ -2,7 +2,7 @@
 title: Holocron Web Trask Client
 owner: holocron-web
 status: active
-lastUpdated: 2026-05-20
+lastUpdated: 2026-05-29
 ---
 
 # Module
@@ -39,6 +39,18 @@ lastUpdated: 2026-05-20
 # Discord sign-in link
 
 - [REPO] `TopNav` links to **`/api/trask/auth/discord/start`** (same-origin on embedded bot with OAuth configured).
+
+# Validation matrix
+
+[SYNTH] Authoritative table: [validation-ladder.md](../50-execution/validation-ladder.md) §8. Summary for Holocron operators:
+
+| Gate | When | Origin | Queries |
+|------|------|--------|---------|
+| `pnpm holocron:e2e` | pre-merge / agent | **http://127.0.0.1:4010** + Worker **:8787** | 5 × `verification-queries.json` |
+| Cursor browser MCP | when MCP available | same **:4010** stack | same 5; new `?thread=<uuid>` per query |
+| Public **qa-webui** | post-deploy smoke | `VITE_TRASK_API_BASE` → live API | 1 spot-check only |
+
+[REPO] Research uses cached Chroma via Worker retrieve (`TRASK_INDEXER_BASE_URL` → **:8787**), not raw indexer **:8790**. [REPO] `trask_live_stack.sh` defaults `TRASK_WEB_RESEARCH_LIVE_CRAWL=0` (REQ-B) and `TRASK_RESEARCH_BUDGET_MS=30000` (REQ-C).
 
 # GitHub Pages public Holocron (qa-webui)
 

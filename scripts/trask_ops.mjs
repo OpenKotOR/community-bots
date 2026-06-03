@@ -128,12 +128,12 @@ try {
       break;
     }
     case "verify-cli": {
-      await run("node", ["--import", "tsx/esm", "scripts/verify_trask_cli_qa.mjs", ...process.argv.slice(3)]);
-      break;
+      // NOTE: script deleted c47c52f (not restored); alias in root package.json also broken. Use smoke-imports:ci + discord verify for now.
+      throw new Error("verify-cli: verify_trask_cli_qa.mjs was removed (residual from free-llm plan 118)");
     }
     case "verify-web": {
-      await run("node", ["scripts/verify_trask_webui_browser.mjs", ...process.argv.slice(3)]);
-      break;
+      // NOTE: script deleted c47c52f; browser MCP + playwright (limited) now preferred.
+      throw new Error("verify-web: verify_trask_webui_browser.mjs was removed (residual)");
     }
     case "smoke-discord": {
       await run("node", ["scripts/discord_bots_smoke.mjs", ...process.argv.slice(3)]);

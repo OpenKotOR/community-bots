@@ -29,9 +29,10 @@ Ask a KOTOR question and get a source-backed answer.
 | `query` | yes | Question or topic (max 200 characters) |
 
 **Behavior (current repo):**
-- Spawns **`scripts/trask_web_research.py`** (Crawl4AI + DuckDuckGo) for allowlisted web gather, then Node LLM rewrite for Holocron/Discord formatting.
-- Bootstrap: `bash scripts/bootstrap_trask_research.sh`; set `TRASK_WEB_RESEARCH_PYTHON` and `OPENAI_API_KEY` or `OPENROUTER_API_KEY`.
-- See **`docs/trask-research-backends.md`** for alternatives and verification commands.
+- **Index-first research:** `scripts/trask_web_research.py` calls the retrieve Worker (`TRASK_INDEXER_BASE_URL`, default **:8787**) for passages from the weekly-refreshed Chroma corpus; live Crawl4AI and DuckDuckGo are recovery-only and **off** on the served stack (`TRASK_WEB_RESEARCH_LIVE_CRAWL=0`).
+- Node grounded compose (`ResearchWizardClient`) synthesizes a cited answer under the **30s soft budget** (`TRASK_RESEARCH_BUDGET_MS=30000`).
+- Bootstrap: `bash scripts/trask_live_stack.sh` (indexer **:8790** → Worker **:8787** → HTTP **:4010**); set `OPENROUTER_API_KEY` for free-profile compose.
+- See **`docs/knowledgebase/50-execution/trask-indexed-stack-runbook.md`** and **`docs/trask-research-backends.md`** for verification commands.
 
 **Example:**
 ```
@@ -99,8 +100,7 @@ Trask's answer generation is pinned to these approved sources by default:
 Live research is constrained to the approved base hosts `lucasforumsarchive.org`, `deadlystream.com`, `github.com`, `kotor.neocities.org`, and `pcgamingwiki.com`. GitHub crawling is further narrowed to the approved KotOR project roots in this catalog. The headless bridge passes both `query_domains` and `allowed_url_prefixes`, rejects direct or discovered URLs outside that allowlist before scraping, and reports accepted/rejected URL lists in `research_information` for audit.
 
 **Holocron and functional e2e require live approved-web citations only** (`https://…` on the allowlisted hosts).
-Answers come from Crawl4AI + DuckDuckGo discovery on those hosts, then Node LLM synthesis. Imported Discord
-chunks may supply lower-authority community context but are not a substitute for web citations in e2e.
+Answers come from **Worker retrieve** over the weekly-refreshed Chroma corpus (`TRASK_INDEXER_BASE_URL` → **:8787**), then grounded Node compose. Live Crawl4AI and DuckDuckGo are recovery-only (`TRASK_WEB_RESEARCH_LIVE_CRAWL=0` default). Imported Discord chunks may supply lower-authority community context but are not a substitute for web citations in e2e.
 
 ## Admin Setup
 
@@ -123,7 +123,7 @@ perform blanket server-history reads unless proactive mode is enabled (see below
 
 ### Web research Python environment (required for `/ask` and Holocron research)
 
-Trask spawns **`scripts/trask_web_research.py`** (Crawl4AI + DuckDuckGo). Bootstrap a dedicated venv:
+Trask spawns **`scripts/trask_web_research.py`**, which retrieves passages from the indexed corpus via the Cloudflare retrieve Worker. Bootstrap the research + indexer stack with `bash scripts/trask_live_stack.sh` (or research venv only below).
 
 - **Windows (PowerShell):** `.\scripts\bootstrap_trask_research.ps1`
 - **macOS / Linux:** `bash scripts/bootstrap_trask_research.sh`
@@ -167,10 +167,10 @@ E2E requires **at least two** distinct `https://` sources. Set `HOLOCRON_REUSE_S
 CLI debug gate:
 
 ```bash
-pnpm verify:trask-cli   # pnpm trask:gate preflight, then live CLI golden queries
+pnpm verify:trask-cli   # (alias; impl mjs deleted — use smoke-imports:ci / gate for CLI parity)
 ```
 
-`verify_trask_cli_qa.mjs` auto-bootstraps the indexer (**8790**) and retrieve Worker (**8787**) when unhealthy
+`verify_trask_cli_qa.mjs` (deleted on branch; not present) — CLI golden now via `trask:smoke-imports:ci` in gate + stack bootstrap. Discord verify and browser MCP cover live.
 (same `ensure_trask_indexed_stack_for_e2e.sh` path as Holocron e2e), with CI-parity env via `trask_qa_stack_bootstrap.mjs`.
 
 That script mirrors the same canonical five technical queries as Holocron e2e. It is for subprocess/retrieval

@@ -184,6 +184,96 @@ def _indexer_base_url() -> str:
     return (os.environ.get("TRASK_INDEXER_BASE_URL") or DEFAULT_INDEXER_URL).strip().rstrip("/")
 
 
+_ANCHOR_QUERY_GENERIC = frozenset(
+    {
+        "about",
+        "after",
+        "and",
+        "are",
+        "before",
+        "does",
+        "for",
+        "from",
+        "game",
+        "games",
+        "how",
+        "into",
+        "knights",
+        "kotor",
+        "modding",
+        "old",
+        "per",
+        "republic",
+        "should",
+        "that",
+        "the",
+        "this",
+        "used",
+        "user",
+        "what",
+        "when",
+        "where",
+        "which",
+        "who",
+        "why",
+        "windows",
+        "with",
+        "your",
+    }
+)
+
+
+def _anchor_retrieve_query(query: str) -> str:
+    """Condensed token query when long phrasing dilutes dense retrieve toward generic hits."""
+    tokens = [
+        t
+        for t in re.findall(r"[a-z0-9]+", query.lower())
+        if len(t) > 3 and t not in _ANCHOR_QUERY_GENERIC
+    ]
+    if len(tokens) < 2:
+        return ""
+    return " ".join(tokens[:10])
+
+
+def _distinct_passage_urls(passages: list[dict[str, Any]]) -> int:
+    return len({str(p.get("url") or "").strip() for p in passages if str(p.get("url") or "").strip()})
+
+
+def _merge_passages_by_url(
+    primary: list[dict[str, Any]],
+    extra: list[dict[str, Any]],
+    *,
+    limit: int,
+) -> list[dict[str, Any]]:
+    merged: dict[str, dict[str, Any]] = {}
+    for passage in [*primary, *extra]:
+        url = str(passage.get("url") or "").strip()
+        if not url:
+            continue
+        prev = merged.get(url)
+        if prev is None or float(passage.get("score") or 0.0) > float(prev.get("score") or 0.0):
+            merged[url] = passage
+    return sorted(merged.values(), key=lambda item: float(item.get("score") or 0.0), reverse=True)[:limit]
+
+
+def _filter_passages_allowlist(
+    passages: list[dict[str, Any]],
+    domains: list[str],
+    prefixes: list[str],
+) -> list[dict[str, Any]]:
+    if not domains and not prefixes:
+        return passages
+    filtered: list[dict[str, Any]] = []
+    for passage in passages:
+        url = str(passage.get("url") or "")
+        if url.startswith("discord://"):
+            filtered.append(passage)
+            continue
+        if _url_allowed(url, domains, prefixes):
+            filtered.append(passage)
+    return filtered
+
+
 def _retrieve_via_http(query: str, limit: int) -> list[dict[str, Any]]:
     body = json.dumps({"query": query, "limit": limit}).encode("utf-8")
     req = Request(
@@ -495,16 +585,24 @@ def run_research(payload: dict[str, Any]) -> dict[str, Any]:
         passages = _ddg_snippets(query, domains, prefixes, limit)
 
     if domains or prefixes:
-        filtered: list[dict[str, Any]] = []
-        for passage in passages:
-            url = str(passage.get("url") or "")
-            if url.startswith("discord://"):
-                filtered.append(passage)
-                continue
-            if _url_allowed(url, domains, prefixes):
-                filtered.append(passage)
+        filtered = _filter_passages_allowlist(passages, domains, prefixes)
         LOG.info("allowlist_filter before=%s after=%s", len(passages), len(filtered))
         passages = filtered
+
+    if _distinct_passage_urls(passages) < 2:
+        anchor_q = _anchor_retrieve_query(query)
+        if anchor_q and anchor_q.lower() != query.lower():
+            LOG.info("retrieve_anchor_fallback query=%r", anchor_q[:120])
+            anchor_passages = _retrieve_via_http(anchor_q, limit)
+            if domains or prefixes:
+                anchor_passages = _filter_passages_allowlist(anchor_passages, domains, prefixes)
+            if anchor_passages:
+                passages = _merge_passages_by_url(passages, anchor_passages, limit=limit)
+                LOG.info(
+                    "retrieve_anchor_fallback merged passages=%s urls=%s",
+                    len(passages),
+                    _distinct_passage_urls(passages),
+                )
 
     passages, rejected_urls = _verify_passages(passages)
     index_miss = vector_miss and len(passages) == 0

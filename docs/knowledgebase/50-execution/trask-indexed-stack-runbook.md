@@ -2,12 +2,20 @@
 title: Trask Indexed Stack Runbook
 owner: trask-http-server
 status: active
-lastUpdated: 2026-05-23
+lastUpdated: 2026-05-29
 ---
 
 # Trask indexed stack (Crawl4AI + Chroma + Worker)
 
 Operator guide for the self-hosted Trask research path: crawl → embed → Chroma → retrieve Worker → Holocron / Discord.
+
+**Product requirements crosswalk** (from [trask-self-hosted-research-pipeline-requirements.md](../../brainstorms/trask-self-hosted-research-pipeline-requirements.md)):
+
+| ID | Requirement | Implementation |
+|----|-------------|----------------|
+| **REQ-A** | Weekly cached-corpus refresh | Cloudflare cron Worker or GitHub Actions → token-guarded `POST /reindex` on indexer **:8790**; Chroma on host |
+| **REQ-B** | Query-time answers from cached index only | `TRASK_WEB_RESEARCH_LIVE_CRAWL=0` on served stack (`trask_live_stack.sh` default); weak retrieve → honest degrade (F3), not per-query crawl |
+| **REQ-C** | ≤30s research budget | `TRASK_RESEARCH_BUDGET_MS=30000` clamps gather + compose; stall → grounded template |
 
 **VPS rollout checklist:** [trask-vps-indexed-stack-rollout-2026-05-24.md](../../solutions/tooling-decisions/trask-vps-indexed-stack-rollout-2026-05-24.md)
 
@@ -15,11 +23,51 @@ Operator guide for the self-hosted Trask research path: crawl → embed → Chro
 
 | Service | Local port | Role |
 |---------|------------|------|
-| Chroma indexer | 8790 | FastEmbed + Chroma + `POST /retrieve` |
+| Chroma indexer | 8790 | FastEmbed + Chroma + `POST /retrieve` + `POST /reindex` |
 | Retrieve Worker | 8787 | Cloudflare Worker proxy to indexer (production parity) |
+| Reindex scheduler | — (Cloudflare cron) | Weekly `scheduled()` → `POST /reindex` (`infra/trask-reindex-scheduler`) |
 | trask-http-server | 4010 | Holocron UI + `/api/trask/*` |
 
 Research subprocess: `scripts/trask_web_research.py` → retrieve URL from `TRASK_INDEXER_BASE_URL` (Worker, not raw Chroma).
+
+## Weekly corpus refresh (REQ-A)
+
+The cached corpus is re-crawled **weekly** (Mondays 06:00 UTC). Two activators call the
+same token-guarded indexer trigger, which runs the batch crawl (the same `run_batch_crawl`
+path as the `crawl-seeds` CLI) in the background; storage stays in Chroma on the host.
+
+> **Two different "reindex" mechanisms:** the weekly `POST /reindex` here = **full approved-catalog batch crawl**. The separate `/queue-reindex` + drain-queue worker (below) = **per-source-id queue drain** (`FileReindexQueueStore`). They are distinct; don't conflate them.
+
+```bash
+# Indexer must run with a shared token to enable the trigger (forwarded by
+# trask_live_stack.sh when TRASK_REINDEX_TOKEN is set in .env / the environment):
+TRASK_REINDEX_TOKEN=<secret> trask-indexer serve
+
+# Manual / smoke trigger (202 accepted; runs crawl-seeds in the background):
+curl -X POST http://127.0.0.1:8790/reindex \
+  -H "Authorization: Bearer <secret>" -H "Content-Type: application/json" \
+  -d '{"limit": 5, "dryRun": true}'
+
+# Status (last_started_at / last_result) surfaces in health:
+curl -s http://127.0.0.1:8790/health | jq .reindex
+```
+
+- **Cloudflare cron:** `infra/trask-reindex-scheduler` (`crons = ["0 6 * * 1"]`); set `TRASK_INDEXER_REINDEX_URL` var + `TRASK_REINDEX_TOKEN` secret. CI dry-runs the bundle.
+- **Credential-free:** `.github/workflows/trask-weekly-reindex.yml` (weekly `schedule:`) with `TRASK_INDEXER_REINDEX_URL` + `TRASK_REINDEX_TOKEN` repo secrets.
+
+## Cached-corpus query contract (REQ-B)
+
+[SYNTH] On the default served stack, Holocron and Discord **must not** depend on per-query live crawl. Answers come from the **weekly-refreshed Chroma index** (REQ-A) via the Worker retrieve path.
+
+- [REPO] `scripts/trask_live_stack.sh` sets `TRASK_WEB_RESEARCH_LIVE_CRAWL="${TRASK_WEB_RESEARCH_LIVE_CRAWL:-0}"` and documents the cached-resource contract (REQ-B).
+- [REPO] `TRASK_INDEXER_BASE_URL` points at the retrieve Worker (**:8787**), not raw Chroma **:8790** — clients call `POST /retrieve` on the Worker only.
+- [SYNTH] When retrieve is weak and live crawl is **off**, the pipeline honest-degrades (F3) rather than blocking on Crawl4AI. Operators may opt in to bounded live crawl (`TRASK_WEB_RESEARCH_LIVE_CRAWL=1`) for recovery experiments; that is **not** the product default.
+
+## Latency budget (REQ-C)
+
+`TRASK_RESEARCH_BUDGET_MS` (default **30000**) clamps gather + each compose LLM call so a
+cached-index query stays under ~30s; on stall it falls back to the grounded template
+(honest-degrade).
 
 ## Bootstrap (first time)
 

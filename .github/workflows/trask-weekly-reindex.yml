@@ -1,0 +1,55 @@
+name: Trask weekly corpus reindex
+
+# Weekly refresh of the cached Trask/Holocron corpus (REQ-A), credential-free
+# alternative to the Cloudflare cron scheduler. Triggers POST /reindex on the
+# persistent indexer origin. No-ops with a notice when secrets are unset.
+
+on:
+  schedule:
+    # Mondays 06:00 UTC — keep in sync with infra/trask-reindex-scheduler cron.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Optional crawl cap (targets per run)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trask-weekly-reindex
+  cancel-in-progress: false
+
+jobs:
+  trigger-reindex:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger indexer reindex
+        env:
+          TRASK_INDEXER_REINDEX_URL: ${{ secrets.TRASK_INDEXER_REINDEX_URL }}
+          TRASK_REINDEX_TOKEN: ${{ secrets.TRASK_REINDEX_TOKEN }}
+          LIMIT: ${{ github.event.inputs.limit }}
+        run: |
+          if [ -z "$TRASK_INDEXER_REINDEX_URL" ] || [ -z "$TRASK_REINDEX_TOKEN" ]; then
+            echo "::notice::Skipping weekly reindex — set TRASK_INDEXER_REINDEX_URL and TRASK_REINDEX_TOKEN repo secrets."
+            exit 0
+          fi
+          base="${TRASK_INDEXER_REINDEX_URL%/}"
+          if [ -n "$LIMIT" ]; then
+            body="{\"limit\": $LIMIT}"
+          else
+            body="{}"
+          fi
+          echo "Triggering reindex at ${base}/reindex"
+          code=$(curl -sS -o /tmp/reindex_resp.json -w "%{http_code}" \
+            -X POST "${base}/reindex" \
+            -H "Authorization: Bearer ${TRASK_REINDEX_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$body" || echo "000")
+          echo "HTTP $code"; cat /tmp/reindex_resp.json || true; echo
+          if [ "$code" != "202" ] && [ "$code" != "200" ]; then
+            echo "::error::Reindex trigger failed with HTTP $code"
+            exit 1
+          fi

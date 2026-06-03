@@ -135,7 +135,7 @@ def live_crawl_and_index(
 
 
 def live_crawl_enabled() -> bool:
-    raw = os.environ.get("TRASK_WEB_RESEARCH_LIVE_CRAWL", "1").strip().lower()
+    raw = os.environ.get("TRASK_WEB_RESEARCH_LIVE_CRAWL", "0").strip().lower()
     return raw in ("1", "true", "yes", "on")
 
 

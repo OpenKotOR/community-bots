@@ -321,7 +321,7 @@ test("buildSocialAuthAuthorizeUrl uses startUrl template when provided", () => {
 
 test("buildSocialAuthAuthorizeUrl builds a valid Google URL", () => {
   const url = buildSocialAuthAuthorizeUrl("google", baseInput);
-  assert.ok(url.startsWith("https://accounts.google.com"));
+  assert.equal(new URL(url).origin, "https://accounts.google.com");
   const parsed = new URL(url);
   assert.equal(parsed.searchParams.get("client_id"), "client-123");
   assert.equal(parsed.searchParams.get("response_type"), "code");
@@ -330,7 +330,7 @@ test("buildSocialAuthAuthorizeUrl builds a valid Google URL", () => {
 
 test("buildSocialAuthAuthorizeUrl builds a valid Discord URL", () => {
   const url = buildSocialAuthAuthorizeUrl("discord", baseInput);
-  assert.ok(url.includes("discord.com"));
+  assert.equal(new URL(url).hostname, "discord.com");
   const parsed = new URL(url);
   assert.equal(parsed.searchParams.get("client_id"), "client-123");
   assert.ok(parsed.searchParams.get("scope")?.includes("identify"));
@@ -348,7 +348,7 @@ test("buildSocialAuthAuthorizeUrl respects custom discordApiBase", () => {
   const url = buildSocialAuthAuthorizeUrl("discord", baseInput, {
     discordApiBase: "https://discord.example.com/api/v10",
   });
-  assert.ok(url.startsWith("https://discord.example.com"));
+  assert.equal(new URL(url).origin, "https://discord.example.com");
 });
 
 // ---------------------------------------------------------------------------
@@ -427,12 +427,12 @@ import { buildBrowserCorsAllowedOrigins, resolveCorsHeaders } from "./cors.js";
 
 test("buildBrowserCorsAllowedOrigins includes discordsays.com when discordAppId is set", () => {
   const origins = buildBrowserCorsAllowedOrigins({ discordAppId: "123456789" });
-  assert.ok(origins.some((o) => o.includes("123456789") && o.includes("discordsays.com")));
+  assert.ok(origins.some((o) => o === "https://123456789.discordsays.com"));
 });
 
 test("buildBrowserCorsAllowedOrigins omits discordsays.com when discordAppId is absent", () => {
   const origins = buildBrowserCorsAllowedOrigins({});
-  assert.ok(!origins.some((o) => o.includes("discordsays.com")));
+  assert.ok(!origins.some((o) => o === "https://123456789.discordsays.com"));
 });
 
 test("buildBrowserCorsAllowedOrigins includes publicWebOrigin when provided", () => {

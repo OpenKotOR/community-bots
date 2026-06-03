@@ -5,10 +5,14 @@ import path from 'node:path'
 const appDir = fileURLToPath(new URL('.', import.meta.url))
 const repoRoot = path.resolve(appDir, '..', '..')
 
-/** Functional e2e: real trask-http-server + Holocron dist (no /api/trask mocks). */
+/** Functional e2e: real trask-http-server + Holocron dist (no /api/trask mocks).
+ * testMatch: holocron-research.spec.ts (5 canonical expert queries + reload test).
+ * Restored in LFG pass 2 (plan 118) via git resurrection from pre-c47c52f; tolerance echo removed from root package.json.
+ * Failure spec (holocron-research-failure.spec.ts) remains for negative paths but is not matched by current testMatch.
+ */
 export default defineConfig({
-  testDir: './e2e',
-  testMatch: 'holocron-research.spec.ts',
+  testDir: path.resolve(appDir, 'e2e'),
+  testMatch: /holocron-research\.spec\.ts$/,
   timeout: 240_000,
   expect: { timeout: 30_000 },
   fullyParallel: false,

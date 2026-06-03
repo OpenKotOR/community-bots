@@ -24,15 +24,9 @@
     "build:trask-worker": "pnpm --dir infra/trask-worker run build",
     "deploy:trask-worker": "pnpm dlx wrangler@4.87.0 deploy --config infra/trask-worker/wrangler.toml",
     "ops:trask": "node scripts/trask_ops.mjs",
-    "verify:trask-cli": "pnpm trask:gate && node --import tsx/esm scripts/verify_trask_cli_qa.mjs",
-    "verify:trask-cli:ci": "TRASK_SKIP_BUILD=1 node --import tsx/esm scripts/verify_trask_cli_qa.mjs --import-smoke",
-    "verify:trask-discord": "pnpm trask:gate && node --import tsx/esm scripts/verify_trask_discord_live.mjs",
-    "verify:trask-discord:post": "pnpm trask:gate && node --import tsx/esm scripts/verify_trask_discord_live.mjs --post",
-    "verify:trask-discord:ci": "TRASK_SKIP_BUILD=1 node --import tsx/esm scripts/verify_trask_discord_live.mjs --import-smoke",
     "trask:smoke:stack-bootstrap": "node scripts/smoke_trask_qa_stack_bootstrap.mjs",
     "trask:faithfulness-eval": "pnpm build && node scripts/trask_faithfulness_eval.mjs --fixtures",
     "trask:config-drift": "node scripts/check_trask_config_drift.mjs",
-    "trask:verify-import-smoke:ci": "TRASK_SKIP_BUILD=1 pnpm verify:trask-discord:ci && TRASK_SKIP_BUILD=1 pnpm verify:trask-cli:ci",
     "trask:optimize-measure": "node scripts/trask_optimize_measure.mjs",
     "trask:optimize-measure:ci": "TRASK_OPTIMIZE_CI_MODE=1 TRASK_SKIP_BUILD=1 node scripts/trask_optimize_measure.mjs",
     "trask:smoke-imports": "pnpm build && node scripts/trask_smoke_package_imports.mjs",
@@ -41,6 +35,11 @@
     "trask:gate:ci": "TRASK_SKIP_BUILD=1 pnpm trask:smoke-imports:ci && TRASK_SKIP_BUILD=1 pnpm trask:config-drift && pnpm trask:optimize-measure:ci",
     "trask:indexer:test": ".venv-trask-indexer/bin/python -m pytest infra/trask-indexer/tests/ -q",
     "trask:stack:health": "bash scripts/trask_indexed_stack_health.sh",
+    "holocron:e2e": "pnpm trask:gate && pnpm --filter @openkotor/holocron-web test:e2e",
+    "holocron:e2e:playwright": "pnpm --filter @openkotor/holocron-web test:e2e",
+    "verify:trask-cli": "pnpm trask:gate && node --import tsx/esm scripts/verify_trask_cli_qa.mjs",
+    "verify:trask-discord": "pnpm trask:gate && node --import tsx/esm scripts/verify_trask_discord_live.mjs",
+    "verify:trask-discord:post": "pnpm trask:gate && node --import tsx/esm scripts/verify_trask_discord_live.mjs --post",
     "discord:setup": "node scripts/discord_setup_wizard.mjs --write",
     "discord:smoke-bots": "node scripts/discord_bots_smoke.mjs",
     "dev:pazaak-nakama": "pnpm --filter @openkotor/pazaak-nakama build && docker compose -f infra/nakama/docker-compose.yml up",
@@ -48,8 +47,6 @@
     "dev:ingest": "pnpm --filter @openkotor/ingest-worker dev",
     "discord:install-links": "tsx scripts/discord-install-links.ts",
     "smoke:trask-research": "python scripts/smoke_trask_indexed_stack.py",
-    "holocron:e2e": "pnpm trask:gate && pnpm holocron:e2e:playwright",
-    "holocron:e2e:playwright": "TRASK_WEB_ALLOW_ANONYMOUS=1 TRASK_INDEXER_BASE_URL=http://127.0.0.1:8787 TRASK_QA_GROUNDING=1 TRASK_LLM_PROFILE=free TRASK_WEB_RESEARCH_PYTHON=.venv-trask-indexer/bin/python node scripts/holocron-e2e-live-build.mjs && pnpm exec playwright test --config apps/holocron-web/playwright.config.ts && HOLOCRON_E2E_FAILURE_MODE=1 TRASK_WEB_ALLOW_ANONYMOUS=1 TRASK_LLM_PROFILE=free TRASK_WEB_RESEARCH_PYTHON=.venv-trask-indexer/bin/python pnpm exec playwright test --config apps/holocron-web/playwright.failure.config.ts",
     "discord:smoke-trask-commands": "node scripts/discord_trask_commands_smoke.mjs"
   },
   "devDependencies": {
@@ -62,11 +59,9 @@
     "tsx": "^4.20.6",
     "typescript": "~6.0.2"
   },
-  "pnpm": {
-    "overrides": {
-      "axios": "^1.16.1",
-      "postcss": "^8.5.10",
-      "uuid": "^11.1.1"
-    }
+  "overrides": {
+    "axios": "^1.16.1",
+    "postcss": "^8.5.10",
+    "uuid": "^11.1.1"
   }
 }

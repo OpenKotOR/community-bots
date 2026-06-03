@@ -3,3 +3,4 @@ paths-ignore:
   - "**/*.test.ts"
   - "**/*.test.js"
   - "**/*.test.mjs"
+  - "scripts/sync_hf_space_secrets.py"

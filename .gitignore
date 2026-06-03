@@ -204,3 +204,7 @@ apps/hk86-web/test-results/
 llm_debug_logs/
 test-results/
 .playwright-discord-profile/
+
+# Cloudflare Wrangler local secrets
+.dev.vars
+**/.dev.vars

@@ -211,7 +211,7 @@ export const importDiscordExport = async (
         ? buildDiscordMessagePermalink(guildId, channelId, firstMessageId)
         : internalUrl;
       const chunkText = buildDiscordChunkText(channelName, scope, windowLines);
-      const chunkId = createHash("sha1")
+      const chunkId = createHash("sha256")
         .update(`${source.id}:${channelId}:${firstMessageId}:${lastMessageId}:${chunkText}`)
         .digest("hex")
         .slice(0, 16);

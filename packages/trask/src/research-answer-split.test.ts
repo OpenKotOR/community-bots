@@ -57,10 +57,13 @@ describe("syncSourcesSectionToApproved", () => {
     assert.equal(syncSourcesSectionToApproved(raw, []), "Only body [1].");
   });
 
-  test("uses homeUrl as label when name is missing", () => {
-    const synced = syncSourcesSectionToApproved("Answer.\n\nSources\n1. x", [
-      { homeUrl: "https://catalog.example/page" },
+  test("preserves deep citation URLs from the existing Sources block when indices align", () => {
+    const deep = "https://deadlystream.com/files/file/1982-tslpatcher/";
+    const raw = `Body [1].\n\nSources\n1. DS file - ${deep}`;
+    const synced = syncSourcesSectionToApproved(raw, [
+      { name: "Deadly Stream catalog", homeUrl: "https://deadlystream.com" },
     ]);
-    assert.match(synced, /1\. https:\/\/catalog\.example\/page - https:\/\/catalog\.example\/page/);
+    assert.match(synced, new RegExp(deep.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.doesNotMatch(synced, /1\. Deadly Stream catalog - https:\/\/deadlystream\.com$/m);
   });
 });

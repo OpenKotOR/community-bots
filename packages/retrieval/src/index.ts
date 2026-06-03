@@ -457,6 +457,16 @@ export const defaultSourceCatalog: readonly SourceDescriptor[] = [
     intentBias: "lore",
   },
   {
+    id: "steam-community-guides-kotor",
+    name: "Steam Community Guides",
+    kind: "website",
+    homeUrl: "https://steamcommunity.com",
+    description: "Player-authored Steam guides covering KOTOR setup, save file locations, and platform fixes; already an approved crawl host.",
+    freshnessPolicy: "weekly crawl for cited KOTOR guide pages",
+    approvalScope: "public Steam community guides",
+    tags: ["troubleshooting", "saves", "pc", "setup", "guides"],
+  },
+  {
     id: "approved-discord-knowledge",
     name: "Approved Discord Knowledge",
     kind: "discord",

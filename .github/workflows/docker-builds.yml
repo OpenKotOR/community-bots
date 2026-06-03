@@ -1,5 +1,8 @@
 name: Docker Builds CI
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
@@ -40,6 +43,8 @@ on:
 jobs:
   docker-builds:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v6
