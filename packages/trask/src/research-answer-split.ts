@@ -69,6 +69,13 @@ export const splitResearchAnswer = (value: string): { body: string; sourceLines:
   return { body, sourceLines };
 };
 
+/** Strip trailing sentence punctuation accidentally captured from source lines. */
+const stripTrailingUrlPunctuation = (value: string): string => {
+  let end = value.length;
+  while (end > 0 && ".,;:!?)".includes(value[end - 1]!)) end -= 1;
+  return value.slice(0, end);
+};
+
 /** Numbered `Sources` lines → citation index to deep URL (when present). */
 export const extractNumberedSourceUrls = (sourceLines: readonly string[]): Map<number, string> => {
   const map = new Map<number, string>();
@@ -77,7 +84,7 @@ export const extractNumberedSourceUrls = (sourceLines: readonly string[]): Map<n
     if (!numMatch) continue;
     const httpIndex = line.indexOf("http");
     if (httpIndex < 0) continue;
-    const url = line.slice(httpIndex).trim().replace(/[.,;:!?)]+$/u, "");
+    const url = stripTrailingUrlPunctuation(line.slice(httpIndex).trim());
     map.set(Number(numMatch[1]), url);
   }
   return map;
