@@ -56,6 +56,33 @@ jobs:
       - name: Bootstrap Trask indexer venv
         run: bash scripts/bootstrap_trask_indexer.sh
 
+      - name: Cache FastEmbed / HuggingFace embedding models
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/fastembed
+            ~/.cache/huggingface
+          key: fastembed-bge-small-${{ runner.os }}-v1
+          restore-keys: |
+            fastembed-bge-small-${{ runner.os }}-
+
+      - name: Pre-warm Trask embedding model
+        env:
+          HF_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            if .venv-trask-indexer/bin/python -c "from trask_indexer.embed import embed_texts; embed_texts(['ci warmup'])"; then
+              echo "Embedding model ready on attempt ${attempt}"
+              exit 0
+            fi
+            delay=$((attempt * 15))
+            echo "Embed warmup attempt ${attempt} failed; sleeping ${delay}s..."
+            sleep "${delay}"
+          done
+          echo "Could not download embedding model after 5 attempts" >&2
+          exit 1
+
       - name: Export Trask allowlist catalog
         run: node scripts/export_trask_allowlist_catalog.mjs
 
