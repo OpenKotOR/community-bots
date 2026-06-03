@@ -1,6 +1,6 @@
 # Discord /ask live verify
 
-Generated: 2026-06-03T06:04:47.582Z
+Generated: 2026-06-03T06:30:27.041Z
 
 Queries: 5 (expert verification set; URL reachability enforced)
 Passed: 5/5
@@ -54,8 +54,8 @@ Footer: `6 passages · indexer 8787`
 PASS
 
 ```
-reone wiki reone exposes Odyssey runtime and scripting capabilities so researchers can experiment with KotOR and TSL behavior outside the retail executable. [1](https://github.com/seedhartha/reone/wiki)
-About A reimplementation of BioWare's Aurora engine (and derivatives). Pre-pre-alpha :P xoreos.org/ [4](https://github.com/xoreos/xoreos)
+reone Odyssey engine The reone project is an open-source reimplementation of the Odyssey engine for KotOR and TSL. It provides runtime, rendering, and scripting surfaces for engine research. [1](https://github.com/seedhartha/reone)
+reone wiki reone exposes Odyssey runtime and scripting capabilities so researchers can experiment with KotOR and TSL behavior outside the retail executable. [2](https://github.com/seedhartha/reone/wiki)
 ```
 
-Footer: `10 passages · indexer 8787`
+Footer: `11 passages · indexer 8787`
