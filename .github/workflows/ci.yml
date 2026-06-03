@@ -140,8 +140,17 @@ jobs:
           TRASK_INDEXER_BASE_URL: http://127.0.0.1:8787
           HOLOCRON_E2E_SKIP_STACK_BOOTSTRAP: "1"
 
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            playwright-chromium-${{ runner.os }}-
+
+      # ubuntu-latest images already ship most browser deps; --with-deps apt can stall for hours.
       - name: Install Playwright Chromium
-        run: pnpm exec playwright install chromium --with-deps
+        run: pnpm exec playwright install chromium
 
       - name: Holocron Playwright e2e (5 expert queries + reload)
         run: pnpm holocron:e2e:playwright
