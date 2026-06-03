@@ -61,6 +61,7 @@ import {
 } from "./grounded-evidence.js";
 import { filterReachableByUrl } from "./citation-url-verify.js";
 import { isDiscordJumpUrl } from "./discord-citation-url.js";
+import { enrichClaimsWithGitHubPermalinks } from "./github-citation-url.js";
 
 import {
   isGroundedComposeEnabled,
@@ -1464,6 +1465,8 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
         claims = heuristicClaims;
       }
     }
+
+    claims = await enrichClaimsWithGitHubPermalinks(claims);
 
     const minimumSupport =
       composeProfile === "brief"
