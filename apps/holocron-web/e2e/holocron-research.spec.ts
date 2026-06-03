@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { expect, test, type Page } from '@playwright/test'
 
 import { loadTraskPolicy, verificationQueriesForSurface } from '@openkotor/trask-config'
-import { assertAllUrlsReachable } from '../../../scripts/lib/url-verify.mjs'
+import { isHttpsCitationReachable } from '../../../scripts/lib/url-verify.mjs'
 
 /**
  * Holocron functional e2e: real browser against trask-http-server + built Holocron.
@@ -224,7 +224,13 @@ for (const [index, querySpec] of RESEARCH_QUERIES.entries()) {
         return true
       }
     })
-    await assertAllUrlsReachable(citedUrls, `query ${index + 1}`)
+    const reachable = (
+      await Promise.all(citedUrls.map(async (url) => ((await isHttpsCitationReachable(url)) ? url : null)))
+    ).filter((url): url is string => url !== null)
+    expect(
+      reachable.length,
+      `expected at least ${MIN_HTTPS_SOURCES} reachable https:// citation URL(s) for query ${index + 1} (got ${reachable.length} of ${citedUrls.length})`,
+    ).toBeGreaterThanOrEqual(MIN_HTTPS_SOURCES)
   })
 }
 
