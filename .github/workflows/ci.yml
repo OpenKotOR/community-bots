@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     name: Build & Test
@@ -47,9 +50,6 @@ jobs:
 
       - name: Unit tests
         run: node --test packages/*/dist/*.test.js apps/*/dist/*.test.js
-
-      - name: Install Playwright (Chromium)
-        run: pnpm exec playwright install chromium --with-deps
 
       - name: Bootstrap Trask indexer venv
         run: bash scripts/bootstrap_trask_indexer.sh
