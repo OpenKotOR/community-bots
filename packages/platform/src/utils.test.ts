@@ -321,7 +321,7 @@ test("buildSocialAuthAuthorizeUrl uses startUrl template when provided", () => {
 
 test("buildSocialAuthAuthorizeUrl builds a valid Google URL", () => {
   const url = buildSocialAuthAuthorizeUrl("google", baseInput);
-  assert.ok(url.startsWith("https://accounts.google.com"));
+  assert.equal(new URL(url).origin, "https://accounts.google.com");
   const parsed = new URL(url);
   assert.equal(parsed.searchParams.get("client_id"), "client-123");
   assert.equal(parsed.searchParams.get("response_type"), "code");
