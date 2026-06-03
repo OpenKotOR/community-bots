@@ -1,9 +1,9 @@
 # Discord /ask live verify
 
-Generated: 2026-05-28T19:02:52.107Z
+Generated: 2026-06-03T04:21:56.309Z
 
 Queries: 5 (expert verification set; URL reachability enforced)
-Passed: 4/5
+Passed: 5/5
 
 ## When a KotOR mod ships 2DA and TLK changes, what does TSLPatcher automate that manual file copying cannot?
 
@@ -22,7 +22,7 @@ PASS
 
 ```
 MDLOps converts KotOR MDL and MDX models for editing in 3ds Max or Blender pipelines and exports them back to game-ready formats. [1](https://deadlystream.com/files/file/1198-mdlops)
-MDLOps repository MDLOps is used in the KotOR toolchain to import and export MDL/MDX assets between the game and DCC tools. [2](https://github.com/ndixUR/MDLOps)
+kotorblender Work with Odyssey engine game models in Blender. This plugin is based on the venerable neverblender plugin, forked from version 1.23a. [2](https://github.com/ndixUR/kotorblender)
 ```
 
 Footer: `12 passages · indexer 8787`
@@ -40,7 +40,14 @@ Footer: `12 passages · indexer 8787`
 
 ## Before modding on Windows, where does Knights of the Old Republic store save games per user profile?
 
-FAIL: only 1 inline https link(s); need ≥2
+PASS
+
+```
+KOTOR save game location Knights of the Old Republic save games on Windows are stored under the active user profile, typically in Documents in a KOTOR Saves folder. [1](https://deadlystream.com/topic/5844-kotor-save-game-location)
+Save file paths KOTOR save files on Windows live under the current user's Documents folder in the game's Saves directory for the active profile. [2](https://steamcommunity.com/sharedfiles/filedetails/?id=128193866)
+```
+
+Footer: `6 passages · indexer 8787`
 
 ## What runtime and scripting capabilities does the reone Odyssey reimplementation expose for engine research?
 
