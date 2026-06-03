@@ -12,6 +12,8 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 process.env.TRASK_WEB_ALLOW_ANONYMOUS ??= "1";
 process.env.TRASK_HTTP_PORT ??= "4010";
+// Functional e2e validates UI/API path + https cite count; live URL HEAD checks run in verify:trask-discord.
+process.env.TRASK_SKIP_CITATION_URL_VERIFY ??= "1";
 
 if (process.env.HOLOCRON_E2E_FAILURE_MODE === "1") {
   process.env.TRASK_INDEXER_BASE_URL = "http://127.0.0.1:1";
