@@ -8,7 +8,11 @@
  * vector index, so "in Cloudflare" means scheduling here, storage on the host.
  */
 
-const trimTrailingSlashes = (value: string): string => value.replace(/\/+$/, "");
+const trimTrailingSlashes = (value: string): string => {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === "/") end -= 1;
+  return value.slice(0, end);
+};
 
 export interface Env {
   TRASK_INDEXER_REINDEX_URL: string;
@@ -89,7 +93,11 @@ export default {
     // Manual trigger for operators (same auth as the indexer enforces downstream).
     if (request.method === "POST" && url.pathname === "/trigger") {
       const result = await triggerReindex(env);
-      return json(result.ok ? 202 : 502, result);
+      return json(result.ok ? 202 : 502, {
+        ok: result.ok,
+        status: result.status,
+        detail: result.ok ? "reindex accepted" : "reindex trigger failed",
+      });
     }
     return json(404, { error: "not_found", path: url.pathname });
   },

@@ -481,13 +481,15 @@ export const composeGroundedAnswerFromClaims = (
     return url.slice(0, end);
   };
 
-  const stripMarkdownArtifacts = (value: string): string =>
-    value
-      .replace(/!\[([^\]]*)\]\([^)]*\)/gu, "$1")
-      .replace(/\[([^\]]*)\]\([^)]*\)/gu, "$1")
-      .replace(/\[\]\([^)]*\)/gu, "")
+  const stripMarkdownArtifacts = (value: string): string => {
+    const capped = value.length > 8000 ? value.slice(0, 8000) : value;
+    return capped
+      .replace(/!\[([^\]]{0,500})\]\([^)]{0,500}\)/gu, "$1")
+      .replace(/\[([^\]]{0,500})\]\([^)]{0,500}\)/gu, "$1")
+      .replace(/\[\]\([^)]{0,500}\)/gu, "")
       .replace(/\*+/gu, "")
       .replace(/`+/gu, "");
+  };
 
   const stripClaimTitle = (claim: string): string => {
     const lines = claim.split("\n");

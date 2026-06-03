@@ -427,29 +427,12 @@ import { buildBrowserCorsAllowedOrigins, resolveCorsHeaders } from "./cors.js";
 
 test("buildBrowserCorsAllowedOrigins includes discordsays.com when discordAppId is set", () => {
   const origins = buildBrowserCorsAllowedOrigins({ discordAppId: "123456789" });
-  assert.ok(
-    origins.some((origin) => {
-      try {
-        const host = new URL(origin).hostname;
-        return host.includes("123456789") && host.endsWith("discordsays.com");
-      } catch {
-        return false;
-      }
-    }),
-  );
+  assert.ok(origins.includes("https://123456789.discordsays.com"));
 });
 
 test("buildBrowserCorsAllowedOrigins omits discordsays.com when discordAppId is absent", () => {
   const origins = buildBrowserCorsAllowedOrigins({});
-  assert.ok(
-    !origins.some((origin) => {
-      try {
-        return new URL(origin).hostname.endsWith("discordsays.com");
-      } catch {
-        return false;
-      }
-    }),
-  );
+  assert.ok(!origins.includes("https://123456789.discordsays.com"));
 });
 
 test("buildBrowserCorsAllowedOrigins includes publicWebOrigin when provided", () => {

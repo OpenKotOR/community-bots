@@ -73,7 +73,7 @@ export const splitResearchAnswer = (value: string): { body: string; sourceLines:
 export const extractNumberedSourceUrls = (sourceLines: readonly string[]): Map<number, string> => {
   const map = new Map<number, string>();
   for (const line of sourceLines) {
-    const match = line.match(/^\s*(\d+)\.\s+.+\s-\s+(https?:\S+)/u);
+    const match = line.match(/^\s*(\d+)\.\s+[^\n]+\s-\s+(https?:\S+)/u);
     if (!match) continue;
     const url = match[2]!.replace(/[.,;:!?)]+$/u, "");
     map.set(Number(match[1]), url);
