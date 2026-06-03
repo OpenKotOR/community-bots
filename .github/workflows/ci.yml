@@ -144,6 +144,7 @@ jobs:
           TRASK_SKIP_BUILD: "1"
           TRASK_INDEXER_BASE_URL: http://127.0.0.1:8787
           HOLOCRON_E2E_SKIP_STACK_BOOTSTRAP: "1"
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
       - name: Trask offline gate (smoke + config drift + measure)
         run: pnpm trask:gate:ci
