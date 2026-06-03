@@ -45,7 +45,6 @@ def main() -> int:
         if not value:
             continue
         api.add_space_secret(repo_id=repo_id, key=key, value=value)
-        print(f"Synced secret {key}")
         synced_secrets += 1
 
     synced_variables = 0
@@ -54,14 +53,17 @@ def main() -> int:
         if not value:
             continue
         api.add_space_variable(repo_id=repo_id, key=key, value=value)
-        print(f"Synced variable {key}")
         synced_variables += 1
 
-    if synced_secrets == 0:
+    if synced_secrets > 0:
+        print(f"Synced {synced_secrets} secret(s) (names redacted).")
+    else:
         print(
             "No optional LLM secrets synced (OPENAI_API_KEY / OPENROUTER_API_KEY / … not set). "
             "Space will use llm_fallbacks free models and local knowledge when configured.",
         )
+    if synced_variables > 0:
+        print(f"Synced {synced_variables} space variable(s) (names redacted).")
     print(f"Done: {synced_secrets} secret(s), {synced_variables} variable(s).")
     return 0
 
