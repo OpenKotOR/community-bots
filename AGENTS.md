@@ -145,6 +145,8 @@ pnpm verify:trask-cli
 
 `pnpm verify:trask-cli` runs `scripts/verify_trask_cli_qa.mjs` (golden queries). `pnpm verify:trask-cli:ci` / `pnpm trask:verify-import-smoke:ci` use `--import-smoke` (no LLM). `pnpm verify:trask-discord` runs live Discord-format checks via the research wizard.
 
+**Playwright (offline Discord + live Holocron):** `pnpm trask:e2e:discord:playwright` — static harness on **:4012** (`scripts/discord-ask-e2e-webserver.mjs`, `e2e/trask-discord-ask.spec.mjs`); mirrors import-smoke embed contract in a real browser (no discord.com, no LLM). `pnpm trask:e2e:playwright` runs Discord harness then `pnpm holocron:e2e:playwright`. CI Build job runs Discord Playwright after `trask:gate:ci`.
+
 #### Offline faithfulness gate (citation alignment)
 
 After code changes to answer formatting, citation alignment, or `grounded-evidence.ts`, run:
@@ -164,7 +166,7 @@ pnpm trask:faithfulness-eval     # faithfulness fixtures only
 
 ### Trask Discord `/ask` — mandatory verification (agents)
 
-**Do not claim Discord `/ask` is fixed until live checks pass.** Run `pnpm verify:trask-discord` (full expert set). Holocron requires `pnpm holocron:e2e` and, when browser MCP works, all five UI queries on `:4010`. Discord web UI is not Playwright-gated in CI; live verify exercises the same compose/format path as the bot. 
+**Do not claim Discord `/ask` is fixed until live checks pass.** Run `pnpm verify:trask-discord` (full expert set). Offline Playwright gate: `pnpm trask:e2e:discord:playwright` (five golden import-smoke embeds on **:4012**). Holocron requires `pnpm holocron:e2e` and, when browser MCP works, all five UI queries on `:4010`. CI runs offline Discord Playwright in Build; live `verify:trask-discord` still needs a bot token locally. 
 
 1. **Worker retrieve** at `TRASK_INDEXER_BASE_URL=http://127.0.0.1:8787` — `pnpm verify:trask-discord` auto-bootstraps indexer+Worker when unhealthy (same as CLI/Holocron e2e); manual path: `bash scripts/trask_live_stack.sh` with QA seed `bash scripts/bootstrap_trask_indexer.sh`, `bash scripts/trask_index_seed_for_qa.sh`.
 2. **Restart** Trask bot after `@openkotor/trask` changes: kill old `trask-bot/dist/main.js`, rebuild (`pnpm build`), start with `TRASK_INDEXER_BASE_URL` + `TRASK_WEB_RESEARCH_PYTHON` + `.env` token.
