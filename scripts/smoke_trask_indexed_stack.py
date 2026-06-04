@@ -79,6 +79,32 @@ def pick_seed_url(catalog) -> str:
     return catalog.sources[0].home_url if catalog.sources else DEFAULT_URL
 
 
+def _verify_golden_retrieve(collection) -> int:
+    for fixture in GOLDEN_FIXTURES:
+        hits = query_passages(collection, fixture["query"], limit=3)
+        joined = " ".join(h.quote.lower() for h in hits)
+        needle = fixture["must_contain"].lower()
+        if needle not in joined:
+            print(
+                f"Retrieve verify failed for: {fixture['query']!r} (expected {needle!r} in hits)",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"OK retrieve: {fixture['query'][:48]}…")
+    return 0
+
+
+def verify_golden_chroma_only(data_dir: Path) -> int:
+    persist_dir = data_dir / "chroma"
+    if not persist_dir.is_dir():
+        print(f"Missing {persist_dir}; run golden seed in build-and-test job first", file=sys.stderr)
+        return 1
+    client = get_chroma_client(persist_dir)
+    collection = get_or_create_collection(client)
+    print(f"Verifying cached Chroma at {persist_dir} (no re-index).")
+    return _verify_golden_retrieve(collection)
+
+
 def seed_golden_fixtures(data_dir: Path, *, verify: bool) -> int:
     persist_dir = data_dir / "chroma"
     if persist_dir.is_dir():
@@ -103,18 +129,7 @@ def seed_golden_fixtures(data_dir: Path, *, verify: bool) -> int:
     if not verify:
         return 0
 
-    for fixture in GOLDEN_FIXTURES:
-        hits = query_passages(collection, fixture["query"], limit=3)
-        joined = " ".join(h.quote.lower() for h in hits)
-        needle = fixture["must_contain"].lower()
-        if needle not in joined:
-            print(
-                f"Retrieve verify failed for: {fixture['query']!r} (expected {needle!r} in hits)",
-                file=sys.stderr,
-            )
-            return 1
-        print(f"OK retrieve: {fixture['query'][:48]}…")
-    return 0
+    return _verify_golden_retrieve(collection)
 
 
 def main() -> int:
@@ -137,6 +152,11 @@ def main() -> int:
         help="With --golden-fixtures, assert each golden query retrieves relevant text",
     )
     parser.add_argument(
+        "--verify-chroma-only",
+        action="store_true",
+        help="With --golden-fixtures --verify-retrieve, reuse existing chroma (CI Playwright job)",
+    )
+    parser.add_argument(
         "--data-dir",
         default=os.environ.get("TRASK_INDEXER_DATA_DIR", "data/trask-indexer"),
     )
@@ -145,6 +165,11 @@ def main() -> int:
     data_dir = Path(args.data_dir)
 
     if args.golden_fixtures:
+        if args.verify_chroma_only:
+            if not args.verify_retrieve:
+                print("--verify-chroma-only requires --verify-retrieve", file=sys.stderr)
+                return 1
+            return verify_golden_chroma_only(data_dir)
         return seed_golden_fixtures(data_dir, verify=args.verify_retrieve)
 
     allowlist_path = default_allowlist_path(data_dir)

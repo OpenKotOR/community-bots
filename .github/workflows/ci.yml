@@ -18,21 +18,10 @@ jobs:
   build-and-test:
     name: Build & Test
     runs-on: ubuntu-latest
-    # Preinstalled browsers + deps; GHA `playwright install` CDN/extract repeatedly timed out (exit 124).
-    container:
-      image: mcr.microsoft.com/playwright:v1.58.2-noble
-    defaults:
-      run:
-        shell: bash
     permissions:
       contents: read
 
     steps:
-      - name: Install python3-venv (Playwright image)
-        run: |
-          apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y python3.12-venv
-
       - name: Checkout
         uses: actions/checkout@v6
         with:
@@ -82,8 +71,15 @@ jobs:
           restore-keys: |
             fastembed-bge-small-${{ runner.os }}-
 
+      - name: Cache Trask Chroma golden index
+        uses: actions/cache@v4
+        with:
+          path: data/trask-indexer/chroma
+          key: trask-chroma-golden-${{ hashFiles('scripts/smoke_trask_indexed_stack.py') }}
+          restore-keys: |
+            trask-chroma-golden-
+
       - name: Pre-warm Trask embedding model
-        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
         env:
           HF_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
           HUGGINGFACE_HUB_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
@@ -101,7 +97,6 @@ jobs:
               exit 0
             fi
           fi
-          # One hub download pass (auth + backoff). Avoid 8× fastembed init retry storms that trigger HF 429.
           "$PY" - <<'PY'
           import os
           import time
@@ -180,7 +175,6 @@ jobs:
           cat /tmp/trask-worker.log
           exit 1
 
-      # Idempotent smoke: same path as local `pnpm trask:smoke:stack-bootstrap` (PR #69).
       - name: Trask QA stack bootstrap smoke
         run: pnpm trask:smoke:stack-bootstrap
         env:
@@ -192,6 +186,116 @@ jobs:
           TRASK_INDEXER_BASE_URL: http://127.0.0.1:8787
           HOLOCRON_E2E_SKIP_STACK_BOOTSTRAP: "1"
 
+  holocron-playwright-e2e:
+    name: Holocron Playwright e2e
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.58.2-noble
+    defaults:
+      run:
+        shell: bash
+    permissions:
+      contents: read
+
+    steps:
+      - name: Install python3-venv (Playwright image)
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y python3.12-venv curl
+
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.11.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Rebuild esbuild native binary
+        run: pnpm rebuild esbuild
+
+      - name: TypeScript build
+        run: pnpm build
+
+      - name: Bootstrap Trask indexer venv
+        run: bash scripts/bootstrap_trask_indexer.sh
+
+      - name: Cache FastEmbed / HuggingFace embedding models
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/fastembed
+            ~/.cache/huggingface
+          key: fastembed-bge-small-${{ runner.os }}-v2
+          restore-keys: |
+            fastembed-bge-small-${{ runner.os }}-
+
+      - name: Cache Trask Chroma golden index
+        uses: actions/cache@v4
+        with:
+          path: data/trask-indexer/chroma
+          key: trask-chroma-golden-${{ hashFiles('scripts/smoke_trask_indexed_stack.py') }}
+          restore-keys: |
+            trask-chroma-golden-
+
+      - name: Probe FastEmbed from Actions cache
+        run: .venv-trask-indexer/bin/python -c "from trask_indexer.embed import embed_texts; embed_texts(['ci probe']); print('embed ok')"
+
+      - name: Verify Chroma golden index (from prior job cache)
+        run: .venv-trask-indexer/bin/python scripts/smoke_trask_indexed_stack.py --golden-fixtures --verify-retrieve --verify-chroma-only
+        env:
+          TRASK_INDEXER_DATA_DIR: data/trask-indexer
+
+      - name: Start Trask indexer (background)
+        run: |
+          set -euo pipefail
+          .venv-trask-indexer/bin/trask-indexer serve > /tmp/trask-indexer.log 2>&1 &
+          INDEXER_PID=$!
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8790/health; then
+              exit 0
+            fi
+            if ! kill -0 "$INDEXER_PID" 2>/dev/null; then
+              cat /tmp/trask-indexer.log
+              exit 1
+            fi
+            sleep 1
+          done
+          cat /tmp/trask-indexer.log
+          exit 1
+
+      - name: Start Trask retrieve Worker (background)
+        run: |
+          set -euo pipefail
+          cd infra/trask-retrieve-worker
+          TRASK_INDEXER_BASE_URL=http://127.0.0.1:8790 \
+            pnpm exec wrangler dev --port 8787 --local-protocol http > /tmp/trask-worker.log 2>&1 &
+          WORKER_PID=$!
+          for i in $(seq 1 45); do
+            if curl -sf http://127.0.0.1:8787/health; then
+              exit 0
+            fi
+            if ! kill -0 "$WORKER_PID" 2>/dev/null; then
+              cat /tmp/trask-worker.log
+              exit 1
+            fi
+            sleep 1
+          done
+          cat /tmp/trask-worker.log
+          exit 1
+
       - name: Holocron Playwright e2e (5 expert queries + reload)
         run: pnpm holocron:e2e:playwright
         env:
@@ -200,5 +304,37 @@ jobs:
           HOLOCRON_E2E_SKIP_STACK_BOOTSTRAP: "1"
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
+  trask-gate-final:
+    name: Trask gate (final)
+    needs: [build-and-test, holocron-playwright-e2e]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.11.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: TypeScript build
+        run: pnpm build
+
       - name: Trask offline gate (smoke + config drift + measure)
         run: pnpm trask:gate:ci
+        env:
+          TRASK_SKIP_BUILD: "1"
