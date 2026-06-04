@@ -14,7 +14,7 @@ warmup() {
   "$PY" -c "from trask_indexer.embed import embed_texts; embed_texts(['ci warmup']); print('embed ok')"
 }
 
-if find "$FASTEMBED_CACHE_PATH" -type f -print -quit 2>/dev/null | grep -q .; then
+if [ -n "$(find "$FASTEMBED_CACHE_PATH" -type f -print -quit 2>/dev/null)" ]; then
   echo "FastEmbed cache dir has files at $FASTEMBED_CACHE_PATH; probing..."
   if warmup; then
     echo "Embedding model ready from cache"
@@ -24,6 +24,11 @@ if find "$FASTEMBED_CACHE_PATH" -type f -print -quit 2>/dev/null | grep -q .; th
 fi
 
 max_attempts="${TRASK_CI_EMBED_WARMUP_ATTEMPTS:-8}"
+if [ "$max_attempts" -lt 1 ] 2>/dev/null; then
+  echo "TRASK_CI_EMBED_WARMUP_ATTEMPTS must be >= 1 (got: ${TRASK_CI_EMBED_WARMUP_ATTEMPTS:-})" >&2
+  exit 1
+fi
+
 for attempt in $(seq 1 "$max_attempts"); do
   if warmup; then
     echo "Embedding model ready (attempt $attempt)"
@@ -37,3 +42,6 @@ for attempt in $(seq 1 "$max_attempts"); do
   echo "warmup attempt $attempt failed; sleep ${wait}s"
   sleep "$wait"
 done
+
+echo "Embedding warmup failed: exhausted attempts without success" >&2
+exit 1
