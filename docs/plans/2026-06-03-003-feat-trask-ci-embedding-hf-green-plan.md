@@ -1,7 +1,7 @@
 ---
 title: "feat(trask): green CI — HF embedding pre-warm"
 type: feat
-status: in_progress
+status: completed
 date: 2026-06-03
 origin: user /lfg continue + PR #94 CI Failures Unresolved (HF 429)
 ---
@@ -20,7 +20,7 @@ Build & Test failed because Actions cached `~/.cache/fastembed` while FastEmbed 
 | R2 | `scripts/ci_warm_trask_embed.sh` — embed probe only (no extra hub repos); backoff on 429 |
 | R2b | Cache key `fastembed-bge-small-*-v3` |
 | R3 | `upload-artifact` / `download-artifact` for Chroma + FastEmbed (container job cannot restore host `actions/cache`) |
-| R4 | PR #94 Build & Test green through Holocron e2e + final gate |
+| R4 | PR #94 Build & Test green through Holocron e2e + final gate — **verified** run `26929259325` (747bbdf) |
 
 ## Out of scope
 
