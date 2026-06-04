@@ -1,5 +1,5 @@
 ---
-status: active
+status: completed
 branch: feat/holocron-topnav-ci-followup
 origin: docs/plans/2026-06-03-001-feat-trask-playwright-holocron-discord-e2e-plan.md
 date: 2026-06-04
