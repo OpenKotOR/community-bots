@@ -72,17 +72,20 @@ jobs:
           HF_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
         run: |
           set -euo pipefail
-          for attempt in 1 2 3 4 5; do
-            if .venv-trask-indexer/bin/python -c "from trask_indexer.embed import embed_texts; embed_texts(['ci warmup'])"; then
-              echo "Embedding model ready on attempt ${attempt}"
-              exit 0
-            fi
-            delay=$((attempt * 15))
-            echo "Embed warmup attempt ${attempt} failed; sleeping ${delay}s..."
-            sleep "${delay}"
-          done
-          echo "Could not download embedding model after 5 attempts" >&2
-          exit 1
+          echo "Checking local cache first..."
+          if HF_HUB_OFFLINE=1 .venv-trask-indexer/bin/python -c "from trask_indexer.embed import embed_texts; embed_texts(['ci warmup'])" 2>/dev/null; then
+            echo "Embedding model found in cache and is ready (offline)."
+            exit 0
+          fi
+
+          echo "Model not found in cache or cache incomplete. Attempting online download..."
+          if .venv-trask-indexer/bin/python -c "from trask_indexer.embed import embed_texts; embed_texts(['ci warmup'])"; then
+            echo "Embedding model downloaded successfully and is ready."
+            exit 0
+          fi
+
+          echo "::warning::Failed to download embedding model from Hugging Face. Warmup failed, but continuing build."
+          exit 0
 
       - name: Export Trask allowlist catalog
         run: node scripts/export_trask_allowlist_catalog.mjs
