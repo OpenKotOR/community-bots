@@ -174,7 +174,13 @@ jobs:
 
       # ubuntu-latest images already ship most browser deps; --with-deps apt can stall for hours.
       - name: Install Playwright Chromium
-        run: pnpm exec playwright install chromium
+        run: |
+          set -euo pipefail
+          if find "${HOME}/.cache/ms-playwright" -type f \( -name chrome -o -name headless_shell \) 2>/dev/null | head -1 | grep -q .; then
+            echo "Playwright Chromium already in Actions cache; skipping download."
+            exit 0
+          fi
+          timeout 600 pnpm exec playwright install chromium
 
       - name: Holocron Playwright e2e (5 expert queries + reload)
         run: pnpm holocron:e2e:playwright
