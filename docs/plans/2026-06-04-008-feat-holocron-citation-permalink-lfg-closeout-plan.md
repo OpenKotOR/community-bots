@@ -1,5 +1,5 @@
 ---
-status: active
+status: completed
 branch: feat/holocron-topnav-ci-followup
 origin: docs/plans/2026-06-04-007-feat-holocron-answer-citation-render-plan.md
 ---
