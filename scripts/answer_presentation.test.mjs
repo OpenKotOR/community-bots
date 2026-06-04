@@ -44,6 +44,17 @@ describe('peelEmbeddedNumberedSources', () => {
     assert.match(split.sourceText, /^1\./m)
   })
 
+  it('does not peel long numbered instructional lines without URLs', () => {
+    const raw = [
+      'Install TSLPatcher from the release page.',
+      '1. Download the latest TSLPatcher archive from the releases page',
+      '2. Extract the archive and run TSLPatcher.exe as administrator',
+    ].join('\n')
+    const split = peelEmbeddedNumberedSources(raw)
+    assert.match(split.answerText, /Install TSLPatcher/)
+    assert.equal(split.sourceText, '')
+  })
+
   it('treats source-only numbered answers as bibliography', () => {
     const raw = [
       '1. reone Odyssey engine - https://github.com/seedhartha/reone',

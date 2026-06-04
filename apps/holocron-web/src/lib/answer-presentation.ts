@@ -229,7 +229,7 @@ function stripSourceNoise(text: string): string {
 function isNumberedBibliographyLine(line: string): boolean {
   const trimmed = line.trim()
   if (!parseNumberedSourceLine(trimmed)) return false
-  return extractHttpUrls(trimmed).length > 0 || trimmed.length > 24
+  return extractHttpUrls(trimmed).length > 0
 }
 
 /**
