@@ -1,7 +1,7 @@
 ---
 title: "fix(holocron): OpenKotOR site path links + CI cache follow-up"
 type: fix
-status: in_progress
+status: completed
 date: 2026-06-03
 origin: user /lfg + openkotor/site route convention (/projects not /#projects)
 ---
