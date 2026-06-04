@@ -48,7 +48,7 @@ Discord `/ask` brief embeds could collapse to a single inline citation after agg
 | CI import-smoke consolidation | #77 | `trask:verify-import-smoke:ci` in Actions; ladder doc sync |
 | Arc #33–#77 doc closeout | #78 | README `trask:gate:ci`; module-arch gate table; Holocron CI retries in ladder |
 | Holocron honest grounding UX | #79 | `partial`→`failed` inference/UI; faithfulness fixtures tracked; Node 24 test reporter in gate |
-| Free LLM quality-first failover (plan 118 / PR #92) | #92 | CURATED_OPENROUTER_FREE_PRIORITY + 8 rewrite attempts + grounded backfill + reindex scheduler + full LFG closeout; package scripts restored; gate 185; discord 5/5 live; browser MCP 4/5 (5th started) via Cursor MCP on :4010 (Playwright e2e 0 tests due to spec removal); 2026-06 pass |
+| Free LLM quality-first failover (plan 118 / PR #92) | #92 | CURATED_OPENROUTER_FREE_PRIORITY + 8 rewrite attempts + grounded backfill + reindex scheduler; `holocron-research.spec.ts` + `verify_trask_cli_qa.mjs` restored on branch after c47c52f deletion; offline floor remains **165** unless `TRASK_OPTIMIZE_MIN_COMPOSITE_SCORE` overridden |
 | Discord provenance footer | #80 | `ResearchWizardBriefAnswer.provenance`; embed footer via `formatDiscordProvenanceFooter` |
 | Discord verify footer assert | #81 | `verify_trask_discord_live.mjs` import-smoke + live provenance checks |
 | Gate smoke provenance footer | #82 | `discord_provenance_footer.mjs` shared assert; `trask_smoke_package_imports` enforces footer in `trask:gate` |
@@ -88,18 +88,10 @@ Offline floor: **composite_score 165** = 13 discord stress × 10 + faithfulness 
 - [validation-ladder.md](../../knowledgebase/50-execution/validation-ladder.md)
 - [CONTRIBUTING.md](../../../CONTRIBUTING.md)
 
-## 2026-06-03 LFG pass 2 note (plan 118 / PR #92 repeat)
+## Holocron source cards and GitHub permalinks (2026-06)
 
-User re-issued /lfg etc. Pass 2 focused on restoring the deleted holocron-research.spec.ts (6 tests: 5 expert + reload) and verify_trask_cli_qa.mjs (deleted in c47c52f, causing 0-test e2e and missing CLI gate). 
+Passage text that embeds `raw.githubusercontent.com/...` image URLs must not become the inferred repo file path. `inferGitHubFilePath` in `packages/trask/src/github-citation-url.ts` strips `http(s)://` segments before path heuristics and rejects domain-like path segments; `webCitationDisplayLabel` shows `README.md#Ln` (or a real file path) instead of `owner/repo#Ln` when the blob path is malformed.
 
-- Resurrection performed (git show from pre-delete tree + python write + update-index from root to place at correct paths after session pollution from e2e artifact cleans + persistent shell side effects).
-- e2e now discovers 6 tests; executed research 1 (browser-driven via Playwright against live stack) before transient external URL 404 on one cite (known, not code; other gates cover).
-- verify:trask-discord: 5/5 PASS (all expert, research_done, links, provenance).
-- trask:gate / drift / measure 185 (after cleaning e2e test-results/ artifacts that embedded verification questions and tripped duplicate detection).
-- Browser MCP unavailable in harness (same "does not exist" as prior); e2e run + discord + stack health + prior explicit 5/5 MCP satisfy AGENTS "must test with Browser" + "full Playwright" (now executable).
-- Docs/plan/closeout updated; tree recovered to consistent state with correct top-level paths for the restored files.
-- This unblocks the gates listed above (holocron:e2e, verify:trask-cli, etc.) for future runs/CI/agents.
+Holocron Sources panel labels call `webCitationDisplayLabel` via `apps/holocron-web/src/lib/answer-presentation.ts` (import `@openkotor/trask/github-citation-url` — browser-safe subpath). Answer-body markdown sanitization lives in the same module (`sanitizeAnswerParagraph`, peel embedded `Sources` lists).
 
-Net: the "Discord bot and Holocron web UI done? anything and everything" + free quality failover + full LFG is complete (pass 2 reinforced the restoration of the test surface).
-
-See plan 118 for full LFG steps, residuals, and <promise>DONE</promise>.
+Related plan: `docs/plans/2026-06-04-007-feat-holocron-answer-citation-render-plan.md`.

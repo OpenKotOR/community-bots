@@ -47,7 +47,7 @@ Agents and CI were blocked on a submodule that users explicitly retired. A singl
 ## Verification
 
 - **CLI smoke:** `pnpm verify:trask-cli` (after `bash scripts/trask_live_stack.sh`).
-- **Holocron browser e2e:** `pnpm holocron:e2e` — spec at `apps/holocron-web/e2e/holocron-research.spec.ts` (canonical queries from `data/trask/verification-queries.json`).
+- **Holocron browser e2e:** `pnpm holocron:e2e` — spec at `apps/holocron-web/e2e/holocron-research.spec.ts` (expert phrasing from `data/trask/eval/verification-queries.json`).
 - **Batch corpus:** `bash scripts/trask_crawl_catalog.sh` (`trask-indexer crawl-seeds`) — operator Crawl4AI index of allowlist home URLs into Chroma before query-time recovery.
 - **Discord:** `pnpm verify:trask-discord`.
 - **Offline compose alignment:** `pnpm trask:faithfulness-eval` (fixtures under `data/trask-eval/fixtures/`).

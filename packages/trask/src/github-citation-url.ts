@@ -61,6 +61,35 @@ const hasDeepGitHubPath = (url: string): boolean => {
 const normalizeForSearch = (value: string): string =>
   value.replace(/\s+/gu, " ").trim().toLowerCase();
 
+const REPO_FILE_EXTENSION_RE =
+  /\.(?:md|markdown|txt|cpp|c|h|hpp|cc|cxx|py|rs|js|ts|tsx|json|yml|yaml|cmake|ini|nss|ncs)$/iu;
+
+const INVALID_REPO_PATH_MARKERS = [
+  "githubusercontent",
+  "raw.githubusercontent",
+  ".com/",
+  "://",
+] as const;
+
+export const isPlausibleRepoRelativePath = (filePath: string): boolean => {
+  const normalized = filePath.replace(/^\/+/u, "").trim();
+  if (!normalized || normalized.length > 260) return false;
+  const lower = normalized.toLowerCase();
+  for (const marker of INVALID_REPO_PATH_MARKERS) {
+    if (lower.includes(marker)) return false;
+  }
+  if (!REPO_FILE_EXTENSION_RE.test(normalized)) return false;
+  const segments = normalized.split("/").filter(Boolean);
+  if (segments.length === 0) return false;
+  for (const segment of segments) {
+    if (/^www\./iu.test(segment) || segment.includes(".com")) return false;
+  }
+  return true;
+};
+
+const passageTextWithoutHttpUrls = (passageText: string): string =>
+  passageText.replace(/https?:\/\/\S+/giu, " ");
+
 export const inferGitHubFilePath = (pageUrl: string, passageText: string): string => {
   if (/\/wiki(\/|$)/iu.test(pageUrl)) {
     try {
@@ -73,16 +102,33 @@ export const inferGitHubFilePath = (pageUrl: string, passageText: string): strin
     }
   }
 
-  const explicitPath = passageText.match(
+  const haystack = passageTextWithoutHttpUrls(passageText);
+  const explicitPath = haystack.match(
     /\b((?:[\w.-]+\/)+[\w.-]+\.(?:md|markdown|txt|cpp|c|h|hpp|cc|cxx|py|rs|js|ts|tsx|json|yml|yaml|cmake|ini|nss|ncs))\b/iu,
   );
-  if (explicitPath?.[1]) return explicitPath[1].replace(/^\/+/u, "");
+  if (explicitPath?.[1]) {
+    const candidate = explicitPath[1].replace(/^\/+/u, "");
+    if (isPlausibleRepoRelativePath(candidate)) return candidate;
+  }
 
-  if (/\bREADME(?:\.md)?\b/iu.test(passageText) || /^#\s+/m.test(passageText)) {
+  if (/\bREADME(?:\.md)?\b/iu.test(haystack) || /^#\s+/m.test(haystack)) {
     return "README.md";
   }
 
   return "README.md";
+};
+
+export const sanitizeGitHubBlobFilePath = (filePath: string): string => {
+  const normalized = filePath.replace(/^\/+/u, "").trim();
+  if (isPlausibleRepoRelativePath(normalized)) return normalized;
+  return "README.md";
+};
+
+export const formatGitHubBlobDisplayPath = (filePath: string): string => {
+  const safe = sanitizeGitHubBlobFilePath(filePath);
+  const segments = safe.split("/").filter(Boolean);
+  if (segments.length <= 2) return safe;
+  return segments.slice(-2).join("/");
 };
 
 export const lineAnchorForQuote = (passageText: string, quote: string): string => {
@@ -125,7 +171,7 @@ export const buildGitHubBlobUrl = (
   filePath: string,
   lineAnchor = "",
 ): string => {
-  const path = filePath.replace(/^\/+/u, "");
+  const path = sanitizeGitHubBlobFilePath(filePath);
   const base = `https://github.com/${owner}/${repo}/blob/${ref}/${path}`;
   return lineAnchor ? `${base}${lineAnchor.startsWith("#") ? lineAnchor : `#${lineAnchor}`}` : base;
 };
@@ -144,7 +190,7 @@ export const webCitationDisplayLabel = (url: string, fallbackName = ""): string 
     const blobMatch = path.match(/\/blob\/[^/]+\/(.+)$/iu);
     if (blobMatch?.[1]) {
       const filePath = blobMatch[1].replace(/\/+$/u, "");
-      const shortPath = filePath.split("/").slice(-2).join("/") || filePath;
+      const shortPath = formatGitHubBlobDisplayPath(filePath);
       return `${shortPath}${hash}`;
     }
 

@@ -55,6 +55,19 @@ describe('peelEmbeddedNumberedSources', () => {
   })
 })
 
+describe('formatSourceDisplayName via buildAnswerPresentation', () => {
+  it('labels malformed GitHub blob paths as README.md#Ln', () => {
+    const presentation = buildAnswerPresentation('', [
+      {
+        name: 'github.com',
+        url: 'https://github.com/KobaltBlu/KotOR.js/blob/master/githubusercontent.com/KobaltBlu/KotOR.js#L1',
+        confidence: 1,
+      },
+    ])
+    assert.equal(presentation.sources[0]?.name, 'README.md#L1')
+  })
+})
+
 describe('buildAnswerPresentation', () => {
   it('parses explicit API sources when body is bibliography-only', () => {
     const content = [
