@@ -21,10 +21,18 @@ jobs:
     # Preinstalled browsers + deps; GHA `playwright install` CDN/extract repeatedly timed out (exit 124).
     container:
       image: mcr.microsoft.com/playwright:v1.58.2-noble
+    defaults:
+      run:
+        shell: bash
     permissions:
       contents: read
 
     steps:
+      - name: Install python3-venv (Playwright image)
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y python3.12-venv
+
       - name: Checkout
         uses: actions/checkout@v6
         with:
