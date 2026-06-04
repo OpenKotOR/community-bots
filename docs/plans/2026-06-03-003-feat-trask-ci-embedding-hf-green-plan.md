@@ -10,14 +10,15 @@ origin: user /lfg continue + PR #94 CI Failures Unresolved (HF 429)
 
 ## Problem Frame
 
-Build & Test fails before Holocron Playwright or import-smoke because **Pre-warm Trask embedding model** hammers HuggingFace with repeated fastembed init retries (429). Local gates are green; branch needs one reliable hub download + cache.
+Build & Test failed because Actions cached `~/.cache/fastembed` while FastEmbed writes to `/tmp/fastembed_cache` (or `FASTEMBED_CACHE_PATH`). Cache never hit → duplicate `snapshot_download` + 429. Fix: set `FASTEMBED_CACHE_PATH=${{ github.workspace }}/.cache/fastembed`, cache that path (key v3), single `ci_warm_trask_embed.sh` probe with backoff.
 
 ## Requirements
 
 | ID | Requirement |
 |----|-------------|
-| R1 | Single authenticated `snapshot_download` for fastembed ONNX repos, then one embed probe |
-| R2 | Bump Actions cache key so empty partial caches are not reused |
+| R1 | `FASTEMBED_CACHE_PATH` aligned with `actions/cache` path `.cache/fastembed` |
+| R2 | `scripts/ci_warm_trask_embed.sh` — embed probe only (no extra hub repos); backoff on 429 |
+| R2b | Cache key `fastembed-bge-small-*-v3` |
 | R3 | PR #94 Build & Test green through Holocron e2e + final gate |
 
 ## Out of scope
