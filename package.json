@@ -37,6 +37,8 @@
     "trask:stack:health": "bash scripts/trask_indexed_stack_health.sh",
     "holocron:e2e": "pnpm trask:gate && pnpm --filter @openkotor/holocron-web test:e2e",
     "holocron:e2e:playwright": "pnpm --filter @openkotor/holocron-web test:e2e",
+    "trask:e2e:discord:playwright": "pnpm exec playwright test --config playwright.trask-discord.config.mjs",
+    "trask:e2e:playwright": "pnpm trask:e2e:discord:playwright && pnpm holocron:e2e:playwright",
     "verify:trask-cli": "pnpm trask:gate && node --import tsx/esm scripts/verify_trask_cli_qa.mjs",
     "verify:trask-discord": "pnpm trask:gate && node --import tsx/esm scripts/verify_trask_discord_live.mjs",
     "verify:trask-discord:ci": "TRASK_SKIP_BUILD=1 node --import tsx/esm scripts/verify_trask_discord_live.mjs --import-smoke",

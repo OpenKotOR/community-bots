@@ -56,6 +56,14 @@ jobs:
         env:
           TRASK_SKIP_BUILD: "1"
 
+      - name: Install Playwright Chromium (Discord embed harness)
+        run: pnpm exec playwright install chromium --with-deps
+
+      - name: Discord /ask Playwright harness (offline)
+        run: pnpm trask:e2e:discord:playwright
+        env:
+          TRASK_SKIP_BUILD: "1"
+
       - name: Lint (pazaak-world)
         run: pnpm --filter pazaak-world lint
 

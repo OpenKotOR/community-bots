@@ -205,6 +205,15 @@ for (const [index, querySpec] of RESEARCH_QUERIES.entries()) {
 
     assertSubstantiveAnswer(bodyText, sourcesText, querySpec)
 
+    expect(bodyText, 'answer should not leak spaced markdown link syntax').not.toMatch(/\]\s*\(https:\/\//)
+    if (hasSourcesPanel) {
+      const sourceLabels = await sourcesRegion.locator('[role="listitem"]').allInnerTexts()
+      for (const label of sourceLabels) {
+        expect(label, 'source card label').not.toMatch(/githubusercontent\.com/i)
+        expect(label, 'source card label').not.toMatch(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+#L\d+$/i)
+      }
+    }
+
     const httpsCount = Math.max(
       await httpsInSources.count(),
       countHttpsUrls(sourcesText),
