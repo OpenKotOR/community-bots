@@ -1,5 +1,6 @@
 import { Sparkle } from '@phosphor-icons/react'
 import { useState } from 'react'
+import { holocronAssetUrl } from '@/lib/asset-url'
 
 type HolocronGlyphProps = {
   variant: 'header' | 'hero'
@@ -28,7 +29,7 @@ export function HolocronGlyph({ variant, className = '' }: HolocronGlyphProps) {
 
   return (
     <img
-      src="/holocron/holocron-artifact.png"
+      src={holocronAssetUrl('holocron/holocron-artifact.png')}
       alt=""
       className={`${dim} ${className}`}
       onError={() => setUseFallback(true)}

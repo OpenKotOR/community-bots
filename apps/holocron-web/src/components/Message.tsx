@@ -159,6 +159,8 @@ function researchPhaseLabel(phaseRaw: string): string {
       return 'Composing'
     case 'retry':
       return 'Retrying'
+    case 'error':
+      return 'Connection error'
     default:
       return phase ? phase[0]!.toUpperCase() + phase.slice(1) : 'Processing'
   }

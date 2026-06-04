@@ -54,8 +54,22 @@ export interface TraskModelOptionDto {
   recommended?: boolean
 }
 
-function apiBase(): string {
+export function traskApiOrigin(): string {
   return import.meta.env.VITE_TRASK_API_BASE?.replace(/\/+$/, '') ?? ''
+}
+
+function apiBase(): string {
+  return traskApiOrigin()
+}
+
+export interface TraskHealthDto {
+  ok: boolean
+  mode?: string
+  upstream?: string
+  upstreamReachable?: boolean
+  upstreamStatus?: number
+  upstreamDetail?: string
+  builtinFallback?: boolean
 }
 
 function authHeaders(apiKey?: string): Record<string, string> {
@@ -114,6 +128,39 @@ function mergeAbortSignals(a: AbortSignal, b: AbortSignal): AbortSignal {
   return c.signal
 }
 
+type TraskApiErrorPayload = {
+  error?: string
+  hint?: string
+  upstream?: string
+  upstreamStatus?: number
+  upstreamDetail?: string
+}
+
+function formatTraskApiError(data: TraskApiErrorPayload | null | undefined, status: number): string {
+  const parts: string[] = []
+  if (data?.error) parts.push(data.error)
+  if (data?.upstreamStatus !== undefined) {
+    parts.push(`upstream HTTP ${data.upstreamStatus}`)
+  }
+  if (data?.upstream) parts.push(`upstream ${data.upstream}`)
+  if (data?.hint) parts.push(data.hint)
+  if (data?.upstreamDetail) {
+    const snippet = data.upstreamDetail.replace(/\s+/g, ' ').trim().slice(0, 160)
+    if (snippet) parts.push(snippet)
+  }
+  if (parts.length > 0) return parts.join(' — ')
+  return `Holocron API request failed (HTTP ${status}).`
+}
+
+async function readTraskErrorBody(res: Response): Promise<string> {
+  try {
+    const data = (await res.json()) as TraskApiErrorPayload
+    return formatTraskApiError(data, res.status)
+  } catch {
+    return `Holocron API request failed (HTTP ${res.status}).`
+  }
+}
+
 /** User-facing message for failed Trask HTTP calls (handles DOMException / TypeError). */
 export function traskErrorMessageFromUnknown(error: unknown): string {
   const abortish = (name: string | undefined) => name === 'AbortError' || name === 'TimeoutError'
@@ -155,6 +202,15 @@ export function traskUsesSameOriginApi(): boolean {
   return !apiBase()
 }
 
+export async function traskFetchHealth(): Promise<TraskHealthDto> {
+  const res = await fetch(`${apiBase()}/healthz`, traskRequestInit(undefined, { method: 'GET' }, 12_000))
+  const data = (await res.json().catch(() => ({}))) as TraskHealthDto & { error?: string }
+  if (!res.ok) {
+    throw new Error(data.error ?? (await readTraskErrorBody(res)))
+  }
+  return data
+}
+
 export async function traskFetchSession(): Promise<TraskSessionDto | null> {
   try {
     const res = await fetch(`${apiBase()}/api/trask/session`, traskRequestInit())
@@ -193,7 +249,7 @@ export async function traskGetThread(
   )
   const data = (await res.json()) as { history?: TraskHistoryRecordDto[]; error?: string }
   if (!res.ok) {
-    throw new Error(data.error ?? `thread failed: ${res.status}`)
+    throw new Error(data.error ?? (await readTraskErrorBody(res)))
   }
   return data.history ?? []
 }
@@ -259,16 +315,15 @@ export async function traskAsk(
     method: 'POST',
     body: JSON.stringify(body),
   }, traskAskTimeoutMs()))
-  const data = (await res.json()) as {
-    error?: string
+  const data = (await res.json()) as TraskApiErrorPayload & {
     query?: TraskHistoryRecordDto
   }
   const record = data.query
-  if (!record) {
-    throw new Error(data.error ?? `ask failed: ${res.status}`)
-  }
   if (!res.ok && res.status !== 202) {
-    throw new Error(data.error ?? record.error ?? `ask failed: ${res.status}`)
+    throw new Error(data.error ?? record?.error ?? formatTraskApiError(data, res.status))
+  }
+  if (!record) {
+    throw new Error(data.error ?? formatTraskApiError(data, res.status))
   }
   if (record.status === 'failed') {
     throw new Error(record.error ?? 'Holocron research failed.')
