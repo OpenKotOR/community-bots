@@ -1,6 +1,6 @@
 # Discord /ask live verify
 
-Generated: 2026-06-03T13:51:53.126Z
+Generated: 2026-06-03T18:40:01.835Z
 
 Queries: 5 (expert verification set; URL reachability enforced)
 Passed: 5/5
@@ -10,7 +10,7 @@ Passed: 5/5
 PASS
 
 ```
-TSLPatcher on GitHub The TSLPatcher project documents how mod authors ship list-driven 2DA, GFF, and TLK changes for KotOR and TSL installs. [1](https://github.com/th3w1zard1/TSLPatcher)
+TSLPatcher on GitHub The TSLPatcher project documents how mod authors ship list-driven 2DA, GFF, and TLK changes for KotOR and TSL installs. [1](https://github.com/th3w1zard1/TSLPatcher/blob/85c4d0416fb5b38fea7caf046212789f4e93dd68/README.md#L1)
 TSLPatcher is a mod installation tool for Knights of the Old Republic and The Sith Lords. It applies 2DA, GFF, and TLK patches from list files so players do not copy files by hand. [2](https://deadlystream.com/files/file/1982-tslpatcher)
 ```
 
@@ -22,7 +22,7 @@ PASS
 
 ```
 MDLOps converts KotOR MDL and MDX models for editing in 3ds Max or Blender pipelines and exports them back to game-ready formats. [1](https://deadlystream.com/files/file/1198-mdlops)
-kotorblender Work with Odyssey engine game models in Blender. This plugin is based on the venerable neverblender plugin, forked from version 1.23a. [2](https://github.com/ndixUR/kotorblender)
+kotorblender Work with Odyssey engine game models in Blender. This plugin is based on the venerable neverblender plugin, forked from version 1.23a. [2](https://github.com/ndixUR/kotorblender/blob/f713407923bd76a4585bf93d5a2df2e7e7daee45/README.md#L1)
 ```
 
 Footer: `12 passages · indexer 8787`
@@ -54,8 +54,24 @@ Footer: `6 passages · indexer 8787`
 PASS
 
 ```
-reone Odyssey engine The reone project is an open-source reimplementation of the Odyssey engine for KotOR and TSL. It provides runtime, rendering, and scripting surfaces for engine research. [1](https://github.com/seedhartha/reone)
+reone Odyssey engine The reone project is an open-source reimplementation of the Odyssey engine for KotOR and TSL. It provides runtime, rendering, and scripting surfaces for engine research. [1](https://github.com/seedhartha/reone/blob/d5e8c00cba975d637ef5019549a48ff70992531b/README.md#L1)
 reone wiki reone exposes Odyssey runtime and scripting capabilities so researchers can experiment with KotOR and TSL behavior outside the retail executable. [2](https://github.com/seedhartha/reone/wiki)
 ```
 
 Footer: `11 passages · indexer 8787`
+
+---
+
+## Holocron browser MCP (expert queries, 2026-06-03)
+
+Origin: `http://127.0.0.1:4010` with fresh `?thread=<uuid>` per query; suggestion buttons when Submit stayed disabled on cold threads.
+
+| Query | Thread suffix | Result |
+|-------|---------------|--------|
+| TSLPatcher / 2DA+TLK | `...701` | PASS — grounded, ≥2 https cites |
+| MDLOps / Blender workflow | `...702` | PASS |
+| Widescreen / ini settings | `...003` | PASS |
+| KOTOR save location (Windows) | `...004` | PASS — Deadly Stream + Steam |
+| reone Odyssey runtime/scripting | `...005` | PASS — seedhartha/reone + wiki |
+
+Playwright local (same session): `HOLOCRON_REUSE_SERVER=1 pnpm holocron:e2e:playwright` — 6/6.

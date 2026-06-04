@@ -10,8 +10,12 @@ BGE_QUERY_PREFIX = "Represent this sentence for searching relevant passages: "
 @lru_cache(maxsize=1)
 def get_embedder():
     from fastembed import TextEmbedding
+    from fastembed.common.utils import define_cache_dir
 
-    return TextEmbedding(model_name=DEFAULT_EMBED_MODEL)
+    return TextEmbedding(
+        model_name=DEFAULT_EMBED_MODEL,
+        cache_dir=str(define_cache_dir()),
+    )
 
 
 def embed_texts(texts: list[str]) -> list[list[float]]:
