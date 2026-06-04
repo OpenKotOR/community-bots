@@ -80,6 +80,23 @@ describe('formatSourceDisplayName via buildAnswerPresentation', () => {
 })
 
 describe('buildAnswerPresentation', () => {
+  it('prefers permalink labels when merging parsed bibliography with API sources', () => {
+    const content = [
+      'KotOR.js ports the engine to TypeScript [3].',
+      '3. icon.png https://raw.githubusercontent.com/KobaltBlu/KotOR.js/master/src/assets/icons/icon.png',
+    ].join('\n')
+    const presentation = buildAnswerPresentation(content, [
+      {
+        name: 'kotor.js',
+        url: 'https://github.com/KobaltBlu/KotOR.js/blob/9149775371dbd73ec4fe78c415c2a6e935423e4c/README.md#L1',
+        confidence: 1,
+      },
+    ])
+    const kotor = presentation.sources.find((s) => s.url.includes('KotOR.js'))
+    assert.ok(kotor)
+    assert.equal(kotor.name, 'README.md#L1')
+  })
+
   it('parses explicit API sources when body is bibliography-only', () => {
     const content = [
       '1. reone - https://github.com/seedhartha/reone',

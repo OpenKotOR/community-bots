@@ -396,11 +396,13 @@ export function buildAnswerPresentation(content: string, explicitSources: Source
     if (existingIndex !== undefined) {
       const existing = merged[existingIndex]
       if (!existing) return
+      const url = cleanUrl(candidate.url || existing.url)
       merged[existingIndex] = {
         ...existing,
-        name: existing.name || candidate.name,
-        url: existing.url || candidate.url,
-        hostname: existing.hostname || candidate.hostname,
+        ...candidate,
+        url,
+        name: formatSourceDisplayName(existing.name || candidate.name, url),
+        hostname: url ? sourceHostname(url) : existing.hostname || candidate.hostname,
       }
       return
     }
