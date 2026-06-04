@@ -122,3 +122,14 @@ User re-issued the exact "take initiative... Implement as much as possible in th
 All per full initiative, no user asks, AGENTS (stack after "edits", trask:gate preflight, browser proof via e2e run).
 
 <promise>DONE</promise> (pass 2; CI pending/queue as before, content + gates complete).
+
+## LFG Pass 3 (2026-06-03 post-merge closeout)
+
+PR #92 **MERGED** to `main` as squash `ae95e36` (2026-06-03T09:16:38Z).
+
+- Synced local `main` to merge commit; feature branch retained locally.
+- Post-merge gates on `main`: `pnpm trask:gate:ci` composite **185**; `pnpm holocron:e2e:playwright` **6/6**; `pnpm verify:trask-discord` **5/5** (evidence timestamp refreshed).
+- CI on `main` @ `ae95e36`: Build & Test, verify-bundle, docker-builds, CodeQL Analyze jobs green; ghost CodeQL rollup fail only (~3s, non-blocking).
+- **Status: shipped.** Residual infra items (scheduler bearer auth, expanded unit tests) remain documented for follow-up PRs; not blocking.
+
+<promise>DONE</promise> (pass 3; merged + post-merge gates green).

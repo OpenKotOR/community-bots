@@ -392,6 +392,48 @@ function sourceHostname(url: string): string {
   }
 }
 
+function formatSourceDisplayName(name: string, url: string): string {
+  if (!url) return name
+  try {
+    const parsed = new URL(url)
+    const host = parsed.hostname.replace(/^www\./, '')
+    const genericName =
+      !name.trim()
+      || name.trim().toLowerCase() === host.toLowerCase()
+      || name.trim().toLowerCase() === 'github.com'
+
+    if (host === 'github.com') {
+      const path = decodeURIComponent(parsed.pathname)
+      const hash = parsed.hash && /^#L/i.test(parsed.hash) ? parsed.hash : ''
+      const blobMatch = path.match(/\/blob\/[^/]+\/(.+)$/i)
+      if (blobMatch?.[1]) {
+        const shortPath = blobMatch[1].replace(/\/+$/, '').split('/').slice(-2).join('/') || blobMatch[1]
+        return `${shortPath}${hash}`
+      }
+      const wikiMatch = path.match(/\/wiki\/(.+)$/i)
+      if (wikiMatch?.[1]) {
+        const page = wikiMatch[1].replace(/\/+$/, '')
+        return `wiki: ${page.split('/').pop() ?? page}${hash}`
+      }
+      const repoMatch = path.match(/^\/([^/]+)\/([^/]+)\/?$/i)
+      if (repoMatch?.[2]) {
+        return `${repoMatch[2]}${hash}`
+      }
+    }
+
+    if (genericName) {
+      const pathSegments = parsed.pathname.replace(/\/+$/, '').split('/').filter(Boolean)
+      if (pathSegments.length > 1) {
+        return `${pathSegments.slice(-2).join('/')}`.replace(/[-_]+/g, ' ')
+      }
+      return host
+    }
+  } catch {
+    /* keep name */
+  }
+  return name
+}
+
 function sourceKey(source: Pick<Source, 'name' | 'url'>): string {
   const url = source.url?.trim().toLowerCase()
   if (url) return `url:${url}`
@@ -451,7 +493,8 @@ function parseSourcesFromText(sourceText: string): DisplaySource[] {
       const body = entry.body.join(' ').trim()
       const urls = extractHttpUrls(body)
       const url = cleanUrl(urls[0] ?? '')
-      const name = stripSourceNoise(body) || (url ? sourceHostname(url) : `Source ${entry.index}`)
+      const name = formatSourceDisplayName(stripSourceNoise(body) || '', url)
+        || (url ? sourceHostname(url) : `Source ${entry.index}`)
 
       if (!url && !name) return null
       return {
@@ -528,6 +571,7 @@ function buildAnswerPresentation(content: string, explicitSources: Source[] = []
   const sources = merged.map((source, idx) => ({
     ...source,
     index: Number.isFinite(source.index) && source.index > 0 ? source.index : idx + 1,
+    name: formatSourceDisplayName(source.name, source.url),
     hostname: source.hostname || (source.url ? sourceHostname(source.url) : ''),
   }))
   const sourceByIndex = new Map(sources.map((source) => [source.index, source]))

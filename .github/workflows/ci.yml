@@ -67,6 +67,7 @@ jobs:
             fastembed-bge-small-${{ runner.os }}-
 
       - name: Pre-warm Trask embedding model
+        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
         env:
           HF_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
         run: |
@@ -99,28 +100,44 @@ jobs:
 
       - name: Start Trask indexer (background)
         run: |
-          .venv-trask-indexer/bin/trask-indexer serve &
+          set -euo pipefail
+          .venv-trask-indexer/bin/trask-indexer serve > /tmp/trask-indexer.log 2>&1 &
+          INDEXER_PID=$!
           for i in $(seq 1 30); do
             if curl -sf http://127.0.0.1:8790/health; then
               exit 0
             fi
+            if ! kill -0 "$INDEXER_PID" 2>/dev/null; then
+              echo "Indexer exited early"
+              cat /tmp/trask-indexer.log
+              exit 1
+            fi
             sleep 1
           done
           echo "Indexer failed to start" >&2
+          cat /tmp/trask-indexer.log
           exit 1
 
       - name: Start Trask retrieve Worker (background)
         run: |
+          set -euo pipefail
           cd infra/trask-retrieve-worker
           TRASK_INDEXER_BASE_URL=http://127.0.0.1:8790 \
-            pnpm exec wrangler dev --port 8787 --local-protocol http &
+            pnpm exec wrangler dev --port 8787 --local-protocol http > /tmp/trask-worker.log 2>&1 &
+          WORKER_PID=$!
           for i in $(seq 1 45); do
             if curl -sf http://127.0.0.1:8787/health; then
               exit 0
             fi
+            if ! kill -0 "$WORKER_PID" 2>/dev/null; then
+              echo "Retrieve worker exited early"
+              cat /tmp/trask-worker.log
+              exit 1
+            fi
             sleep 1
           done
           echo "Retrieve Worker failed to start" >&2
+          cat /tmp/trask-worker.log
           exit 1
 
       # Idempotent smoke: same path as local `pnpm trask:smoke:stack-bootstrap` (PR #69).

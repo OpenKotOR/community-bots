@@ -18,6 +18,7 @@ export * from "./research-answer-split.js";
 export * from "./query-anchor.js";
 export * from "./discord-reply-format.js";
 export * from "./discord-citation-url.js";
+export * from "./github-citation-url.js";
 export * from "./citation-url-verify.js";
 export * from "./trask-research-subprocess.js";
 export * from "./proactive-llm.js";

@@ -25,6 +25,10 @@ import {
   passageMatchesQueryAnchor,
 } from "./query-anchor.js";
 import { splitResearchAnswer, syncSourcesSectionToApproved } from "./research-answer-split.js";
+import {
+  enhanceWebCitationUrl,
+  webCitationDisplayLabel,
+} from "./github-citation-url.js";
 
 const MIN_WEB_CITATIONS = loadTraskPolicy().minWebCitations;
 export const BRIEF_MAX_CLAIM_LINES = 5;
@@ -110,8 +114,10 @@ export const passagesFromRetrieveRows = (rows: readonly RetrievePassageRow[]): E
   return passages;
 };
 
-export const publicCitationUrlForPassage = (passage: EvidencePassage): string =>
-  resolvePublicCitationUrl(passage.url, passageLocator(passage));
+export const publicCitationUrlForPassage = (passage: EvidencePassage): string => {
+  const resolved = resolvePublicCitationUrl(passage.url, passageLocator(passage));
+  return enhanceWebCitationUrl(resolved, passage.text, passage.text);
+};
 
 export const publicCitationUrlForClaim = (claim: EvidenceClaim): string => claim.citationUrl;
 
@@ -533,7 +539,11 @@ export const composeGroundedAnswerFromClaims = (
         normalize(source.homeUrl) === normalize(citationUrl)
         || normalize(source.homeUrl) === normalize(claim.url),
     );
-    return match?.name?.trim() || hostFromUrl(citationUrl) || citationUrl;
+    const catalogName = match?.name?.trim();
+    if (catalogName && !/^github\.com$/iu.test(catalogName) && catalogName !== hostFromUrl(citationUrl)) {
+      return webCitationDisplayLabel(citationUrl, catalogName);
+    }
+    return webCitationDisplayLabel(citationUrl, catalogName || hostFromUrl(citationUrl));
   };
 
   const seenSourceIndices = new Set<number>();
