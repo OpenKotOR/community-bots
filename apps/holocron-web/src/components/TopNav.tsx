@@ -53,7 +53,7 @@ export function TopNav({ holocronSession, onHolocronLogout }: TopNavProps) {
                 Home
               </a>
               <a 
-                href="https://openkotor.com/#projects" 
+                href="https://openkotor.com/projects" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="text-muted-foreground hover:text-foreground transition-colors"
@@ -61,7 +61,7 @@ export function TopNav({ holocronSession, onHolocronLogout }: TopNavProps) {
                 Projects
               </a>
               <a 
-                href="https://openkotor.com/#faq" 
+                href="https://openkotor.com/faq" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="text-muted-foreground hover:text-foreground transition-colors"
@@ -69,7 +69,7 @@ export function TopNav({ holocronSession, onHolocronLogout }: TopNavProps) {
                 FAQ
               </a>
               <a 
-                href="https://openkotor.com/#formats" 
+                href="https://openkotor.com/formats" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="text-muted-foreground hover:text-foreground transition-colors"
