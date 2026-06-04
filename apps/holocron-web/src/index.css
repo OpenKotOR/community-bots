@@ -88,7 +88,7 @@
 .holocron-atmosphere__panel {
   position: absolute;
   inset: 0;
-  background: url("/holocron/holocron-artifact.png") center / cover no-repeat;
+  background: var(--holocron-artifact-url, none) center / cover no-repeat;
   opacity: 0.22;
   mix-blend-mode: normal;
   filter: none;

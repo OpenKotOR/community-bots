@@ -1,7 +1,8 @@
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react'
+import { holocronAssetUrl } from '@/lib/asset-url'
 import { fluxTokensFromQuery, holocronMulberry32 } from '@/lib/holocron-live'
 
-const HOLOCRON_ARTIFACT_SRC = '/holocron/holocron-artifact.png'
+const HOLOCRON_ARTIFACT_SRC = holocronAssetUrl('holocron/holocron-artifact.png')
 
 export type HolocronActivityMood = 'idle' | 'retrieve' | 'success' | 'warn' | 'hot'
 

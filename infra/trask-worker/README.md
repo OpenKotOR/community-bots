@@ -7,7 +7,7 @@ Edge proxy for public Holocron (`qa-webui`) → live `trask-http-server`.
 - **Proxy mode** (`TRASK_BUILTIN_API=0`, required for research): forwards `/api/trask/*` to `TRASK_RESEARCHWIZARD_BASE_URL` (for example Hugging Face Space `OpenKotOR/holocron-trask-http`).
 - **Builtin stub** (`TRASK_BUILTIN_API=1`): health checks only; `/api/trask/*` returns **503** (bundled reference Q&A was removed).
 
-There is **no** bundled fallback when upstream fails (`TRASK_BUILTIN_FALLBACK=0` by default).
+When `TRASK_BUILTIN_FALLBACK=1`, upstream **5xx** responses fall back to the builtin stub (still **503** for research — bundled Q&A was removed). `/healthz` probes upstream and returns **503** with `ok: false` when the Trask HTTP host is down (for example HF Space `OpenKotOR/holocron-trask-http` in **ERROR**).
 
 ## Layout
 

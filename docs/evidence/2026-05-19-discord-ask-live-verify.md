@@ -62,16 +62,20 @@ Footer: `11 passages · indexer 8787`
 
 ---
 
-## Holocron browser MCP (expert queries, 2026-06-03)
+## Holocron browser MCP (expert queries, 2026-06-04)
 
-Origin: `http://127.0.0.1:4010` with fresh `?thread=<uuid>` per query; suggestion buttons when Submit stayed disabled on cold threads.
+Origin: `http://127.0.0.1:4010` with fresh `?thread=<uuid>` per query; suggestion buttons on cold threads (Submit disabled until a question is chosen).
+
+TopNav verified via CDP: `https://openkotor.com/projects`, `/faq`, `/formats` (no `/#` hash routes).
 
 | Query | Thread suffix | Result |
 |-------|---------------|--------|
-| TSLPatcher / 2DA+TLK | `...701` | PASS — grounded, ≥2 https cites |
-| MDLOps / Blender workflow | `...702` | PASS |
-| Widescreen / ini settings | `...003` | PASS |
-| KOTOR save location (Windows) | `...004` | PASS — Deadly Stream + Steam |
-| reone Odyssey runtime/scripting | `...005` | PASS — seedhartha/reone + wiki |
+| TSLPatcher / 2DA+TLK | `...101` | PASS — grounded, citations 1–4 |
+| Widescreen / ini settings | `...102` | PASS — Deadly Stream widescreen files |
+| MDLOps / Blender workflow | `...103` | PASS — MDLOps + kotorblender cites |
+| KOTOR save location (Windows) | `...104` | PASS — save path + https cites |
+| reone Odyssey runtime/scripting | `...105` | PASS — reone GitHub cites (9 links) |
 
-Playwright local (same session): `HOLOCRON_REUSE_SERVER=1 pnpm holocron:e2e:playwright` — 6/6.
+Playwright local (prior session + CI): `HOLOCRON_REUSE_SERVER=1 pnpm holocron:e2e:playwright` — 6/6. PR [#96](https://github.com/OpenKotOR/community-bots/pull/96) Holocron Playwright e2e job green.
+
+Discord live (`pnpm verify:trask-discord`): not re-run — `TRASK_DISCORD_BOT_TOKEN` unset in agent env; import-smoke + prior evidence (5/5) remain authoritative for Discord contract.
