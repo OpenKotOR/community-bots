@@ -1,7 +1,7 @@
 ---
 title: "feat(trask): green CI — HF embedding pre-warm"
 type: feat
-status: active
+status: in_progress
 date: 2026-06-03
 origin: user /lfg continue + PR #94 CI Failures Unresolved (HF 429)
 ---

@@ -36,12 +36,7 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: {
-        ...devices['Desktop Chrome'],
-        // CI: smaller headless-shell install (full chrome zip extract was timing out on GHA).
-        ...(process.env.CI ? { channel: 'chromium-headless-shell' as const } : {}),
-        viewport: { width: 1366, height: 900 },
-      },
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1366, height: 900 } },
     },
   ],
 })

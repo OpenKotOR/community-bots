@@ -18,6 +18,9 @@ jobs:
   build-and-test:
     name: Build & Test
     runs-on: ubuntu-latest
+    # Preinstalled browsers + deps; GHA `playwright install` CDN/extract repeatedly timed out (exit 124).
+    container:
+      image: mcr.microsoft.com/playwright:v1.58.2-noble
     permissions:
       contents: read
 
@@ -163,24 +166,6 @@ jobs:
         env:
           TRASK_INDEXER_BASE_URL: http://127.0.0.1:8787
           HOLOCRON_E2E_SKIP_STACK_BOOTSTRAP: "1"
-
-      - name: Cache Playwright Chromium
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            playwright-chromium-${{ runner.os }}-
-
-      # ubuntu-latest: no --with-deps (apt stall). CI uses chromium-headless-shell (see holocron playwright.config).
-      - name: Install Playwright Chromium
-        run: |
-          set -euo pipefail
-          if find "${HOME}/.cache/ms-playwright" -type f \( -name chrome -o -name headless_shell \) 2>/dev/null | head -1 | grep -q .; then
-            echo "Playwright browser already in Actions cache; skipping download."
-            exit 0
-          fi
-          timeout 900 pnpm exec playwright install chromium-headless-shell
 
       - name: Holocron Playwright e2e (5 expert queries + reload)
         run: pnpm holocron:e2e:playwright
