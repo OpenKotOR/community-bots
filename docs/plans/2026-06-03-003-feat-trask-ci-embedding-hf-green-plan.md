@@ -19,7 +19,8 @@ Build & Test failed because Actions cached `~/.cache/fastembed` while FastEmbed 
 | R1 | `FASTEMBED_CACHE_PATH` aligned with `actions/cache` path `.cache/fastembed` |
 | R2 | `scripts/ci_warm_trask_embed.sh` — embed probe only (no extra hub repos); backoff on 429 |
 | R2b | Cache key `fastembed-bge-small-*-v3` |
-| R3 | PR #94 Build & Test green through Holocron e2e + final gate |
+| R3 | `upload-artifact` / `download-artifact` for Chroma + FastEmbed (container job cannot restore host `actions/cache`) |
+| R4 | PR #94 Build & Test green through Holocron e2e + final gate |
 
 ## Out of scope
 

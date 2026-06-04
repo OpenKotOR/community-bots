@@ -154,6 +154,17 @@ jobs:
           TRASK_INDEXER_BASE_URL: http://127.0.0.1:8787
           HOLOCRON_E2E_SKIP_STACK_BOOTSTRAP: "1"
 
+      # Container Playwright job cannot restore Actions cache from this host job — use artifacts.
+      - name: Upload Holocron e2e fixtures (Chroma + FastEmbed)
+        uses: actions/upload-artifact@v4
+        with:
+          name: trask-holocron-e2e-fixtures
+          path: |
+            .cache/fastembed
+            data/trask-indexer/chroma
+          if-no-files-found: error
+          retention-days: 1
+
   holocron-playwright-e2e:
     name: Holocron Playwright e2e
     needs: build-and-test
@@ -162,6 +173,8 @@ jobs:
       image: mcr.microsoft.com/playwright:v1.58.2-noble
     env:
       FASTEMBED_CACHE_PATH: ${{ github.workspace }}/.cache/fastembed
+      HF_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
+      HUGGINGFACE_HUB_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
     defaults:
       run:
         shell: bash
@@ -202,26 +215,16 @@ jobs:
       - name: Bootstrap Trask indexer venv
         run: bash scripts/bootstrap_trask_indexer.sh
 
-      - name: Cache FastEmbed embedding models
-        uses: actions/cache@v4
+      - name: Download Holocron e2e fixtures from build job
+        uses: actions/download-artifact@v4
         with:
-          path: .cache/fastembed
-          key: fastembed-bge-small-${{ runner.os }}-v3
-          restore-keys: |
-            fastembed-bge-small-${{ runner.os }}-
+          name: trask-holocron-e2e-fixtures
+          path: .
 
-      - name: Cache Trask Chroma golden index
-        uses: actions/cache@v4
-        with:
-          path: data/trask-indexer/chroma
-          key: trask-chroma-golden-${{ hashFiles('scripts/smoke_trask_indexed_stack.py') }}
-          restore-keys: |
-            trask-chroma-golden-
-
-      - name: Probe FastEmbed from Actions cache
+      - name: Probe FastEmbed from build job artifact
         run: bash scripts/ci_warm_trask_embed.sh
 
-      - name: Verify Chroma golden index (from prior job cache)
+      - name: Verify Chroma golden index (from build job artifact)
         run: .venv-trask-indexer/bin/python scripts/smoke_trask_indexed_stack.py --golden-fixtures --verify-retrieve --verify-chroma-only
         env:
           TRASK_INDEXER_DATA_DIR: data/trask-indexer
