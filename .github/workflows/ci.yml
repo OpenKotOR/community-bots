@@ -170,11 +170,13 @@ jobs:
     needs: build-and-test
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.58.2-noble
+      # Must match @playwright/test in pnpm-lock.yaml (browser revision paths).
+      image: mcr.microsoft.com/playwright:v1.59.1-noble
     env:
       FASTEMBED_CACHE_PATH: ${{ github.workspace }}/.cache/fastembed
       HF_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
       HUGGINGFACE_HUB_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
     defaults:
       run:
         shell: bash
@@ -273,6 +275,7 @@ jobs:
           TRASK_SKIP_BUILD: "1"
           TRASK_INDEXER_BASE_URL: http://127.0.0.1:8787
           HOLOCRON_E2E_SKIP_STACK_BOOTSTRAP: "1"
+          TRASK_QA_GROUNDING: "1"
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
   trask-gate-final:
