@@ -2,8 +2,10 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   buildAnswerPresentation,
+  formatTraceUrlLabel,
   peelEmbeddedNumberedSources,
   sanitizeAnswerParagraph,
+  sanitizeResearchTraceText,
   stripMarkdownHttpLinks,
 } from '../apps/holocron-web/src/lib/answer-presentation.ts'
 
@@ -29,6 +31,25 @@ describe('sanitizeAnswerParagraph', () => {
     const out = sanitizeAnswerParagraph(raw)
     assert.match(out, /\[1\]/)
     assert.match(out, /\[3\]/)
+  })
+})
+
+describe('sanitizeResearchTraceText', () => {
+  it('strips raw.githubusercontent image markdown from trace detail', () => {
+    const raw =
+      '.githubusercontent.com/KobaltBlu/KotOR.js/master/icon.png KotOR.js is a TypeScript remake [3].'
+    const out = sanitizeResearchTraceText(raw)
+    assert.doesNotMatch(out, /githubusercontent\.com/i)
+    assert.match(out, /\[3\]/)
+  })
+})
+
+describe('formatTraceUrlLabel', () => {
+  it('labels GitHub blob permalinks as README.md#Ln', () => {
+    const label = formatTraceUrlLabel(
+      'https://github.com/KobaltBlu/KotOR.js/blob/9149775371dbd73ec4fe78c415c2a6e935423e4c/README.md#L1',
+    )
+    assert.equal(label, 'README.md#L1')
   })
 })
 

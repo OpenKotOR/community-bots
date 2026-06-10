@@ -7,7 +7,13 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { CaretDown, CaretUp, Link as LinkIcon, Copy, Check, Clock, MagnifyingGlass, CheckCircle, XCircle, Download, Database, PencilSimple, ArrowsClockwise, ArrowClockwise } from '@phosphor-icons/react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { toast } from 'sonner'
-import { buildAnswerPresentation, sanitizeAnswerParagraph, sourceKey } from '@/lib/answer-presentation'
+import {
+  buildAnswerPresentation,
+  formatTraceUrlLabel,
+  sanitizeAnswerParagraph,
+  sanitizeResearchTraceText,
+  sourceKey,
+} from '@/lib/answer-presentation'
 
 interface MessageProps {
   message: MessageType
@@ -211,7 +217,7 @@ function ResearchStepDiagnostics({ step }: { step: MessageResearchStep }) {
                   title={url}
                   onClick={(event) => event.stopPropagation()}
                 >
-                  {url}
+                  {formatTraceUrlLabel(url)}
                 </a>
               ) : (
                 <span title={url}>{url}</span>
@@ -233,7 +239,7 @@ function ResearchStepDiagnostics({ step }: { step: MessageResearchStep }) {
                 className="text-primary hover:underline"
                 onClick={(event) => event.stopPropagation()}
               >
-                {source.url}
+                {formatTraceUrlLabel(source.url, source.name)}
               </a>
             </li>
           ))}
@@ -520,7 +526,7 @@ function MessageView({
                           <span className="text-xs text-muted-foreground">{formatTime(step.at)}</span>
                         </div>
                         <p className="mt-0.5 break-words font-mono text-xs leading-snug text-muted-foreground">
-                          {step.detail}
+                          {sanitizeResearchTraceText(step.detail)}
                         </p>
                         <ResearchStepDiagnostics step={step} />
                       </div>

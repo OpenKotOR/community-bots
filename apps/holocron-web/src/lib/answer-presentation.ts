@@ -174,7 +174,8 @@ export function sanitizeAnswerParagraph(text: string): string {
     const token = `${CITATION_PLACEHOLDER_PREFIX}${i}${CITATION_PLACEHOLDER_SUFFIX}`
     t = t.split(token).join(citations[i] ?? '')
   }
-  return t
+  t = t.replace(/(?:https?:\/\/)?(?:raw\.)?\.?githubusercontent\.com\/[^\s)]+/giu, ' ')
+  return t.replace(/\s{2,}/gu, ' ').trim()
 }
 
 function parseBracketCitationLine(line: string): { index: number; rest: string } | null {
@@ -209,6 +210,24 @@ function formatSourceDisplayName(name: string, url: string): string {
   if (!url) return name
   const label = webCitationDisplayLabel(url, name)
   return label.trim() || name
+}
+
+/** Visible research-trace lines: same cleanup as answer paragraphs. */
+export function sanitizeResearchTraceText(text: string): string {
+  return sanitizeAnswerParagraph(text)
+}
+
+/** Short label for trace URL lists (permalink-aware; full URL stays in href/title). */
+export function formatTraceUrlLabel(url: string, fallbackName = ''): string {
+  const label = webCitationDisplayLabel(url, fallbackName)
+  if (label.trim()) return label.trim()
+  if (fallbackName.trim()) return fallbackName.trim()
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '')
+    return host || url
+  } catch {
+    return url
+  }
 }
 
 export function sourceKey(source: Pick<SourceLike, 'name' | 'url'>): string {
