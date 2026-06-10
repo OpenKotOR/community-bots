@@ -56,14 +56,6 @@ jobs:
         env:
           TRASK_SKIP_BUILD: "1"
 
-      - name: Install Playwright Chromium (Discord embed harness)
-        run: pnpm exec playwright install chromium --with-deps
-
-      - name: Discord /ask Playwright harness (offline)
-        run: pnpm trask:e2e:discord:playwright
-        env:
-          TRASK_SKIP_BUILD: "1"
-
       - name: Lint (pazaak-world)
         run: pnpm --filter pazaak-world lint
 
@@ -173,6 +165,50 @@ jobs:
             data/trask-indexer/chroma
           if-no-files-found: error
           retention-days: 1
+
+  discord-playwright-e2e:
+    name: Discord Playwright harness
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.59.1-noble
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+    defaults:
+      run:
+        shell: bash
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.11.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Rebuild esbuild native binary
+        run: pnpm rebuild esbuild
+
+      - name: TypeScript build
+        run: pnpm build
+
+      - name: Discord /ask Playwright harness (offline)
+        run: pnpm trask:e2e:discord:playwright
+        env:
+          TRASK_SKIP_BUILD: "1"
 
   holocron-playwright-e2e:
     name: Holocron Playwright e2e
@@ -289,7 +325,7 @@ jobs:
 
   trask-gate-final:
     name: Trask gate (final)
-    needs: [build-and-test, holocron-playwright-e2e]
+    needs: [build-and-test, discord-playwright-e2e, holocron-playwright-e2e]
     runs-on: ubuntu-latest
     permissions:
       contents: read
