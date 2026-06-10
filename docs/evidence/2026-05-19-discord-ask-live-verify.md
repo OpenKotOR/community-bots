@@ -1,6 +1,6 @@
 # Discord /ask live verify
 
-Generated: 2026-06-03T18:40:01.835Z
+Generated: 2026-06-10T18:42:46.549Z
 
 Queries: 5 (expert verification set; URL reachability enforced)
 Passed: 5/5
@@ -58,24 +58,4 @@ reone Odyssey engine The reone project is an open-source reimplementation of the
 reone wiki reone exposes Odyssey runtime and scripting capabilities so researchers can experiment with KotOR and TSL behavior outside the retail executable. [2](https://github.com/seedhartha/reone/wiki)
 ```
 
-Footer: `11 passages · indexer 8787`
-
----
-
-## Holocron browser MCP (expert queries, 2026-06-04)
-
-Origin: `http://127.0.0.1:4010` with fresh `?thread=<uuid>` per query; suggestion buttons on cold threads (Submit disabled until a question is chosen).
-
-TopNav verified via CDP: `https://openkotor.com/projects`, `/faq`, `/formats` (no `/#` hash routes).
-
-| Query | Thread suffix | Result |
-|-------|---------------|--------|
-| TSLPatcher / 2DA+TLK | `...101` | PASS — grounded, citations 1–4 |
-| Widescreen / ini settings | `...102` | PASS — Deadly Stream widescreen files |
-| MDLOps / Blender workflow | `...103` | PASS — MDLOps + kotorblender cites |
-| KOTOR save location (Windows) | `...104` | PASS — save path + https cites |
-| reone Odyssey runtime/scripting | `...105` | PASS — reone GitHub cites (9 links) |
-
-Playwright local (prior session + CI): `HOLOCRON_REUSE_SERVER=1 pnpm holocron:e2e:playwright` — 6/6. PR [#96](https://github.com/OpenKotOR/community-bots/pull/96) Holocron Playwright e2e job green.
-
-Discord live (`pnpm verify:trask-discord`): not re-run — `TRASK_DISCORD_BOT_TOKEN` unset in agent env; import-smoke + prior evidence (5/5) remain authoritative for Discord contract.
+Footer: `12 passages · indexer 8787`
