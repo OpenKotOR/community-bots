@@ -21,6 +21,7 @@ COPY data/ingest-worker ./data/ingest-worker
 COPY data/trask ./data/trask
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @openkotor/retrieval build
+RUN pnpm --filter @openkotor/trask build
 RUN pnpm --filter @openkotor/trask-http-server build
 RUN pnpm --filter @openkotor/holocron-web build
 RUN bash scripts/bootstrap_trask_research.sh

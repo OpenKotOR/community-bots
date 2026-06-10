@@ -172,6 +172,9 @@ importers:
       '@octokit/core':
         specifier: ^6.1.4
         version: 6.1.6
+      '@openkotor/trask':
+        specifier: workspace:*
+        version: link:../../packages/trask
       '@phosphor-icons/react':
         specifier: ^2.1.7
         version: 2.1.10(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -347,9 +350,6 @@ importers:
       '@eslint/js':
         specifier: ^9.21.0
         version: 9.39.4
-      '@openkotor/trask':
-        specifier: workspace:*
-        version: link:../../packages/trask
       '@openkotor/trask-config':
         specifier: workspace:*
         version: link:../../packages/trask-config
