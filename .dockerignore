@@ -1,0 +1,33 @@
+# Keep Docker build context small — images rebuild deps inside multi-stage builds.
+.git
+.github
+**/.git
+
+# Local venvs (Docker bootstraps its own)
+.venv*
+**/.venv*
+
+# Node modules (pnpm install in deps stage)
+node_modules
+**/node_modules
+
+# Playwright / test artifacts
+**/playwright-report
+**/test-results
+**/.playwright
+
+# Editor / agent
+.cursor
+**/.cursor
+
+# Docs and plans (not copied by Dockerfiles)
+docs
+**/*.md
+!infra/**/README.md
+!packages/**/README.md
+
+# Local runtime data
+data/chroma
+data/trask-http-server
+**/__pycache__
+**/*.pyc

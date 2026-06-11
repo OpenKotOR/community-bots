@@ -19,11 +19,7 @@ import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { loadResearchWizardRuntimeConfig, loadSharedAiConfig } from "@openkotor/config";
-import {
-  createResearchWizardClient,
-  formatDiscordAskDisplay,
-  DISCORD_ASK_MAX_BODY_LINES,
-} from "@openkotor/trask";
+import { createResearchWizardClient } from "@openkotor/trask";
 import { degradedAnswerRegexes, loadVerificationQueries, verificationQueriesForSurface } from "@openkotor/trask-config";
 import { isHttpsCitationReachable } from "./lib/url-verify.mjs";
 import { loadEnvFiles, repoRoot } from "./lib/trask-env.mjs";
@@ -33,6 +29,11 @@ import {
   assertProvenanceFooter,
   defaultIndexerUrlForSmoke,
 } from "./lib/discord_provenance_footer.mjs";
+import {
+  auditDiscordAskDisplay,
+  extractInlineHttpsUrls,
+  MIN_INLINE_DISCORD_LINKS,
+} from "./lib/discord_ask_display_audit.mjs";
 
 const DEFAULT_CHANNEL_ID = "1497410480208216306";
 
@@ -46,39 +47,9 @@ const DEGRADED_RE = degradedAnswerRegexes()[0] ?? /could not complete live/i;
 const postToDiscord = process.argv.includes("--post");
 const skipUrlCheck = process.argv.includes("--skip-url-check");
 const importSmoke = process.argv.includes("--import-smoke");
-const MIN_INLINE_LINKS = 2;
 const SYNTHESIS_FAILURE_SNIPPET = "could not complete live archive synthesis";
 
-const extractInlineHttpsUrls = (display) => [...display.matchAll(/\]\((https:\/\/[^)]+)\)/g)].map((m) => m[1]);
-
-const auditDisplay = (question, answer, approvedSources) => {
-  const display = formatDiscordAskDisplay(answer, approvedSources, { query: question });
-  const lines = display.split(/\r?\n/).filter((line) => line.trim().length > 0);
-
-  if (DEGRADED_RE.test(display)) {
-    return "degraded synthesis message";
-  }
-  if (/\nSources\s*\n/i.test(display) || /^\s*Sources\b/im.test(display)) {
-    return "visible Sources block in embed description";
-  }
-  if (lines.length > DISCORD_ASK_MAX_BODY_LINES) {
-    return `${lines.length} lines (max ${DISCORD_ASK_MAX_BODY_LINES})`;
-  }
-  if (/^Answer for:/im.test(display) || /\bAnswer for:/i.test(display)) {
-    return "contains Answer for: prefix";
-  }
-  if (/^\s*-\s*#\s+/m.test(display) || /^\s*#\s+\w/m.test(display)) {
-    return "contains markdown # topic headings";
-  }
-  const linked = [...display.matchAll(/\]\(https:\/\/[^)]+\)/g)];
-  if (linked.length < MIN_INLINE_LINKS) {
-    return `only ${linked.length} inline https link(s); need ≥${MIN_INLINE_LINKS}`;
-  }
-  if (approvedSources.length < MIN_INLINE_LINKS) {
-    return `only ${approvedSources.length} approved source(s); need ≥${MIN_INLINE_LINKS}`;
-  }
-  return { display, lines: lines.length, linked: linked.length, urls: extractInlineHttpsUrls(display) };
-};
+const auditDisplay = auditDiscordAskDisplay;
 
 const verificationById = () =>
   new Map(loadVerificationQueries().map((entry) => [entry.id, entry]));
@@ -112,7 +83,7 @@ const runImportSmoke = () => {
       continue;
     }
     const footerAudit = assertProvenanceFooter({
-      passagesCount: Math.max(approvedSources.length, MIN_INLINE_LINKS),
+      passagesCount: Math.max(approvedSources.length, MIN_INLINE_DISCORD_LINKS),
       indexerUrl: defaultIndexerUrlForSmoke(),
     });
     if (typeof footerAudit === "string") {

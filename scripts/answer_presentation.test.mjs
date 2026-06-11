@@ -1,0 +1,133 @@
+import assert from 'node:assert/strict'
+import { describe, it } from 'node:test'
+import {
+  buildAnswerPresentation,
+  formatTraceUrlLabel,
+  peelEmbeddedNumberedSources,
+  sanitizeAnswerParagraph,
+  sanitizeResearchTraceText,
+  stripMarkdownHttpLinks,
+} from '../apps/holocron-web/src/lib/answer-presentation.ts'
+
+describe('stripMarkdownHttpLinks', () => {
+  it('strips spaced markdown links', () => {
+    const raw =
+      '[icon.png] (https://raw.githubusercontent.com/KobaltBlu/KotOR.js/master/src/assets/icons/icon.png)'
+    const out = stripMarkdownHttpLinks(raw)
+    assert.equal(out, 'icon.png')
+  })
+
+  it('drops image-only markdown', () => {
+    const raw = '![alt](https://example.com/a.png) KotOR.js remake'
+    const out = stripMarkdownHttpLinks(raw)
+    assert.match(out, /KotOR\.js remake/)
+    assert.doesNotMatch(out, /example\.com/)
+  })
+})
+
+describe('sanitizeAnswerParagraph', () => {
+  it('preserves numeric citation markers', () => {
+    const raw = 'The reone project provides engine work [1] and KotOR.js ports TypeScript [3].'
+    const out = sanitizeAnswerParagraph(raw)
+    assert.match(out, /\[1\]/)
+    assert.match(out, /\[3\]/)
+  })
+})
+
+describe('sanitizeResearchTraceText', () => {
+  it('strips raw.githubusercontent image markdown from trace detail', () => {
+    const raw =
+      '.githubusercontent.com/KobaltBlu/KotOR.js/master/icon.png KotOR.js is a TypeScript remake [3].'
+    const out = sanitizeResearchTraceText(raw)
+    assert.doesNotMatch(out, /githubusercontent\.com/i)
+    assert.match(out, /\[3\]/)
+  })
+})
+
+describe('formatTraceUrlLabel', () => {
+  it('labels GitHub blob permalinks as README.md#Ln', () => {
+    const label = formatTraceUrlLabel(
+      'https://github.com/KobaltBlu/KotOR.js/blob/9149775371dbd73ec4fe78c415c2a6e935423e4c/README.md#L1',
+    )
+    assert.equal(label, 'README.md#L1')
+  })
+})
+
+describe('peelEmbeddedNumberedSources', () => {
+  it('moves trailing numbered bibliography into sourceText', () => {
+    const raw = [
+      'The reone project is an open-source Odyssey engine reimplementation [1].',
+      '1. reone - https://github.com/seedhartha/reone',
+      '2. KotOR.js - https://github.com/KobaltBlu/KotOR.js',
+    ].join('\n')
+    const split = peelEmbeddedNumberedSources(raw)
+    assert.match(split.answerText, /reone project/)
+    assert.match(split.sourceText, /^1\./m)
+  })
+
+  it('does not peel long numbered instructional lines without URLs', () => {
+    const raw = [
+      'Install TSLPatcher from the release page.',
+      '1. Download the latest TSLPatcher archive from the releases page',
+      '2. Extract the archive and run TSLPatcher.exe as administrator',
+    ].join('\n')
+    const split = peelEmbeddedNumberedSources(raw)
+    assert.match(split.answerText, /Install TSLPatcher/)
+    assert.equal(split.sourceText, '')
+  })
+
+  it('treats source-only numbered answers as bibliography', () => {
+    const raw = [
+      '1. reone Odyssey engine - https://github.com/seedhartha/reone',
+      '2. reone wiki - https://github.com/seedhartha/reone/wiki',
+    ].join('\n')
+    const split = peelEmbeddedNumberedSources(raw)
+    assert.equal(split.answerText, '')
+    assert.match(split.sourceText, /reone wiki/)
+  })
+})
+
+describe('formatSourceDisplayName via buildAnswerPresentation', () => {
+  it('labels malformed GitHub blob paths as README.md#Ln', () => {
+    const presentation = buildAnswerPresentation('', [
+      {
+        name: 'github.com',
+        url: 'https://github.com/KobaltBlu/KotOR.js/blob/master/githubusercontent.com/KobaltBlu/KotOR.js#L1',
+        confidence: 1,
+      },
+    ])
+    assert.equal(presentation.sources[0]?.name, 'README.md#L1')
+  })
+})
+
+describe('buildAnswerPresentation', () => {
+  it('prefers permalink labels when merging parsed bibliography with API sources', () => {
+    const content = [
+      'KotOR.js ports the engine to TypeScript [3].',
+      '3. icon.png https://raw.githubusercontent.com/KobaltBlu/KotOR.js/master/src/assets/icons/icon.png',
+    ].join('\n')
+    const presentation = buildAnswerPresentation(content, [
+      {
+        name: 'kotor.js',
+        url: 'https://github.com/KobaltBlu/KotOR.js/blob/9149775371dbd73ec4fe78c415c2a6e935423e4c/README.md#L1',
+        confidence: 1,
+      },
+    ])
+    const kotor = presentation.sources.find((s) => s.url.includes('KotOR.js'))
+    assert.ok(kotor)
+    assert.equal(kotor.name, 'README.md#L1')
+  })
+
+  it('parses explicit API sources when body is bibliography-only', () => {
+    const content = [
+      '1. reone - https://github.com/seedhartha/reone',
+      '2. KotOR.js - https://github.com/KobaltBlu/KotOR.js',
+    ].join('\n')
+    const presentation = buildAnswerPresentation(content, [
+      { name: 'reone', url: 'https://github.com/seedhartha/reone', confidence: 1 },
+      { name: 'KotOR.js', url: 'https://github.com/KobaltBlu/KotOR.js', confidence: 1 },
+    ])
+    assert.equal(presentation.isSourceOnly, true)
+    assert.equal(presentation.sources.length, 2)
+  })
+})

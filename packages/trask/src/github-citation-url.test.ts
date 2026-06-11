@@ -4,6 +4,7 @@ import { describe, test } from "node:test";
 import {
   buildGitHubBlobUrl,
   inferGitHubFilePath,
+  isPlausibleRepoRelativePath,
   lineAnchorForQuote,
   parseShallowGitHubRepoUrl,
   resolveGitHubCitationUrlSync,
@@ -57,5 +58,32 @@ describe("github-citation-url", () => {
       buildGitHubBlobUrl("seedhartha", "reone", "abc1234", "README.md", "#L2"),
       "https://github.com/seedhartha/reone/blob/abc1234/README.md#L2",
     );
+  });
+
+  test("inferGitHubFilePath ignores raw.githubusercontent paths in passage text", () => {
+    const passage =
+      "See [icon](https://raw.githubusercontent.com/KobaltBlu/KotOR.js/master/src/assets/icons/icon.png) for branding.";
+    assert.equal(inferGitHubFilePath("https://github.com/KobaltBlu/KotOR.js", passage), "README.md");
+    assert.equal(isPlausibleRepoRelativePath("githubusercontent.com/KobaltBlu/KotOR.js"), false);
+  });
+
+  test("resolveGitHubCitationUrlSync does not embed githubusercontent in blob path", () => {
+    const passage =
+      "KotOR.js ports the engine [icon.png](https://raw.githubusercontent.com/KobaltBlu/KotOR.js/master/src/assets/icons/icon.png).";
+    const resolved = resolveGitHubCitationUrlSync(
+      "https://github.com/KobaltBlu/KotOR.js",
+      passage,
+      "KotOR.js ports the engine.",
+    );
+    assert.doesNotMatch(resolved, /githubusercontent/iu);
+    assert.match(resolved, /\/blob\/main\/README\.md(?:#|$)/iu);
+  });
+
+  test("webCitationDisplayLabel uses README path for malformed blob URLs", () => {
+    const label = webCitationDisplayLabel(
+      "https://github.com/KobaltBlu/KotOR.js/blob/master/githubusercontent.com/KobaltBlu/KotOR.js#L1",
+      "github.com",
+    );
+    assert.equal(label, "README.md#L1");
   });
 });

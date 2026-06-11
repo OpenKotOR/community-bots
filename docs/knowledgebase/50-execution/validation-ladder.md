@@ -44,7 +44,7 @@ lastUpdated: 2026-05-29
 - [REPO] `pnpm trask:smoke:stack-bootstrap` — shared QA env + `ensure_trask_indexed_stack_for_e2e.sh` + `pnpm trask:stack:health` (see [trask-qa-stack-bootstrap-2026-05-24.md](../../solutions/tooling-decisions/trask-qa-stack-bootstrap-2026-05-24.md)).
 - [REPO] CI: after indexer+Worker start → `trask:smoke:stack-bootstrap` → **`trask:verify-import-smoke:ci`** → `holocron:e2e:playwright`. Import-smoke exercises **all five** canonical golden queries (CLI golden wording; Discord expert wording via `goldenQueryId`). Debug individually with `verify:trask-discord:ci` / `verify:trask-cli:ci`.
 - [REPO] Holocron Playwright (`apps/holocron-web/playwright.config.ts`): **`retries: 1` when `CI` is set** (0 locally) for flaky live-research timing; does not replace fixing retrieval or compose regressions.
-- [REPO] Failure-path Holocron e2e (HOLOCRON_E2E_FAILURE_MODE=1 in webserver): unreachable indexer → `groundingStatus: failed` + classifiable `liveTrace`. Note: playwright.failure.config.ts + happy holocron-research.spec.ts deleted on branch (c47c52f); failure spec stranded, happy e2e finds 0 tests (residual). Browser MCP is current path for happy 5 queries.
+- [REPO] Failure-path Holocron e2e (HOLOCRON_E2E_FAILURE_MODE=1 in webserver): unreachable indexer → `groundingStatus: failed` + classifiable `liveTrace`. `playwright.failure.config.ts` + `holocron-research-failure.spec.ts` are optional; default happy path is `holocron-research.spec.ts` (six tests: five queries + reload). Browser MCP supplements Playwright when available.
 - [REPO] Happy-path Holocron e2e: when `groundingStatus === 'grounded'`, `liveTrace` includes gather `diag.research_done` (Plan 006 U2 v1.1 / #87).
 - [REPO] HTTP contracts for Holocron: [trask-http-ask-contract.md](../10-architecture-runtime/trask-http-ask-contract.md), [trask-http-session-history-contract.md](../10-architecture-runtime/trask-http-session-history-contract.md); host wiring: [trask-embedded-holocron-web.md](../10-architecture-runtime/trask-embedded-holocron-web.md), [trask-http-server-standalone-contract.md](../10-architecture-runtime/trask-http-server-standalone-contract.md).
 - [REPO] Env map: [trask-configuration-env-map.md](trask-configuration-env-map.md).
@@ -69,7 +69,8 @@ lastUpdated: 2026-05-29
 | Holocron browser MCP | Cursor browser on **http://127.0.0.1:4010** | same as Playwright | same 5; fresh `?thread=<uuid>` each | same as Playwright row |
 | CLI live | `pnpm verify:trask-cli` | auto-bootstrap **8787**/**8790** | golden-queries | on-topic + citations per script |
 | Discord live | `pnpm verify:trask-discord` | auto-bootstrap + bot token | golden + expert | embed contract per [trask-discord-slash-contract.md](../10-architecture-runtime/trask-discord-slash-contract.md) |
-| Public Pages | manual **qa-webui** URL after deploy | `VITE_TRASK_API_BASE` → live worker API | **1** spot-check (not full matrix) | **≥2** `https://` sources on representative query |
+| Public Pages | `pnpm holocron:public-gate` or `TRASK_QA_PUBLIC=1 pnpm trask:qa:surfaces` | `VITE_TRASK_API_BASE` → live worker API (`/healthz` preflight) | **1** spot-check (golden `reone` default) | **≥2** `https://` sources; fails fast when worker upstream down |
+| One-shot local surfaces | `pnpm trask:qa:surfaces` | offline Discord :4012 + live :4010 ladder + optional public | Discord harness + 5 Holocron + failure path | per row above |
 
 [REPO] Retrieve path for all live rows: `TRASK_INDEXER_BASE_URL=http://127.0.0.1:8787` (Worker), not raw Chroma **:8790**. [REPO] Served stack defaults: `TRASK_WEB_RESEARCH_LIVE_CRAWL=0` (REQ-B), `TRASK_RESEARCH_BUDGET_MS=30000` (REQ-C).
 
@@ -78,4 +79,4 @@ Detail: [holocron-web-trask-client.md](../30-product-ux/holocron-web-trask-clien
 ## 9. Public Holocron (GitHub Pages)
 
 - [REPO] After deploy: open **`https://openkotor.github.io/community-bots/qa-webui/?thread=<fresh-uuid>`** with live **`VITE_TRASK_API_BASE`** / worker research backend — see [holocron-web-trask-client.md](../30-product-ux/holocron-web-trask-client.md).
-- [SYNTH] Spot-check **one** query with **≥2** `https://` sources per matrix §8; full five-query gate remains **`pnpm holocron:e2e`** on **:4010** and Cursor browser MCP per **`AGENTS.md`**.
+- [SYNTH] Spot-check **one** query with **`pnpm holocron:public-gate`** (Playwright + API preflight) or manual **qa-webui** URL; full five-query gate remains **`pnpm holocron:e2e`** / **`pnpm holocron:browser-gate`** on **:4010** and Cursor browser MCP per **`AGENTS.md`**.

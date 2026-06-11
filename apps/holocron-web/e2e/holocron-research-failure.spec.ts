@@ -4,8 +4,7 @@ import { expect, test, type Page } from '@playwright/test'
 
 /**
  * Holocron failure-path e2e: unreachable TRASK_INDEXER_BASE_URL.
- * (Note: dedicated playwright.failure.config.ts was removed in c47c52f; this spec is currently
- * stranded and not matched by the active playwright.config.ts testMatch. See residuals.)
+ * Run via playwright.failure.config.ts (`pnpm holocron:e2e:playwright:failure`).
  * Asserts failed grounding UX and classifiable liveTrace without live retrieve/LLM.
  */
 

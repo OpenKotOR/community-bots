@@ -9,12 +9,21 @@ on:
   pull_request:
     branches: [main]
 
+# Avoid duplicate PR jobs stacking on Playwright install (runner queue stalls).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-test:
     name: Build & Test
     runs-on: ubuntu-latest
+    env:
+      # FastEmbed defaults to /tmp/fastembed_cache — must match actions/cache path.
+      FASTEMBED_CACHE_PATH: ${{ github.workspace }}/.cache/fastembed
     permissions:
       contents: read
+      actions: write
 
     steps:
       - name: Checkout
@@ -56,32 +65,28 @@ jobs:
       - name: Bootstrap Trask indexer venv
         run: bash scripts/bootstrap_trask_indexer.sh
 
-      - name: Cache FastEmbed / HuggingFace embedding models
+      - name: Cache FastEmbed embedding models
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.cache/fastembed
-            ~/.cache/huggingface
-          key: fastembed-bge-small-${{ runner.os }}-v1
+          path: .cache/fastembed
+          key: fastembed-bge-small-${{ runner.os }}-v3
           restore-keys: |
             fastembed-bge-small-${{ runner.os }}-
+
+      - name: Cache Trask Chroma golden index
+        uses: actions/cache@v4
+        with:
+          path: data/trask-indexer/chroma
+          key: trask-chroma-golden-${{ hashFiles('scripts/smoke_trask_indexed_stack.py') }}
+          restore-keys: |
+            trask-chroma-golden-
 
       - name: Pre-warm Trask embedding model
         env:
           HF_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
-        run: |
-          set -euo pipefail
-          for attempt in 1 2 3 4 5; do
-            if .venv-trask-indexer/bin/python -c "from trask_indexer.embed import embed_texts; embed_texts(['ci warmup'])"; then
-              echo "Embedding model ready on attempt ${attempt}"
-              exit 0
-            fi
-            delay=$((attempt * 15))
-            echo "Embed warmup attempt ${attempt} failed; sleeping ${delay}s..."
-            sleep "${delay}"
-          done
-          echo "Could not download embedding model after 5 attempts" >&2
-          exit 1
+          HUGGINGFACE_HUB_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
+          HF_HUB_ENABLE_HF_TRANSFER: "1"
+        run: bash scripts/ci_warm_trask_embed.sh
 
       - name: Export Trask allowlist catalog
         run: node scripts/export_trask_allowlist_catalog.mjs
@@ -99,35 +104,262 @@ jobs:
 
       - name: Start Trask indexer (background)
         run: |
-          .venv-trask-indexer/bin/trask-indexer serve &
+          set -euo pipefail
+          .venv-trask-indexer/bin/trask-indexer serve > /tmp/trask-indexer.log 2>&1 &
+          INDEXER_PID=$!
           for i in $(seq 1 30); do
             if curl -sf http://127.0.0.1:8790/health; then
               exit 0
             fi
+            if ! kill -0 "$INDEXER_PID" 2>/dev/null; then
+              echo "Indexer exited early"
+              cat /tmp/trask-indexer.log
+              exit 1
+            fi
             sleep 1
           done
           echo "Indexer failed to start" >&2
+          cat /tmp/trask-indexer.log
           exit 1
 
       - name: Start Trask retrieve Worker (background)
         run: |
+          set -euo pipefail
           cd infra/trask-retrieve-worker
           TRASK_INDEXER_BASE_URL=http://127.0.0.1:8790 \
-            pnpm exec wrangler dev --port 8787 --local-protocol http &
+            pnpm exec wrangler dev --port 8787 --local-protocol http > /tmp/trask-worker.log 2>&1 &
+          WORKER_PID=$!
           for i in $(seq 1 45); do
             if curl -sf http://127.0.0.1:8787/health; then
               exit 0
             fi
+            if ! kill -0 "$WORKER_PID" 2>/dev/null; then
+              echo "Retrieve worker exited early"
+              cat /tmp/trask-worker.log
+              exit 1
+            fi
             sleep 1
           done
           echo "Retrieve Worker failed to start" >&2
+          cat /tmp/trask-worker.log
           exit 1
 
-      # Idempotent smoke: same path as local `pnpm trask:smoke:stack-bootstrap` (PR #69).
       - name: Trask QA stack bootstrap smoke
         run: pnpm trask:smoke:stack-bootstrap
         env:
           TRASK_INDEXER_BASE_URL: http://127.0.0.1:8787
 
+      - name: Trask Discord + CLI import smoke (indexed, no LLM)
+        run: pnpm trask:verify-import-smoke:ci
+        env:
+          TRASK_INDEXER_BASE_URL: http://127.0.0.1:8787
+          HOLOCRON_E2E_SKIP_STACK_BOOTSTRAP: "1"
+
+      # Container Playwright job cannot restore Actions cache from this host job — use artifacts.
+      - name: Upload Holocron e2e fixtures (Chroma + FastEmbed)
+        uses: actions/upload-artifact@v4
+        with:
+          name: trask-holocron-e2e-fixtures
+          path: |
+            .cache/fastembed
+            data/trask-indexer/chroma
+          if-no-files-found: error
+          retention-days: 1
+
+  discord-playwright-e2e:
+    name: Discord Playwright harness
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.59.1-noble
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+    defaults:
+      run:
+        shell: bash
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.11.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Rebuild esbuild native binary
+        run: pnpm rebuild esbuild
+
+      - name: TypeScript build
+        run: pnpm build
+
+      - name: Discord /ask Playwright harness (offline)
+        run: pnpm trask:e2e:discord:playwright
+        env:
+          TRASK_SKIP_BUILD: "1"
+
+  holocron-playwright-e2e:
+    name: Holocron Playwright e2e
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    container:
+      # Must match @playwright/test in pnpm-lock.yaml (browser revision paths).
+      image: mcr.microsoft.com/playwright:v1.59.1-noble
+    env:
+      FASTEMBED_CACHE_PATH: ${{ github.workspace }}/.cache/fastembed
+      HF_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
+      HUGGINGFACE_HUB_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+    defaults:
+      run:
+        shell: bash
+    permissions:
+      contents: read
+
+    steps:
+      - name: Install python3-venv (Playwright image)
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y python3.12-venv curl
+
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.11.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Rebuild esbuild native binary
+        run: pnpm rebuild esbuild
+
+      - name: TypeScript build
+        run: pnpm build
+
+      - name: Bootstrap Trask indexer venv
+        run: bash scripts/bootstrap_trask_indexer.sh
+
+      - name: Download Holocron e2e fixtures from build job
+        uses: actions/download-artifact@v4
+        with:
+          name: trask-holocron-e2e-fixtures
+          path: .
+
+      - name: Probe FastEmbed from build job artifact
+        run: bash scripts/ci_warm_trask_embed.sh
+
+      - name: Verify Chroma golden index (from build job artifact)
+        run: .venv-trask-indexer/bin/python scripts/smoke_trask_indexed_stack.py --golden-fixtures --verify-retrieve --verify-chroma-only
+        env:
+          TRASK_INDEXER_DATA_DIR: data/trask-indexer
+
+      - name: Start Trask indexer (background)
+        run: |
+          set -euo pipefail
+          .venv-trask-indexer/bin/trask-indexer serve > /tmp/trask-indexer.log 2>&1 &
+          INDEXER_PID=$!
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8790/health; then
+              exit 0
+            fi
+            if ! kill -0 "$INDEXER_PID" 2>/dev/null; then
+              cat /tmp/trask-indexer.log
+              exit 1
+            fi
+            sleep 1
+          done
+          cat /tmp/trask-indexer.log
+          exit 1
+
+      - name: Start Trask retrieve Worker (background)
+        run: |
+          set -euo pipefail
+          cd infra/trask-retrieve-worker
+          TRASK_INDEXER_BASE_URL=http://127.0.0.1:8790 \
+            pnpm exec wrangler dev --port 8787 --local-protocol http > /tmp/trask-worker.log 2>&1 &
+          WORKER_PID=$!
+          for i in $(seq 1 45); do
+            if curl -sf http://127.0.0.1:8787/health; then
+              exit 0
+            fi
+            if ! kill -0 "$WORKER_PID" 2>/dev/null; then
+              cat /tmp/trask-worker.log
+              exit 1
+            fi
+            sleep 1
+          done
+          cat /tmp/trask-worker.log
+          exit 1
+
+      - name: Holocron Playwright e2e (5 expert queries + reload)
+        run: pnpm holocron:e2e:playwright
+        env:
+          TRASK_SKIP_BUILD: "1"
+          TRASK_INDEXER_BASE_URL: http://127.0.0.1:8787
+          HOLOCRON_E2E_SKIP_STACK_BOOTSTRAP: "1"
+          TRASK_QA_GROUNDING: "1"
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+
+      - name: Holocron Playwright failure-path e2e
+        run: pnpm holocron:e2e:playwright:failure
+        env:
+          TRASK_SKIP_BUILD: "1"
+          TRASK_QA_GROUNDING: "1"
+
+  trask-gate-final:
+    name: Trask gate (final)
+    needs: [build-and-test, discord-playwright-e2e, holocron-playwright-e2e]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.11.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: TypeScript build
+        run: pnpm build
+
       - name: Trask offline gate (smoke + config drift + measure)
         run: pnpm trask:gate:ci
+        env:
+          TRASK_SKIP_BUILD: "1"

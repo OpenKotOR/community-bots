@@ -66,7 +66,8 @@ pr_refs: [33, 34, 35, 36, 38]
 | Sources in UI | Visible panel / API fields | **Hidden** — stripped from embed |
 | Body presentation | Multi-paragraph / bullets allowed | ≤5 non-empty lines, char cap per line |
 | Citations | `[n]` + URLs in Sources | Inline `[n](https://…)` only |
-| Display entry | HTTP record + Holocron UI | `buildResearchEmbed` + `formatDiscordAskDisplay` |
+| Display entry | HTTP record + Holocron UI (`answer-presentation.ts` + `webCitationDisplayLabel`) | `buildResearchEmbed` + `formatDiscordAskDisplay` |
+| GitHub source permalinks | `github-citation-url.ts` at compose; Holocron re-labels via `@openkotor/trask/github-citation-url` | Same module for embed URL map |
 
 [SYNTH] Faithfulness fixtures and Holocron e2e validate full answers; **discord-reply-format.test.js** stress tests validate the display transform only.
 

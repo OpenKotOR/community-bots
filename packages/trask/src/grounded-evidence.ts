@@ -490,9 +490,9 @@ export const composeGroundedAnswerFromClaims = (
   const stripMarkdownArtifacts = (value: string): string => {
     const capped = value.length > 8000 ? value.slice(0, 8000) : value;
     return capped
-      .replace(/!\[([^\]]{0,500})\]\([^)]{0,500}\)/gu, "$1")
-      .replace(/\[([^\]]{0,500})\]\([^)]{0,500}\)/gu, "$1")
-      .replace(/\[\]\([^)]{0,500}\)/gu, "")
+      .replace(/!\[([^\]]{0,500})\]\s*\([^)]{0,500}\)/gu, "$1")
+      .replace(/\[([^\]]{0,500})\]\s*\([^)]{0,500}\)/gu, "$1")
+      .replace(/\[\]\s*\([^)]{0,500}\)/gu, "")
       .replace(/\*+/gu, "")
       .replace(/`+/gu, "");
   };

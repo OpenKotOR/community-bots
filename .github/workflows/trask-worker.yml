@@ -166,3 +166,9 @@ jobs:
             deploy_args+=(--var "TRASK_RESEARCHWIZARD_BASE_URL:${TRASK_RESEARCHWIZARD_BASE_URL}")
           fi
           pnpm dlx wrangler@4.87.0 deploy "${deploy_args[@]}"
+
+      - name: Verify deployed worker health
+        if: steps.cf_check.outputs.configured == 'true'
+        env:
+          TRASK_API_BASE: ${{ vars.TRASK_API_BASE != '' && vars.TRASK_API_BASE || 'https://trask-worker.bocloud.workers.dev' }}
+        run: bash scripts/check_trask_public_api.sh
