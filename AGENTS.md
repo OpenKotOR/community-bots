@@ -151,7 +151,7 @@ pnpm verify:trask-cli
 
 **Live browser gate (stack on :4010):** `pnpm holocron:browser-gate` — five expert queries via Playwright against an existing `trask-http-server`; writes `docs/evidence/holocron-browser-gate-latest.md` (no webServer boot).
 
-**Playwright (offline Discord + live Holocron):** `pnpm trask:e2e:discord:playwright` — static harness on **:4012** (`scripts/discord-ask-e2e-webserver.mjs`, `e2e/trask-discord-ask.spec.mjs`); mirrors import-smoke embed contract in a real browser (no discord.com, no LLM). `pnpm trask:e2e:playwright` runs Discord harness then `pnpm holocron:e2e:playwright` (six happy-path tests). `pnpm holocron:e2e:playwright:failure` — unreachable indexer (`playwright.failure.config.ts`). `pnpm trask:e2e:playwright:full` — Discord + Holocron happy + failure. CI runs Discord Playwright in a container job; Holocron job runs happy then failure specs.
+**Playwright (offline Discord + live Holocron):** `pnpm trask:e2e:discord:playwright` — static harness on **:4012** (`scripts/discord-ask-e2e-webserver.mjs`, `e2e/trask-discord-ask.spec.mjs`); mirrors import-smoke embed contract in a real browser (no discord.com, no LLM). `pnpm trask:e2e:playwright` runs Discord harness then `pnpm holocron:e2e:playwright` (six happy-path tests). `pnpm holocron:e2e:playwright:failure` — unreachable indexer on **:4011** (`playwright.failure.config.ts`; live stack on **:4010** can stay up). `pnpm trask:e2e:playwright:full` — Discord + Holocron happy + failure. `pnpm trask:public-api:check` — worker `/healthz` + ask smoke (`TRASK_API_BASE` required). CI runs Discord Playwright in a container job; Holocron job runs happy then failure specs.
 
 #### Offline faithfulness gate (citation alignment)
 

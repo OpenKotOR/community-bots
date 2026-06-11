@@ -22,8 +22,7 @@ HOLOCRON_REUSE_SERVER=1 pnpm holocron:e2e:playwright
 echo "==> Holocron browser gate (five expert queries, evidence file)"
 pnpm holocron:browser-gate
 
-echo "==> Holocron failure-path Playwright (stops :4010 trask-http for unreachable indexer test)"
-fuser -k 4010/tcp 2>/dev/null || true
+echo "==> Holocron failure-path Playwright (:4011 unreachable indexer; :4010 stack may stay up)"
 pnpm holocron:e2e:playwright:failure
 
 if [ "${TRASK_QA_PUBLIC:-0}" = "1" ]; then
@@ -31,4 +30,4 @@ if [ "${TRASK_QA_PUBLIC:-0}" = "1" ]; then
   pnpm holocron:public-gate
 fi
 
-echo "OK: Trask QA surfaces passed (restart stack if you still need :4010: bash scripts/trask_live_stack.sh)"
+echo "OK: Trask QA surfaces passed (:4010 live stack unchanged; failure e2e used :4011)"
