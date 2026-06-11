@@ -21,6 +21,7 @@ on:
       - "scripts/pack-trask-http-hf-context.sh"
       - "data/trask/**"
       - ".github/workflows/docker-builds.yml"
+      - ".dockerignore"
   pull_request:
     branches:
       - main
@@ -55,6 +56,13 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Free disk space for image builds
+        run: |
+          set -euo pipefail
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL 2>/dev/null || true
+          docker system prune -af --volumes || true
+          df -h
 
       - name: Build and verify service images
         run: |
@@ -130,6 +138,8 @@ jobs:
       - name: Build and smoke test Trask HTTP public (HF Space)
         run: |
           set -euo pipefail
+          docker system prune -af || true
+          df -h
           image="trask-http-public:test"
           container="trask-http-public-ci"
           docker buildx build --load --progress=plain -f infra/trask-http-public/Dockerfile -t "$image" .

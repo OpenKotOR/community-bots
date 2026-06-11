@@ -28,6 +28,10 @@ RUN bash scripts/bootstrap_trask_research.sh
 RUN bash scripts/bootstrap_trask_indexer.sh
 RUN node scripts/export_trask_allowlist_catalog.mjs
 RUN TRASK_INDEX_SEED_REQUIRE_INDEXER=0 bash scripts/trask_index_seed_for_qa.sh
+# Drop pytest baselines and caches from Python venvs — shrinks export layer on CI runners.
+RUN find /workspace/.venv-trask-research /workspace/.venv-trask-indexer \
+    -type d \( -name tests -o -name __pycache__ \) -prune -exec rm -rf {} + 2>/dev/null || true \
+  && find /workspace/.venv-trask-research /workspace/.venv-trask-indexer -type f -name '*.pyc' -delete 2>/dev/null || true
 
 FROM base AS runtime
 WORKDIR /workspace
