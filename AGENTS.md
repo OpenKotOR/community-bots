@@ -51,7 +51,7 @@ Standard scripts from `package.json`:
 
 **Requirement:** Do not claim Holocron search/research is working until you have **fully verified it in a real browser** — all five canonical research queries must complete with substantive answers and sources. Use Playwright (`pnpm holocron:e2e`) as the mandatory automated gate; use the Cursor **browser** MCP for an extra manual pass when it is available. A single happy-path click or CLI-only check is not sufficient.
 
-Holocron e2e is **functional only** (no mocked `/api/trask` routes, no UI regression fixtures). Happy-path Playwright: `apps/holocron-web/e2e/holocron-research.spec.ts` (five expert queries + reload; matched by `playwright.config.ts`). Failure-path spec exists but is not in default `testMatch`. When Cursor **browser** MCP is available, run the same five queries on `:4010` in addition to Playwright — not instead of it.
+Holocron e2e is **functional only** (no mocked `/api/trask` routes, no UI regression fixtures). Happy-path Playwright: `holocron-research.spec.ts` (five expert queries + reload; `playwright.config.ts`). Failure-path: `holocron-research-failure.spec.ts` via `pnpm holocron:e2e:playwright:failure` (`playwright.failure.config.ts`, unreachable indexer). When Cursor **browser** MCP is available, run the same five queries on `:4010` in addition to Playwright — not instead of it.
 
 #### Mandatory verification (run before “done”)
 
@@ -145,6 +145,14 @@ pnpm verify:trask-cli
 
 `pnpm verify:trask-cli` runs `scripts/verify_trask_cli_qa.mjs` (golden queries). `pnpm verify:trask-cli:ci` / `pnpm trask:verify-import-smoke:ci` use `--import-smoke` (no LLM). `pnpm verify:trask-discord` runs live Discord-format checks via the research wizard.
 
+**Public Pages spot-check (post-deploy):** `pnpm holocron:public-gate` — one Playwright query on `https://openkotor.github.io/community-bots/qa-webui/`; writes `docs/evidence/holocron-public-pages-gate-latest.md` (requires live `VITE_TRASK_API_BASE` / worker backend).
+
+**One-shot QA surfaces (Discord + Holocron Playwright + browser gate):** `pnpm trask:qa:surfaces` — runs `scripts/trask_qa_surfaces.sh` (offline Discord harness on :4012, then live stack on :4010 for happy Playwright + browser gate, failure-path Playwright last). Optional public Pages spot-check: `TRASK_QA_PUBLIC=1 pnpm trask:qa:surfaces`. Live Discord bot: `pnpm verify:trask-discord`.
+
+**Live browser gate (stack on :4010):** `pnpm holocron:browser-gate` — five expert queries via Playwright against an existing `trask-http-server`; writes `docs/evidence/holocron-browser-gate-latest.md` (no webServer boot).
+
+**Playwright (offline Discord + live Holocron):** `pnpm trask:e2e:discord:playwright` — static harness on **:4012** (`scripts/discord-ask-e2e-webserver.mjs`, `e2e/trask-discord-ask.spec.mjs`); mirrors import-smoke embed contract in a real browser (no discord.com, no LLM). `pnpm trask:e2e:playwright` runs Discord harness then `pnpm holocron:e2e:playwright` (six happy-path tests). `pnpm holocron:e2e:playwright:failure` — unreachable indexer on **:4011** (`playwright.failure.config.ts`; live stack on **:4010** can stay up). `pnpm trask:e2e:playwright:full` — Discord + Holocron happy + failure. `pnpm trask:public-api:check` — worker `/healthz` + ask smoke (`TRASK_API_BASE` required). CI runs Discord Playwright in a container job; Holocron job runs happy then failure specs.
+
 #### Offline faithfulness gate (citation alignment)
 
 After code changes to answer formatting, citation alignment, or `grounded-evidence.ts`, run:
@@ -160,11 +168,11 @@ pnpm trask:optimize-measure:ci   # CI-equivalent gate after build — see docs/s
 pnpm trask:faithfulness-eval     # faithfulness fixtures only
 ```
 
-`trask:faithfulness-eval` replays committed golden fixtures under `data/trask-eval/fixtures/` (no live web research). It does **not** replace Holocron e2e for end-to-end research validation. `pnpm holocron:e2e` runs **`pnpm trask:gate`** then `holocron:e2e:playwright` (Playwright `webServer` runs `scripts/holocron-e2e-webserver.mjs`, which bootstraps indexer+Worker when needed and sets `TRASK_QA_GROUNDING=1` for CI-parity compose). `pnpm verify:trask-discord` and `pnpm verify:trask-cli` preflight with **`trask:gate`** and auto-bootstrap the indexed stack before live queries. CI runs `pnpm build`, early **`pnpm trask:gate:ci`**, indexer+Worker bootstrap, **`pnpm trask:verify-import-smoke:ci`**, then **`pnpm holocron:e2e:playwright`** with `TRASK_SKIP_BUILD=1` and `HOLOCRON_E2E_SKIP_STACK_BOOTSTRAP=1`, then a final **`pnpm trask:gate:ci`**. Product policy strings live under `data/trask/`; `pnpm trask:gate` includes `trask:config-drift` — use standalone `pnpm trask:config-drift` only for a quick drift-only check after edits.
+`trask:faithfulness-eval` replays committed golden fixtures under `data/trask-eval/fixtures/` (no live web research). It does **not** replace Holocron e2e for end-to-end research validation. `pnpm holocron:e2e` runs **`pnpm trask:gate`** then `test:e2e:all` (happy-path + failure-path Playwright; `webServer` uses `scripts/holocron-e2e-webserver.mjs`, bootstraps indexer+Worker on happy path, `HOLOCRON_E2E_FAILURE_MODE=1` on failure path). `pnpm verify:trask-discord` and `pnpm verify:trask-cli` preflight with **`trask:gate`** and auto-bootstrap the indexed stack before live queries. CI runs `pnpm build`, early **`pnpm trask:gate:ci`**, indexer+Worker bootstrap, **`pnpm trask:verify-import-smoke:ci`**, then **`pnpm holocron:e2e:playwright`** with `TRASK_SKIP_BUILD=1` and `HOLOCRON_E2E_SKIP_STACK_BOOTSTRAP=1`, then a final **`pnpm trask:gate:ci`**. Product policy strings live under `data/trask/`; `pnpm trask:gate` includes `trask:config-drift` — use standalone `pnpm trask:config-drift` only for a quick drift-only check after edits.
 
 ### Trask Discord `/ask` — mandatory verification (agents)
 
-**Do not claim Discord `/ask` is fixed until live checks pass.** Run `pnpm verify:trask-discord` (full expert set). Holocron requires `pnpm holocron:e2e` and, when browser MCP works, all five UI queries on `:4010`. Discord web UI is not Playwright-gated in CI; live verify exercises the same compose/format path as the bot. 
+**Do not claim Discord `/ask` is fixed until live checks pass.** Run `pnpm verify:trask-discord` (full expert set). Offline Playwright gate: `pnpm trask:e2e:discord:playwright` (five golden import-smoke embeds on **:4012**). Holocron requires `pnpm holocron:e2e` and, when browser MCP works, all five UI queries on `:4010`. CI runs offline Discord Playwright in Build; live `verify:trask-discord` still needs a bot token locally. 
 
 1. **Worker retrieve** at `TRASK_INDEXER_BASE_URL=http://127.0.0.1:8787` — `pnpm verify:trask-discord` auto-bootstraps indexer+Worker when unhealthy (same as CLI/Holocron e2e); manual path: `bash scripts/trask_live_stack.sh` with QA seed `bash scripts/bootstrap_trask_indexer.sh`, `bash scripts/trask_index_seed_for_qa.sh`.
 2. **Restart** Trask bot after `@openkotor/trask` changes: kill old `trask-bot/dist/main.js`, rebuild (`pnpm build`), start with `TRASK_INDEXER_BASE_URL` + `TRASK_WEB_RESEARCH_PYTHON` + `.env` token.

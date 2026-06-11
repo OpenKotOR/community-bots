@@ -26,8 +26,10 @@ Authoritative display contract: [trask-citation-display-contract.md](../../knowl
 citation-markers.ts          ← regex + parseCitationIndex (**internal** — not exported from `@openkotor/trask` index)
 query-anchor.ts              ← BRIEF_DISCORD_MIN_CITATIONS, distinctiveAnchorTokens, claimMatchesQueryAnchor (**exported** from `@openkotor/trask` index)
 research-answer-split.ts     ← splitResearchAnswer, syncSourcesSectionToApproved (**exported** from `@openkotor/trask` index)
-grounded-evidence.ts         ← compose, claims, sufficiency (imports split + anchor; re-exports anchor)
+github-citation-url.ts       ← shallow repo → blob permalinks, webCitationDisplayLabel, passage path inference (**exported**)
+grounded-evidence.ts         ← compose, claims, sufficiency (imports split + anchor + github-citation-url; re-exports anchor)
 discord-reply-format.ts      ← line filters, embedInlineCitationLinks (imports markers, anchor, split; NOT grounded-evidence)
+apps/holocron-web/src/lib/answer-presentation.ts ← Holocron Sources panel labels (`webCitationDisplayLabel` via `@openkotor/trask/github-citation-url` — browser-safe subpath)
 ```
 
 [SYNTH] **No cycle** on answer parsing (split) or display anchors (query-anchor). Compose still owns claim selection; display imports anchor helpers only.

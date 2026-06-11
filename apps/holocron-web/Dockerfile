@@ -11,6 +11,7 @@ COPY packages ./packages
 COPY apps/holocron-web ./apps/holocron-web
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @openkotor/platform build \
+  && pnpm --filter @openkotor/trask build \
   && pnpm --filter @openkotor/holocron-web build
 
 FROM base AS runtime

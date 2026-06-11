@@ -2,8 +2,10 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   buildAnswerPresentation,
+  formatTraceUrlLabel,
   peelEmbeddedNumberedSources,
   sanitizeAnswerParagraph,
+  sanitizeResearchTraceText,
   stripMarkdownHttpLinks,
 } from '../apps/holocron-web/src/lib/answer-presentation.ts'
 
@@ -32,6 +34,25 @@ describe('sanitizeAnswerParagraph', () => {
   })
 })
 
+describe('sanitizeResearchTraceText', () => {
+  it('strips raw.githubusercontent image markdown from trace detail', () => {
+    const raw =
+      '.githubusercontent.com/KobaltBlu/KotOR.js/master/icon.png KotOR.js is a TypeScript remake [3].'
+    const out = sanitizeResearchTraceText(raw)
+    assert.doesNotMatch(out, /githubusercontent\.com/i)
+    assert.match(out, /\[3\]/)
+  })
+})
+
+describe('formatTraceUrlLabel', () => {
+  it('labels GitHub blob permalinks as README.md#Ln', () => {
+    const label = formatTraceUrlLabel(
+      'https://github.com/KobaltBlu/KotOR.js/blob/9149775371dbd73ec4fe78c415c2a6e935423e4c/README.md#L1',
+    )
+    assert.equal(label, 'README.md#L1')
+  })
+})
+
 describe('peelEmbeddedNumberedSources', () => {
   it('moves trailing numbered bibliography into sourceText', () => {
     const raw = [
@@ -42,6 +63,17 @@ describe('peelEmbeddedNumberedSources', () => {
     const split = peelEmbeddedNumberedSources(raw)
     assert.match(split.answerText, /reone project/)
     assert.match(split.sourceText, /^1\./m)
+  })
+
+  it('does not peel long numbered instructional lines without URLs', () => {
+    const raw = [
+      'Install TSLPatcher from the release page.',
+      '1. Download the latest TSLPatcher archive from the releases page',
+      '2. Extract the archive and run TSLPatcher.exe as administrator',
+    ].join('\n')
+    const split = peelEmbeddedNumberedSources(raw)
+    assert.match(split.answerText, /Install TSLPatcher/)
+    assert.equal(split.sourceText, '')
   })
 
   it('treats source-only numbered answers as bibliography', () => {
@@ -55,7 +87,37 @@ describe('peelEmbeddedNumberedSources', () => {
   })
 })
 
+describe('formatSourceDisplayName via buildAnswerPresentation', () => {
+  it('labels malformed GitHub blob paths as README.md#Ln', () => {
+    const presentation = buildAnswerPresentation('', [
+      {
+        name: 'github.com',
+        url: 'https://github.com/KobaltBlu/KotOR.js/blob/master/githubusercontent.com/KobaltBlu/KotOR.js#L1',
+        confidence: 1,
+      },
+    ])
+    assert.equal(presentation.sources[0]?.name, 'README.md#L1')
+  })
+})
+
 describe('buildAnswerPresentation', () => {
+  it('prefers permalink labels when merging parsed bibliography with API sources', () => {
+    const content = [
+      'KotOR.js ports the engine to TypeScript [3].',
+      '3. icon.png https://raw.githubusercontent.com/KobaltBlu/KotOR.js/master/src/assets/icons/icon.png',
+    ].join('\n')
+    const presentation = buildAnswerPresentation(content, [
+      {
+        name: 'kotor.js',
+        url: 'https://github.com/KobaltBlu/KotOR.js/blob/9149775371dbd73ec4fe78c415c2a6e935423e4c/README.md#L1',
+        confidence: 1,
+      },
+    ])
+    const kotor = presentation.sources.find((s) => s.url.includes('KotOR.js'))
+    assert.ok(kotor)
+    assert.equal(kotor.name, 'README.md#L1')
+  })
+
   it('parses explicit API sources when body is bibliography-only', () => {
     const content = [
       '1. reone - https://github.com/seedhartha/reone',

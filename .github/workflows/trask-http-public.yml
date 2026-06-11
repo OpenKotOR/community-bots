@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "apps/trask-http-server/**"
+      - "apps/holocron-web/**"
       - "packages/trask/**"
       - "packages/trask-http/**"
       - "packages/config/**"
@@ -25,6 +26,7 @@ on:
       - "data/ingest-worker/**"
       - "infra/trask-http-public/**"
       - "scripts/pack-trask-http-hf-context.sh"
+      - "scripts/verify_trask_http_hf_pack.mjs"
       - "scripts/sync_hf_space_secrets.py"
       - "pnpm-lock.yaml"
       - ".github/workflows/trask-http-public.yml"
@@ -85,6 +87,12 @@ jobs:
           pip install -q huggingface_hub
           python3 scripts/sync_hf_space_secrets.py "${HF_SPACE_ID}"
 
+      - name: Verify HF Space pack
+        if: steps.hf_check.outputs.configured == 'true'
+        run: |
+          chmod +x scripts/pack-trask-http-hf-context.sh
+          node scripts/verify_trask_http_hf_pack.mjs
+
       - name: Pack and upload Space context
         if: steps.hf_check.outputs.configured == 'true'
         env:
@@ -116,8 +124,9 @@ jobs:
               if stage == "RUNNING":
                   print(f"Space running: https://{info.subdomain}.hf.space")
                   break
-              if stage == "ERROR":
-                  raise SystemExit("HF Space build failed")
+              if stage in ("ERROR", "CONFIG_ERROR"):
+                  msg = getattr(getattr(info, "runtime", None), "message", None)
+                  raise SystemExit(f"HF Space failed: stage={stage} message={msg}")
               time.sleep(30)
           else:
               raise SystemExit("Timed out waiting for HF Space")

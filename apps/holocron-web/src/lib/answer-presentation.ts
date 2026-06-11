@@ -3,6 +3,8 @@
  * Kept separate from Message.tsx for unit testing without React.
  */
 
+import { webCitationDisplayLabel } from '@openkotor/trask/github-citation-url'
+
 export interface SourceLike {
   name: string
   url: string
@@ -172,7 +174,8 @@ export function sanitizeAnswerParagraph(text: string): string {
     const token = `${CITATION_PLACEHOLDER_PREFIX}${i}${CITATION_PLACEHOLDER_SUFFIX}`
     t = t.split(token).join(citations[i] ?? '')
   }
-  return t
+  t = t.replace(/(?:https?:\/\/)?(?:raw\.)?\.?githubusercontent\.com\/[^\s)]+/giu, ' ')
+  return t.replace(/\s{2,}/gu, ' ').trim()
 }
 
 function parseBracketCitationLine(line: string): { index: number; rest: string } | null {
@@ -205,44 +208,26 @@ function sourceHostname(url: string): string {
 
 function formatSourceDisplayName(name: string, url: string): string {
   if (!url) return name
+  const label = webCitationDisplayLabel(url, name)
+  return label.trim() || name
+}
+
+/** Visible research-trace lines: same cleanup as answer paragraphs. */
+export function sanitizeResearchTraceText(text: string): string {
+  return sanitizeAnswerParagraph(text)
+}
+
+/** Short label for trace URL lists (permalink-aware; full URL stays in href/title). */
+export function formatTraceUrlLabel(url: string, fallbackName = ''): string {
+  const label = webCitationDisplayLabel(url, fallbackName)
+  if (label.trim()) return label.trim()
+  if (fallbackName.trim()) return fallbackName.trim()
   try {
-    const parsed = new URL(url)
-    const host = parsed.hostname.replace(/^www\./, '')
-    const genericName =
-      !name.trim()
-      || name.trim().toLowerCase() === host.toLowerCase()
-      || name.trim().toLowerCase() === 'github.com'
-
-    if (host === 'github.com') {
-      const path = decodeURIComponent(parsed.pathname)
-      const hash = parsed.hash && /^#L/i.test(parsed.hash) ? parsed.hash : ''
-      const blobMatch = path.match(/\/blob\/[^/]+\/(.+)$/i)
-      if (blobMatch?.[1]) {
-        const shortPath = blobMatch[1].replace(/\/+$/, '').split('/').slice(-2).join('/') || blobMatch[1]
-        return `${shortPath}${hash}`
-      }
-      const wikiMatch = path.match(/\/wiki\/(.+)$/i)
-      if (wikiMatch?.[1]) {
-        const page = wikiMatch[1].replace(/\/+$/, '')
-        return `wiki: ${page.split('/').pop() ?? page}${hash}`
-      }
-      const repoMatch = path.match(/^\/([^/]+)\/([^/]+)\/?$/i)
-      if (repoMatch?.[2]) {
-        return `${repoMatch[2]}${hash}`
-      }
-    }
-
-    if (genericName) {
-      const pathSegments = parsed.pathname.replace(/\/+$/, '').split('/').filter(Boolean)
-      if (pathSegments.length > 1) {
-        return `${pathSegments.slice(-2).join('/')}`.replace(/[-_]+/g, ' ')
-      }
-      return host
-    }
+    const host = new URL(url).hostname.replace(/^www\./, '')
+    return host || url
   } catch {
-    /* keep name */
+    return url
   }
-  return name
 }
 
 export function sourceKey(source: Pick<SourceLike, 'name' | 'url'>): string {
@@ -263,7 +248,7 @@ function stripSourceNoise(text: string): string {
 function isNumberedBibliographyLine(line: string): boolean {
   const trimmed = line.trim()
   if (!parseNumberedSourceLine(trimmed)) return false
-  return extractHttpUrls(trimmed).length > 0 || trimmed.length > 24
+  return extractHttpUrls(trimmed).length > 0
 }
 
 /**
@@ -430,11 +415,13 @@ export function buildAnswerPresentation(content: string, explicitSources: Source
     if (existingIndex !== undefined) {
       const existing = merged[existingIndex]
       if (!existing) return
+      const url = cleanUrl(candidate.url || existing.url)
       merged[existingIndex] = {
         ...existing,
-        name: existing.name || candidate.name,
-        url: existing.url || candidate.url,
-        hostname: existing.hostname || candidate.hostname,
+        ...candidate,
+        url,
+        name: formatSourceDisplayName(existing.name || candidate.name, url),
+        hostname: url ? sourceHostname(url) : existing.hostname || candidate.hostname,
       }
       return
     }

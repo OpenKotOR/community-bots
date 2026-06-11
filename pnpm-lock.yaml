@@ -92,7 +92,7 @@ importers:
         version: 17.6.0
       tailwindcss:
         specifier: ^4.2.2
-        version: 4.2.4
+        version: 4.3.0
       typescript:
         specifier: ~6.0.2
         version: 6.0.2
@@ -172,6 +172,9 @@ importers:
       '@octokit/core':
         specifier: ^6.1.4
         version: 6.1.6
+      '@openkotor/trask':
+        specifier: workspace:*
+        version: link:../../packages/trask
       '@phosphor-icons/react':
         specifier: ^2.1.7
         version: 2.1.10(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -258,7 +261,7 @@ importers:
         version: 1.2.8(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@tailwindcss/container-queries':
         specifier: ^0.1.1
-        version: 0.1.1(tailwindcss@4.2.4)
+        version: 0.1.1(tailwindcss@4.3.0)
       '@tailwindcss/vite':
         specifier: ^4.1.11
         version: 4.2.2(vite@7.3.5(@types/node@24.12.3)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))
@@ -376,7 +379,7 @@ importers:
         version: 16.5.0
       tailwindcss:
         specifier: ^4.1.11
-        version: 4.2.4
+        version: 4.3.0
       typescript:
         specifier: ~5.7.2
         version: 5.7.3
@@ -547,7 +550,7 @@ importers:
         version: 17.6.0
       tailwindcss:
         specifier: ^4.2.2
-        version: 4.2.4
+        version: 4.3.0
       typescript:
         specifier: ~6.0.2
         version: 6.0.2
@@ -4884,9 +4887,6 @@ packages:
   tailwindcss@4.2.2:
     resolution: {integrity: sha512-KWBIxs1Xb6NoLdMVqhbhgwZf2PGBpPEiwOqgI4pFIYbNTfBXiKYyWoTsXgBQ9WFg/OlhnvHaY+AEpW7wSmFo2Q==}
 
-  tailwindcss@4.2.4:
-    resolution: {integrity: sha512-HhKppgO81FQof5m6TEnuBWCZGgfRAWbaeOaGT00KOy/Pf/j6oUihdvBpA7ltCeAvZpFhW3j0PTclkxsd4IXYDA==}
-
   tailwindcss@4.3.0:
     resolution: {integrity: sha512-y6nxMGB1nMW9R6k96e5gdIFzcfL/gTJRNaqGes1YvkLnPVXzWgbqFF2yLC0T8G774n24cx3Pe8XrKoniCOAH+Q==}
 
@@ -7146,9 +7146,9 @@ snapshots:
 
   '@tabby_ai/hijri-converter@1.0.5': {}
 
-  '@tailwindcss/container-queries@0.1.1(tailwindcss@4.2.4)':
+  '@tailwindcss/container-queries@0.1.1(tailwindcss@4.3.0)':
     dependencies:
-      tailwindcss: 4.2.4
+      tailwindcss: 4.3.0
 
   '@tailwindcss/node@4.2.2':
     dependencies:
@@ -9255,8 +9255,6 @@ snapshots:
   tailwind-merge@3.6.0: {}
 
   tailwindcss@4.2.2: {}
-
-  tailwindcss@4.2.4: {}
 
   tailwindcss@4.3.0: {}
 
