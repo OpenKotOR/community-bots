@@ -43,6 +43,7 @@ test('each embed matches Discord /ask display contract', async ({ page }) => {
     expect(display, `${specId}: on-topic`).toMatch(new RegExp(expectPattern, 'i'))
     expect(display, `${specId}: no Sources block`).not.toMatch(/^\s*Sources\b/im)
     expect(display, `${specId}: no Answer for prefix`).not.toMatch(/\bAnswer for:/i)
+    expect(display, `${specId}: no raw githubusercontent paths`).not.toMatch(/githubusercontent\.com/i)
 
     const nonEmptyLines = display.split(/\r?\n/).filter((line) => line.trim().length > 0)
     expect(

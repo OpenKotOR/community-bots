@@ -43,6 +43,9 @@ export function auditDiscordAskDisplay(question, answer, approvedSources) {
   if (/^\s*-\s*#\s+/m.test(display) || /^\s*#\s+\w/m.test(display)) {
     return "contains markdown # topic headings";
   }
+  if (/githubusercontent\.com/i.test(display)) {
+    return "raw githubusercontent path in embed description";
+  }
   const linked = [...display.matchAll(/\]\(https:\/\/[^)]+\)/g)];
   if (linked.length < MIN_INLINE_DISCORD_LINKS) {
     return `only ${linked.length} inline https link(s); need ≥${MIN_INLINE_DISCORD_LINKS}`;

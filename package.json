@@ -35,7 +35,7 @@
     "trask:gate:ci": "TRASK_SKIP_BUILD=1 pnpm trask:smoke-imports:ci && TRASK_SKIP_BUILD=1 pnpm trask:config-drift && pnpm trask:optimize-measure:ci",
     "trask:indexer:test": ".venv-trask-indexer/bin/python -m pytest infra/trask-indexer/tests/ -q",
     "trask:stack:health": "bash scripts/trask_indexed_stack_health.sh",
-    "holocron:e2e": "pnpm trask:gate && pnpm --filter @openkotor/holocron-web test:e2e",
+    "holocron:e2e": "pnpm trask:gate && pnpm --filter @openkotor/holocron-web test:e2e:all",
     "holocron:e2e:playwright": "pnpm --filter @openkotor/holocron-web test:e2e",
     "holocron:e2e:playwright:failure": "pnpm --filter @openkotor/holocron-web test:e2e:failure",
     "trask:e2e:discord:playwright": "pnpm exec playwright test --config playwright.trask-discord.config.mjs",
