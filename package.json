@@ -38,6 +38,7 @@
     "holocron:e2e": "pnpm trask:gate && pnpm --filter @openkotor/holocron-web test:e2e:all",
     "holocron:e2e:playwright": "pnpm --filter @openkotor/holocron-web test:e2e",
     "holocron:e2e:playwright:failure": "pnpm --filter @openkotor/holocron-web test:e2e:failure",
+    "holocron:browser-gate": "node scripts/record_holocron_browser_gate.mjs",
     "trask:e2e:discord:playwright": "pnpm exec playwright test --config playwright.trask-discord.config.mjs",
     "trask:e2e:playwright": "pnpm trask:e2e:discord:playwright && pnpm holocron:e2e:playwright",
     "trask:e2e:playwright:full": "pnpm trask:e2e:discord:playwright && pnpm holocron:e2e:playwright && pnpm holocron:e2e:playwright:failure",
