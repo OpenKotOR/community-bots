@@ -1,6 +1,6 @@
 # Holocron browser gate (live Playwright)
 
-Generated: 2026-06-11T01:40:06.889Z
+Generated: 2026-06-11T01:54:43.777Z
 
 Base URL: http://127.0.0.1:4010
 
