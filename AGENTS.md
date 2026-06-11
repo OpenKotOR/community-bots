@@ -145,7 +145,9 @@ pnpm verify:trask-cli
 
 `pnpm verify:trask-cli` runs `scripts/verify_trask_cli_qa.mjs` (golden queries). `pnpm verify:trask-cli:ci` / `pnpm trask:verify-import-smoke:ci` use `--import-smoke` (no LLM). `pnpm verify:trask-discord` runs live Discord-format checks via the research wizard.
 
-**One-shot QA surfaces (Discord + Holocron Playwright + browser gate):** `pnpm trask:qa:surfaces` — runs `scripts/trask_qa_surfaces.sh` (offline Discord harness, failure-path Holocron, then requires live stack on :4010 for happy Playwright + browser gate). Live Discord bot: `pnpm verify:trask-discord`.
+**Public Pages spot-check (post-deploy):** `pnpm holocron:public-gate` — one Playwright query on `https://openkotor.github.io/community-bots/qa-webui/`; writes `docs/evidence/holocron-public-pages-gate-latest.md` (requires live `VITE_TRASK_API_BASE` / worker backend).
+
+**One-shot QA surfaces (Discord + Holocron Playwright + browser gate):** `pnpm trask:qa:surfaces` — runs `scripts/trask_qa_surfaces.sh` (offline Discord harness on :4012, then live stack on :4010 for happy Playwright + browser gate, failure-path Playwright last). Optional public Pages spot-check: `TRASK_QA_PUBLIC=1 pnpm trask:qa:surfaces`. Live Discord bot: `pnpm verify:trask-discord`.
 
 **Live browser gate (stack on :4010):** `pnpm holocron:browser-gate` — five expert queries via Playwright against an existing `trask-http-server`; writes `docs/evidence/holocron-browser-gate-latest.md` (no webServer boot).
 

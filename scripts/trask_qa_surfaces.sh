@@ -26,4 +26,9 @@ echo "==> Holocron failure-path Playwright (stops :4010 trask-http for unreachab
 fuser -k 4010/tcp 2>/dev/null || true
 pnpm holocron:e2e:playwright:failure
 
+if [ "${TRASK_QA_PUBLIC:-0}" = "1" ]; then
+  echo "==> Holocron public Pages spot-check (live worker + qa-webui)"
+  pnpm holocron:public-gate
+fi
+
 echo "OK: Trask QA surfaces passed (restart stack if you still need :4010: bash scripts/trask_live_stack.sh)"
