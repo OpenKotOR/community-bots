@@ -197,9 +197,42 @@ const resolveScriptPath = (config: ResearchWizardRuntimeConfig): string => {
   return defaultResearchScript();
 };
 
+export const parseTraskWebResearchStdout = (stdout: string): TraskWebResearchResult => {
+  const trimmed = stdout.trim();
+  const candidates = [trimmed];
+  const firstBrace = trimmed.indexOf("{");
+  const lastBrace = trimmed.lastIndexOf("}");
+
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    candidates.push(trimmed.slice(firstBrace, lastBrace + 1));
+  }
+
+  let syntaxError: SyntaxError | undefined;
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate) as TraskWebResearchResult;
+
+      if (typeof parsed.report !== "string" || !parsed.report.trim()) {
+        throw new Error("Trask web research returned an empty report.");
+      }
+
+      return parsed;
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        syntaxError = error;
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  throw syntaxError ?? new SyntaxError("Trask web research stdout did not contain JSON.");
+};
+
 export const runTraskWebResearch = async (
   config: ResearchWizardRuntimeConfig,
   payload: TraskWebResearchRequestPayload,
+  options?: { gatherTimeoutMs?: number },
 ): Promise<TraskWebResearchResult> => {
   const script = resolveScriptPath(config);
 
@@ -209,21 +242,25 @@ export const runTraskWebResearch = async (
 
   const python = config.pythonExecutable?.trim() || "python";
   const runCwd = monorepoRootFromPackage;
+  const effectiveConfig =
+    options?.gatherTimeoutMs !== undefined
+      ? { ...config, gatherTimeoutMs: options.gatherTimeoutMs }
+      : config;
 
-  const { stdout, stderr, code } = await spawnResearchRunner(config, python, script, runCwd, payload);
+  const { stdout, stderr, code } = await spawnResearchRunner(
+    effectiveConfig,
+    python,
+    script,
+    runCwd,
+    payload,
+  );
 
   if (code !== 0) {
     throw new Error(`Trask web research runner exited ${code ?? "unknown"}: ${stderr || stdout || "no output"}`);
   }
 
   try {
-    const parsed = JSON.parse(stdout) as TraskWebResearchResult;
-
-    if (typeof parsed.report !== "string" || !parsed.report.trim()) {
-      throw new Error("Trask web research returned an empty report.");
-    }
-
-    return parsed;
+    return parseTraskWebResearchStdout(stdout);
   } catch (error) {
     if (error instanceof SyntaxError) {
       throw new Error(`Trask web research returned invalid JSON: ${stdout.slice(0, 400)}`);

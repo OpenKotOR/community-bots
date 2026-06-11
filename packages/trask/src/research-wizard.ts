@@ -68,7 +68,13 @@ import {
   isIndexMissPayload,
   isRewriteComposeEnabled,
 } from "./research-compose.js";
+import {
+  buildBalancedComposeAttempts,
+  ResearchBudget,
+} from "./research-budget.js";
 import { runTraskWebResearch } from "./trask-research-subprocess.js";
+
+export { buildBalancedComposeAttempts, ResearchBudget } from "./research-budget.js";
 
 export interface ResearchWizardAnswer {
   answer: string;
@@ -139,6 +145,12 @@ export interface ResearchWizardQueryOptions {
   model?: string;
   /** Optional per-request source enablement and weight hints from Holocron's Source Prioritization dialog. */
   sourcePreferences?: readonly ResearchWizardSourcePreference[];
+  /** Destination Discord guild for answer-time citation authorization. */
+  destinationGuildId?: string;
+  /** Destination Discord channel/thread for answer-time citation authorization. */
+  destinationChannelId?: string;
+  /** Additional Discord channel ids visible to the destination audience. */
+  authorizedDiscordChannelIds?: readonly string[];
 }
 
 export interface ResearchWizardSourcePreference {
@@ -963,6 +975,7 @@ const tokenizeQuery = (query: string): string[] =>
 /** Citations must be real public web pages on the approved allowlist (live web research only). */
 const isPublicWebCitationUrl = (url: string): boolean => {
   if (url.startsWith("local://") || url.startsWith("discord://")) return false;
+  if (isDiscordJumpUrl(url)) return false;
   try {
     const parsed = new URL(url);
     return parsed.protocol === "https:" || parsed.protocol === "http:";
@@ -971,10 +984,43 @@ const isPublicWebCitationUrl = (url: string): boolean => {
   }
 };
 
-export const isCitableCitationUrl = (url: string, surfaceProfileId: string): boolean => {
+const discordJumpLocator = (url: string): { guildId: string; channelId: string; messageId: string } | null => {
+  const match = url.trim().match(/^https:\/\/discord\.com\/channels\/(\d+)\/(\d+)\/(\d+)/iu);
+  if (!match) return null;
+  return { guildId: match[1]!, channelId: match[2]!, messageId: match[3]! };
+};
+
+export interface CitationAuthorizationContext {
+  destinationGuildId?: string;
+  destinationChannelId?: string;
+  authorizedDiscordChannelIds?: readonly string[];
+}
+
+export const isCitableCitationUrl = (
+  url: string,
+  surfaceProfileId: string,
+  authorization?: CitationAuthorizationContext,
+): boolean => {
   if (isPublicWebCitationUrl(url)) return true;
   if (surfaceProfileId === "discord" || surfaceProfileId === "cli") {
-    return isDiscordJumpUrl(url);
+    if (!isDiscordJumpUrl(url)) return false;
+    const locator = discordJumpLocator(url);
+    if (!locator) return false;
+    const destinationGuildId = authorization?.destinationGuildId?.trim();
+    if (destinationGuildId && locator.guildId !== destinationGuildId) return false;
+    const visibleChannelIds = new Set(
+      [
+        authorization?.destinationChannelId,
+        ...(authorization?.authorizedDiscordChannelIds ?? []),
+      ]
+        .map((entry) => entry?.trim())
+        .filter((entry): entry is string => Boolean(entry)),
+    );
+    if (surfaceProfileId === "discord") {
+      if (visibleChannelIds.size === 0) return false;
+      return visibleChannelIds.has(locator.channelId);
+    }
+    return visibleChannelIds.size === 0 || visibleChannelIds.has(locator.channelId);
   }
   return false;
 };
@@ -985,8 +1031,9 @@ const filterPublicWebCitationSources = (sources: readonly SourceDescriptor[]): S
 export const filterCitationSourcesForSurface = (
   sources: readonly SourceDescriptor[],
   surfaceProfileId: string,
+  authorization?: CitationAuthorizationContext,
 ): SourceDescriptor[] =>
-  sources.filter((source) => isCitableCitationUrl(source.homeUrl, surfaceProfileId));
+  sources.filter((source) => isCitableCitationUrl(source.homeUrl, surfaceProfileId, authorization));
 
 const materializeSourceFromCitationUrl = (
   url: string,
@@ -1234,19 +1281,23 @@ const withProgressHeartbeat = async <T>(
 
 export class ResearchWizardClient implements ResearchWizardQueryHandler {
   private readonly openAiClient: OpenAI | null;
+  private readonly aiClients: readonly { client: OpenAI; providerId: string; models: readonly string[] }[];
 
   public constructor(
     private readonly config: ResearchWizardRuntimeConfig,
     private readonly aiConfig: SharedAiConfig,
     private readonly approvedSources: readonly SourceDescriptor[] = traskApprovedResearchSources,
   ) {
-    this.openAiClient = aiConfig.openAiApiKey
-      ? new OpenAI({
-          apiKey: aiConfig.openAiApiKey,
-          ...(aiConfig.openAiBaseUrl ? { baseURL: aiConfig.openAiBaseUrl } : {}),
-          ...(aiConfig.openAiDefaultHeaders ? { defaultHeaders: aiConfig.openAiDefaultHeaders } : {}),
-        })
-      : null;
+    this.aiClients = aiConfig.aiProviders.map((provider) => ({
+      providerId: provider.id,
+      client: new OpenAI({
+        apiKey: provider.apiKey,
+        baseURL: provider.baseUrl,
+        ...(provider.defaultHeaders ? { defaultHeaders: provider.defaultHeaders } : {}),
+      }),
+      models: [...new Set([provider.chatModel, ...provider.chatModelFallbacks])],
+    }));
+    this.openAiClient = this.aiClients[0]?.client ?? null;
   }
 
   public async listModels(): Promise<readonly ResearchWizardModelOption[]> {
@@ -1258,8 +1309,9 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
     report: string,
     approvedSources: readonly SourceDescriptor[],
     preferredModel?: string,
+    budget?: ResearchBudget,
   ): Promise<string> {
-    if (!this.openAiClient) {
+    if (this.aiClients.length === 0) {
       return fallbackDiscordRewrite(query, report, approvedSources);
     }
 
@@ -1268,14 +1320,32 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
       .join("\n");
 
     const preferredRewriteModel = normalizePreferredRewriteModel(preferredModel);
-    const modelsToTry = [
-      ...new Set([...(preferredRewriteModel ? [preferredRewriteModel] : []), this.aiConfig.chatModel, ...this.aiConfig.chatModelFallbacks]),
-    ].slice(0, MAX_REWRITE_ATTEMPTS);
+    const attempts = buildBalancedComposeAttempts(
+      this.aiClients,
+      preferredRewriteModel,
+      MAX_REWRITE_ATTEMPTS,
+    );
 
-    for (const model of modelsToTry) {
+    for (const { client, model, providerId } of attempts) {
+      if (budget?.isExpired()) {
+        break;
+      }
+      if (budget && !budget.canAttemptCompose()) {
+        break;
+      }
+      const composeMs = budget?.remainingComposeMs() ?? this.config.composeTimeoutMs;
+      emitResearchTraceLog({
+        phase: "compose",
+        detail: `Discord rewrite attempt ${providerId}/${model}`,
+        diag: {
+          provider_id: providerId,
+          model,
+          remaining_budget_ms: budget?.enabled ? budget.remainingMs() : this.config.composeTimeoutMs,
+        },
+      });
       try {
         const completion = await withTimeout(
-          this.openAiClient.chat.completions.create({
+          client.chat.completions.create({
             model,
             temperature: 0.2,
             messages: [
@@ -1307,7 +1377,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
               },
             ],
           }),
-          this.config.composeTimeoutMs,
+          composeMs,
         );
 
         const rewritten = completion.choices[0]?.message?.content?.trim();
@@ -1327,8 +1397,9 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
     query: string,
     report: string,
     approvedSources: readonly SourceDescriptor[],
+    budget?: ResearchBudget,
   ): Promise<string> {
-    if (!this.openAiClient) {
+    if (this.aiClients.length === 0) {
       return fallbackDiscordBrief(query, report, approvedSources);
     }
 
@@ -1336,12 +1407,28 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
       .map((source, index) => `${index + 1}. ${source.name} - ${source.homeUrl}`)
       .join("\n");
 
-    const modelsToTry = [...new Set([this.aiConfig.chatModel, ...this.aiConfig.chatModelFallbacks])].slice(0, MAX_REWRITE_ATTEMPTS);
+    const attempts = buildBalancedComposeAttempts(this.aiClients, undefined, MAX_REWRITE_ATTEMPTS);
 
-    for (const model of modelsToTry) {
+    for (const { client, model, providerId } of attempts) {
+      if (budget?.isExpired()) {
+        break;
+      }
+      if (budget && !budget.canAttemptCompose()) {
+        break;
+      }
+      const composeMs = budget?.remainingComposeMs() ?? this.config.composeTimeoutMs;
+      emitResearchTraceLog({
+        phase: "compose",
+        detail: `Discord brief rewrite attempt ${providerId}/${model}`,
+        diag: {
+          provider_id: providerId,
+          model,
+          remaining_budget_ms: budget?.enabled ? budget.remainingMs() : this.config.composeTimeoutMs,
+        },
+      });
       try {
         const completion = await withTimeout(
-          this.openAiClient.chat.completions.create({
+          client.chat.completions.create({
             model,
             temperature: 0.15,
             max_tokens: 380,
@@ -1369,7 +1456,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
               },
             ],
           }),
-          this.config.composeTimeoutMs,
+          composeMs,
         );
 
         const rewritten = completion.choices[0]?.message?.content?.trim();
@@ -1405,18 +1492,16 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
     preferredModel?: string,
     composeProfile: "full" | "brief" = "full",
     surfaceProfileId = "holocron",
-    deadlineMs?: number,
+    authorization?: CitationAuthorizationContext,
+    budget?: ResearchBudget,
   ): Promise<{ answer: string; approvedSources: readonly SourceDescriptor[] } | null> {
     if (!isGroundedComposeEnabled(this.config)) {
       return null;
     }
     // Keep cached-index answers within the soft research budget: bound each LLM
     // compose call by the time remaining before the deadline (R6/F3 honest-degrade).
-    const remainingComposeMs = (): number => {
-      if (deadlineMs === undefined) return this.config.composeTimeoutMs;
-      const remaining = deadlineMs - Date.now();
-      return Math.max(2000, Math.min(this.config.composeTimeoutMs, remaining));
-    };
+    const remainingComposeMs = (): number =>
+      budget?.remainingComposeMs() ?? this.config.composeTimeoutMs;
 
     if (isIndexMissPayload(payload)) {
       return null;
@@ -1434,7 +1519,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
       return null;
     }
 
-    const model = normalizePreferredRewriteModel(preferredModel) ?? this.aiConfig.chatModel;
+    const primaryModel = normalizePreferredRewriteModel(preferredModel) ?? this.aiConfig.chatModel;
 
     let claims = claimsFromDistinctPassages(
       passages,
@@ -1442,10 +1527,11 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
       query,
       { preserveDistinctPassagePool: true },
     );
-    if (!hasMinimumGroundedSupport(claims) && this.openAiClient) {
+    if (!hasMinimumGroundedSupport(claims) && this.aiClients.length > 0) {
       try {
+        const primary = this.aiClients[0]!;
         const llmClaims = await withTimeout(
-          extractClaimsWithLlm(this.openAiClient, model, query, passages),
+          extractClaimsWithLlm(primary.client, primaryModel, query, passages),
           remainingComposeMs(),
         );
         if (hasMinimumGroundedSupport(llmClaims)) {
@@ -1482,6 +1568,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
         this.approvedSources,
       ),
       surfaceProfileId,
+      authorization,
     );
 
     const claimsForComposeGrounded =
@@ -1504,29 +1591,42 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
       && templateAligned.length >= minCitationsForProfile;
 
     // REQ-C: when the instant grounded template already satisfies citation bars, skip LLM retries.
-    if (this.openAiClient && !templateMeetsCitationBar) {
-      const modelsToTry = [
-        ...new Set(
-          [
-            normalizePreferredRewriteModel(preferredModel),
-            this.aiConfig.chatModel,
-            ...this.aiConfig.chatModelFallbacks,
-          ].filter((entry): entry is string => Boolean(entry?.trim())),
-        ),
-      ].slice(0, MAX_REWRITE_ATTEMPTS);
+    if (this.aiClients.length > 0 && !templateMeetsCitationBar) {
+      const preferred = normalizePreferredRewriteModel(preferredModel);
+      const attempts = buildBalancedComposeAttempts(
+        this.aiClients,
+        preferred,
+        MAX_REWRITE_ATTEMPTS,
+      );
 
       let bestLlmAnswer: string | null = null;
       let bestCitationCount = templateCitationCount;
 
-      for (const tryModel of modelsToTry) {
-        if (deadlineMs !== undefined && Date.now() >= deadlineMs) break;
+      for (const { client, model: tryModel, providerId } of attempts) {
+        if (budget?.isExpired()) {
+          break;
+        }
         const composeMs = remainingComposeMs();
-        if (composeMs < 3000) break;
+        if (budget && !budget.canAttemptCompose()) {
+          break;
+        }
+        if (composeMs < 3000) {
+          break;
+        }
+        emitResearchTraceLog({
+          phase: "compose",
+          detail: `Grounded LLM compose attempt ${providerId}/${tryModel}`,
+          diag: {
+            provider_id: providerId,
+            model: tryModel,
+            remaining_budget_ms: budget?.enabled ? budget.remainingMs() : this.config.composeTimeoutMs,
+          },
+        });
         try {
           const llmAnswer =
             (await withTimeout(
               composeGroundedAnswerWithLlm(
-                this.openAiClient,
+                client,
                 tryModel,
                 query,
                 claimsForComposeGrounded,
@@ -1642,17 +1742,23 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
     customPrompt: string,
     approvedSources: readonly SourceDescriptor[],
     options?: ResearchWizardQueryOptions,
+    budget?: ResearchBudget,
   ): Promise<{ report: string; payload: ResearchWizardResponsePayload }> {
     if (approvedSources.length === 0) {
       throw new Error("No approved research sources are enabled.");
     }
 
     const allowedDomains = researchDomainsForSources(approvedSources);
-    const raw = await runTraskWebResearch(this.config, {
-      query: buildResearchTask(query),
-      query_domains: allowedDomains,
-      allowed_url_prefixes: approvedSources.map((source) => source.homeUrl),
-    });
+    const gatherTimeoutMs = budget?.gatherTimeoutMs(this.config.gatherTimeoutMs) ?? this.config.gatherTimeoutMs;
+    const raw = await runTraskWebResearch(
+      this.config,
+      {
+        query: buildResearchTask(query),
+        query_domains: allowedDomains,
+        allowed_url_prefixes: approvedSources.map((source) => source.homeUrl),
+      },
+      { gatherTimeoutMs },
+    );
 
     const payload: ResearchWizardResponsePayload = {
       report: raw.report,
@@ -1708,6 +1814,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
       applySourcePreferences(this.approvedSources, options?.sourcePreferences),
     );
     const queryStartedAt = Date.now();
+    const budget = new ResearchBudget(this.config, queryStartedAt);
     try {
       const allowedDomains = researchDomainsForSources(approvedSources);
       await reportProgress({
@@ -1730,7 +1837,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
           return `Researching approved archive sources… (${seconds}s)`;
         },
         reportProgress,
-        async () => await this.fetchResearchReport(query, buildCustomPrompt(promptTemplateId), approvedSources, options),
+        async () => await this.fetchResearchReport(query, buildCustomPrompt(promptTemplateId), approvedSources, options, budget),
       );
       const enrichedReport = report;
       await emitRetrieveSummary(payload, this.config.indexerBaseUrl, reportProgress);
@@ -1796,7 +1903,8 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
               options?.model,
               "full",
               "holocron",
-              this.config.researchBudgetMs > 0 ? queryStartedAt + this.config.researchBudgetMs : undefined,
+              undefined,
+              budget,
             )
           : null;
 
@@ -1828,7 +1936,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
           && this.passagesSupportLlmRewrite(query, enrichedReport, payload)
         ) {
           answer = this.openAiClient
-            ? await this.rewriteForDiscord(query, enrichedReport, sourcesForRewrite, options?.model)
+            ? await this.rewriteForDiscord(query, enrichedReport, sourcesForRewrite, options?.model, budget)
             : fallbackDiscordRewrite(query, enrichedReport, sourcesForRewrite);
         } else if (webSources.length > 0) {
           answer = sourceOnlyFallbackAnswer(query, webSources);
@@ -1846,6 +1954,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
           enrichedReport,
           filterPublicWebCitationSources(retrievedSources),
           options?.model,
+          budget,
         );
       } else if (this.openAiClient) {
         answer = sourceOnlyFallbackAnswer(
@@ -1949,6 +2058,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
     surfaceProfileId = "discord",
   ): Promise<ResearchWizardBriefAnswer> {
     const queryStartedAt = Date.now();
+    const budget = new ResearchBudget(this.config, queryStartedAt);
     try {
       const approvedSources = routeSourcesForQuery(
         query,
@@ -1959,6 +2069,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
         buildCustomPromptBrief(promptTemplateId),
         approvedSources,
         options,
+        budget,
       );
       const enrichedReport = report;
       const webEvidenceSources = collectWebEvidenceSources(query, enrichedReport, approvedSources, payload);
@@ -1973,7 +2084,8 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
               options?.model,
               "brief",
               surfaceProfileId,
-              this.config.researchBudgetMs > 0 ? queryStartedAt + this.config.researchBudgetMs : undefined,
+              options,
+              budget,
             )
           : null;
 
@@ -2005,6 +2117,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
             approvedSources,
           ),
           surfaceProfileId,
+          options,
         );
         const briefClaims = selectDistinctBriefClaims(claims, query, BRIEF_MAX_CLAIM_LINES);
         if (
@@ -2040,7 +2153,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
         && retrievedSources.length > 0
       ) {
         try {
-          answer = await this.rewriteForDiscordBrief(query, enrichedReport, retrievedSources);
+          answer = await this.rewriteForDiscordBrief(query, enrichedReport, retrievedSources, budget);
         } catch {
           const ranked = filterPublicWebCitationSources(retrievedSources);
           answer =
@@ -2065,6 +2178,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
           retrievedSources,
         ),
         surfaceProfileId,
+        options,
       );
 
       const citedSources = grounded

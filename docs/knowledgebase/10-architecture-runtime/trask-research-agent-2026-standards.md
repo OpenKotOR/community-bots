@@ -1,13 +1,13 @@
 # Trask research agent — 2026 standards (authority)
 
-**Status:** Active operator reference (2026-05-19). Supersedes DuckDuckGo-first wording in older notes.
+**Status:** Active operator reference (2026-06-11). Replacement-first; supersedes Crawl4AI/Chroma/OpenRouter-as-strategy wording in older notes.
 
 ## Pipeline (mandatory)
 
-1. **Ingest:** Crawl4AI + Discord sync → Chroma on indexer host (`infra/trask-indexer`, port **8790** internal).
-2. **Retrieve:** Clients call **`POST /retrieve` only on the Cloudflare Worker** (`infra/trask-retrieve-worker`, local **8787**). Worker proxies to Chroma.
-3. **Gather:** `scripts/trask_web_research.py` → structured **`passages`** JSON (verified URLs). DDG fallback **off** in production (`TRASK_WEB_RESEARCH_DDG_FALLBACK=0`).
-4. **Compose:** `@openkotor/trask` grounded evidence — citations only from passages; ≥2 `https://` sources when index supports it; abstain when insufficient.
+1. **Ingest:** Scheduled approved web crawl + DiscordChatExporter archives → normalized evidence records with freshness, hashes, deletion state, and exact citation locators.
+2. **Retrieve:** Clients call **`POST /retrieve` only on the Cloudflare Worker** (`infra/trask-retrieve-worker`, local **8787**). Worker proxies to the current Chroma indexer and returns `passages` plus `evidencePack`.
+3. **Authorize:** Web citations must be exact retrieved URLs. Discord citations must be exact jump links and pass destination guild/channel authorization at answer time.
+4. **Compose:** `@openkotor/trask` grounded evidence — Hugging Face first, Cloudflare second, deterministic extractive fallback when hosted providers fail.
 
 ## Environment
 
@@ -19,6 +19,9 @@
 | `TRASK_RESEARCH_BUDGET_MS` | `30000` (REQ-C) |
 | `TRASK_RESEARCH_COMPOSE_MODE` | `grounded` |
 | `TRASK_GROUNDED_COMPOSE` | on (default) |
+| `HF_TOKEN` / `HUGGINGFACE_TOKEN` | Primary hosted inference |
+| `TRASK_CLOUDFLARE_AI_BASE_URL` + `TRASK_CLOUDFLARE_AI_TOKEN` | Cloudflare HA fallback |
+| `TRASK_DISCORD_EXPORT_TARGETS_CONFIG` | Discord export target config JSON; default `data/trask/discord-export-targets.json` (see runbook for target schema) |
 
 ## Local stack
 
@@ -30,8 +33,8 @@ bash scripts/trask_live_stack.sh   # indexer 8790 + Worker 8787 + Holocron 4010
 
 | ID | Summary |
 |----|---------|
-| REQ-A | Weekly `POST /reindex` batch crawl into Chroma ([trask-indexed-stack-runbook.md](../50-execution/trask-indexed-stack-runbook.md)) |
-| REQ-B | Query-time answers from cached index; `TRASK_WEB_RESEARCH_LIVE_CRAWL=0` default |
+| REQ-A | Scheduled corpus refresh for web and Discord archives ([trask-indexed-stack-runbook.md](../50-execution/trask-indexed-stack-runbook.md)) |
+| REQ-B | Query-time answers from maintained evidence cache; `TRASK_WEB_RESEARCH_LIVE_CRAWL=0` default |
 | REQ-C | `TRASK_RESEARCH_BUDGET_MS=30000` end-to-end soft budget |
 
 ## Verification (agents)
@@ -45,8 +48,19 @@ Full matrix: [validation-ladder.md](../50-execution/validation-ladder.md) §8.
 
 ## Retrieve quality (indexer)
 
-Hybrid recall: dense Chroma query (k≈15–30) + lexical RRF + URL anchor boost → top passages. See `infra/trask-indexer/trask_indexer/chroma_store.py`.
+Hybrid recall: dense Chroma query (k≈15–30) + lexical RRF + URL anchor boost → top passages. The response is an evidence pack with metadata needed for citations, agents, purge, and authorization. See `infra/trask-indexer/trask_indexer/chroma_store.py` and `retrieve_api.py`.
+
+## Agent-native operations
+
+```bash
+node scripts/trask_ops.mjs capabilities
+node scripts/trask_ops.mjs sources
+node scripts/trask_ops.mjs provider-health
+node scripts/trask_ops.mjs evidence "What is TSLPatcher used for?"
+node scripts/trask_ops.mjs refresh-dry-run
+node scripts/trask_ops.mjs purge-discord-message --channel-id <id> --message-id <id>
+```
 
 ## Plan
 
-Implementation roadmap: `docs/plans/2026-05-19-005-feat-trask-research-agent-2026-standards-plan.md`.
+Implementation roadmap: `docs/brainstorms/trask-self-hosted-research-pipeline-requirements.md` (product policy) and `.cursor/plans/trask-qa-pipeline_3561ef66.plan.md` (replacement-first implementation).

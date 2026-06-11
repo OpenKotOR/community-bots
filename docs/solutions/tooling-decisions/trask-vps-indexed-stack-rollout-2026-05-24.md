@@ -1,7 +1,7 @@
 ---
 title: "Trask VPS indexed stack rollout checklist"
 date: 2026-05-24
-last_refreshed: 2026-05-24
+last_refreshed: 2026-06-11
 category: tooling-decisions
 problem_type: runbook
 component: infrastructure
@@ -44,7 +44,8 @@ Assume repo checkout at `/opt/community-bots` (adjust paths in systemd units).
 ### 2. Environment
 
 - [ ] Copy `infra/trask-bot-stack/.env.production.example` → `/opt/community-bots/.env`
-- [ ] Set `TRASK_DISCORD_BOT_TOKEN`, guild/channel IDs, `OPENROUTER_API_KEY` or `OPENAI_API_KEY`
+- [ ] Set `TRASK_DISCORD_BOT_TOKEN`, guild/channel IDs, **`HF_TOKEN`** (primary compose/classifier), optional Cloudflare AI vars for HA fallback
+- [ ] Configure Discord export targets: copy `data/trask/discord-export-targets.json` sample and set each target's `output_dir` (or override `TRASK_DISCORD_EXPORT_TARGETS_CONFIG`)
 - [ ] Set `TRASK_INDEXER_BASE_URL=http://127.0.0.1:8787` (co-located Worker) **or** Cloudflare Workers URL after `wrangler deploy`
 - [ ] Set `TRASK_DISCORD_SYNC_INTERVAL_MS=1800000` (30 min) for continuous Discord→Chroma sync
 
@@ -72,7 +73,7 @@ Install: `sudo cp … /etc/systemd/system/`, edit `User=`/`WorkingDirectory=`, `
 pnpm trask:stack:health
 bash scripts/trask_indexed_stack_health.sh --check-http   # when trask-http-server on :4010
 pnpm trask:indexer:test                 # after bootstrap
-pnpm verify:trask-cli                   # golden queries (needs LLM key)
+pnpm verify:trask-cli                   # golden queries (needs HF_TOKEN or fallback provider)
 pnpm holocron:e2e                       # full browser gate (CI parity)
 pnpm verify:trask-discord               # when bot token + Discord access
 ```

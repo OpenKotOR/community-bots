@@ -41,8 +41,11 @@ if (envDir) {
   loadDotEnv();
 }
 
-const defaultChatModel = "gpt-5.4-mini";
-const defaultEmbeddingModel = "text-embedding-3-large";
+const defaultChatModel = "Qwen/Qwen3-4B-Instruct-2507:fastest";
+const defaultEmbeddingModel = "BAAI/bge-m3";
+const deterministicFallbackModel = "trask-extractive-fallback";
+const huggingFaceRouterBaseUrl = "https://router.huggingface.co/v1";
+const defaultCloudflareWorkersAiChatModel = "@cf/meta/llama-3.1-8b-instruct-fast";
 const openRouterApiBase = "https://openrouter.ai/api/v1";
 /** Direct OpenRouter API model ids (not LiteLLM `openrouter/...` prefixes). */
 const freeDefaultOpenRouterChatModel = "openrouter/free";
@@ -202,11 +205,14 @@ export interface DiscordRuntimeConfig {
 }
 
 export interface SharedAiConfig {
-  /** OpenAI key, or OpenRouter key when using an OpenAI-compatible base URL. */
+  /**
+   * First configured chat-compatible provider. Kept for older call sites that
+   * accept an OpenAI SDK client, but Trask should use {@link aiProviders}.
+   */
   openAiApiKey: string | undefined;
-  /** When set, the OpenAI SDK talks to this host (e.g. `https://openrouter.ai/api/v1`). */
+  /** Base URL for the first configured chat-compatible provider. */
   openAiBaseUrl: string | undefined;
-  /** Extra headers for providers like OpenRouter (`HTTP-Referer`, `X-Title`). */
+  /** Extra headers for the first configured chat-compatible provider. */
   openAiDefaultHeaders: Record<string, string> | undefined;
   firecrawlApiKey: string | undefined;
   chatModel: string;
@@ -214,6 +220,20 @@ export interface SharedAiConfig {
   chatModelFallbacks: readonly string[];
   embeddingModel: string;
   databaseUrl: string | undefined;
+  /** Ordered free-first provider chain for Trask: Hugging Face -> Cloudflare -> optional legacy providers. */
+  aiProviders: readonly SharedAiProviderConfig[];
+}
+
+export interface SharedAiProviderConfig {
+  id: "huggingface" | "cloudflare" | "proxy" | "openrouter" | "openai";
+  apiKey: string;
+  baseUrl: string;
+  chatModel: string;
+  chatModelFallbacks: readonly string[];
+  embeddingModel: string;
+  /** When false, callers must not use this provider for embedding APIs (e.g. Cloudflare chat-only). */
+  supportsEmbeddings?: boolean;
+  defaultHeaders?: Record<string, string>;
 }
 
 export type ResearchComposeMode = "grounded" | "rewrite";
@@ -568,7 +588,7 @@ const resolveTraskLlmProfile = (env: NodeJS.ProcessEnv): TraskLlmProfile => {
   return raw === "paid" ? "paid" : "free";
 };
 
-/** LiteLLM (:4000) or OpenCode LLM proxy — OpenAI-compatible; fallbacks live in the proxy config. */
+/** LiteLLM (:4000) or OpenCode LLM proxy — legacy OpenAI-compatible path. */
 const resolveLlmProxyBaseUrl = (env: NodeJS.ProcessEnv): string | undefined => {
   const hit =
     readOptionalEnv("TRASK_LLM_BASE_URL", env) ??
@@ -577,92 +597,127 @@ const resolveLlmProxyBaseUrl = (env: NodeJS.ProcessEnv): string | undefined => {
   return hit ? normalizeOpenAiCompatibleBaseUrl(hit) : undefined;
 };
 
-const resolveOpenAiApiKey = (env: NodeJS.ProcessEnv, proxyBaseUrl: string | undefined): string | undefined => {
-  const direct =
-    readOptionalEnv("OPENAI_API_KEY", env) ??
-    readOptionalEnv("OPENROUTER_API_KEY", env) ??
-    readOptionalEnv("GROQ_API_KEY", env);
-  if (direct) return direct;
-  if (proxyBaseUrl) {
-    return (
-      readOptionalEnv("LITELLM_API_KEY", env) ??
-      readOptionalEnv("OPENCODE_LLM_PROXY_TOKEN", env) ??
-      readOptionalEnv("LITELLM_MASTER_KEY", env) ??
-      proxyPlaceholderApiKey
-    );
-  }
-  return undefined;
-};
-
-const resolveDefaultChatModel = (
-  env: NodeJS.ProcessEnv,
-  profile: TraskLlmProfile,
-  proxyBaseUrl: string | undefined,
-  openRouterKey: string | undefined,
-  openAiKey: string | undefined,
-  openAiBaseUrl: string | undefined,
-): string => {
-  const explicit = readOptionalEnv("OPENAI_CHAT_MODEL", env) ?? readOptionalEnv("TRASK_LLM_MODEL", env);
-  if (explicit) return explicit;
-
-  if (proxyBaseUrl) {
-    return profile === "paid" ? "trask-research-paid-only" : "trask-research";
-  }
-
-  const usesOpenRouter =
-    Boolean(openRouterKey) || openAiBaseUrl?.includes("openrouter.ai") === true;
-  if (usesOpenRouter) {
-    return profile === "paid" ? paidOpenRouterChatModel : freeDefaultOpenRouterChatModel;
-  }
-
-  if (profile === "paid" || openAiKey) {
-    return paidDirectChatModel;
-  }
-
-  return defaultChatModel;
-};
-
-const resolveDefaultChatModelFallbacks = (
-  env: NodeJS.ProcessEnv,
-  profile: TraskLlmProfile,
-  proxyBaseUrl: string | undefined,
-  openRouterKey: string | undefined,
-): readonly string[] => {
+const resolveExplicitChatFallbacks = (env: NodeJS.ProcessEnv): readonly string[] => {
   const explicit = readListEnv("TRASK_REWRITE_MODEL_FALLBACKS", env);
   if (explicit.length > 0) return explicit;
-  if (profile !== "free") return [];
-  if (proxyBaseUrl) return [];
-  if (openRouterKey) return loadVendorOpenRouterFreeFallbacks();
   return [];
 };
 
 export const loadSharedAiConfig = (env: NodeJS.ProcessEnv = process.env): SharedAiConfig => {
   const profile = resolveTraskLlmProfile(env);
   const proxyBaseUrl = resolveLlmProxyBaseUrl(env);
-  const openRouterKey = readOptionalEnv("OPENROUTER_API_KEY", env);
-  const openAiKey = readOptionalEnv("OPENAI_API_KEY", env);
-  const explicitBaseUrl = readOptionalEnv("OPENAI_BASE_URL", env);
+  const hfToken = readOptionalEnv("HF_TOKEN", env) ?? readOptionalEnv("HUGGINGFACE_TOKEN", env);
+  const hfBaseUrl = normalizeOpenAiCompatibleBaseUrl(
+    readOptionalEnv("TRASK_HF_INFERENCE_BASE_URL", env) ??
+      readOptionalEnv("HF_INFERENCE_BASE_URL", env) ??
+      huggingFaceRouterBaseUrl,
+  );
+  const hfChatModel =
+    readOptionalEnv("TRASK_HF_CHAT_MODEL", env) ??
+    readOptionalEnv("HF_CHAT_MODEL", env) ??
+    readOptionalEnv("TRASK_LLM_MODEL", env) ??
+    defaultChatModel;
+  const hfEmbeddingModel =
+    readOptionalEnv("TRASK_HF_EMBEDDING_MODEL", env) ??
+    readOptionalEnv("HF_EMBEDDING_MODEL", env) ??
+    defaultEmbeddingModel;
 
-  let openAiBaseUrl = explicitBaseUrl
-    ? normalizeOpenAiCompatibleBaseUrl(explicitBaseUrl)
-    : proxyBaseUrl;
-  if (!openAiBaseUrl && openRouterKey && !openAiKey) {
-    openAiBaseUrl = openRouterApiBase;
+  const cloudflareBaseRaw =
+    readOptionalEnv("TRASK_CLOUDFLARE_AI_BASE_URL", env) ??
+    readOptionalEnv("CLOUDFLARE_AI_GATEWAY_BASE_URL", env);
+  const cloudflareToken =
+    readOptionalEnv("TRASK_CLOUDFLARE_AI_TOKEN", env) ??
+    readOptionalEnv("CLOUDFLARE_AI_GATEWAY_TOKEN", env) ??
+    readOptionalEnv("CLOUDFLARE_API_TOKEN", env);
+  const cloudflareChatModel =
+    readOptionalEnv("TRASK_CLOUDFLARE_CHAT_MODEL", env) ??
+    readOptionalEnv("CLOUDFLARE_WORKERS_AI_MODEL", env) ??
+    defaultCloudflareWorkersAiChatModel;
+  const cloudflareEmbeddingModel = readOptionalEnv("TRASK_CLOUDFLARE_EMBEDDING_MODEL", env)?.trim() ?? "";
+
+  const openAiKey = readOptionalEnv("OPENAI_API_KEY", env);
+  const openRouterKey = readOptionalEnv("OPENROUTER_API_KEY", env);
+  const explicitBaseUrl = readOptionalEnv("OPENAI_BASE_URL", env);
+  const explicitFallbacks = resolveExplicitChatFallbacks(env);
+
+  const providers: SharedAiProviderConfig[] = [];
+  if (hfToken) {
+    providers.push({
+      id: "huggingface",
+      apiKey: hfToken,
+      baseUrl: hfBaseUrl,
+      chatModel: hfChatModel,
+      chatModelFallbacks: explicitFallbacks,
+      embeddingModel: hfEmbeddingModel,
+    });
+  }
+  if (cloudflareBaseRaw && cloudflareToken) {
+    providers.push({
+      id: "cloudflare",
+      apiKey: cloudflareToken,
+      baseUrl: normalizeOpenAiCompatibleBaseUrl(cloudflareBaseRaw),
+      chatModel: cloudflareChatModel,
+      chatModelFallbacks: [],
+      embeddingModel: cloudflareEmbeddingModel || hfEmbeddingModel,
+      supportsEmbeddings: Boolean(cloudflareEmbeddingModel),
+    });
   }
 
-  const openAiApiKey = resolveOpenAiApiKey(env, proxyBaseUrl);
-  const chatModel = resolveDefaultChatModel(env, profile, proxyBaseUrl, openRouterKey, openAiKey, openAiBaseUrl);
-  const chatModelFallbacks = resolveDefaultChatModelFallbacks(env, profile, proxyBaseUrl, openRouterKey);
+  // Legacy escape hatches remain available for non-Trask surfaces and manual
+  // experiments, but they are never needed for the primary Trask validation path.
+  if (providers.length === 0 && proxyBaseUrl) {
+    providers.push({
+      id: "proxy",
+      apiKey:
+        readOptionalEnv("LITELLM_API_KEY", env) ??
+        readOptionalEnv("OPENCODE_LLM_PROXY_TOKEN", env) ??
+        readOptionalEnv("LITELLM_MASTER_KEY", env) ??
+        proxyPlaceholderApiKey,
+      baseUrl: proxyBaseUrl,
+      chatModel: profile === "paid" ? "trask-research-paid-only" : "trask-research",
+      chatModelFallbacks: [],
+      embeddingModel: hfEmbeddingModel,
+    });
+  }
+  if (providers.length === 0 && openRouterKey) {
+    const defaultHeaders = buildOpenAiProviderHeaders(env);
+    providers.push({
+      id: "openrouter",
+      apiKey: openRouterKey,
+      baseUrl: openRouterApiBase,
+      chatModel: profile === "paid" ? paidOpenRouterChatModel : freeDefaultOpenRouterChatModel,
+      chatModelFallbacks: profile === "free" ? loadVendorOpenRouterFreeFallbacks() : [],
+      embeddingModel: hfEmbeddingModel,
+      ...(defaultHeaders ? { defaultHeaders } : {}),
+    });
+  }
+  if (providers.length === 0 && openAiKey) {
+    providers.push({
+      id: "openai",
+      apiKey: openAiKey,
+      baseUrl: explicitBaseUrl ? normalizeOpenAiCompatibleBaseUrl(explicitBaseUrl) : "https://api.openai.com/v1",
+      chatModel: readOptionalEnv("OPENAI_CHAT_MODEL", env) ?? readOptionalEnv("TRASK_LLM_MODEL", env) ?? paidDirectChatModel,
+      chatModelFallbacks: [],
+      embeddingModel: readOptionalEnv("OPENAI_EMBEDDING_MODEL", env) ?? hfEmbeddingModel,
+    });
+  }
+
+  const primary = providers[0];
+  const embeddingProvider =
+    providers.find(
+      (provider) => provider.supportsEmbeddings !== false && provider.embeddingModel.trim().length > 0,
+    ) ?? primary;
 
   return {
-    openAiApiKey,
-    openAiBaseUrl,
-    openAiDefaultHeaders: buildOpenAiProviderHeaders(env),
+    openAiApiKey: primary?.apiKey,
+    openAiBaseUrl: primary?.baseUrl,
+    openAiDefaultHeaders: primary?.defaultHeaders,
     firecrawlApiKey: readOptionalEnv("FIRECRAWL_API_KEY", env),
-    chatModel,
-    chatModelFallbacks,
-    embeddingModel: readOptionalEnv("OPENAI_EMBEDDING_MODEL", env) ?? defaultEmbeddingModel,
+    chatModel: primary?.chatModel ?? deterministicFallbackModel,
+    chatModelFallbacks: primary?.chatModelFallbacks ?? [],
+    embeddingModel: embeddingProvider?.embeddingModel ?? hfEmbeddingModel,
     databaseUrl: readOptionalEnv("DATABASE_URL", env),
+    aiProviders: providers,
   };
 };
 
@@ -704,7 +759,7 @@ export const loadTraskBotConfig = (env: NodeJS.ProcessEnv = process.env): TraskB
       debounceMs: integerish.parse(readOptionalEnv("TRASK_PROACTIVE_DEBOUNCE_MS", env) ?? "25000"),
       userCooldownMs: integerish.parse(readOptionalEnv("TRASK_PROACTIVE_USER_COOLDOWN_MS", env) ?? "120000"),
       competingReplyMinLength: integerish.parse(readOptionalEnv("TRASK_PROACTIVE_COMPETING_MIN_LENGTH", env) ?? "80"),
-      classifierModel: readOptionalEnv("TRASK_PROACTIVE_CLASSIFIER_MODEL", env) ?? "gpt-4o-mini",
+      classifierModel: readOptionalEnv("TRASK_PROACTIVE_CLASSIFIER_MODEL", env) ?? defaultChatModel,
       classifierMinConfidence: z.coerce.number().min(0).max(1).parse(readOptionalEnv("TRASK_PROACTIVE_CLASSIFIER_MIN_CONFIDENCE", env) ?? "0.55"),
       similarityThreshold: z.coerce.number().min(0).max(1).parse(readOptionalEnv("TRASK_PROACTIVE_SIMILARITY_THRESHOLD", env) ?? "0.62"),
       minMessageLength: integerish.parse(readOptionalEnv("TRASK_PROACTIVE_MIN_MESSAGE_LENGTH", env) ?? "12"),

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import os
 import re
 from dataclasses import dataclass, replace
@@ -49,6 +51,14 @@ class PassageHit:
     guild_id: str = ""
     channel_id: str = ""
     first_message_id: str = ""
+    last_message_id: str = ""
+    source_type: str = "web"
+    source_target: str = ""
+    indexed_at: str = ""
+    source_freshness_at: str = ""
+    discord_jump_url: str = ""
+    content_hash: str = ""
+    deleted: bool = False
 
 
 def get_chroma_client(persist_dir: Path):
@@ -91,6 +101,41 @@ def upsert_chunks(
     return len(ids)
 
 
+def upsert_discord_windows(
+    collection,
+    windows: list[dict[str, Any]],
+) -> int:
+    """Batch embed + upsert multiple Discord message windows in one embedding call."""
+    if not windows:
+        return 0
+    texts: list[str] = []
+    ids: list[str] = []
+    metadatas: list[dict[str, str]] = []
+    for window in windows:
+        url = str(window["url"])
+        host = str(window["host"])
+        source_id = str(window["source_id"])
+        chunks = window["chunks"]
+        extra_metadata = dict(window.get("extra_metadata") or {})
+        for chunk in chunks:
+            texts.append(chunk.text)
+            ids.append(f"{source_id}:{chunk.chunk_id}")
+            metadatas.append(
+                {
+                    "url": url,
+                    "host": host,
+                    "source_id": source_id,
+                    "content_hash": chunk.content_hash,
+                    **extra_metadata,
+                },
+            )
+    if not texts:
+        return 0
+    embeddings = embed_texts(texts)
+    collection.upsert(ids=ids, documents=texts, embeddings=embeddings, metadatas=metadatas)
+    return len(ids)
+
+
 def query_passages(
     collection,
     query: str,
@@ -122,6 +167,9 @@ def query_passages(
         full_doc = doc or ""
         full_docs[row_id] = full_doc
         quote = full_doc[:1200]
+        deleted = str(meta.get("deleted", "") or "").lower() in {"1", "true", "yes"}
+        if deleted:
+            continue
         hits.append(
             PassageHit(
                 id=row_id,
@@ -133,6 +181,14 @@ def query_passages(
                 guild_id=str(meta.get("guild_id", "") or ""),
                 channel_id=str(meta.get("channel_id", "") or ""),
                 first_message_id=str(meta.get("first_message_id", "") or ""),
+                last_message_id=str(meta.get("last_message_id", "") or ""),
+                source_type=str(meta.get("source_type", "") or ("discord" if str(meta.get("url", "")).startswith("discord://") else "web")),
+                source_target=str(meta.get("source_target", "") or ""),
+                indexed_at=str(meta.get("indexed_at", "") or ""),
+                source_freshness_at=str(meta.get("source_freshness_at", "") or ""),
+                discord_jump_url=str(meta.get("discord_jump_url", "") or ""),
+                content_hash=str(meta.get("content_hash", "") or ""),
+                deleted=deleted,
             )
         )
     if not hits:
@@ -153,3 +209,41 @@ def query_passages(
 
     fused.sort(key=lambda pair: pair[0], reverse=True)
     return [h for _, h in fused[:limit]]
+
+
+def purge_discord_message_rows(
+    collection,
+    *,
+    channel_id: str,
+    message_id: str,
+    guild_id: str | None = None,
+    dry_run: bool = False,
+) -> list[str]:
+    """Delete Discord evidence chunks whose stored message window contains `message_id`."""
+    channel = channel_id.strip()
+    message = message_id.strip()
+    if not channel or not message:
+        return []
+    try:
+        target = int(message)
+    except ValueError:
+        return []
+    result = collection.get(where={"channel_id": channel}, include=["metadatas"])
+    ids = result.get("ids") or []
+    metas = result.get("metadatas") or []
+    doomed: list[str] = []
+    for row_id, meta in zip(ids, metas, strict=False):
+        meta = meta or {}
+        if guild_id and str(meta.get("guild_id", "") or "") != guild_id:
+            continue
+        try:
+            first = int(str(meta.get("first_message_id", "") or "0"))
+            last = int(str(meta.get("last_message_id", "") or meta.get("first_message_id", "") or "0"))
+        except ValueError:
+            continue
+        lower, upper = sorted((first, last))
+        if lower <= target <= upper:
+            doomed.append(str(row_id))
+    if doomed and not dry_run:
+        collection.delete(ids=doomed)
+    return doomed

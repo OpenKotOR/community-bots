@@ -1,7 +1,7 @@
 ---
 title: "Trask live research cutover to Crawl4AI indexer"
 date: 2026-05-19
-last_refreshed: 2026-05-19
+last_refreshed: 2026-06-11
 category: tooling-decisions
 problem_type: tooling_decision
 component: background_job
@@ -11,7 +11,8 @@ tags:
   - "holocron"
   - "crawl4ai"
   - "indexer"
-  - "openrouter"
+  - "huggingface"
+  - "cloudflare"
   - "llm_fallbacks"
 applies_when: "Implementing or debugging Trask/Holocron live web research, Docker HF deploy, or research env vars"
 ---
@@ -27,11 +28,12 @@ Product policy authority: `docs/brainstorms/trask-self-hosted-research-pipeline-
 - **Node bridge:** `packages/trask/src/trask-research-subprocess.ts` spawns `scripts/trask_web_research.py` (not the removed vendor tree). Holocron/Discord compose via `ResearchWizardClient` (`packages/trask/src/research-wizard.ts`) with `TRASK_RESEARCH_COMPOSE_MODE=grounded` (default in `scripts/trask_live_stack.sh`).
 - **Retrieve URL defaults:** `@openkotor/config` and `trask_live_stack.sh` set `TRASK_INDEXER_BASE_URL=http://127.0.0.1:8787` (Cloudflare retrieve **Worker**). Python script fallback default is `8790` (raw `trask-indexer serve`). Local stack: indexer :8790 → Worker :8787 → HTTP :4010.
 - **Python gather order** (`scripts/trask_web_research.py`): `POST {TRASK_INDEXER_BASE_URL}/retrieve` → optional local Chroma → **bounded live Crawl4AI recovery** when `TRASK_WEB_RESEARCH_LIVE_CRAWL=1` and retrieve is weak → DuckDuckGo only when `TRASK_WEB_RESEARCH_DDG_FALLBACK=1` (default **off** in live stack).
-- **Compose LLM (free cloud, not local):** `OPENROUTER_API_KEY` + `TRASK_LLM_PROFILE=free`; fallback chain from `vendor/llm_fallbacks/configs/free_models_ids.txt` when `TRASK_REWRITE_MODEL_FALLBACKS` unset (`@openkotor/config`). Ops path: `bash scripts/trask_litellm_proxy.sh` with `vendor/llm_fallbacks/configs/litellm_config_free.yaml`.
+- **Compose LLM (replacement-first):** `@openkotor/config` `loadSharedAiConfig` — **Hugging Face first** (`HF_TOKEN` / `HUGGINGFACE_TOKEN`), **Cloudflare second** (`TRASK_CLOUDFLARE_AI_BASE_URL` + token), then deterministic extractive fallback when hosted providers fail or budget is exhausted. Legacy OpenRouter/OpenAI keys remain optional paid paths via `TRASK_LLM_PROFILE=paid`. Ops proxy (optional): `bash scripts/trask_litellm_proxy.sh` with `vendor/llm_fallbacks/configs/litellm_config_free.yaml`.
+- **Discord corpus:** DiscordChatExporter archives indexed via `data/trask/discord-export-targets.json` (`TRASK_DISCORD_EXPORT_TARGETS_CONFIG`); `channel_ids` on a target is an **allowlist** when non-empty. Citation authorization on the `discord` surface is fail-closed without destination context (`packages/trask/src/research-wizard.ts`).
 - **Sufficiency gate (R6):** `passagesSupportGroundedCompose` gates LLM compose; `TRASK_QA_GROUNDING=1` enables 1-URL QA seed escape only.
 - **Config:** `loadResearchWizardRuntimeConfig` (`packages/config/src/index.ts`) exposes `indexerBaseUrl`, `researchScriptPath`, `pythonExecutable`, `timeoutMs`. Prefer `.venv-trask-research` via `bash scripts/bootstrap_trask_research.sh`.
 - **Product policy (repo data):** golden queries, surface profiles, linguistics, and retrieval defaults live under `data/trask/` (loaded by `@openkotor/trask-config`). After edits, run `pnpm trask:config-drift`.
-- **Env:** `TRASK_WEB_RESEARCH_PYTHON`, `TRASK_INDEXER_BASE_URL`, `TRASK_WEB_RESEARCH_DDG_FALLBACK=0`, `TRASK_WEB_RESEARCH_LIVE_CRAWL=0` (recovery-only when `1`), `TRASK_RESEARCH_BUDGET_MS=30000`, `TRASK_RESEARCH_TIMEOUT_MS` (aliases `TRASK_RESEARCHWIZARD_TIMEOUT_MS`, default **900000** parent ceiling).
+- **Env:** `TRASK_WEB_RESEARCH_PYTHON`, `TRASK_INDEXER_BASE_URL`, `TRASK_WEB_RESEARCH_DDG_FALLBACK=0`, `TRASK_WEB_RESEARCH_LIVE_CRAWL=0` (recovery-only when `1`), `TRASK_RESEARCH_BUDGET_MS=30000`, `HF_TOKEN`, optional Cloudflare AI vars, `TRASK_DISCORD_EXPORT_TARGETS_CONFIG` (default `data/trask/discord-export-targets.json`), `TRASK_RESEARCH_TIMEOUT_MS` (aliases `TRASK_RESEARCHWIZARD_TIMEOUT_MS`, default **900000** parent ceiling).
 - **HF Docker:** `infra/trask-http-public/Dockerfile` bootstraps research + indexer venvs, seeds QA Chroma at build, and **`docker-entrypoint.sh`** supervises `trask-indexer serve` (:8790) then `trask-http-server`. No Cloudflare Worker in-container — `TRASK_INDEXER_BASE_URL` hits raw indexer HTTP.
 - **Discord `/ask` display:** same research stack; UX gates are `pnpm verify:trask-discord` and `packages/trask/src/discord-reply-format.ts` (single on-topic line, inline `[n](url)` citations — no separate Sources block).
 

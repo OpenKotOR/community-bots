@@ -1,4 +1,4 @@
-from trask_indexer.chroma_store import _lexical_score, _rrf, _url_anchor_boost
+from trask_indexer.chroma_store import _lexical_score, _rrf, _url_anchor_boost, purge_discord_message_rows, query_passages
 
 
 def test_lexical_score_prefers_matching_tokens():
@@ -15,3 +15,72 @@ def test_rrf_is_monotonic_by_rank():
 def test_url_anchor_boost_rewards_tool_name_in_url():
     boost = _url_anchor_boost("What is TSLPatcher used for?", "https://deadlystream.com/files/file/123-tslpatcher/")
     assert boost > 0
+
+
+def test_query_passages_filters_deleted_rows_and_exposes_metadata(monkeypatch):
+    monkeypatch.setattr("trask_indexer.chroma_store.embed_query", lambda _query: [0.1, 0.2])
+
+    class FakeCollection:
+        def query(self, **_kwargs):
+            return {
+                "ids": [["live", "deleted"]],
+                "documents": [["TSLPatcher installs mod files.", "Deleted staff note"]],
+                "distances": [[0.1, 0.2]],
+                "metadatas": [[
+                    {
+                        "url": "discord://channels/456/100-101",
+                        "host": "discord:modding",
+                        "source_id": "approved-discord-knowledge:openkotor:456",
+                        "source_type": "discord",
+                        "source_target": "openkotor",
+                        "guild_id": "123",
+                        "channel_id": "456",
+                        "first_message_id": "100",
+                        "last_message_id": "101",
+                        "discord_jump_url": "https://discord.com/channels/123/456/100",
+                        "deleted": "false",
+                    },
+                    {
+                        "url": "discord://channels/456/99-99",
+                        "host": "discord:staff",
+                        "source_id": "approved-discord-knowledge:staff:456",
+                        "deleted": "true",
+                    },
+                ]],
+            }
+
+    hits = query_passages(FakeCollection(), "TSLPatcher", limit=3)
+
+    assert len(hits) == 1
+    assert hits[0].source_type == "discord"
+    assert hits[0].source_target == "openkotor"
+    assert hits[0].discord_jump_url == "https://discord.com/channels/123/456/100"
+    assert hits[0].last_message_id == "101"
+
+
+def test_purge_discord_message_rows_matches_message_windows():
+    deleted: list[str] = []
+
+    class FakeCollection:
+        def get(self, **_kwargs):
+            return {
+                "ids": ["a", "b", "c"],
+                "metadatas": [
+                    {"guild_id": "123", "channel_id": "456", "first_message_id": "100", "last_message_id": "110"},
+                    {"guild_id": "123", "channel_id": "456", "first_message_id": "120", "last_message_id": "130"},
+                    {"guild_id": "999", "channel_id": "456", "first_message_id": "100", "last_message_id": "110"},
+                ],
+            }
+
+        def delete(self, *, ids):
+            deleted.extend(ids)
+
+    matched = purge_discord_message_rows(
+        FakeCollection(),
+        guild_id="123",
+        channel_id="456",
+        message_id="105",
+    )
+
+    assert matched == ["a"]
+    assert deleted == ["a"]

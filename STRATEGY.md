@@ -1,6 +1,6 @@
 ---
 name: Holocron & Trask
-last_updated: 2026-05-19
+last_updated: 2026-06-11
 ---
 
 # Holocron & Trask Strategy
@@ -11,7 +11,9 @@ KotOR modding knowledge is scattered across Discord, wikis, and file-host thread
 
 ## Our approach
 
-**Owned crawl → embed → retrieve → cite → assistant compose.** Crawl4AI indexes allowlisted sources into Chroma (FastEmbed vectors); every question runs hybrid RAG retrieval first, with bounded live Crawl4AI fetch on weak or empty index hits. Node synthesis rewrites retrieved passages into a conversational, AI-assistant answer with inline [n] citations and a clean Sources bibliography — never unverified snippet padding.
+**Owned evidence cache → retrieve → authorize citations → compose or extract.** Trask is a fast KotOR research agent over an ahead-of-time cache of approved web sources and Discord archives. Current internals such as Crawl4AI, Chroma, FastEmbed, and the retrieve Worker are implementation candidates, not strategy commitments: they stay only when they beat replacements on citation quality, source freshness, latency, deletion support, maintainability, and free-tier operation.
+
+The durable contract is source-first: every factual answer must be backed by exact public URLs or authorized Discord jump links, and answers should complete inside a 10-30 second budget. Hugging Face-hosted inference is the first compose/classification path, Cloudflare is the HA fallback, and deterministic extractive answers are required when hosted providers are unavailable. `OPENAI_API_KEY` is not part of the primary Trask validation path.
 
 ## Who it's for
 
@@ -19,38 +21,38 @@ KotOR modding knowledge is scattered across Discord, wikis, and file-host thread
 
 **Secondary:** Discord server members — they ask Trask in-channel and get the same RAG + compose pipeline with optional community context when configured.
 
-**Operators:** Maintainers who seed Chroma, run `trask_live_stack.sh`, configure env/LLM keys, and deploy the public Trask HTTP surface.
+**Operators:** Maintainers who approve sources, inspect freshness, trigger or dry-run refreshes, purge Discord evidence, monitor provider health, and deploy the public Trask HTTP surface.
 
 ## Key metrics
 
-- **Grounded answer quality** — responses read as assistant prose with ≥2 distinct `https://` citations when evidence supports it; spot-checked in Holocron UI and Discord `/ask`
-- **RAG retrieve hit rate** — `passages_count > 0` and `index_miss=false` on expert verification queries; logged in `trask_web_research.py` stderr and research trace JSON
-- **Live crawl recovery rate** — share of weak-retrieve queries where bounded Crawl4AI live index returns usable passages (`live_crawl_passages` in research diagnostics)
-- **Research latency (p95)** — submit → final answer on `/api/trask/*`; server logs and manual QA
+- **Grounded answer quality** — responses read like Trask, a messenger of the Colossal Holocron, with citations aligned to retrieved evidence and no unsupported roleplay
+- **Citation integrity** — web citations are exact `https://` URLs; Discord citations are exact jump links authorized for the destination surface at answer time
+- **Evidence freshness** — approved web sources and DiscordChatExporter archives expose last-refresh, hash, deletion/tombstone, and reconciliation state
+- **Research latency (p95)** — submit → final answer on `/api/trask/*` or Discord `/ask` stays inside the 10-30 second budget, including provider fallback
 
 ## Tracks
 
-### Crawl4AI + Chroma RAG
+### Citation-First Evidence Cache
 
-Crawl4AI crawl/chunk, FastEmbed vectors, Chroma hybrid retrieve, bounded live crawl on miss.
+Scheduled web and Discord ingestion normalize approved material into citation-ready evidence records. The crawler/parser and backing store may be Crawl4AI/Chroma, Trafilatura/Docling plus Qdrant/LanceDB/sqlite-vec, or Cloudflare-native storage if they meet the replacement gates.
 
-_Why it serves the approach:_ Replaces opaque vendor research with an owned, inspectable retrieval path the team can seed, crawl, and debug.
+_Why it serves the approach:_ Users trust Trask when every answer can be traced to exact, authorized sources.
 
-### Grounded assistant compose
+### Hugging Face-First Compose
 
-LLM rewrite of retrieved passages into conversational answers with aligned Sources bibliographies.
+Hugging Face handles primary answer generation, proactive classification, and optional rerank where configured. Cloudflare provides HA fallback. If both fail, Trask returns a cited extractive answer or a clear insufficient-evidence response.
 
-_Why it serves the approach:_ Users expect an AI assistant, not a research digest; compose must stay tied to verified passages.
+_Why it serves the approach:_ Free-first hosted inference keeps answers quick without making OpenAI/OpenRouter credentials a product dependency.
 
 ### Holocron & Discord surfaces
 
-Server-backed Q&A only; one API contract for web and Discord; source weighting without client-side scrapers.
+Server-backed Q&A only; one evidence-pack contract for web, Discord, and agent tooling; source weighting without client-side scrapers.
 
 _Why it serves the approach:_ Prevents UI/runtime drift and keeps citations authoritative.
 
 ### Deploy and ops
 
-`trask_live_stack.sh`, indexer + Worker + HTTP env maps, HF/Docker deploy parity.
+Agent-readable actions for source listing, freshness inspection, dry-run refresh, purge requests, evidence inspection, provider health, and proactive-reply traces.
 
 _Why it serves the approach:_ Operators and agents can reproduce local behavior before shipping public Holocron.
 
@@ -59,6 +61,6 @@ _Why it serves the approach:_ Operators and agents can reproduce local behavior 
 ## Not working on
 
 - Vendored GPT-Researcher / `vendor/ai-researchwizard` as the default research path
-- DuckDuckGo snippets as primary evidence when Crawl4AI + Chroma can serve the query
+- DuckDuckGo snippets as primary evidence when the maintained evidence cache can serve the query
 - browser-use, llm-scraper, or Firecrawl as the Holocron/Discord answer pipeline
-- Automated test suites for Trask while the RAG/compose contract is still in active design (manual stack smoke + UI QA instead)
+- `OPENAI_API_KEY` / OpenRouter as a primary Trask validation requirement

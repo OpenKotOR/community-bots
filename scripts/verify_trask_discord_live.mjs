@@ -19,7 +19,7 @@ import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { loadResearchWizardRuntimeConfig, loadSharedAiConfig } from "@openkotor/config";
-import { createResearchWizardClient } from "@openkotor/trask";
+import { createResearchWizardClient, isCitableCitationUrl } from "@openkotor/trask";
 import { degradedAnswerRegexes, loadVerificationQueries, verificationQueriesForSurface } from "@openkotor/trask-config";
 import { isHttpsCitationReachable } from "./lib/url-verify.mjs";
 import { loadEnvFiles, repoRoot } from "./lib/trask-env.mjs";
@@ -29,6 +29,10 @@ import {
   assertProvenanceFooter,
   defaultIndexerUrlForSmoke,
 } from "./lib/discord_provenance_footer.mjs";
+import {
+  assertDiscordCitationAuthContract,
+  discordCitationAuthFromEnv,
+} from "./lib/discord_citation_auth.mjs";
 import {
   auditDiscordAskDisplay,
   extractInlineHttpsUrls,
@@ -57,6 +61,14 @@ const verificationById = () =>
 const runImportSmoke = () => {
   loadEnvFiles();
   bootstrapTraskIndexedStack(repoRoot);
+
+  try {
+    assertDiscordCitationAuthContract(isCitableCitationUrl);
+    console.log("import-smoke OK: discord citation auth fail-closed contract");
+  } catch (error) {
+    console.error(`import-smoke FAIL: ${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
 
   const byId = verificationById();
   let failed = 0;
@@ -109,6 +121,7 @@ const runLive = async () => {
   bootstrapTraskIndexedStack(repoRoot);
   loadSharedAiConfig();
   const wizard = createResearchWizardClient(loadResearchWizardRuntimeConfig());
+  const citationAuth = discordCitationAuthFromEnv();
 
   const results = [];
   let failed = 0;
@@ -117,7 +130,7 @@ const runLive = async () => {
     const expectRe = new RegExp(spec.expectPattern, "i");
     process.stdout.write(`… ${spec.question.slice(0, 72)}${spec.question.length > 72 ? "…" : ""}\n`);
 
-    const result = await wizard.answerForSurface(spec.question, "discord");
+    const result = await wizard.answerForSurface(spec.question, "discord", undefined, citationAuth);
     const audit = auditDisplay(spec.question, result.answer, result.approvedSources);
 
     if (typeof audit === "string") {

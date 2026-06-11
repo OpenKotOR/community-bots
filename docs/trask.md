@@ -207,8 +207,8 @@ not the long embed briefing).
 **Requirements**
 
 - Enable **Message Content Intent** (and guild message events) for the application in the Discord Developer Portal.
-- Set **`OPENAI_API_KEY`** (or **`OPENROUTER_API_KEY`**) — used for a **small-model JSON classifier** (question +
-  KOTOR relevance), **embeddings** to compare the draft answer against the research report, and the brief rewrite path.
+- Set **`HF_TOKEN`** (primary) or configure Cloudflare AI fallback — used for the **small-model JSON classifier** (question +
+  KOTOR relevance), **embeddings** when an embedding-capable provider is configured, and the brief rewrite path. Legacy **`OPENAI_API_KEY`** / **`OPENROUTER_API_KEY`** remain optional paid paths.
 - Configure at least one channel: **`TRASK_PROACTIVE_CHANNEL_IDS`** or **`TRASK_APPROVED_CHANNEL_IDS`** (proactive falls
   back to approved channels when the proactive list is empty).
 
@@ -217,13 +217,14 @@ not the long embed briefing).
 1. **Debounce** (`TRASK_PROACTIVE_DEBOUNCE_MS`, default 25s): waits for quiet time before running the pipeline on the
    latest eligible message in that channel.
 2. **Competing reply heuristic**: after the wait, if another (non-bot) user posted a message at least
-   `TRASK_PROACTIVE_COMPETING_MIN_LENGTH` characters long, Trask stays silent so humans can answer first.
-3. **Classifier** (`TRASK_PROACTIVE_CLASSIFIER_MODEL`, default `gpt-4o-mini`): JSON output gates obvious non-questions
+   `TRASK_PROACTIVE_COMPETING_MIN_LENGTH` characters long, Trask stays silent so humans can answer first (re-checked before send).
+3. **Supersession**: if a newer eligible message arrives in the same channel while research is in flight, the pending reply is dropped.
+4. **Classifier** (`TRASK_PROACTIVE_CLASSIFIER_MODEL`): JSON output gates obvious non-questions
    and off-topic chatter.
-4. **Research**: runs web research (Crawl4AI + DDG) with a **brief** digest prompt and a short Discord rewrite.
-5. **Semantic gate** (`TRASK_PROACTIVE_SIMILARITY_THRESHOLD`): embedding similarity between the user question / brief
-   answer and the normalized report must clear the threshold, reducing confident-but-ungrounded replies.
-6. **Per-user cooldown** (`TRASK_PROACTIVE_USER_COOLDOWN_MS`) limits spam.
+5. **Research**: runs indexed retrieval + grounded compose with a **brief** digest prompt.
+6. **Semantic gate** (`TRASK_PROACTIVE_SIMILARITY_THRESHOLD`): when embeddings are available, similarity between the user question / brief
+   answer and the normalized report must clear the threshold; when no embedding provider is configured, the gate passes through.
+7. **Per-user cooldown** (`TRASK_PROACTIVE_USER_COOLDOWN_MS`) limits spam.
 
 See [`apps/trask-bot/.env.example`](apps/trask-bot/.env.example) for all proactive tunables.
 

@@ -60,6 +60,27 @@ export interface EvidenceClaim {
   authority: EvidenceAuthority;
 }
 
+export const sanitizeEvidenceForProvider = (text: string): string => {
+  const capped = text.slice(0, 1600);
+  return capped
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => {
+      const lowered = line.toLowerCase();
+      if (lowered.includes("ignore previous instructions")) return false;
+      if (lowered.includes("ignore all previous instructions")) return false;
+      if (lowered.includes("system prompt")) return false;
+      if (lowered.includes("developer message")) return false;
+      if (lowered.includes("you are chatgpt")) return false;
+      if (lowered.includes("exfiltrate")) return false;
+      return true;
+    })
+    .join("\n")
+    .replace(/(?:mfa\.)?[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{20,}/gu, "[redacted-token]")
+    .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/gu, "[redacted-email]")
+    .trim();
+};
+
 const HOST_AUTHORITY_SCORE: Readonly<Record<string, number>> = loadLinguistics().hostAuthorityScores;
 
 const passageAuthority = (url: string): EvidenceAuthority => {
@@ -259,7 +280,7 @@ export const extractClaimsWithLlm = async (
   if (evidencePassages.length === 0) return [];
 
   const passageBlock = evidencePassages
-    .map((p, i) => `[passage ${i + 1}] url=${p.url}\n${p.text.slice(0, 1200)}`)
+    .map((p, i) => `[passage ${i + 1}] url=${p.url}\n${sanitizeEvidenceForProvider(p.text).slice(0, 1200)}`)
     .join("\n\n");
 
   const completion = await client.chat.completions.create({
@@ -575,7 +596,7 @@ export const composeGroundedAnswerWithLlm = async (
     .join("\n");
 
   const evidenceLines = indexed
-    .map((c) => `[${c.sourceIndex}] ${c.claim}\nQuote: "${c.quote}"\nURL: ${c.url}`)
+    .map((c) => `[${c.sourceIndex}] ${sanitizeEvidenceForProvider(c.claim)}\nQuote: "${sanitizeEvidenceForProvider(c.quote)}"\nURL: ${c.url}`)
     .join("\n\n");
 
   const trimmedQuery = query.trim();

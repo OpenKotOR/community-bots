@@ -1,6 +1,6 @@
 # Discord /ask live verify
 
-Generated: 2026-06-10T18:42:46.549Z
+Generated: 2026-06-11T14:42:21.541Z
 
 Queries: 5 (expert verification set; URL reachability enforced)
 Passed: 5/5
@@ -58,4 +58,4 @@ reone Odyssey engine The reone project is an open-source reimplementation of the
 reone wiki reone exposes Odyssey runtime and scripting capabilities so researchers can experiment with KotOR and TSL behavior outside the retail executable. [2](https://github.com/seedhartha/reone/wiki)
 ```
 
-Footer: `12 passages · indexer 8787`
+Footer: `11 passages · indexer 8787`

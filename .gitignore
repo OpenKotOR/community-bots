@@ -208,3 +208,6 @@ test-results/
 # Cloudflare Wrangler local secrets
 .dev.vars
 **/.dev.vars
+
+# AutoClaw KDream data
+.autoclaw/
