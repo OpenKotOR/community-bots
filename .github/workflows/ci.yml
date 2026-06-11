@@ -323,6 +323,12 @@ jobs:
           TRASK_QA_GROUNDING: "1"
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
+      - name: Holocron Playwright failure-path e2e
+        run: pnpm holocron:e2e:playwright:failure
+        env:
+          TRASK_SKIP_BUILD: "1"
+          TRASK_QA_GROUNDING: "1"
+
   trask-gate-final:
     name: Trask gate (final)
     needs: [build-and-test, discord-playwright-e2e, holocron-playwright-e2e]

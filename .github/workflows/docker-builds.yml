@@ -39,6 +39,7 @@ on:
       - "scripts/pack-trask-http-hf-context.sh"
       - "data/trask/**"
       - ".github/workflows/docker-builds.yml"
+      - ".dockerignore"
   workflow_dispatch:
 
 jobs:

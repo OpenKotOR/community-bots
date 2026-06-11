@@ -5,15 +5,11 @@ import path from 'node:path'
 const appDir = fileURLToPath(new URL('.', import.meta.url))
 const repoRoot = path.resolve(appDir, '..', '..')
 
-/** Functional e2e: real trask-http-server + Holocron dist (no /api/trask mocks).
- * testMatch: holocron-research.spec.ts (5 canonical expert queries + reload test).
- * Restored in LFG pass 2 (plan 118) via git resurrection from pre-c47c52f; tolerance echo removed from root package.json.
- * Failure spec: playwright.failure.config.ts (`pnpm holocron:e2e:playwright:failure`).
- */
+/** Failure-path e2e: unreachable indexer (HOLOCRON_E2E_FAILURE_MODE=1). No Worker/indexer bootstrap. */
 export default defineConfig({
   testDir: path.resolve(appDir, 'e2e'),
-  testMatch: /holocron-research\.spec\.ts$/,
-  timeout: 240_000,
+  testMatch: /holocron-research-failure\.spec\.ts$/,
+  timeout: 180_000,
   expect: { timeout: 30_000 },
   fullyParallel: false,
   workers: 1,
@@ -28,10 +24,17 @@ export default defineConfig({
     command: 'bash scripts/holocron-e2e-webserver.sh',
     cwd: repoRoot,
     url: process.env.HOLOCRON_E2E_BASE_URL ?? 'http://127.0.0.1:4010',
-    reuseExistingServer: process.env.HOLOCRON_REUSE_SERVER === '1' || !process.env.CI,
-    timeout: 180_000,
+    reuseExistingServer: false,
+    timeout: 120_000,
     stdout: 'pipe',
     stderr: 'pipe',
+    env: {
+      HOLOCRON_E2E_FAILURE_MODE: '1',
+      TRASK_QA_GROUNDING: '1',
+      TRASK_WEB_ALLOW_ANONYMOUS: '1',
+      TRASK_HTTP_PORT: '4010',
+      TRASK_SKIP_CITATION_URL_VERIFY: '1',
+    },
   },
   projects: [
     {

@@ -51,7 +51,7 @@ Standard scripts from `package.json`:
 
 **Requirement:** Do not claim Holocron search/research is working until you have **fully verified it in a real browser** — all five canonical research queries must complete with substantive answers and sources. Use Playwright (`pnpm holocron:e2e`) as the mandatory automated gate; use the Cursor **browser** MCP for an extra manual pass when it is available. A single happy-path click or CLI-only check is not sufficient.
 
-Holocron e2e is **functional only** (no mocked `/api/trask` routes, no UI regression fixtures). Happy-path Playwright: `apps/holocron-web/e2e/holocron-research.spec.ts` (five expert queries + reload; matched by `playwright.config.ts`). Failure-path spec exists but is not in default `testMatch`. When Cursor **browser** MCP is available, run the same five queries on `:4010` in addition to Playwright — not instead of it.
+Holocron e2e is **functional only** (no mocked `/api/trask` routes, no UI regression fixtures). Happy-path Playwright: `holocron-research.spec.ts` (five expert queries + reload; `playwright.config.ts`). Failure-path: `holocron-research-failure.spec.ts` via `pnpm holocron:e2e:playwright:failure` (`playwright.failure.config.ts`, unreachable indexer). When Cursor **browser** MCP is available, run the same five queries on `:4010` in addition to Playwright — not instead of it.
 
 #### Mandatory verification (run before “done”)
 
@@ -145,7 +145,7 @@ pnpm verify:trask-cli
 
 `pnpm verify:trask-cli` runs `scripts/verify_trask_cli_qa.mjs` (golden queries). `pnpm verify:trask-cli:ci` / `pnpm trask:verify-import-smoke:ci` use `--import-smoke` (no LLM). `pnpm verify:trask-discord` runs live Discord-format checks via the research wizard.
 
-**Playwright (offline Discord + live Holocron):** `pnpm trask:e2e:discord:playwright` — static harness on **:4012** (`scripts/discord-ask-e2e-webserver.mjs`, `e2e/trask-discord-ask.spec.mjs`); mirrors import-smoke embed contract in a real browser (no discord.com, no LLM). `pnpm trask:e2e:playwright` runs Discord harness then `pnpm holocron:e2e:playwright`. CI Build job runs Discord Playwright after `trask:gate:ci`.
+**Playwright (offline Discord + live Holocron):** `pnpm trask:e2e:discord:playwright` — static harness on **:4012** (`scripts/discord-ask-e2e-webserver.mjs`, `e2e/trask-discord-ask.spec.mjs`); mirrors import-smoke embed contract in a real browser (no discord.com, no LLM). `pnpm trask:e2e:playwright` runs Discord harness then `pnpm holocron:e2e:playwright` (six happy-path tests). `pnpm holocron:e2e:playwright:failure` — unreachable indexer (`playwright.failure.config.ts`). `pnpm trask:e2e:playwright:full` — Discord + Holocron happy + failure. CI runs Discord Playwright in a container job; Holocron job runs happy then failure specs.
 
 #### Offline faithfulness gate (citation alignment)
 
