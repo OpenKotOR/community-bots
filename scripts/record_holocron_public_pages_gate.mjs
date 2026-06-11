@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 
 import { chromium } from "@playwright/test";
-import { loadTraskPolicy } from "@openkotor/trask-config";
+import { getGoldenQuery, loadTraskPolicy } from "@openkotor/trask-config";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const baseURL =
@@ -19,8 +19,11 @@ const apiBase =
   process.env.HOLOCRON_PUBLIC_API_BASE?.replace(/\/+$/, "") ??
   "https://trask-worker.bocloud.workers.dev";
 const question =
-  process.env.HOLOCRON_PUBLIC_GATE_QUERY ??
-  "What does the reone project provide for Odyssey engine work?";
+  process.env.HOLOCRON_PUBLIC_GATE_QUERY ?? getGoldenQuery("reone")?.question;
+if (!question) {
+  console.error("HOLOCRON_PUBLIC_GATE_QUERY unset and golden query reone missing");
+  process.exit(1);
+}
 const minHttps = loadTraskPolicy().holocron.minHttpsSources;
 
 async function probePublicApiHealth() {
