@@ -15,6 +15,7 @@ cp "$ROOT/package.json" "$ROOT/pnpm-lock.yaml" "$ROOT/pnpm-workspace.yaml" "$ROO
 
 rsync -a --exclude node_modules --exclude dist "$ROOT/packages/" "$OUT/packages/"
 rsync -a --exclude node_modules --exclude dist "$ROOT/apps/trask-http-server/" "$OUT/apps/trask-http-server/"
+rsync -a --exclude node_modules --exclude dist "$ROOT/apps/holocron-web/" "$OUT/apps/holocron-web/"
 rsync -a --exclude node_modules --exclude dist --exclude .venv --exclude data/trask-indexer/chroma \
   "$ROOT/infra/trask-indexer/" "$OUT/infra/trask-indexer/"
 rsync -a --exclude .git --exclude node_modules --exclude dist --exclude tests \

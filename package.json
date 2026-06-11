@@ -42,6 +42,7 @@
     "trask:qa:surfaces": "bash scripts/trask_qa_surfaces.sh",
     "holocron:public-gate": "node scripts/record_holocron_public_pages_gate.mjs",
     "trask:public-api:check": "bash scripts/check_trask_public_api.sh",
+    "trask:verify-hf-pack": "node scripts/verify_trask_http_hf_pack.mjs",
     "trask:e2e:discord:playwright": "pnpm exec playwright test --config playwright.trask-discord.config.mjs",
     "trask:e2e:playwright": "pnpm trask:e2e:discord:playwright && pnpm holocron:e2e:playwright",
     "trask:e2e:playwright:full": "pnpm trask:e2e:discord:playwright && pnpm holocron:e2e:playwright && pnpm holocron:e2e:playwright:failure",

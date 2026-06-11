@@ -1,5 +1,11 @@
 ---
 title: Holocron Trask HTTP
+emoji: 📚
+colorFrom: indigo
+colorTo: blue
+sdk: docker
+app_port: 7860
+startup_duration_timeout: 1h
 ---
 
 # Holocron Trask HTTP (Hugging Face Space)
@@ -25,10 +31,11 @@ The Docker image runs a **supervisor entrypoint** that starts the indexer, waits
 
 ## Public outage recovery
 
-When `trask-worker` `/healthz` reports `upstreamReachable: false` and the Space shows **ERROR** on Hugging Face:
+When `trask-worker` `/healthz` reports `upstreamReachable: false` and the Space shows **ERROR** or **CONFIG_ERROR** on Hugging Face:
 
-1. Redeploy: `gh workflow run trask-http-public.yml` (needs `HUGGINGFACE_TOKEN`).
-2. Verify worker upstream: `TRASK_API_BASE=https://trask-worker.bocloud.workers.dev pnpm trask:public-api:check`
-3. Verify Pages client: `pnpm holocron:public-gate` (Playwright on `qa-webui` + API preflight).
+1. Confirm Space `README.md` frontmatter includes `sdk: docker` and `app_port: 7860` (`pnpm trask:verify-hf-pack`).
+2. Redeploy: `gh workflow run trask-http-public.yml` (needs `HUGGINGFACE_TOKEN`).
+3. Verify worker upstream: `TRASK_API_BASE=https://trask-worker.bocloud.workers.dev pnpm trask:public-api:check`
+4. Verify Pages client: `pnpm holocron:public-gate` (Playwright on `qa-webui` + API preflight).
 
 Worker `TRASK_RESEARCHWIZARD_BASE_URL` must point at this Space (`https://openkotor-holocron-trask-http.hf.space` or custom domain).
