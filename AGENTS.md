@@ -145,6 +145,8 @@ pnpm verify:trask-cli
 
 `pnpm verify:trask-cli` runs `scripts/verify_trask_cli_qa.mjs` (golden queries). `pnpm verify:trask-cli:ci` / `pnpm trask:verify-import-smoke:ci` use `--import-smoke` (no LLM). `pnpm verify:trask-discord` runs live Discord-format checks via the research wizard.
 
+**One-shot QA surfaces (Discord + Holocron Playwright + browser gate):** `pnpm trask:qa:surfaces` — runs `scripts/trask_qa_surfaces.sh` (offline Discord harness, failure-path Holocron, then requires live stack on :4010 for happy Playwright + browser gate). Live Discord bot: `pnpm verify:trask-discord`.
+
 **Live browser gate (stack on :4010):** `pnpm holocron:browser-gate` — five expert queries via Playwright against an existing `trask-http-server`; writes `docs/evidence/holocron-browser-gate-latest.md` (no webServer boot).
 
 **Playwright (offline Discord + live Holocron):** `pnpm trask:e2e:discord:playwright` — static harness on **:4012** (`scripts/discord-ask-e2e-webserver.mjs`, `e2e/trask-discord-ask.spec.mjs`); mirrors import-smoke embed contract in a real browser (no discord.com, no LLM). `pnpm trask:e2e:playwright` runs Discord harness then `pnpm holocron:e2e:playwright` (six happy-path tests). `pnpm holocron:e2e:playwright:failure` — unreachable indexer (`playwright.failure.config.ts`). `pnpm trask:e2e:playwright:full` — Discord + Holocron happy + failure. CI runs Discord Playwright in a container job; Holocron job runs happy then failure specs.
