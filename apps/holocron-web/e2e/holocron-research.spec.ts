@@ -205,6 +205,25 @@ for (const [index, querySpec] of RESEARCH_QUERIES.entries()) {
 
     assertSubstantiveAnswer(bodyText, sourcesText, querySpec)
 
+    expect(bodyText, 'answer should not leak spaced markdown link syntax').not.toMatch(/\]\s*\(https:\/\//)
+    expect(bodyText, 'answer body should not leak raw githubusercontent paths').not.toMatch(/githubusercontent\.com/i)
+
+    await thoughtProcess.click()
+    const traceRegion = assistantArticle.getByRole('region', { name: /thought process/i })
+    await expect(traceRegion).toBeVisible({ timeout: 10_000 })
+    const traceText = (await traceRegion.innerText()).trim()
+    expect(traceText, 'thought process should not leak raw githubusercontent paths').not.toMatch(
+      /githubusercontent\.com/i,
+    )
+
+    if (hasSourcesPanel) {
+      const sourceLabels = await sourcesRegion.locator('[role="listitem"]').allInnerTexts()
+      for (const label of sourceLabels) {
+        expect(label, 'source card label').not.toMatch(/githubusercontent\.com/i)
+        expect(label, 'source card label').not.toMatch(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+#L\d+$/i)
+      }
+    }
+
     const httpsCount = Math.max(
       await httpsInSources.count(),
       countHttpsUrls(sourcesText),

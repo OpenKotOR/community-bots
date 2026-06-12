@@ -2,7 +2,7 @@
 title: Trask Configuration Environment Map
 owner: trask-bot
 status: active
-lastUpdated: 2026-05-29
+lastUpdated: 2026-06-11
 ---
 
 [SYNTH] Quick map of **Trask-related** process env vars to loaders in `packages/config/src/index.ts`. For narrative setup, see [docs/trask.md](../../trask.md).
@@ -23,8 +23,15 @@ lastUpdated: 2026-05-29
 
 | Variable | Consumed by | Notes |
 |----------|-------------|--------|
-| `OPENAI_API_KEY` / `OPENROUTER_API_KEY` | [REPO] `loadSharedAiConfig` — Trask bot, Trask HTTP server, ingest worker | Key fallback order per loader. |
-| `OPENAI_BASE_URL`, `OPENAI_CHAT_MODEL`, `OPENAI_EMBEDDING_MODEL` | [REPO] `loadSharedAiConfig` | |
+| `HF_TOKEN` / `HUGGINGFACE_TOKEN` | [REPO] `loadSharedAiConfig` — Trask bot, Trask HTTP server, ingest worker | Primary Trask hosted inference provider. |
+| `TRASK_HF_INFERENCE_BASE_URL`, `HF_INFERENCE_BASE_URL` | [REPO] `loadSharedAiConfig` | OpenAI-compatible Hugging Face router/endpoint base; default `https://router.huggingface.co/v1`. |
+| `TRASK_HF_CHAT_MODEL`, `HF_CHAT_MODEL` | [REPO] `loadSharedAiConfig` | Primary Hugging Face chat/classifier model. |
+| `TRASK_HF_EMBEDDING_MODEL`, `HF_EMBEDDING_MODEL` | [REPO] `loadSharedAiConfig` | Primary embedding model name; default BGE-M3. |
+| `TRASK_CLOUDFLARE_AI_BASE_URL`, `CLOUDFLARE_AI_GATEWAY_BASE_URL` | [REPO] `loadSharedAiConfig` | Cloudflare HA fallback base URL. |
+| `TRASK_CLOUDFLARE_AI_TOKEN`, `CLOUDFLARE_AI_GATEWAY_TOKEN`, `CLOUDFLARE_API_TOKEN` | [REPO] `loadSharedAiConfig` | Cloudflare fallback credential. |
+| `TRASK_CLOUDFLARE_CHAT_MODEL`, `CLOUDFLARE_WORKERS_AI_MODEL` | [REPO] `loadSharedAiConfig` | Cloudflare fallback model. |
+| `OPENAI_API_KEY` / `OPENROUTER_API_KEY` | [REPO] `loadSharedAiConfig` | Legacy escape hatches when no HF/Cloudflare/proxy provider is configured; not primary Trask validation path. |
+| `OPENAI_BASE_URL`, `OPENAI_CHAT_MODEL`, `OPENAI_EMBEDDING_MODEL` | [REPO] `loadSharedAiConfig` | Legacy OpenAI-compatible path only. |
 | `OPENROUTER_HTTP_REFERER`, `OPENROUTER_APP_TITLE` | [REPO] Optional OpenRouter headers | |
 | `FIRECRAWL_API_KEY` | [REPO] Ingest + optional Trask AI bundle | Ingest uses Firecrawl for scraping when set. |
 | `DATABASE_URL` | [REPO] `loadSharedAiConfig` | Passed through for embeddings / DB features when used. |
@@ -53,6 +60,10 @@ lastUpdated: 2026-05-29
 | `TRASK_REINDEX_LIMIT` | [REPO] Optional crawl cap per weekly run; empty = full approved catalog. |
 | `TRASK_DISCORD_SYNC_STALE_HOURS` | [REPO] Indexer `/health` marks `discord_sync_stale` when `last_discord_sync` is older than this many hours (default **48**; `0` disables stale flag). |
 | `TRASK_DISCORD_SYNC_TIMEOUT_MS` | [REPO] Kill `trask_discord_sync.py` subprocess after N ms (default **600000**; `0` = no timeout). |
+| `TRASK_DISCORD_EXPORT_TARGETS_CONFIG` | [REPO] `scripts/trask_discord_sync.py` | Discord export target config JSON; default `data/trask/discord-export-targets.json`. Archive sync runs only when this file exists and `TRASK_DISCORD_SYNC_USE_EXPORT_TARGETS=1` (default); otherwise bot-token export mode. |
+| `TRASK_DISCORD_SYNC_USE_EXPORT_TARGETS` | [REPO] `scripts/trask_discord_sync.py` | Default `1`; set `0` to force bot-token export mode. |
+| `TRASK_OPS_EVIDENCE_LIMIT` | [REPO] `scripts/trask_ops.mjs evidence` | Evidence-pack retrieve limit for agent/native ops. |
+| `TRASK_REINDEX_DRY_RUN_LIMIT` | [REPO] `scripts/trask_ops.mjs refresh-dry-run` | Dry-run refresh cap. |
 
 # Trask Discord bot (`loadTraskBotConfig`)
 

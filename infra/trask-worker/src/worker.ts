@@ -165,6 +165,47 @@ async function serveBuiltin(request: Request, origin: string | null): Promise<Re
   return jsonResponse(404, { error: "Not found" }, origin);
 }
 
+async function probeUpstreamHealth(baseUrl: string, upstreamApiKey: string): Promise<{
+  reachable: boolean;
+  status?: number;
+  detail?: string;
+}> {
+  const healthUrl = `${normalizeBackendBaseUrl(baseUrl)}/healthz`;
+  try {
+    const headers = new Headers({ Accept: "application/json" });
+    if (upstreamApiKey) {
+      headers.set("Authorization", `Bearer ${upstreamApiKey}`);
+    }
+    const res = await fetch(healthUrl, { method: "GET", headers, redirect: "manual" });
+    const detail = (await res.text()).slice(0, 300);
+    return { reachable: res.ok, status: res.status, detail: detail || undefined };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { reachable: false, detail: message };
+  }
+}
+
+async function enrichUpstreamFailure(
+  upstreamResponse: Response,
+  baseUrl: string,
+  origin: string | null,
+): Promise<Response> {
+  const upstreamStatus = upstreamResponse.status;
+  const upstreamDetail = (await upstreamResponse.text()).slice(0, 500);
+  return jsonResponse(
+    upstreamStatus >= 500 ? upstreamStatus : 502,
+    {
+      error: `Trask HTTP upstream unavailable (${upstreamStatus}).`,
+      upstream: normalizeBackendBaseUrl(baseUrl),
+      upstreamStatus,
+      upstreamDetail: upstreamDetail || undefined,
+      hint:
+        "Restore the Hugging Face Space OpenKotOR/holocron-trask-http or point TRASK_RESEARCHWIZARD_BASE_URL at a healthy trask-http-server.",
+    },
+    origin,
+  );
+}
+
 async function serveUpstreamOrFallback(
   request: Request,
   env: Env,
@@ -181,13 +222,28 @@ async function serveUpstreamOrFallback(
   const upstreamApiKey = (env.TRASK_RESEARCHWIZARD_API_KEY ?? "").trim();
 
   try {
-    return await proxyToUpstream(request, targetUrl, origin, upstreamApiKey, bodyText);
+    const upstreamResponse = await proxyToUpstream(request, targetUrl, origin, upstreamApiKey, bodyText);
+    if (upstreamResponse.ok) {
+      return upstreamResponse;
+    }
+    if (useBuiltinFallback(env) && shouldFallbackToBuiltin(upstreamResponse)) {
+      const replayed =
+        bodyText !== undefined
+          ? new Request(request.url, { method: request.method, headers: request.headers, body: bodyText })
+          : request;
+      const builtin = await serveBuiltin(replayed, origin);
+      if (builtin && builtin.status < 500) {
+        return builtin;
+      }
+    }
+    return enrichUpstreamFailure(upstreamResponse, baseUrl, origin);
   } catch {
     return jsonResponse(
       502,
       {
         error: "Upstream Trask HTTP origin is unreachable.",
-        detail: "Bundled reference fallback is disabled; fix Trask HTTP upstream or TRASK_RESEARCHWIZARD_BASE_URL.",
+        upstream: normalizeBackendBaseUrl(baseUrl),
+        hint: "Fix Trask HTTP upstream or TRASK_RESEARCHWIZARD_BASE_URL.",
       },
       origin,
     );
@@ -223,12 +279,21 @@ export default {
           return builtin;
         }
       }
+      const baseUrl = upstreamBaseUrl(env);
+      const upstreamApiKey = (env.TRASK_RESEARCHWIZARD_API_KEY ?? "").trim();
+      const upstreamProbe = hasRealUpstream(env)
+        ? await probeUpstreamHealth(baseUrl, upstreamApiKey)
+        : { reachable: false as const };
+      const upstreamHealthy = hasRealUpstream(env) ? upstreamProbe.reachable : false;
       return jsonResponse(
-        200,
+        upstreamHealthy ? 200 : 503,
         {
-          ok: true,
+          ok: upstreamHealthy,
           mode: hasRealUpstream(env) ? "proxy" : "builtin-public-api",
-          upstream: hasRealUpstream(env) ? normalizeBackendBaseUrl(upstreamBaseUrl(env)) : undefined,
+          upstream: hasRealUpstream(env) ? normalizeBackendBaseUrl(baseUrl) : undefined,
+          upstreamReachable: upstreamProbe.reachable,
+          upstreamStatus: upstreamProbe.status,
+          upstreamDetail: upstreamProbe.detail,
           builtinFallback: useBuiltinFallback(env),
         },
         origin,

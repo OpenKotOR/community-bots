@@ -105,22 +105,33 @@ The wizard will:
 - **App ID** and **Public Key** — "General Information" tab
 - **Bot Token** — "Bot" tab → "Reset Token" → confirm → copy
 
-### 4. Optionally add an LLM key for prose synthesis
+### 4. Add a hosted inference key for grounded compose
 
-Without an LLM key, Trask returns citation lists. Add one of these to `.env`:
+Without a hosted provider, Trask may return extractive cited fallback only. Primary path (see `docs/trask-research-backends.md`):
 
 ```env
-# Option A: OpenAI
+# Primary: Hugging Face (replacement-first stack)
+HF_TOKEN=hf_...
+
+# HA fallback (optional)
+TRASK_CLOUDFLARE_AI_BASE_URL=https://gateway.ai.cloudflare.com/...
+TRASK_CLOUDFLARE_AI_TOKEN=...
+```
+
+Legacy optional paths:
+
+```env
+# Option A: OpenAI (paid profile)
 OPENAI_API_KEY=sk-...
 
-# Option B: OpenRouter (free tier available)
+# Option B: OpenRouter (free/paid tier)
 OPENROUTER_API_KEY=sk-or-...
 OPENAI_BASE_URL=https://openrouter.ai/api/v1
 OPENROUTER_HTTP_REFERER=https://github.com/openkotor/community-bots
 OPENROUTER_APP_TITLE=OpenKotor Trask
 TRASK_REWRITE_MODEL_FALLBACKS=meta-llama/llama-3.2-3b-instruct:free,openrouter/auto
 
-# Option C: Tavily (improves search quality)
+# Option C: Tavily (improves search quality — legacy gather path only)
 TAVILY_API_KEY=tvly-...
 ```
 

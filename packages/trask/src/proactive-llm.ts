@@ -38,12 +38,23 @@ interface ClassificationJson {
   readonly confidence?: string | number | boolean | null;
 }
 
-const parseClassificationJson = (raw: string): TraskProactiveClassification | null => {
+const parseBooleanish = (value: string | number | boolean | null | undefined): boolean => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value !== "string") return false;
+
+  const normalized = value.trim().toLowerCase();
+  if (["true", "yes", "y", "1"].includes(normalized)) return true;
+  if (["false", "no", "n", "0", ""].includes(normalized)) return false;
+  return false;
+};
+
+export const parseTraskProactiveClassificationJson = (raw: string): TraskProactiveClassification | null => {
   try {
     const parsed = JSON.parse(raw) as ClassificationJson;
 
-    const isQuestion = Boolean(parsed.is_question);
-    const kotorRelevant = Boolean(parsed.kotor_relevant);
+    const isQuestion = parseBooleanish(parsed.is_question);
+    const kotorRelevant = parseBooleanish(parsed.kotor_relevant);
     const confidence = typeof parsed.confidence === "number" ? parsed.confidence : Number(parsed.confidence);
 
     if (!Number.isFinite(confidence)) {
@@ -93,7 +104,7 @@ export const classifyTraskProactiveMessage = async (
       return null;
     }
 
-    return parseClassificationJson(raw);
+    return parseTraskProactiveClassificationJson(raw);
   };
 
   try {
@@ -117,6 +128,48 @@ export interface ResearchAlignmentInput {
   readonly answerMarkdown: string;
   readonly researchReport: string;
 }
+
+const STOP_WORDS = new Set([
+  "about",
+  "after",
+  "could",
+  "does",
+  "from",
+  "handle",
+  "have",
+  "into",
+  "mods",
+  "should",
+  "that",
+  "their",
+  "there",
+  "these",
+  "this",
+  "what",
+  "when",
+  "where",
+  "which",
+  "with",
+  "would",
+]);
+
+const alignmentTerms = (question: string): string[] => {
+  const terms = question
+    .toLowerCase()
+    .match(/[a-z0-9][a-z0-9._-]{2,}/gu) ?? [];
+  return [...new Set(terms.filter((term) => term.length >= 4 && !STOP_WORDS.has(term)))].slice(0, 12);
+};
+
+export const scoreLexicalResearchAlignment = (input: ResearchAlignmentInput): number => {
+  const terms = alignmentTerms(input.question);
+  if (terms.length === 0) return 0;
+
+  const haystack = `${input.answerMarkdown}\n${input.researchReport}`.toLowerCase();
+  const matched = terms.filter((term) => haystack.includes(term));
+  if (matched.length < 2) return 0;
+
+  return matched.length / terms.length;
+};
 
 /** Embedding similarity between question/answer and the research report (max of the two cosines). */
 export const scoreResearchAlignment = async (
@@ -151,13 +204,32 @@ export const scoreResearchAlignment = async (
 };
 
 export const createOpenAiClient = (ai: SharedAiConfig): OpenAI | null => {
-  if (!ai.openAiApiKey) {
+  const provider = ai.aiProviders[0];
+  if (!provider) {
     return null;
   }
 
   return new OpenAI({
-    apiKey: ai.openAiApiKey,
-    ...(ai.openAiBaseUrl ? { baseURL: ai.openAiBaseUrl } : {}),
-    ...(ai.openAiDefaultHeaders ? { defaultHeaders: ai.openAiDefaultHeaders } : {}),
+    apiKey: provider.apiKey,
+    baseURL: provider.baseUrl,
+    ...(provider.defaultHeaders ? { defaultHeaders: provider.defaultHeaders } : {}),
   });
+};
+
+export const createEmbeddingClient = (ai: SharedAiConfig): { client: OpenAI; model: string } | null => {
+  const provider = ai.aiProviders.find(
+    (entry) => entry.supportsEmbeddings !== false && entry.embeddingModel.trim().length > 0,
+  );
+  if (!provider) {
+    return null;
+  }
+
+  return {
+    client: new OpenAI({
+      apiKey: provider.apiKey,
+      baseURL: provider.baseUrl,
+      ...(provider.defaultHeaders ? { defaultHeaders: provider.defaultHeaders } : {}),
+    }),
+    model: provider.embeddingModel,
+  };
 };

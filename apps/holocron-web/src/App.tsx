@@ -6,6 +6,7 @@ import { HolocronModelPicker } from '@/components/HolocronModelPicker'
 import { SourceWeightsDialog } from '@/components/SourceWeightsDialog'
 import { KeyboardShortcutsDialog } from '@/components/KeyboardShortcutsDialog'
 import { TopNav, type HolocronSessionUi } from '@/components/TopNav'
+import { TraskBackendStatus } from '@/components/TraskBackendStatus'
 import { HolocronGlyph } from '@/components/HolocronGlyph'
 import {
   HolocronSanctum,
@@ -44,12 +45,14 @@ import {
   traskListModels,
   traskLogout,
   traskPollIterationSignal,
+  traskErrorMessageFromUnknown,
   traskUsesSameOriginApi,
   type TraskHistoryLiveEventDto,
   type TraskHistoryRecordDto,
   type TraskSessionDto,
 } from '@/lib/trask-api'
 import { priorUserQuestionsFromOtherThreads } from '@/lib/starter-suggestions'
+import { holocronAssetUrl } from '@/lib/asset-url'
 
 const CONVERSATIONS_KEY = 'qa-conversations-v2'
 const LEGACY_CONVERSATIONS_KEY = 'qa-conversations'
@@ -58,6 +61,8 @@ const RESEARCH_RETRY_BASE_MS = 5_000
 const RESEARCH_RETRY_MAX_MS = 90_000
 /** ~2.5 min of missing thread rows before re-dispatching (research can run up to ~90s). */
 const RESEARCH_POLL_FAILURE_GIVE_UP = 48
+/** Stop silent retries and surface a failed assistant message when the API stays unreachable. */
+const RESEARCH_CONNECTION_FAILURE_MAX_ATTEMPTS = 8
 const SIDEBAR_WIDTH_MIN = 260
 const SIDEBAR_WIDTH_MAX = 520
 
@@ -691,6 +696,11 @@ function App() {
   const mobileSidebarRef = useRef<HTMLDivElement>(null)
   const mobileSidebarToggleButtonRef = useRef<HTMLButtonElement>(null)
   const lastFocusedElementRef = useRef<HTMLElement | null>(null)
+
+  useEffect(() => {
+    const artifactUrl = holocronAssetUrl('holocron/holocron-artifact.png')
+    document.documentElement.style.setProperty('--holocron-artifact-url', `url("${artifactUrl}")`)
+  }, [])
 
   const detachFromBottom = useCallback(() => {
     shouldStickToBottomRef.current = false
@@ -1538,7 +1548,31 @@ function App() {
       replaceResearchAssistantMessage(job, createFailedMessageFromTraskRecord(record, job.queryType))
       setResearchJobs((current) => normalizeResearchJobs(current).filter((candidate) => candidate.clientId !== job.clientId))
     },
-    [activeConversationId, replaceResearchAssistantMessage, setResearchJobs],
+    [replaceResearchAssistantMessage, setResearchJobs],
+  )
+
+  const failResearchJobFromConnectionError = useCallback(
+    (job: HolocronResearchJob, errorMessage: string) => {
+      const nowIso = new Date().toISOString()
+      const record: TraskHistoryRecordDto = {
+        queryId: job.serverQueryId ?? job.clientId,
+        threadId: job.threadId,
+        userId: 'holocron-web',
+        query: job.question,
+        status: 'failed',
+        answer: null,
+        sources: [],
+        error: errorMessage,
+        createdAt: new Date(job.createdAt).toISOString(),
+        completedAt: nowIso,
+        liveTrace: [
+          { at: nowIso, phase: 'error', detail: errorMessage },
+          { at: nowIso, phase: 'dispatch', detail: 'Could not reach the Holocron research API.' },
+        ],
+      }
+      failResearchJob(job, record)
+    },
+    [failResearchJob],
   )
 
   const completeResearchJob = useCallback(
@@ -1722,10 +1756,24 @@ function App() {
           pollFailures: 0,
           nextAttemptAt: Date.now() + 1_500,
         })
-      } catch {
-        if (!cancelled) {
-          retryLater(job)
+      } catch (err) {
+        if (cancelled || !isJobCurrent()) return
+        const errorMessage = traskErrorMessageFromUnknown(err)
+        if (job.attemptCount >= RESEARCH_CONNECTION_FAILURE_MAX_ATTEMPTS) {
+          failResearchJobFromConnectionError(job, errorMessage)
+          return
         }
+        replaceResearchAssistantMessage(job, createResearchLoadingMessage(
+          job.assistantMessageId,
+          job.question,
+          job.createdAt,
+          job.queryType,
+          [
+            localResearchStep('queued', 'Persisted locally; continuing in the background.'),
+            localResearchStep('retry', errorMessage),
+          ],
+        ))
+        retryLater(job)
       } finally {
         researchWorkersRef.current.delete(job.clientId)
         researchConversationWorkersRef.current.delete(job.conversationId)
@@ -1762,6 +1810,7 @@ function App() {
     activeConversationId,
     completeResearchJob,
     failResearchJob,
+    failResearchJobFromConnectionError,
     replaceResearchAssistantMessage,
     researchJobs,
     setResearchJobs,
@@ -2010,6 +2059,7 @@ function App() {
   return (
     <div className="h-dvh flex flex-col bg-background relative overflow-x-hidden overflow-y-hidden">
       <TopNav holocronSession={holocronSession} onHolocronLogout={handleHolocronLogout} />
+      <TraskBackendStatus />
 
       <div className="flex-1 flex min-h-0 pt-14 relative">
         <div className="holocron-atmosphere pointer-events-none overflow-visible" aria-hidden>

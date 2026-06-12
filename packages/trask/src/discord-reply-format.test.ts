@@ -56,6 +56,27 @@ test("formatDiscordAskDisplay strips Sources block from display", () => {
   assert.doesNotMatch(display, /^\s*Sources\b/im);
 });
 
+test("formatDiscordAskDisplay cleans proactive TSLPatcher dump shape", () => {
+  const raw = `TSLPatcher on GitHub The TSLPatcher project documents how mod authors ship list-driven 2DA, GFF, and TLK changes for KotOR and TSL installs. [1]
+TSLPatcher is a mod installation tool for Knights of the Old Republic and The Sith Lords. It applies 2DA, GFF, and TLK patches from list files so players do not copy files by hand. [2]
+For Mod Developers HoloPatcher README for Mod Developers [TSLPatcher's Official Readme](https://github.com/NickHugi/PyKotor/wiki/TSLPatcher's-Official-Readme) [3]
+
+Sources
+1. github.com - https://github.com/th3w1zard1/TSLPatcher/blob/85c4d0416fb5b38fea7caf046212789f4e93dd68/README.md#L1
+2. Deadly Stream - https://deadlystream.com/files/file/1982-tslpatcher/
+3. github.com - https://github.com/NickHu`;
+
+  const display = formatDiscordAskDisplay(raw, approvedSources, {
+    maxLines: 2,
+    query: "Can TSLPatcher patch GFF and TLK files for KOTOR mods?",
+  });
+
+  const links = [...display.matchAll(/\]\((https:\/\/[^)]+)\)/g)];
+  assert.equal(links.length, 2, display);
+  assert.doesNotMatch(display, /Sources:/i);
+  assert.doesNotMatch(display, /HoloPatcher|NickHu|PyKotor/i);
+});
+
 test("ensureMinimumDistinctCitedLines backfills second distinct citation", () => {
   const line1 =
     "TSLPatcher applies 2DA and TLK patches from list files for KotOR mod installs. [1]";

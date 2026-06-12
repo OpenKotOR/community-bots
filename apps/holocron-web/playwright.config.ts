@@ -8,7 +8,7 @@ const repoRoot = path.resolve(appDir, '..', '..')
 /** Functional e2e: real trask-http-server + Holocron dist (no /api/trask mocks).
  * testMatch: holocron-research.spec.ts (5 canonical expert queries + reload test).
  * Restored in LFG pass 2 (plan 118) via git resurrection from pre-c47c52f; tolerance echo removed from root package.json.
- * Failure spec (holocron-research-failure.spec.ts) remains for negative paths but is not matched by current testMatch.
+ * Failure spec: playwright.failure.config.ts (`pnpm holocron:e2e:playwright:failure`).
  */
 export default defineConfig({
   testDir: path.resolve(appDir, 'e2e'),

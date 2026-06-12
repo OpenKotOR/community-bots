@@ -121,7 +121,10 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@': resolve(projectRoot, 'src')
+      '@': resolve(projectRoot, 'src'),
+      ...(enableSparkPlugin
+        ? {}
+        : { '@github/spark/spark': resolve(projectRoot, 'src/spark-stub.ts') }),
     }
   },
 });

@@ -1,6 +1,6 @@
 # Discord /ask live verify
 
-Generated: 2026-06-03T18:40:01.835Z
+Generated: 2026-06-11T14:42:21.541Z
 
 Queries: 5 (expert verification set; URL reachability enforced)
 Passed: 5/5
@@ -59,19 +59,3 @@ reone wiki reone exposes Odyssey runtime and scripting capabilities so researche
 ```
 
 Footer: `11 passages · indexer 8787`
-
----
-
-## Holocron browser MCP (expert queries, 2026-06-03)
-
-Origin: `http://127.0.0.1:4010` with fresh `?thread=<uuid>` per query; suggestion buttons when Submit stayed disabled on cold threads.
-
-| Query | Thread suffix | Result |
-|-------|---------------|--------|
-| TSLPatcher / 2DA+TLK | `...701` | PASS — grounded, ≥2 https cites |
-| MDLOps / Blender workflow | `...702` | PASS |
-| Widescreen / ini settings | `...003` | PASS |
-| KOTOR save location (Windows) | `...004` | PASS — Deadly Stream + Steam |
-| reone Odyssey runtime/scripting | `...005` | PASS — seedhartha/reone + wiki |
-
-Playwright local (same session): `HOLOCRON_REUSE_SERVER=1 pnpm holocron:e2e:playwright` — 6/6.

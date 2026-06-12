@@ -5,14 +5,15 @@ Holocron’s UI lives in **`apps/holocron-web`**. It talks to **`apps/trask-http
 **Product policy:** `docs/brainstorms/trask-self-hosted-research-pipeline-requirements.md`  
 **Operational cheat sheet:** `docs/solutions/tooling-decisions/trask-crawl4ai-research-cutover-2026-05-19.md`
 
-## Default stack (index-first RAG)
+## Default stack (replacement-ready evidence-pack RAG)
 
 | Layer | Implementation |
 |--------|----------------|
-| **Index** | Crawl4AI + FastEmbed + Chroma (`infra/trask-indexer`, `bash scripts/bootstrap_trask_indexer.sh`) |
-| **Retrieve API** | Cloudflare Worker `POST /retrieve` (`infra/trask-retrieve-worker`, local **:8787**) — clients must not hit raw Chroma |
-| **Gather** | `scripts/trask_web_research.py` — Worker retrieve → optional local Chroma → bounded live crawl on weak hit → DDG only if `TRASK_WEB_RESEARCH_DDG_FALLBACK=1` |
-| **Compose** | `@openkotor/trask` `ResearchWizardClient` — grounded passages → sufficiency gate → OpenRouter `:free` + `vendor/llm_fallbacks` |
+| **Corpus** | Scheduled approved web crawl plus DiscordChatExporter archives (`data/trask/discord-export-targets.json` → per-target `output_dir`) normalized into evidence records |
+| **Index** | Current local implementation: FastEmbed + Chroma (`infra/trask-indexer`); replaceable behind the evidence-pack boundary |
+| **Retrieve API** | Cloudflare Worker `POST /retrieve` (`infra/trask-retrieve-worker`, local **:8787**) returns `passages` plus `evidencePack` metadata |
+| **Gather** | `scripts/trask_web_research.py` — Worker retrieve → optional local Chroma → bounded live crawl only when explicitly enabled |
+| **Compose** | `@openkotor/trask` `ResearchWizardClient` — citation gate → Hugging Face provider → Cloudflare provider → deterministic extractive fallback |
 
 ### Bootstrap
 
@@ -37,20 +38,23 @@ Fedora/RHEL hosts need `libxml2-devel` and `libxslt-devel` before the first boot
 | `TRASK_RESEARCH_COMPOSE_MODE` | `grounded` (default in live stack) |
 | `TRASK_RESEARCH_GATHER_MS` / `TRASK_RESEARCH_COMPOSE_MS` | Clamped to `TRASK_RESEARCH_BUDGET_MS` (REQ-C); legacy `TRASK_RESEARCHWIZARD_TIMEOUT_MS` still honored |
 | `TRASK_RESEARCH_BUDGET_MS` | `30000` (REQ-C) — soft end-to-end research budget |
-| `OPENROUTER_API_KEY` | Free-tier compose via OpenRouter (`openrouter/free` default) |
-| `TRASK_LLM_PROFILE` | `free` (default) or `paid` — `@openkotor/config` |
-| `TRASK_REWRITE_MODEL_FALLBACKS` | Override; else **curated quality-first** `:free` models from `@openkotor/config` `CURATED_OPENROUTER_FREE_PRIORITY`, then `vendor/llm_fallbacks/configs/free_models_ids.txt`, then `openrouter/auto` |
-| `LITELLM_PROXY_URL` | Optional LiteLLM proxy (`bash scripts/trask_litellm_proxy.sh`) |
+| `HF_TOKEN` / `HUGGINGFACE_TOKEN` | Primary Trask hosted inference provider |
+| `TRASK_HF_CHAT_MODEL`, `TRASK_HF_EMBEDDING_MODEL`, `TRASK_HF_INFERENCE_BASE_URL` | Hugging Face overrides; default chat target is Qwen3-class, embedding target is BGE-M3 |
+| `TRASK_CLOUDFLARE_AI_BASE_URL`, `TRASK_CLOUDFLARE_AI_TOKEN` | Cloudflare AI Gateway / Worker fallback provider |
+| `TRASK_REWRITE_MODEL_FALLBACKS` | Optional model fallback list attached to the primary Hugging Face provider |
+| `OPENAI_API_KEY` / `OPENROUTER_API_KEY` | Legacy escape hatches only; not required for primary Trask validation |
 | `TRASK_QA_GROUNDING` | `1` only for QA seed — allows 1-URL sufficiency escape (not production default) |
 
 See **`docs/knowledgebase/50-execution/trask-configuration-env-map.md`** for the full table.
 
-### LiteLLM proxy (free → paid fallbacks)
-
-Minimal sample: **`infra/trask-litellm/litellm_config.yaml`**. Full `:free` catalog:
+### Agent-native ops
 
 ```bash
-TRASK_LITELLM_CONFIG=vendor/llm_fallbacks/configs/litellm_config_free.yaml bash scripts/trask_litellm_proxy.sh
+node scripts/trask_ops.mjs capabilities
+node scripts/trask_ops.mjs sources
+node scripts/trask_ops.mjs provider-health
+node scripts/trask_ops.mjs evidence "What is TSLPatcher used for?"
+node scripts/trask_ops.mjs purge-discord-message --channel-id <id> --message-id <id> # dry-run by default
 ```
 
 ### Verification ladder
@@ -74,7 +78,7 @@ CI runs `pnpm build`, **`pnpm trask:gate:ci`**, indexer+Worker bootstrap, **`pnp
 | Node-native **llm-scraper** | Not product path |
 | **browser-use** integration | Not product path |
 | Firecrawl as Holocron/Discord answer pipeline | Ingest-worker only |
-| Local Ollama as default compose | OpenRouter free + `llm_fallbacks` instead |
+| Local Ollama as default compose | HF/Cloudflare hosted path plus deterministic fallback instead |
 | GPT-Researcher / vendored research-wizard as default | Removed |
 
 ## Other references (not default)

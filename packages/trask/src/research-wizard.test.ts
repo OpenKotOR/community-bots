@@ -28,6 +28,7 @@ import {
   _isGatherTimeoutResearchError,
   _isComposeTimeoutResearchError,
   _timeoutDiagForResearchError,
+  isCitableCitationUrl,
   createResearchWizardClient,
   ResearchWizardClient,
 } from "./research-wizard.js";
@@ -69,6 +70,32 @@ test("_extractUrls strips trailing punctuation from URLs", () => {
 test("_extractUrls deduplicates URLs", () => {
   const urls = _extractUrls("https://example.com and https://example.com again");
   assert.equal(urls.filter((u) => u === "https://example.com").length, 1);
+});
+
+test("isCitableCitationUrl authorizes Discord jump links by destination guild and channel", () => {
+  const url = "https://discord.com/channels/123/456/789";
+  assert.equal(
+    isCitableCitationUrl(url, "discord", {
+      destinationGuildId: "123",
+      destinationChannelId: "456",
+    }),
+    true,
+  );
+  assert.equal(
+    isCitableCitationUrl(url, "discord", {
+      destinationGuildId: "123",
+      destinationChannelId: "999",
+    }),
+    false,
+  );
+  assert.equal(isCitableCitationUrl(url, "discord"), false);
+  assert.equal(
+    isCitableCitationUrl(url, "holocron", {
+      destinationGuildId: "123",
+      destinationChannelId: "456",
+    }),
+    false,
+  );
 });
 
 test("_extractUrls returns empty array when no URLs are present", () => {

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawn, execSync } from "node:child_process";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -50,6 +50,48 @@ const isPortOpen = (port, host = "127.0.0.1") =>
   });
 
 const command = process.argv[2] ?? "help";
+const dataDir = resolve(repoRoot, process.env.TRASK_INDEXER_DATA_DIR ?? "data/trask-indexer");
+const discordTargetsConfig = process.env.TRASK_DISCORD_EXPORT_TARGETS_CONFIG ?? resolve(repoRoot, "data/trask/discord-export-targets.json");
+
+const outputJson = (payload) => {
+  console.log(JSON.stringify(payload, null, 2));
+};
+
+const readJsonIfExists = (path) => {
+  if (!existsSync(path)) return null;
+  return JSON.parse(readFileSync(path, "utf8"));
+};
+
+const listDiscordTargets = () => {
+  const payload = readJsonIfExists(discordTargetsConfig);
+  const targets = Array.isArray(payload?.targets) ? payload.targets : [];
+  return targets.map((target) => ({
+    name: String(target.name ?? ""),
+    enabled: target.enabled !== false,
+    outputDir: String(target.output_dir ?? ""),
+    disabledReason: String(target.disabled_reason ?? ""),
+    guildIds: Array.isArray(target.guild_ids) ? target.guild_ids.map(String) : [],
+    channelIds: Array.isArray(target.channel_ids) ? target.channel_ids.map(String) : [],
+  })).filter((target) => target.name);
+};
+
+const retrieveBaseUrl = () => (process.env.TRASK_INDEXER_BASE_URL ?? "http://127.0.0.1:8787").replace(/\/+$/u, "");
+
+const postJson = async (url, payload, headers = {}) => {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...headers },
+    body: JSON.stringify(payload),
+  });
+  const text = await response.text();
+  let parsed;
+  try {
+    parsed = text ? JSON.parse(text) : {};
+  } catch {
+    parsed = { text };
+  }
+  return { ok: response.ok, status: response.status, body: parsed };
+};
 
 const help = () => {
   console.log(`Trask / community-bots ops helper
@@ -63,6 +105,12 @@ Usage:
   node scripts/trask_ops.mjs verify-cli     # CLI Trask Q&A smoke (5 queries)
   node scripts/trask_ops.mjs verify-web     # Playwright browser test: 5 KOTOR queries (optional)
   node scripts/trask_ops.mjs smoke-discord  # verify Discord bot slash command registration
+  node scripts/trask_ops.mjs capabilities   # JSON list of agent-readable Trask actions
+  node scripts/trask_ops.mjs sources        # JSON source/freshness snapshot
+  node scripts/trask_ops.mjs provider-health # JSON provider configuration health
+  node scripts/trask_ops.mjs evidence "q"   # JSON evidence pack from /retrieve
+  node scripts/trask_ops.mjs refresh-dry-run # JSON dry-run refresh request/status
+  node scripts/trask_ops.mjs purge-discord-message --channel-id C --message-id M [--guild-id G] [--execute]
 
 Quick start:
   1. cp .env.local.example .env  && fill in TRASK/HK/PAZAAK Discord tokens
@@ -78,7 +126,7 @@ Quick start:
 Notes:
   - Falls back to npx pnpm@${pnpmVersion} when pnpm is not on PATH.
   - Run setup-venv and set TRASK_WEB_RESEARCH_PYTHON / TRASK_INDEXER_BASE_URL for live research.
-  - Without an LLM API key (OPENAI_API_KEY or OPENROUTER_API_KEY) results are citation-only.
+  - Trask inference is HF_TOKEN first, Cloudflare second; without hosted providers it returns deterministic cited fallback where possible.
 `);
 };
 
@@ -137,6 +185,136 @@ try {
     }
     case "smoke-discord": {
       await run("node", ["scripts/discord_bots_smoke.mjs", ...process.argv.slice(3)]);
+      break;
+    }
+    case "capabilities": {
+      outputJson({
+        ok: true,
+        workspace: repoRoot,
+        actions: [
+          { id: "sources", mutates: false, description: "List approved web and Discord archive sources plus freshness status." },
+          { id: "provider-health", mutates: false, description: "Inspect configured Hugging Face, Cloudflare, and legacy provider readiness." },
+          { id: "evidence", mutates: false, description: "POST a query to /retrieve and return the evidence pack." },
+          { id: "refresh-dry-run", mutates: false, description: "Send a dry-run /reindex request when a tokened indexer endpoint is configured." },
+          { id: "purge-discord-message", mutates: true, dryRunDefault: true, description: "Purge indexed evidence rows covering a Discord message id." },
+          { id: "smoke-discord", mutates: false, description: "Run Discord command registration smoke." },
+        ],
+        safetyLimits: {
+          destructiveActionsDefaultToDryRun: true,
+          purgeRequiresExplicitCommand: true,
+          discordPrivateChannelsIndexedByDefault: false,
+        },
+        requiredCredentials: {
+          huggingFace: "HF_TOKEN or HUGGINGFACE_TOKEN",
+          cloudflareFallback: "TRASK_CLOUDFLARE_AI_BASE_URL plus TRASK_CLOUDFLARE_AI_TOKEN or Cloudflare AI Gateway env",
+          reindex: "TRASK_REINDEX_TOKEN and TRASK_INDEXER_BASE_URL",
+        },
+      });
+      break;
+    }
+    case "sources": {
+      const allowlist = readJsonIfExists(resolve(dataDir, "allowlist.json"));
+      const discordStatus = readJsonIfExists(resolve(dataDir, "discord_sync_status.json"));
+      outputJson({
+        ok: true,
+        dataDir,
+        allowlist: {
+          sources: Array.isArray(allowlist?.sources) ? allowlist.sources : [],
+          baseHosts: Array.isArray(allowlist?.baseHosts) ? allowlist.baseHosts : [],
+          urlPrefixes: Array.isArray(allowlist?.urlPrefixes) ? allowlist.urlPrefixes : [],
+        },
+        discord: {
+          targetsConfig: discordTargetsConfig,
+          targets: listDiscordTargets(),
+          syncStatus: discordStatus,
+        },
+      });
+      break;
+    }
+    case "provider-health": {
+      const hf = Boolean(process.env.HF_TOKEN || process.env.HUGGINGFACE_TOKEN);
+      const cf = Boolean(
+        (process.env.TRASK_CLOUDFLARE_AI_BASE_URL || process.env.CLOUDFLARE_AI_GATEWAY_BASE_URL)
+        && (process.env.TRASK_CLOUDFLARE_AI_TOKEN || process.env.CLOUDFLARE_AI_GATEWAY_TOKEN || process.env.CLOUDFLARE_API_TOKEN),
+      );
+      const haReady = hf && cf;
+      outputJson({
+        ok: true,
+        haReady,
+        providerOrder: ["huggingface", "cloudflare", "deterministic-extractive"],
+        providers: [
+          { id: "huggingface", configured: hf, model: process.env.TRASK_HF_CHAT_MODEL ?? process.env.HF_CHAT_MODEL ?? "Qwen/Qwen3-4B-Instruct-2507:fastest" },
+          { id: "cloudflare", configured: cf, model: process.env.TRASK_CLOUDFLARE_CHAT_MODEL ?? process.env.CLOUDFLARE_WORKERS_AI_MODEL ?? "@cf/meta/llama-3.1-8b-instruct-fast" },
+          { id: "deterministic-extractive", configured: true, model: "local-template" },
+        ],
+        warnings: [
+          ...(hf ? [] : ["Hugging Face is not configured; hosted primary synthesis is unavailable."]),
+          ...(cf ? [] : ["Cloudflare AI is not configured; hosted HA fallback is unavailable."]),
+        ],
+        legacyOpenAiKeysIgnoredForPrimaryTraskPath: Boolean(process.env.OPENAI_API_KEY || process.env.OPENROUTER_API_KEY),
+      });
+      break;
+    }
+    case "evidence": {
+      const query = process.argv.slice(3).join(" ").trim();
+      if (!query) throw new Error("Usage: node scripts/trask_ops.mjs evidence \"question\"");
+      const result = await postJson(`${retrieveBaseUrl()}/retrieve`, {
+        query,
+        limit: Number.parseInt(process.env.TRASK_OPS_EVIDENCE_LIMIT ?? "8", 10),
+      });
+      outputJson({
+        ok: result.ok,
+        status: result.status,
+        retrieveBaseUrl: retrieveBaseUrl(),
+        ...result.body,
+      });
+      if (!result.ok) process.exitCode = 1;
+      break;
+    }
+    case "refresh-dry-run": {
+      const token = process.env.TRASK_REINDEX_TOKEN ?? "";
+      if (!token) {
+        outputJson({
+          ok: false,
+          dryRun: true,
+          skippedReason: "TRASK_REINDEX_TOKEN is not set; dry-run request not sent",
+          request: { url: `${retrieveBaseUrl()}/reindex`, body: { dryRun: true, limit: 5 } },
+        });
+        process.exitCode = 1;
+        break;
+      }
+      const result = await postJson(
+        `${retrieveBaseUrl()}/reindex`,
+        { dryRun: true, limit: Number.parseInt(process.env.TRASK_REINDEX_DRY_RUN_LIMIT ?? "5", 10) },
+        { authorization: `Bearer ${token}` },
+      );
+      outputJson({ ok: result.ok, status: result.status, dryRun: true, ...result.body });
+      if (!result.ok) process.exitCode = 1;
+      break;
+    }
+    case "purge-discord-message": {
+      const args = process.argv.slice(3);
+      const readFlag = (flag) => {
+        const index = args.indexOf(flag);
+        return index >= 0 ? args[index + 1] : undefined;
+      };
+      const channelId = readFlag("--channel-id");
+      const messageId = readFlag("--message-id");
+      const guildId = readFlag("--guild-id");
+      const execute = args.includes("--execute");
+      if (!channelId || !messageId) {
+        throw new Error("Usage: node scripts/trask_ops.mjs purge-discord-message --channel-id C --message-id M [--guild-id G] [--execute]");
+      }
+      const purgeArgs = [
+        "scripts/trask_purge_discord_message.py",
+        "--channel-id",
+        channelId,
+        "--message-id",
+        messageId,
+        ...(guildId ? ["--guild-id", guildId] : []),
+        ...(execute ? [] : ["--dry-run"]),
+      ];
+      await run("python", purgeArgs);
       break;
     }
     case "help":

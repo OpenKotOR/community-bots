@@ -24,42 +24,91 @@ const discordEnv = (prefix: string) => ({
 });
 
 // ---------------------------------------------------------------------------
-// loadSharedAiConfig — key resolution and fallback
+// loadSharedAiConfig — Trask provider chain and fallback
 // ---------------------------------------------------------------------------
 
-test("loadSharedAiConfig reads OPENAI_API_KEY", () => {
-  const cfg = loadSharedAiConfig({ OPENAI_API_KEY: "sk-test-openai" });
-  assert.equal(cfg.openAiApiKey, "sk-test-openai");
+test("loadSharedAiConfig uses Hugging Face as the primary Trask provider", () => {
+  const cfg = loadSharedAiConfig({ HF_TOKEN: "hf-test" });
+  assert.equal(cfg.openAiApiKey, "hf-test");
+  assert.equal(cfg.openAiBaseUrl, "https://router.huggingface.co/v1");
+  assert.equal(cfg.chatModel, "Qwen/Qwen3-4B-Instruct-2507:fastest");
+  assert.equal(cfg.embeddingModel, "BAAI/bge-m3");
+  assert.equal(cfg.aiProviders[0]?.id, "huggingface");
 });
 
-test("loadSharedAiConfig falls back to OPENROUTER_API_KEY when OPENAI_API_KEY is absent", () => {
-  const cfg = loadSharedAiConfig({ OPENROUTER_API_KEY: "sk-or-test" });
-  assert.equal(cfg.openAiApiKey, "sk-or-test");
+test("loadSharedAiConfig can put Cloudflare after Hugging Face for HA", () => {
+  const cfg = loadSharedAiConfig({
+    HF_TOKEN: "hf-test",
+    CLOUDFLARE_AI_GATEWAY_BASE_URL: "https://gateway.ai.cloudflare.com/v1/account/gateway",
+    CLOUDFLARE_AI_GATEWAY_TOKEN: "cf-test",
+  });
+  assert.deepEqual(cfg.aiProviders.map((provider) => provider.id), ["huggingface", "cloudflare"]);
+  assert.equal(cfg.aiProviders[1]?.baseUrl, "https://gateway.ai.cloudflare.com/v1/account/gateway/v1");
 });
 
-test("loadSharedAiConfig OPENAI_API_KEY takes precedence over OPENROUTER_API_KEY", () => {
-  const cfg = loadSharedAiConfig({ OPENAI_API_KEY: "openai-key", OPENROUTER_API_KEY: "or-key" });
-  assert.equal(cfg.openAiApiKey, "openai-key");
+test("loadSharedAiConfig marks Cloudflare-only deployments as chat-only unless an embedding model is configured", () => {
+  const cfg = loadSharedAiConfig({
+    CLOUDFLARE_AI_GATEWAY_BASE_URL: "https://gateway.ai.cloudflare.com/v1/account/gateway",
+    CLOUDFLARE_AI_GATEWAY_TOKEN: "cf-test",
+  });
+  assert.deepEqual(cfg.aiProviders.map((provider) => provider.id), ["cloudflare"]);
+  assert.equal(cfg.aiProviders[0]?.supportsEmbeddings, false);
+  assert.equal(cfg.chatModel, cfg.aiProviders[0]?.chatModel);
 });
 
-test("loadSharedAiConfig sets openAiApiKey to undefined when neither key is present", () => {
+test("loadSharedAiConfig resolves embeddingModel from the first embedding-capable provider", () => {
+  const cfg = loadSharedAiConfig({
+    HF_TOKEN: "hf-test",
+    CLOUDFLARE_AI_GATEWAY_BASE_URL: "https://gateway.ai.cloudflare.com/v1/account/gateway",
+    CLOUDFLARE_AI_GATEWAY_TOKEN: "cf-test",
+  });
+  assert.equal(cfg.embeddingModel, "BAAI/bge-m3");
+  assert.equal(cfg.aiProviders[0]?.id, "huggingface");
+});
+
+test("loadSharedAiConfig does not require OPENAI_API_KEY or OPENROUTER_API_KEY", () => {
   const cfg = loadSharedAiConfig({});
   assert.equal(cfg.openAiApiKey, undefined);
+  assert.equal(cfg.openAiBaseUrl, undefined);
+  assert.equal(cfg.chatModel, "trask-extractive-fallback");
+  assert.deepEqual(cfg.aiProviders, []);
 });
 
-test("loadSharedAiConfig uses default chat model when OPENAI_CHAT_MODEL is absent", () => {
-  const cfg = loadSharedAiConfig({});
-  assert.ok(cfg.chatModel.length > 0, "chatModel should have a non-empty default");
+test("loadSharedAiConfig uses explicit Hugging Face model overrides", () => {
+  const cfg = loadSharedAiConfig({
+    HF_TOKEN: "hf-test",
+    TRASK_HF_CHAT_MODEL: "Qwen/Qwen3-8B:fastest",
+    TRASK_HF_EMBEDDING_MODEL: "BAAI/bge-m3",
+  });
+  assert.equal(cfg.chatModel, "Qwen/Qwen3-8B:fastest");
+  assert.equal(cfg.embeddingModel, "BAAI/bge-m3");
 });
 
-test("loadSharedAiConfig respects OPENAI_CHAT_MODEL override", () => {
-  const cfg = loadSharedAiConfig({ OPENAI_CHAT_MODEL: "gpt-4o" });
-  assert.equal(cfg.chatModel, "gpt-4o");
-});
-
-test("loadSharedAiConfig parses TRASK_REWRITE_MODEL_FALLBACKS as comma list", () => {
-  const cfg = loadSharedAiConfig({ TRASK_REWRITE_MODEL_FALLBACKS: "model-a,model-b, model-c" });
+test("loadSharedAiConfig lets explicit model fallbacks attach to the primary Hugging Face provider", () => {
+  const cfg = loadSharedAiConfig({
+    HF_TOKEN: "hf-test",
+    TRASK_REWRITE_MODEL_FALLBACKS: "model-a,model-b, model-c",
+  });
   assert.deepEqual([...cfg.chatModelFallbacks], ["model-a", "model-b", "model-c"]);
+  assert.deepEqual([...cfg.aiProviders[0]!.chatModelFallbacks], ["model-a", "model-b", "model-c"]);
+});
+
+test("loadSharedAiConfig keeps OpenRouter as a legacy escape hatch only when no HF or Cloudflare provider is configured", () => {
+  const cfg = loadSharedAiConfig({ OPENROUTER_API_KEY: "sk-or-test" });
+  assert.equal(cfg.aiProviders[0]?.id, "openrouter");
+  assert.equal(cfg.openAiBaseUrl, "https://openrouter.ai/api/v1");
+  assert.equal(cfg.chatModel, "openrouter/free");
+  assert.ok(cfg.chatModelFallbacks.includes("openrouter/auto"));
+});
+
+test("loadSharedAiConfig prefers Hugging Face over legacy OpenAI/OpenRouter credentials", () => {
+  const cfg = loadSharedAiConfig({
+    HF_TOKEN: "hf-test",
+    OPENAI_API_KEY: "openai-key",
+    OPENROUTER_API_KEY: "or-key",
+  });
+  assert.equal(cfg.aiProviders[0]?.id, "huggingface");
+  assert.equal(cfg.openAiApiKey, "hf-test");
 });
 
 test("loadSharedAiConfig returns empty fallbacks when TRASK_REWRITE_MODEL_FALLBACKS is unset", () => {
@@ -69,6 +118,7 @@ test("loadSharedAiConfig returns empty fallbacks when TRASK_REWRITE_MODEL_FALLBA
 
 test("loadSharedAiConfig injects OPENROUTER headers when present", () => {
   const cfg = loadSharedAiConfig({
+    OPENROUTER_API_KEY: "sk-or-test",
     OPENROUTER_HTTP_REFERER: "https://myapp.example",
     OPENROUTER_APP_TITLE: "MyApp",
   });
@@ -80,13 +130,6 @@ test("loadSharedAiConfig injects OPENROUTER headers when present", () => {
 test("loadSharedAiConfig returns undefined headers when no OpenRouter vars are set", () => {
   const cfg = loadSharedAiConfig({});
   assert.equal(cfg.openAiDefaultHeaders, undefined);
-});
-
-test("loadSharedAiConfig free profile uses OpenRouter free model when only OPENROUTER_API_KEY is set", () => {
-  const cfg = loadSharedAiConfig({ OPENROUTER_API_KEY: "sk-or-test" });
-  assert.equal(cfg.openAiBaseUrl, "https://openrouter.ai/api/v1");
-  assert.equal(cfg.chatModel, "openrouter/free");
-  assert.ok(cfg.chatModelFallbacks.includes("openrouter/auto"));
 });
 
 test("loadSharedAiConfig free profile lists quality-first fallbacks before vendor scan order", () => {
@@ -102,15 +145,17 @@ test("loadSharedAiConfig wires LiteLLM proxy URL and placeholder key", () => {
   assert.equal(cfg.openAiBaseUrl, "http://127.0.0.1:4000/v1");
   assert.equal(cfg.openAiApiKey, "sk-local");
   assert.equal(cfg.chatModel, "trask-research");
+  assert.equal(cfg.aiProviders[0]?.id, "proxy");
 });
 
-test("loadSharedAiConfig prefers explicit OPENAI_BASE_URL over proxy URL", () => {
+test("loadSharedAiConfig treats proxy as legacy when no HF or Cloudflare provider is configured", () => {
   const cfg = loadSharedAiConfig({
     LITELLM_PROXY_URL: "http://127.0.0.1:4000",
     OPENAI_BASE_URL: "https://openrouter.ai/api/v1",
     OPENROUTER_API_KEY: "sk-or-test",
   });
-  assert.equal(cfg.openAiBaseUrl, "https://openrouter.ai/api/v1");
+  assert.equal(cfg.aiProviders[0]?.id, "proxy");
+  assert.equal(cfg.openAiBaseUrl, "http://127.0.0.1:4000/v1");
 });
 
 test("loadSharedAiConfig paid profile uses LiteLLM paid alias when proxy is set", () => {

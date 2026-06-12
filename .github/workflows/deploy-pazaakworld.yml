@@ -97,6 +97,12 @@ jobs:
             exit 1
           fi
 
+      - name: Verify Trask public API health (worker + upstream)
+        if: hashFiles('apps/holocron-web/package.json') != ''
+        env:
+          TRASK_API_BASE: ${{ vars.TRASK_API_BASE }}
+        run: bash scripts/check_trask_public_api.sh
+
       - name: Build Holocron web (Trask Q&A SPA)
         if: hashFiles('apps/holocron-web/package.json') != ''
         env:

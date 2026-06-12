@@ -1,0 +1,15 @@
+{
+  "defaults": {
+    "refresh_interval_seconds": 3600
+  },
+  "targets": [
+    {
+      "name": "example-guild",
+      "enabled": false,
+      "disabled_reason": "Set enabled true and point output_dir at your DiscordChatExporter archive",
+      "output_dir": "data/trask-discord-export/example-guild",
+      "guild_ids": [],
+      "channel_ids": []
+    }
+  ]
+}

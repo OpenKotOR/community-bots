@@ -5,6 +5,7 @@ import logging
 import os
 import threading
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import BackgroundTasks, FastAPI, Header, HTTPException
@@ -55,10 +56,31 @@ class PassageDto(BaseModel):
     guildId: str = ""
     channelId: str = ""
     firstMessageId: str = ""
+    lastMessageId: str = ""
+    sourceType: str = "web"
+    sourceTarget: str = ""
+    indexedAt: str = ""
+    sourceFreshnessAt: str = ""
+    discordJumpUrl: str = ""
+    contentHash: str = ""
+    deleted: bool = False
+    authorizationHint: str = "public-web"
+
+
+class EvidencePackDto(BaseModel):
+    query: str
+    backend: str = "chroma-hybrid-rrf"
+    retrievalMode: str = "dense+lexical-rrf"
+    retrievedAt: str
+    passagesCount: int
+    citationReadyCount: int
+    rerankStatus: str = "not_configured"
+    exclusionNotes: list[str] = []
 
 
 class RetrieveResponse(BaseModel):
     passages: list[PassageDto]
+    evidencePack: EvidencePackDto
 
 
 class ReindexRequest(BaseModel):
@@ -141,8 +163,7 @@ def create_app() -> FastAPI:
             )
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(status_code=503, detail=str(exc)) from exc
-        return RetrieveResponse(
-            passages=[
+        passages=[
                 PassageDto(
                     id=h.id,
                     url=h.url,
@@ -153,9 +174,30 @@ def create_app() -> FastAPI:
                     guildId=h.guild_id,
                     channelId=h.channel_id,
                     firstMessageId=h.first_message_id,
+                    lastMessageId=h.last_message_id,
+                    sourceType=h.source_type,
+                    sourceTarget=h.source_target,
+                    indexedAt=h.indexed_at,
+                    sourceFreshnessAt=h.source_freshness_at,
+                    discordJumpUrl=h.discord_jump_url,
+                    contentHash=h.content_hash,
+                    deleted=h.deleted,
+                    authorizationHint="discord-destination-check-required" if h.source_type == "discord" else "public-web",
                 )
                 for h in hits
             ]
+        exclusion_notes: list[str] = []
+        if len(passages) < body.limit:
+            exclusion_notes.append("retrieve returned fewer passages than requested; corpus may be thin or filtered")
+        return RetrieveResponse(
+            passages=passages,
+            evidencePack=EvidencePackDto(
+                query=body.query,
+                retrievedAt=datetime.now(timezone.utc).isoformat(),
+                passagesCount=len(passages),
+                citationReadyCount=sum(1 for passage in passages if passage.url.startswith("http") or passage.discordJumpUrl.startswith("https://discord.com/channels/")),
+                exclusionNotes=exclusion_notes,
+            ),
         )
 
     return app

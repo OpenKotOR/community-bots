@@ -245,7 +245,11 @@ const handleAskCommand = async (interaction: ChatInputCommandInteraction): Promi
       queryPreview: query.slice(0, 120),
     });
 
-    const answerPromise = researchWizard.answerForSurface(query, "discord") as Promise<ResearchWizardBriefAnswer>;
+    const answerPromise = researchWizard.answerForSurface(query, "discord", undefined, {
+      ...(interaction.guildId ? { destinationGuildId: interaction.guildId } : {}),
+      destinationChannelId: interaction.channelId,
+      authorizedDiscordChannelIds: config.approvedChannelIds,
+    }) as Promise<ResearchWizardBriefAnswer>;
     const timedResult = await Promise.race<
       { kind: "result"; value: ResearchWizardBriefAnswer } | { kind: "timeout" }
     >([
@@ -456,7 +460,7 @@ const proactiveChannelIds =
   config.proactive.channelIds.length > 0 ? config.proactive.channelIds : config.approvedChannelIds;
 
 const proactiveRuntimeReady =
-  config.proactive.enabled && proactiveChannelIds.length > 0 && Boolean(config.ai.openAiApiKey);
+  config.proactive.enabled && proactiveChannelIds.length > 0 && config.ai.aiProviders.length > 0;
 const welcomeRuntimeReady = Boolean(config.welcome?.channelId && config.welcome.message);
 
 const client = createBotClient(
@@ -468,9 +472,9 @@ const client = createBotClient(
 
 if (config.proactive.enabled && !proactiveRuntimeReady) {
   logger.warn("TRASK_PROACTIVE_ENABLED is set but proactive mode cannot start.", {
-    hasOpenAiKey: Boolean(config.ai.openAiApiKey),
+    configuredAiProviders: config.ai.aiProviders.map((provider) => provider.id),
     resolvedProactiveChannelCount: proactiveChannelIds.length,
-    hint: "Set TRASK_APPROVED_CHANNEL_IDS or TRASK_PROACTIVE_CHANNEL_IDS and provide OPENAI_API_KEY (or OPENROUTER_API_KEY).",
+    hint: "Set TRASK_APPROVED_CHANNEL_IDS or TRASK_PROACTIVE_CHANNEL_IDS and configure HF_TOKEN or Cloudflare AI Gateway credentials.",
   });
 }
 

@@ -1,20 +1,20 @@
 ---
-title: Trask Indexed Stack Runbook
+title: Trask Evidence-Pack Stack Runbook
 owner: trask-http-server
 status: active
 lastUpdated: 2026-05-29
 ---
 
-# Trask indexed stack (Crawl4AI + Chroma + Worker)
+# Trask evidence-pack stack (scheduled corpus + retrieve Worker)
 
-Operator guide for the self-hosted Trask research path: crawl → embed → Chroma → retrieve Worker → Holocron / Discord.
+Operator guide for the self-hosted Trask research path: scheduled corpus → hybrid retrieve → evidence pack → citation gate → Holocron / Discord. Chroma remains the current local store, but callers should depend on the evidence-pack contract, not the backing store.
 
 **Product requirements crosswalk** (from [trask-self-hosted-research-pipeline-requirements.md](../../brainstorms/trask-self-hosted-research-pipeline-requirements.md)):
 
 | ID | Requirement | Implementation |
 |----|-------------|----------------|
-| **REQ-A** | Weekly cached-corpus refresh | Cloudflare cron Worker or GitHub Actions → token-guarded `POST /reindex` on indexer **:8790**; Chroma on host |
-| **REQ-B** | Query-time answers from cached index only | `TRASK_WEB_RESEARCH_LIVE_CRAWL=0` on served stack (`trask_live_stack.sh` default); weak retrieve → honest degrade (F3), not per-query crawl |
+| **REQ-A** | Scheduled cached-corpus refresh | Cloudflare cron Worker or GitHub Actions → token-guarded `POST /reindex`; DiscordChatExporter archives via `scripts/trask_discord_sync.py` |
+| **REQ-B** | Query-time answers from maintained evidence cache only | `TRASK_WEB_RESEARCH_LIVE_CRAWL=0` on served stack (`trask_live_stack.sh` default); weak retrieve → honest degrade (F3), not per-query crawl |
 | **REQ-C** | ≤30s research budget | `TRASK_RESEARCH_BUDGET_MS=30000` clamps gather + compose; stall → grounded template |
 
 **VPS rollout checklist:** [trask-vps-indexed-stack-rollout-2026-05-24.md](../../solutions/tooling-decisions/trask-vps-indexed-stack-rollout-2026-05-24.md)
@@ -23,12 +23,12 @@ Operator guide for the self-hosted Trask research path: crawl → embed → Chro
 
 | Service | Local port | Role |
 |---------|------------|------|
-| Chroma indexer | 8790 | FastEmbed + Chroma + `POST /retrieve` + `POST /reindex` |
-| Retrieve Worker | 8787 | Cloudflare Worker proxy to indexer (production parity) |
+| Chroma indexer | 8790 | Current FastEmbed + Chroma implementation for `POST /retrieve` / `POST /reindex`; replaceable behind evidence-pack DTOs |
+| Retrieve Worker | 8787 | Cloudflare Worker proxy to indexer (production parity); clients call this boundary |
 | Reindex scheduler | — (Cloudflare cron) | Weekly `scheduled()` → `POST /reindex` (`infra/trask-reindex-scheduler`) |
 | trask-http-server | 4010 | Holocron UI + `/api/trask/*` |
 
-Research subprocess: `scripts/trask_web_research.py` → retrieve URL from `TRASK_INDEXER_BASE_URL` (Worker, not raw Chroma).
+Research subprocess: `scripts/trask_web_research.py` → retrieve URL from `TRASK_INDEXER_BASE_URL` (Worker, not raw Chroma). `/retrieve` returns legacy `passages` plus `evidencePack` metadata: backend, retrieval mode, citation-ready count, freshness, Discord locators, deletion state, and authorization hints.
 
 ## Weekly corpus refresh (REQ-A)
 
@@ -123,13 +123,34 @@ bash scripts/trask_indexer_run_queue_worker.sh [pollMs]
 
 Uses the same lock contract as ingest-worker (`reindex-queue.lock`). Do not run ingest-worker `drain-queue` and indexer `drain-queue` concurrently on the same `INGEST_STATE_DIR`.
 
-## Discord → Chroma sync
+## DiscordChatExporter archives → evidence cache
 
 ```bash
 python scripts/trask_discord_sync.py
 ```
 
+Default export target config: `data/trask/discord-export-targets.json`. Copy the sample and set each target's `output_dir` to your DiscordChatExporter archive path. Archive sync runs only when that config file exists; otherwise `trask_discord_sync.py` falls back to bot-token export (`TRASK_DISCORD_BOT_TOKEN` required).
+
+Target JSON fields:
+
+- `name` — stable target id stored in chunk metadata (`source_target`)
+- `output_dir` — DiscordChatExporter export root (`manifest.json` + `containers/`)
+- `enabled` / `disabled_reason` — skip disabled targets with an auditable reason
+- `guild_ids` — optional filter when resolving export directories
+- `channel_ids` — optional **allowlist**; when non-empty, only those channel ids are indexed (global `TRASK_DISCORD_CHANNEL_BLACKLIST` still applies as exclude)
+
+Enabled targets are indexed; disabled targets are reported with `disabled_reason`. The importer namespaces chunks by target/channel, records `source_freshness_at`, `window_content_hash`, `discord_jump_url`, and reconciles by deleting stale rows for a target before reimport.
+
 Enable periodic sync on trask-bot with `TRASK_DISCORD_SYNC_INTERVAL_MS` > 0 (production template: `infra/trask-bot-stack/.env.production.example`, default **1800000** = 30 min). Indexer `GET /health` exposes `last_discord_sync`, `discord_sync_age_hours`, and `discord_sync_stale` (default stale threshold: 48h via `TRASK_DISCORD_SYNC_STALE_HOURS`).
+
+Purge a Discord message from indexed evidence:
+
+```bash
+node scripts/trask_ops.mjs purge-discord-message --channel-id <channel> --message-id <message>
+node scripts/trask_ops.mjs purge-discord-message --channel-id <channel> --message-id <message> --execute
+```
+
+The first command is dry-run; `--execute` deletes rows whose stored message window contains the message id.
 
 ## Backup / restore (Chroma)
 
@@ -190,7 +211,7 @@ bash scripts/trask_indexed_stack_health.sh --strict-stale # fail if discord_sync
 | Citation offline (Discord stress + faithfulness) | `pnpm trask:gate` (recommended: one build, smoke, full measure with skip-check, `:ci`); floor `composite_score` **165** — see [stack closeout](../../solutions/tooling-decisions/trask-citation-stack-closeout-2026-05-24.md), [module architecture](../../solutions/tooling-decisions/trask-citation-module-architecture-2026-05-24.md), [display contract](../10-architecture-runtime/trask-citation-display-contract.md) |
 | Discord `/ask` live | `pnpm verify:trask-discord` (preflight `pnpm trask:gate`; script auto-bootstraps indexer+Worker when unhealthy) |
 | Indexer unit tests | `pnpm trask:indexer:test` (after `bootstrap_trask_indexer.sh`) |
-| Holocron e2e (5 queries) | `pnpm holocron:e2e` — CI passes optional `OPENROUTER_API_KEY` / `OPENAI_API_KEY` repo secrets for richer LLM compose |
+| Holocron e2e (5 queries) | `pnpm holocron:e2e` — primary validation should work without `OPENAI_API_KEY` / `OPENROUTER_API_KEY`; HF/Cloudflare or deterministic fallback handle compose |
 | CLI QA | `pnpm verify:trask-cli` (preflight `pnpm trask:gate`; script auto-bootstraps indexer+Worker when unhealthy) |
 | Offline faithfulness | `pnpm trask:faithfulness-eval` |
 | Stack health (VPS) | `bash scripts/trask_indexed_stack_health.sh [--check-http]` |
@@ -203,6 +224,9 @@ See [trask-configuration-env-map.md](trask-configuration-env-map.md). Indexed pa
 - `TRASK_INDEXER_DATA_DIR` — Chroma + allowlist data
 - `INGEST_STATE_DIR` — reindex queue location (default `data/ingest-worker`)
 - `TRASK_WEB_ALLOW_ANONYMOUS=1` — anonymous Holocron on standalone trask-http-server
+- `HF_TOKEN` — primary hosted inference
+- `TRASK_CLOUDFLARE_AI_BASE_URL` + `TRASK_CLOUDFLARE_AI_TOKEN` — hosted HA fallback
+- `TRASK_DISCORD_EXPORT_TARGETS_CONFIG` — DiscordChatExporter target config override
 
 ## Related
 
