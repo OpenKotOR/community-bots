@@ -38,8 +38,8 @@ lastUpdated: 2026-06-11
 
 # Reply shape
 
-- [REPO] `formatProactivePlainReply` with body cap `min(520, TRASK_PROACTIVE_MAX_REPLY_CHARS)` and **3** sources; final content capped at **`TRASK_PROACTIVE_MAX_REPLY_CHARS`**.
-- [REPO] Plain `message.reply` with **`allowedMentions: { repliedUser: false, parse: [] }`**.
+- [REPO] `formatDiscordAskDisplay` renders at most **2** cited lines for proactive replies; final content is prefixed with `Trask, quietly:` and capped at **`TRASK_PROACTIVE_MAX_REPLY_CHARS`**.
+- [REPO] Plain `message.reply` uses **`allowedMentions: { repliedUser: false, parse: [] }`** and suppresses embeds/unfurls.
 
 # Query log
 

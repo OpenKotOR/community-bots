@@ -4,6 +4,7 @@ from typing import Any
 
 import os
 import re
+import sqlite3
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -34,8 +35,17 @@ def _url_anchor_boost(query: str, url: str) -> float:
     boost = 0.0
     for token in _tokenize(query):
         if len(token) >= 5 and token in url_lower:
-            boost += 0.08
+            boost += 0.12
     return boost
+
+
+def _topic_match_boost(query: str, hit: "PassageHit", full_doc: str) -> float:
+    haystack = " ".join([hit.id, hit.url, hit.source_id, hit.host, full_doc]).lower()
+    boost = 0.0
+    for token in set(_tokenize(query)):
+        if len(token) >= 5 and token in haystack:
+            boost += 0.28 if len(token) >= 8 else 0.12
+    return min(boost, 0.64)
 
 DEFAULT_COLLECTION = os.environ.get("TRASK_CHROMA_COLLECTION", "trask_dev")
 
@@ -204,11 +214,118 @@ def query_passages(
 
     fused: list[tuple[float, PassageHit]] = []
     for h in hits:
-        fused_score = _rrf(dense_rank[h.id]) + _rrf(lex_rank[h.id]) + _url_anchor_boost(query, h.url)
+        full_doc = full_docs.get(h.id, h.quote)
+        lexical = _lexical_score(query, f"{h.id} {h.url} {h.source_id} {full_doc}")
+        fused_score = (
+            _rrf(dense_rank[h.id])
+            + _rrf(lex_rank[h.id])
+            + _url_anchor_boost(query, h.url)
+            + _topic_match_boost(query, h, full_doc)
+            + (0.08 * lexical)
+        )
         fused.append((fused_score, replace(h, score=round(fused_score, 6))))
 
     fused.sort(key=lambda pair: pair[0], reverse=True)
     return [h for _, h in fused[:limit]]
+
+
+def query_passages_sqlite_fallback(
+    persist_dir: Path,
+    query: str,
+    *,
+    limit: int = 8,
+    host_filter: str | None = None,
+) -> list[PassageHit]:
+    if not query.strip():
+        return []
+    db_path = persist_dir / "chroma.sqlite3"
+    if not db_path.exists():
+        return []
+
+    con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    try:
+        query_tokens = [token for token in _tokenize(query) if len(token) >= 4]
+        candidate_ids: list[int] = []
+        if query_tokens:
+            match = " OR ".join(dict.fromkeys(query_tokens))
+            candidate_ids = [
+                int(row[0])
+                for row in con.execute(
+                    """
+                    select rowid
+                    from embedding_fulltext_search
+                    where embedding_fulltext_search match ?
+                    limit 80
+                    """,
+                    (match,),
+                )
+            ]
+        if not candidate_ids:
+            candidate_ids = [int(row[0]) for row in con.execute("select id from embeddings limit 120")]
+        placeholders = ",".join("?" for _ in candidate_ids)
+        rows = con.execute(
+            f"""
+            select e.id, e.embedding_id, m.key, m.string_value, m.int_value, m.float_value, m.bool_value
+            from embeddings e
+            join embedding_metadata m on m.id = e.id
+            where e.id in ({placeholders})
+            """,
+            candidate_ids,
+        )
+        by_id: dict[int, dict[str, str]] = {}
+        embedding_ids: dict[int, str] = {}
+        for row_id, embedding_id, key, string_value, int_value, float_value, bool_value in rows:
+            embedding_ids[int(row_id)] = str(embedding_id)
+            value = string_value
+            if value is None and int_value is not None:
+                value = str(int_value)
+            if value is None and float_value is not None:
+                value = str(float_value)
+            if value is None and bool_value is not None:
+                value = "true" if bool_value else "false"
+            by_id.setdefault(int(row_id), {})[str(key)] = str(value or "")
+    finally:
+        con.close()
+
+    scored: list[tuple[float, PassageHit]] = []
+    for row_id, meta in by_id.items():
+        doc = meta.get("chroma:document", "")
+        url = meta.get("url", "")
+        host = meta.get("host", "")
+        source_id = meta.get("source_id", "")
+        if host_filter and host != host_filter:
+            continue
+        deleted = meta.get("deleted", "").lower() in {"1", "true", "yes"}
+        if deleted:
+            continue
+        hit = PassageHit(
+            id=embedding_ids.get(row_id, str(row_id)),
+            url=url,
+            host=host,
+            quote=doc[:1200],
+            score=0.0,
+            source_id=source_id,
+            guild_id=meta.get("guild_id", ""),
+            channel_id=meta.get("channel_id", ""),
+            first_message_id=meta.get("first_message_id", ""),
+            last_message_id=meta.get("last_message_id", ""),
+            source_type=meta.get("source_type", "") or ("discord" if url.startswith("discord://") else "web"),
+            source_target=meta.get("source_target", ""),
+            indexed_at=meta.get("indexed_at", ""),
+            source_freshness_at=meta.get("source_freshness_at", ""),
+            discord_jump_url=meta.get("discord_jump_url", ""),
+            content_hash=meta.get("content_hash", ""),
+            deleted=deleted,
+        )
+        lexical = _lexical_score(query, f"{hit.id} {url} {source_id} {doc}")
+        topic = _topic_match_boost(query, hit, doc)
+        url_boost = _url_anchor_boost(query, url)
+        score = lexical + topic + url_boost
+        if score > 0:
+            scored.append((score, replace(hit, score=round(score, 6))))
+
+    scored.sort(key=lambda pair: pair[0], reverse=True)
+    return [hit for _, hit in scored[:limit]]
 
 
 def purge_discord_message_rows(

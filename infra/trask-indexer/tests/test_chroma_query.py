@@ -58,6 +58,44 @@ def test_query_passages_filters_deleted_rows_and_exposes_metadata(monkeypatch):
     assert hits[0].last_message_id == "101"
 
 
+def test_query_passages_promotes_exact_topic_over_generic_dense_neighbor(monkeypatch):
+    monkeypatch.setattr("trask_indexer.chroma_store.embed_query", lambda _query: [0.1, 0.2])
+
+    class FakeCollection:
+        def query(self, **_kwargs):
+            return {
+                "ids": [["kotorjs-generic", "github-tslpatcher", "deadlystream-tslpatcher"]],
+                "documents": [[
+                    "KotOR.js is a TypeScript reimplementation of the Odyssey engine.",
+                    "TSLPatcher documents list-driven 2DA, GFF, and TLK changes for KotOR mods.",
+                    "TSLPatcher installs Knights of the Old Republic mods from patch lists.",
+                ]],
+                "distances": [[0.01, 0.08, 0.09]],
+                "metadatas": [[
+                    {
+                        "url": "https://github.com/KobaltBlu/KotOR.js",
+                        "host": "github.com",
+                        "source_id": "kotorjs-repo",
+                    },
+                    {
+                        "url": "https://github.com/th3w1zard1/TSLPatcher",
+                        "host": "github.com",
+                        "source_id": "github-tslpatcher",
+                    },
+                    {
+                        "url": "https://deadlystream.com/files/file/1982-tslpatcher/",
+                        "host": "deadlystream.com",
+                        "source_id": "deadlystream-tslpatcher",
+                    },
+                ]],
+            }
+
+    hits = query_passages(FakeCollection(), "What is TSLPatcher used for in KOTOR modding?", limit=3)
+
+    assert hits[0].source_id in {"github-tslpatcher", "deadlystream-tslpatcher"}
+    assert hits[-1].source_id == "kotorjs-repo"
+
+
 def test_purge_discord_message_rows_matches_message_windows():
     deleted: list[str] = []
 

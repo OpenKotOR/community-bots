@@ -22,6 +22,9 @@ export TRASK_WEB_RESEARCH_LOCAL_CHROMA="${TRASK_WEB_RESEARCH_LOCAL_CHROMA:-0}"
 export TRASK_WEB_RESEARCH_DDG_FALLBACK="${TRASK_WEB_RESEARCH_DDG_FALLBACK:-0}"
 export TRASK_RESEARCH_COMPOSE_MODE="${TRASK_RESEARCH_COMPOSE_MODE:-grounded}"
 export TRASK_LLM_PROFILE="${TRASK_LLM_PROFILE:-free}"
+export TRASK_INDEXER_DENSE_RETRIEVE="${TRASK_INDEXER_DENSE_RETRIEVE:-0}"
+export TRASK_INDEXER_RETRIEVE_TIMEOUT_MS="${TRASK_INDEXER_RETRIEVE_TIMEOUT_MS:-5000}"
+export TRASK_RETRIEVE_UPSTREAM_TIMEOUT_MS="${TRASK_RETRIEVE_UPSTREAM_TIMEOUT_MS:-10000}"
 # Fast cached-index answers: soft end-to-end budget clamps gather + compose so a
 # query stays under ~30s and honest-degrades instead of stalling on live crawl.
 export TRASK_RESEARCH_BUDGET_MS="${TRASK_RESEARCH_BUDGET_MS:-30000}"
@@ -58,6 +61,8 @@ fi
 echo "Starting Chroma indexer on :${INDEXER_PORT}…"
 (
   TRASK_INDEXER_DATA_DIR="$ROOT/data/trask-indexer" \
+    TRASK_INDEXER_DENSE_RETRIEVE="$TRASK_INDEXER_DENSE_RETRIEVE" \
+    TRASK_INDEXER_RETRIEVE_TIMEOUT_MS="$TRASK_INDEXER_RETRIEVE_TIMEOUT_MS" \
     "$INDEXER_BIN" serve --host 127.0.0.1 --port "$INDEXER_PORT"
 ) &
 INDEXER_PID=$!
@@ -73,6 +78,7 @@ echo "Starting retrieve Worker on :${WORKER_PORT} (proxies indexer)…"
 (
   cd "$ROOT/infra/trask-retrieve-worker"
   TRASK_INDEXER_BASE_URL="http://127.0.0.1:${INDEXER_PORT}" \
+    TRASK_RETRIEVE_UPSTREAM_TIMEOUT_MS="$TRASK_RETRIEVE_UPSTREAM_TIMEOUT_MS" \
     pnpm exec wrangler dev --port "$WORKER_PORT" --local-protocol http
 ) &
 WORKER_PID=$!

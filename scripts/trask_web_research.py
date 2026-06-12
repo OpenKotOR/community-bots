@@ -85,10 +85,28 @@ def _load_retrieval_defaults() -> dict[str, Any]:
 _RETRIEVAL_DEFAULTS = _load_retrieval_defaults()
 MAX_PASSAGES = int(_RETRIEVAL_DEFAULTS.get("maxPassages", 12))
 MAX_DDG_RESULTS = int(_RETRIEVAL_DEFAULTS.get("maxDdgResults", 6))
-FETCH_TIMEOUT_S = max(1, int(_RETRIEVAL_DEFAULTS.get("fetchTimeoutMs", 20_000) / 1000))
-URL_VERIFY_TIMEOUT_S = max(
-    1,
-    int(_RETRIEVAL_DEFAULTS.get("urlVerifyTimeoutMs", _RETRIEVAL_DEFAULTS.get("fetchTimeoutMs", 8000)) / 1000),
+
+
+def _default_ms(key: str, fallback: int) -> int:
+    try:
+        return int(_RETRIEVAL_DEFAULTS.get(key, fallback))
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _timeout_seconds(env_name: str, default_ms: int) -> int:
+    try:
+        timeout_ms = int(os.environ.get(env_name, default_ms))
+    except (TypeError, ValueError):
+        timeout_ms = default_ms
+    return max(1, timeout_ms // 1000)
+
+
+FETCH_TIMEOUT_S = _timeout_seconds("TRASK_FETCH_TIMEOUT_MS", _default_ms("fetchTimeoutMs", 20_000))
+RETRIEVE_TIMEOUT_S = _timeout_seconds("TRASK_RETRIEVE_TIMEOUT_MS", _default_ms("retrieveTimeoutMs", 10_000))
+URL_VERIFY_TIMEOUT_S = _timeout_seconds(
+    "TRASK_URL_VERIFY_TIMEOUT_MS",
+    _default_ms("urlVerifyTimeoutMs", _default_ms("fetchTimeoutMs", 8_000)),
 )
 
 
@@ -284,7 +302,7 @@ def _retrieve_via_http(query: str, limit: int) -> list[dict[str, Any]]:
     )
     started = time.monotonic()
     try:
-        with urlopen(req, timeout=FETCH_TIMEOUT_S) as resp:
+        with urlopen(req, timeout=RETRIEVE_TIMEOUT_S) as resp:
             parsed = json.loads(resp.read().decode("utf-8"))
     except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
         LOG.warning("retrieve_http failed error=%s", exc)

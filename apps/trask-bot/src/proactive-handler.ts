@@ -21,11 +21,15 @@ type Pending = {
   channelId: string;
   guildId: string | null;
   authorId: string;
+  rawContent: string;
   content: string;
+  directMention: boolean;
   generation: number;
 };
 
 const PROACTIVE_MIN_CITED_SOURCES = 2;
+const MARKDOWN_LINK_RE = /\[[^\]]+\]\(https?:\/\/[^)]+\)/g;
+const TRAILING_MARKDOWN_LINK_RE = /(\s*\[[^\]]+\]\(https?:\/\/[^)]+\))\s*$/;
 
 type ProactiveAuditTrace = Array<{
   phase: string;
@@ -43,8 +47,60 @@ const isTextableChannel = (channel: Message["channel"]): channel is TextChannel 
   return channel.isTextBased() && !channel.isDMBased();
 };
 
+const toAuditTrace = (
+  phase: string,
+  detail: string,
+  diag?: Record<string, string | number | boolean>,
+): ProactiveAuditTrace[number] => ({
+  phase,
+  detail,
+  ...(diag ? { diag } : {}),
+});
+
 const resolveProactiveChannelIds = (config: TraskBotConfig): string[] => {
   return config.proactive.channelIds.length > 0 ? config.proactive.channelIds : config.approvedChannelIds;
+};
+
+const stripBotMention = (content: string, botUserId: string | undefined): string => {
+  if (!botUserId) return content;
+  return content
+    .replace(new RegExp(`<@!?${botUserId}>`, "g"), "")
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
+const countVisibleLinks = (content: string): number => [...content.matchAll(MARKDOWN_LINK_RE)].length;
+
+const trimLinePreservingTrailingCitation = (line: string, maxChars: number): string => {
+  if (line.length <= maxChars) return line;
+  const trailing = line.match(TRAILING_MARKDOWN_LINK_RE)?.[1] ?? "";
+  if (!trailing || trailing.length >= maxChars - 2) {
+    return `${line.slice(0, Math.max(0, maxChars - 1)).trimEnd()}…`;
+  }
+
+  const prefixMax = Math.max(0, maxChars - trailing.length - 2);
+  return `${line.slice(0, prefixMax).trimEnd()}…${trailing}`;
+};
+
+const formatProactiveOutbound = (display: string, maxChars: number): string => {
+  const prefix = "A calm Jedi: ";
+  const lines = display.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const out: string[] = [];
+  let usedChars = prefix.length;
+
+  for (const line of lines) {
+    const separatorChars = out.length > 0 ? 1 : 0;
+    const remaining = maxChars - usedChars - separatorChars;
+    if (remaining <= 0) break;
+
+    const trimmed = trimLinePreservingTrailingCitation(line, remaining);
+    if (!trimmed.trim()) continue;
+
+    out.push(trimmed);
+    usedChars += separatorChars + trimmed.length;
+  }
+
+  return `${prefix}${out.join("\n")}`.trim();
 };
 
 const shouldIgnoreMessage = (message: Message, config: TraskBotConfig): boolean => {
@@ -222,14 +278,14 @@ export const registerTraskProactiveHandlers = (
 
       const trigger = await channel.messages.fetch(pending.messageId).catch(() => null);
 
-      if (!trigger || trigger.content.trim() !== pending.content.trim()) {
+      if (!trigger || trigger.content.trim() !== pending.rawContent.trim()) {
         await auditFailure(pending, "trigger message changed or disappeared before debounce completed", [
-          { phase: "proactive_suppress", detail: "Trigger message changed or disappeared." },
+          toAuditTrace("proactive_suppress", "Trigger message changed or disappeared."),
         ]);
         return;
       }
 
-      const competing = await hasCompetingHumanReply(channel, pending);
+      const competing = pending.directMention ? null : await hasCompetingHumanReply(channel, pending);
 
       if (competing) {
         logger.debug("Skipping proactive reply — competing human message detected.", {
@@ -241,12 +297,10 @@ export const registerTraskProactiveHandlers = (
           pending,
           "competing human answer suppressed proactive reply",
           [
-            { phase: "proactive_trigger", detail: "KOTOR question candidate waited for human replies." },
-            {
-              phase: "proactive_suppress",
-              detail: "A human replied before Trask.",
-              diag: { competitor_message_id: competing.id },
-            },
+            toAuditTrace("proactive_trigger", "KOTOR question candidate waited for human replies."),
+            toAuditTrace("proactive_suppress", "A human replied before Trask.", {
+              competitor_message_id: competing.id,
+            }),
           ],
         );
         return;
@@ -269,15 +323,11 @@ export const registerTraskProactiveHandlers = (
           classification,
         });
         await auditFailure(pending, "classifier rejected proactive reply", [
-          {
-            phase: "proactive_classify",
-            detail: "Classifier rejected the message.",
-            diag: {
-              is_question: Boolean(classification?.isQuestion),
-              kotor_relevant: Boolean(classification?.kotorRelevant),
-              confidence: classification?.confidence ?? 0,
-            },
-          },
+          toAuditTrace("proactive_classify", "Classifier rejected the message.", {
+            is_question: Boolean(classification?.isQuestion),
+            kotor_relevant: Boolean(classification?.kotorRelevant),
+            confidence: classification?.confidence ?? 0,
+          }),
         ]);
         return;
       }
@@ -285,21 +335,19 @@ export const registerTraskProactiveHandlers = (
       const now = Date.now();
       const cooldownUntil = userCooldownUntil.get(pending.authorId) ?? 0;
 
-      if (cooldownUntil > now) {
+      if (!pending.directMention && cooldownUntil > now) {
         logger.debug("Skipping proactive reply — user cooldown.", { authorId: pending.authorId });
         await auditFailure(pending, "user cooldown suppressed proactive reply", [
-          {
-            phase: "proactive_suppress",
-            detail: "User cooldown is active.",
-            diag: { cooldown_remaining_ms: cooldownUntil - now },
-          },
+          toAuditTrace("proactive_suppress", "User cooldown is active.", {
+            cooldown_remaining_ms: cooldownUntil - now,
+          }),
         ]);
         return;
       }
 
       if (isSuperseded(pending)) {
         await auditFailure(pending, "superseded by newer channel activity before research started", [
-          { phase: "proactive_suppress", detail: "A newer message replaced this proactive candidate." },
+          toAuditTrace("proactive_suppress", "A newer message replaced this proactive candidate."),
         ]);
         return;
       }
@@ -325,15 +373,11 @@ export const registerTraskProactiveHandlers = (
           pending,
           "citation gate suppressed proactive reply",
           [
-            {
-              phase: "proactive_evidence",
-              detail: "Research completed but did not produce enough cited sources for an unsolicited reply.",
-              diag: {
-                cited_sources: brief.approvedSources.length,
-                retrieved_sources: brief.retrievedSources.length,
-                minimum_cited_sources: PROACTIVE_MIN_CITED_SOURCES,
-              },
-            },
+            toAuditTrace("proactive_evidence", "Research completed but did not produce enough cited sources for an unsolicited reply.", {
+              cited_sources: brief.approvedSources.length,
+              retrieved_sources: brief.retrievedSources.length,
+              minimum_cited_sources: PROACTIVE_MIN_CITED_SOURCES,
+            }),
           ],
           {
             sources: brief.approvedSources,
@@ -389,11 +433,10 @@ export const registerTraskProactiveHandlers = (
           pending,
           "semantic alignment gate suppressed proactive reply",
           [
-            {
-              phase: "proactive_evidence",
-              detail: "Retrieved evidence did not align strongly enough with the trigger.",
-              diag: { similarity, threshold: config.proactive.similarityThreshold },
-            },
+            toAuditTrace("proactive_evidence", "Retrieved evidence did not align strongly enough with the trigger.", {
+              similarity,
+              threshold: config.proactive.similarityThreshold,
+            }),
           ],
           { retrievedSources: brief.retrievedSources, visitedUrls: brief.visitedUrls },
         );
@@ -405,13 +448,13 @@ export const registerTraskProactiveHandlers = (
         query: pending.content,
       });
 
-      let outbound = `Trask, quietly: ${display}`.slice(0, config.proactive.maxReplyChars);
+      const outbound = formatProactiveOutbound(display, config.proactive.maxReplyChars);
 
       if (outbound.length === 0) {
         await auditFailure(
           pending,
           "formatted proactive reply was empty",
-          [{ phase: "proactive_format", detail: "Formatted answer was empty." }],
+          [toAuditTrace("proactive_format", "Formatted answer was empty.")],
           {
             sources: brief.approvedSources,
             retrievedSources: brief.retrievedSources,
@@ -421,7 +464,27 @@ export const registerTraskProactiveHandlers = (
         return;
       }
 
-      const lateCompeting = await hasCompetingHumanReply(channel, pending);
+      const visibleLinks = countVisibleLinks(outbound);
+      if (visibleLinks < PROACTIVE_MIN_CITED_SOURCES) {
+        await auditFailure(
+          pending,
+          "formatted proactive reply had too few visible citation links",
+          [
+            toAuditTrace("proactive_format", "Formatted reply was suppressed because citation links would not be visible after clamping.", {
+              visible_links: visibleLinks,
+              minimum_visible_links: PROACTIVE_MIN_CITED_SOURCES,
+            }),
+          ],
+          {
+            sources: brief.approvedSources,
+            retrievedSources: brief.retrievedSources,
+            visitedUrls: brief.visitedUrls,
+          },
+        );
+        return;
+      }
+
+      const lateCompeting = pending.directMention ? null : await hasCompetingHumanReply(channel, pending);
       if (lateCompeting || isSuperseded(pending)) {
         await auditFailure(
           pending,
@@ -429,13 +492,11 @@ export const registerTraskProactiveHandlers = (
             ? "competing human answer suppressed proactive reply after research"
             : "superseded by newer channel activity before send",
           [
-            {
-              phase: "proactive_suppress",
-              detail: lateCompeting
-                ? "A human replied while Trask was researching."
-                : "A newer message replaced this proactive candidate before send.",
-              ...(lateCompeting ? { diag: { competitor_message_id: lateCompeting.id } } : {}),
-            },
+            toAuditTrace(
+              "proactive_suppress",
+              lateCompeting ? "A human replied while Trask was researching." : "A newer message replaced this proactive candidate before send.",
+              lateCompeting ? { competitor_message_id: lateCompeting.id } : undefined,
+            ),
           ],
           {
             sources: brief.approvedSources,
@@ -459,25 +520,17 @@ export const registerTraskProactiveHandlers = (
         retrievedSources: brief.retrievedSources,
         visitedUrls: brief.visitedUrls,
         trace: [
-          {
-            phase: "proactive_classify",
-            detail: "Classifier accepted KOTOR research question.",
-            diag: {
-              confidence: classification.confidence,
-              is_question: classification.isQuestion,
-              kotor_relevant: classification.kotorRelevant,
-            },
-          },
-          {
-            phase: "proactive_evidence",
-            detail: "Citation and semantic gates passed.",
-            diag: {
-              similarity,
-              cited_sources: brief.approvedSources.length,
-              retrieved_sources: brief.retrievedSources.length,
-            },
-          },
-          { phase: "proactive_send", detail: "Trask replied in-channel." },
+          toAuditTrace("proactive_classify", "Classifier accepted KOTOR research question.", {
+            confidence: classification.confidence,
+            is_question: classification.isQuestion,
+            kotor_relevant: classification.kotorRelevant,
+          }),
+          toAuditTrace("proactive_evidence", "Citation and semantic gates passed.", {
+            similarity,
+            cited_sources: brief.approvedSources.length,
+            retrieved_sources: brief.retrievedSources.length,
+          }),
+          toAuditTrace("proactive_send", "Trask replied in-channel."),
         ],
       });
 
@@ -486,7 +539,7 @@ export const registerTraskProactiveHandlers = (
       logger.error("Trask proactive pipeline failed.", error instanceof Error ? error : { error: String(error) });
       try {
         await auditFailure(pending, error instanceof Error ? error.message : String(error), [
-          { phase: "proactive_error", detail: "Proactive pipeline threw before send." },
+          toAuditTrace("proactive_error", "Proactive pipeline threw before send."),
         ]);
       } catch (auditError) {
         logger.error(
@@ -513,12 +566,23 @@ export const registerTraskProactiveHandlers = (
     const generation = (generationByChannel.get(message.channelId) ?? 0) + 1;
     generationByChannel.set(message.channelId, generation);
 
+    const rawContent = message.content.trim();
+    const botUserId = client.user?.id;
+    const directMention = botUserId ? message.mentions.has(botUserId) : false;
+    const content = directMention ? stripBotMention(rawContent, botUserId) : rawContent;
+
+    if (content.length < config.proactive.minMessageLength) {
+      return;
+    }
+
     const pending: Pending = {
       messageId: message.id,
       channelId: message.channelId,
       guildId: message.guildId,
       authorId: message.author.id,
-      content: message.content.trim(),
+      rawContent,
+      content,
+      directMention,
       generation,
     };
 

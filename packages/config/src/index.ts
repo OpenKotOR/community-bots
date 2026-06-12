@@ -756,7 +756,7 @@ export const loadTraskBotConfig = (env: NodeJS.ProcessEnv = process.env): TraskB
     proactive: {
       enabled: readBooleanEnv("TRASK_PROACTIVE_ENABLED", env) ?? false,
       channelIds: proactiveChannelIds,
-      debounceMs: integerish.parse(readOptionalEnv("TRASK_PROACTIVE_DEBOUNCE_MS", env) ?? "25000"),
+      debounceMs: integerish.parse(readOptionalEnv("TRASK_PROACTIVE_DEBOUNCE_MS", env) ?? "12000"),
       userCooldownMs: integerish.parse(readOptionalEnv("TRASK_PROACTIVE_USER_COOLDOWN_MS", env) ?? "120000"),
       competingReplyMinLength: integerish.parse(readOptionalEnv("TRASK_PROACTIVE_COMPETING_MIN_LENGTH", env) ?? "80"),
       classifierModel: readOptionalEnv("TRASK_PROACTIVE_CLASSIFIER_MODEL", env) ?? defaultChatModel,

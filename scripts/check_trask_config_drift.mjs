@@ -57,12 +57,37 @@ const shouldScanFile = (relPath) => {
   );
 };
 
+const SKIPPED_DIRECTORY_NAMES = new Set([
+  ".cache",
+  ".cursor",
+  ".git",
+  ".history",
+  ".playwright-discord-profile",
+  "__pycache__",
+  "agent-transcripts",
+  "dist",
+  "node_modules",
+  "test-results",
+  "vendor",
+]);
+
+const SKIPPED_DIRECTORY_PATHS = new Set(["data/trask-bot"]);
+
+const shouldSkipDirectory = (relPath) => {
+  if (SKIPPED_DIRECTORY_PATHS.has(relPath)) return true;
+  if (relPath.split("/").some((part) => SKIPPED_DIRECTORY_NAMES.has(part))) return true;
+  if (relPath.split("/").some((part) => part.startsWith(".venv"))) return true;
+  if (relPath.endsWith("/chroma")) return true;
+  return false;
+};
+
 const walk = (dir, base = "") => {
   const entries = [];
   for (const name of readdirSync(dir, { withFileTypes: true })) {
     const rel = base ? `${base}/${name.name}` : name.name;
     const abs = join(dir, name.name);
     if (name.isDirectory()) {
+      if (shouldSkipDirectory(rel)) continue;
       entries.push(...walk(abs, rel));
     } else if (shouldScanFile(rel)) {
       entries.push(rel);

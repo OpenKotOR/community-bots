@@ -1,0 +1,27 @@
+{
+  "name": "@openkotor/decomp-platform",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "bin": {
+    "decomp-analyze": "./dist/cli.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "test": "pnpm run build && node --test dist/*.test.js"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2"
+  }
+}

@@ -59,7 +59,8 @@
     "dev:ingest": "pnpm --filter @openkotor/ingest-worker dev",
     "discord:install-links": "tsx scripts/discord-install-links.ts",
     "smoke:trask-research": "python scripts/smoke_trask_indexed_stack.py",
-    "discord:smoke-trask-commands": "node scripts/discord_trask_commands_smoke.mjs"
+    "discord:smoke-trask-commands": "node scripts/discord_trask_commands_smoke.mjs",
+    "decomp:analyze": "pnpm --filter @openkotor/decomp-platform build && node packages/decomp-platform/dist/cli.js"
   },
   "devDependencies": {
     "@openkotor/config": "workspace:*",

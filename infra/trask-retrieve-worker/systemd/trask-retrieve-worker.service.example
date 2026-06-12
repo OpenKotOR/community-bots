@@ -21,6 +21,7 @@ WorkingDirectory=/opt/community-bots
 EnvironmentFile=-/opt/community-bots/.env
 Environment=TRASK_INDEXER_PORT=8790
 Environment=TRASK_RETRIEVE_WORKER_PORT=8787
+Environment=TRASK_RETRIEVE_UPSTREAM_TIMEOUT_MS=10000
 ExecStart=/opt/community-bots/scripts/trask_retrieve_worker_start.sh
 Restart=on-failure
 RestartSec=10

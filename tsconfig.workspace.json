@@ -38,6 +38,9 @@
       "path": "packages/pazaak-tournament"
     },
     {
+      "path": "packages/decomp-platform"
+    },
+    {
       "path": "packages/platform"
     },
     {

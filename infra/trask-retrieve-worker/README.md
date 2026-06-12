@@ -23,6 +23,7 @@ curl -sS -X POST http://127.0.0.1:8787/retrieve \
 ```
 
 Point bots and Holocron at the Worker with `TRASK_INDEXER_BASE_URL=https://trask-retrieve.<account>.workers.dev` once deployed.
+The Worker bounds upstream indexer calls with `TRASK_RETRIEVE_UPSTREAM_TIMEOUT_MS` (default `10000`) and returns a JSON `503` or `504` instead of letting user-facing surfaces hang.
 
 ## VPS co-located (wrangler dev proxy)
 
@@ -36,6 +37,7 @@ pnpm trask:stack:health
 systemd: `infra/trask-retrieve-worker/systemd/trask-retrieve-worker.service.example` (requires `trask-indexer.service`).
 
 Set holocron/bot `TRASK_INDEXER_BASE_URL=http://127.0.0.1:8787`.
+Set `TRASK_RETRIEVE_UPSTREAM_TIMEOUT_MS` in the Worker environment if the co-located indexer needs a different fail-fast budget.
 
 ## Deploy (Cloudflare edge)
 
@@ -43,6 +45,8 @@ Set holocron/bot `TRASK_INDEXER_BASE_URL=http://127.0.0.1:8787`.
 pnpm dlx wrangler deploy --config infra/trask-retrieve-worker/wrangler.toml
 pnpm dlx wrangler secret put TRASK_INDEXER_BASE_URL --config infra/trask-retrieve-worker/wrangler.toml
 ```
+
+Keep `TRASK_RETRIEVE_UPSTREAM_TIMEOUT_MS` low enough for Discord defers and Holocron polling to degrade honestly inside the global research budget.
 
 ## Future (Vectorize)
 

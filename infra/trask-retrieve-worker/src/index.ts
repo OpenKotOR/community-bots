@@ -11,6 +11,7 @@ const trimTrailingSlashes = (value: string): string => {
 
 export interface Env {
   TRASK_INDEXER_BASE_URL: string;
+  TRASK_RETRIEVE_UPSTREAM_TIMEOUT_MS?: string;
 }
 
 const corsHeaders = (): Headers => {
@@ -25,6 +26,45 @@ const json = (status: number, body: unknown): Response => {
   const headers = corsHeaders();
   headers.set("Content-Type", "application/json");
   return new Response(JSON.stringify(body), { status, headers });
+};
+
+const parsePositiveInteger = (value: string | undefined, fallback: number): number => {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+type UpstreamFetchResult =
+  | { ok: true; response: Response }
+  | { ok: false; status: 503 | 504; body: { error: string; timeoutMs?: number } };
+
+const fetchUpstreamWithTimeout = async (
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<UpstreamFetchResult> => {
+  const controller = new AbortController();
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+
+  const upstream = fetch(url, { ...init, signal: controller.signal })
+    .then((response): UpstreamFetchResult => ({ ok: true, response }))
+    .catch(
+      (): UpstreamFetchResult => (
+        controller.signal.aborted
+          ? { ok: false, status: 504, body: { error: "upstream_timeout", timeoutMs } }
+          : { ok: false, status: 503, body: { error: "upstream_unavailable" } }
+      ),
+    );
+
+  const deadline = new Promise<UpstreamFetchResult>((resolve) => {
+    timeout = setTimeout(() => {
+      controller.abort();
+      resolve({ ok: false, status: 504, body: { error: "upstream_timeout", timeoutMs } });
+    }, timeoutMs);
+  });
+
+  const result = await Promise.race([upstream, deadline]);
+  if (timeout) clearTimeout(timeout);
+  return result;
 };
 
 export default {
@@ -52,6 +92,8 @@ export default {
       return json(503, { error: "TRASK_INDEXER_BASE_URL is not configured" });
     }
 
+    const timeoutMs = parsePositiveInteger(env.TRASK_RETRIEVE_UPSTREAM_TIMEOUT_MS, 10_000);
+
     let body: string;
     try {
       body = await request.text();
@@ -59,14 +101,24 @@ export default {
       return json(400, { error: "invalid_body" });
     }
 
-    const upstream = await fetch(`${base}/retrieve`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
+    const upstreamResult = await fetchUpstreamWithTimeout(
+      `${base}/retrieve`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body,
       },
-      body,
-    });
+      timeoutMs,
+    );
+
+    if (!upstreamResult.ok) {
+      return json(upstreamResult.status, upstreamResult.body);
+    }
+
+    const upstream = upstreamResult.response;
 
     const text = await upstream.text();
     const headers = corsHeaders();

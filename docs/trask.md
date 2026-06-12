@@ -214,7 +214,7 @@ not the long embed briefing).
 
 **Behavior (high level)**
 
-1. **Debounce** (`TRASK_PROACTIVE_DEBOUNCE_MS`, default 25s): waits for quiet time before running the pipeline on the
+1. **Debounce** (`TRASK_PROACTIVE_DEBOUNCE_MS`, default 12s): waits for quiet time before running the pipeline on the
    latest eligible message in that channel.
 2. **Competing reply heuristic**: after the wait, if another (non-bot) user posted a message at least
    `TRASK_PROACTIVE_COMPETING_MIN_LENGTH` characters long, Trask stays silent so humans can answer first (re-checked before send).

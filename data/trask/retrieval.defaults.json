@@ -5,6 +5,7 @@
   "indexerDefaultLimit": 8,
   "maxDdgResults": 6,
   "fetchTimeoutMs": 45000,
+  "retrieveTimeoutMs": 10000,
   "urlVerifyTimeoutMs": 8000,
   "researchTimeoutMs": 900000
 }
