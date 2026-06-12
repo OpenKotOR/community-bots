@@ -4,9 +4,12 @@
   "main": "dist/worker.js",
   "type": "module",
   "scripts": {
-    "build": "esbuild src/worker.ts --bundle --platform=neutral --target=es2022 --outfile=dist/worker.js"
+    "build": "esbuild src/worker.ts --bundle --platform=neutral --main-fields=module,main --conditions=workerd,worker,browser --target=es2022 --external:cloudflare:* --external:node:* --external:path --external:os --outfile=dist/worker.js"
   },
   "devDependencies": {
     "esbuild": "^0.25.0"
+  },
+  "dependencies": {
+    "agents": "^0.16.0"
   }
 }

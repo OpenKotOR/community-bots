@@ -82,6 +82,41 @@ test("extractClaimsHeuristic finds multi-url claims", () => {
   );
 });
 
+test("extractClaimsHeuristic strips source headings from TSLPatcher brief evidence", () => {
+  const passages = [
+    {
+      text: "# TSLPatcher on GitHub\n\nThe TSLPatcher project documents how mod authors ship list-driven 2DA, GFF, and TLK changes for KotOR and TSL installs.",
+      url: "https://github.com/th3w1zard1/TSLPatcher",
+      host: "github.com",
+      authority: "web" as const,
+    },
+    {
+      text: "# TSLPatcher\n\nTSLPatcher is a mod installation tool for Knights of the Old Republic and The Sith Lords. It applies 2DA, GFF, and TLK patches from list files so players do not copy files by hand.",
+      url: "https://deadlystream.com/files/file/1982-tslpatcher/",
+      host: "deadlystream.com",
+      authority: "web" as const,
+    },
+  ];
+
+  const claims = extractClaimsHeuristic("What is TSLPatcher used for in KOTOR modding?", passages);
+  const answer = composeGroundedAnswerFromClaims(
+    "What is TSLPatcher used for in KOTOR modding?",
+    claims,
+    [
+      { ...sources[0]!, homeUrl: passages[0]!.url },
+      { ...sources[1]!, homeUrl: passages[1]!.url },
+    ],
+    "brief",
+  );
+
+  const { body } = splitResearchAnswer(answer);
+  assert.doesNotMatch(body, /TSLPatcher on GitHub The TSLPatcher project/);
+  assert.doesNotMatch(body, /^TSLPatcher TSLPatcher\b/m);
+  assert.match(body, /mod authors ship list-driven 2DA, GFF, and TLK changes/i);
+  assert.match(body, /mod installation tool for Knights of the Old Republic/i);
+  assert.equal(collectCitationIndicesFromAnswer(answer).length, 2);
+});
+
 test("composeGroundedAnswerFromClaims emits Sources for cited indices", () => {
   const claims = [
     {

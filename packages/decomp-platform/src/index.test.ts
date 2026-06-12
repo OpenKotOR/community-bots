@@ -1,7 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-import { analyzeBinary, compareBinaryEquivalence, detectBinaryFormat, generateReconstructionWorkspace } from "./index.js";
+import {
+  analyzeBinary,
+  compareBinaryEquivalence,
+  detectBinaryFormat,
+  generateReconstructionWorkspace,
+  writeReconstructionWorkspace,
+  type ReconstructionWorkspace,
+} from "./index.js";
 
 test("detects PE and reports uncertainty instead of guessed source", () => {
   const pe = minimalPe();
@@ -9,8 +19,9 @@ test("detects PE and reports uncertainty instead of guessed source", () => {
 
   assert.equal(report.identity.format, "pe");
   assert.equal(report.details.architecture, "x86_64");
-  assert.equal(report.sections.length, 1);
+  assert.equal(report.sections.length, 2);
   assert.equal(report.sections[0]?.name, ".text");
+  assert.equal(report.dependencies.some((dependency) => dependency.name === "KERNEL32.dll"), true);
   assert.ok(report.rebuildPlan.sourceUnits.some((unit) => unit.path === "recovered/manifest.json"));
   assert.ok(report.uncertainty.some((item) => item.id === "compiler-profile-unknown"));
   assert.ok(report.uncertainty.some((item) => item.id === "semantic-lift-not-confirmed"));
@@ -45,11 +56,51 @@ test("generates a compilable evidence workspace without semantic fabrication", (
   assert.equal(workspace.root, "reconstruction");
   assert.ok(workspace.blockedBy.includes("compiler-profile-unknown"));
   assert.ok(workspace.files.some((file) => file.path === "CMakeLists.txt"));
+  assert.ok(workspace.files.some((file) => file.path === "BLOCKED_REBUILD.md"));
   const source = workspace.files.find((file) => file.path === "src/recovered_inventory.c")?.contents ?? "";
   assert.match(source, /recovered_input_sha256/);
   assert.match(source, /recovered_symbol_count/);
   assert.match(source, /recovered_relocation_count/);
   assert.doesNotMatch(source, /TODO|return 0;|guessed/iu);
+});
+
+test("writes reconstruction workspace with proof gate and safe paths", async () => {
+  const report = analyzeBinary({ path: "sample.elf", bytes: minimalElf64() });
+  const workspace = generateReconstructionWorkspace(report);
+  const outputDir = await mkdtemp(join(tmpdir(), "decomp-platform-"));
+  try {
+    const written = await writeReconstructionWorkspace(workspace, outputDir);
+    assert.equal(written.blockedBy.includes("semantic-lift-not-confirmed"), true);
+    assert.ok(written.writtenFiles.includes("BLOCKED_REBUILD.md"));
+    const blocked = await readFile(join(outputDir, "BLOCKED_REBUILD.md"), "utf8");
+    const source = await readFile(join(outputDir, "src", "recovered_inventory.c"), "utf8");
+    assert.match(blocked, /Rebuild Blocked/);
+    assert.match(blocked, /semantic-lift-not-confirmed/);
+    assert.match(source, /puts/);
+  } finally {
+    await rm(outputDir, { recursive: true, force: true });
+  }
+});
+
+test("rejects generated workspace paths that escape the output root", async () => {
+  const outputDir = await mkdtemp(join(tmpdir(), "decomp-platform-escape-"));
+  const workspace: ReconstructionWorkspace = {
+    root: "reconstruction",
+    blockedBy: [],
+    files: [{
+      path: "../escape.txt",
+      purpose: "malformed test fixture",
+      contents: "nope",
+    }],
+  };
+  try {
+    await assert.rejects(
+      writeReconstructionWorkspace(workspace, outputDir),
+      /not safely relative/u,
+    );
+  } finally {
+    await rm(outputDir, { recursive: true, force: true });
+  }
 });
 
 test("equivalence report identifies exact and drifting binaries", () => {
@@ -74,24 +125,39 @@ test("unknown inputs produce blocker uncertainty", () => {
 });
 
 function minimalPe(): Uint8Array {
-  const bytes = Buffer.alloc(0x400);
+  const bytes = Buffer.alloc(0x600);
   bytes.write("MZ", 0, "ascii");
   bytes.writeUInt32LE(0x80, 0x3c);
   bytes.write("PE\0\0", 0x80, "ascii");
   bytes.writeUInt16LE(0x8664, 0x84);
-  bytes.writeUInt16LE(1, 0x86);
+  bytes.writeUInt16LE(2, 0x86);
   bytes.writeUInt32LE(1_700_000_000, 0x88);
   bytes.writeUInt16LE(0xf0, 0x94);
   bytes.writeUInt16LE(0x20b, 0x98);
   bytes.writeUInt32LE(0x1000, 0xa8);
   bytes.writeBigUInt64LE(0x140000000n, 0xb0);
+  bytes.writeUInt32LE(0x2000, 0x98 + 112 + 8);
+  bytes.writeUInt32LE(0x40, 0x98 + 112 + 12);
   const section = 0x80 + 24 + 0xf0;
   bytes.write(".text\0\0\0", section, "ascii");
   bytes.writeUInt32LE(0x100, section + 8);
   bytes.writeUInt32LE(0x1000, section + 12);
   bytes.writeUInt32LE(0x100, section + 16);
-  bytes.writeUInt32LE(0x200, section + 20);
+  bytes.writeUInt32LE(0x240, section + 20);
   bytes.writeUInt32LE(0x60000020, section + 36);
+  const idata = section + 40;
+  bytes.write(".idata\0\0", idata, "ascii");
+  bytes.writeUInt32LE(0x100, idata + 8);
+  bytes.writeUInt32LE(0x2000, idata + 12);
+  bytes.writeUInt32LE(0x100, idata + 16);
+  bytes.writeUInt32LE(0x340, idata + 20);
+  bytes.writeUInt32LE(0x40000040, idata + 36);
+  bytes.writeUInt32LE(0, 0x340);
+  bytes.writeUInt32LE(0, 0x344);
+  bytes.writeUInt32LE(0, 0x348);
+  bytes.writeUInt32LE(0x2030, 0x34c);
+  bytes.writeUInt32LE(0x2040, 0x350);
+  bytes.write("KERNEL32.dll\0", 0x370, "ascii");
   return bytes;
 }
 

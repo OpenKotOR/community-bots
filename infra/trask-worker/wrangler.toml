@@ -2,6 +2,15 @@ name = "trask-worker"
 workers_dev = true
 main = "dist/worker.js"
 compatibility_date = "2026-05-09"
+compatibility_flags = ["nodejs_compat"]
+
+[[durable_objects.bindings]]
+name = "TraskAgent"
+class_name = "TraskAgent"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["TraskAgent"]
 
 [vars]
 TRASK_WEB_ALLOW_ANONYMOUS = "1"

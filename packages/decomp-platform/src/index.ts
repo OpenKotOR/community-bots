@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname, isAbsolute, normalize, resolve, sep } from "node:path";
 
 export type BinaryFormat =
   | "pe"
@@ -122,6 +124,12 @@ export interface GeneratedFile {
 export interface ReconstructionWorkspace {
   readonly root: string;
   readonly files: readonly GeneratedFile[];
+  readonly blockedBy: readonly string[];
+}
+
+export interface WrittenWorkspace {
+  readonly root: string;
+  readonly writtenFiles: readonly string[];
   readonly blockedBy: readonly string[];
 }
 
@@ -255,36 +263,72 @@ export function compareBinaryEquivalence(expected: Uint8Array, actual: Uint8Arra
 
 export function generateReconstructionWorkspace(report: DecompilationReport): ReconstructionWorkspace {
   const blockedBy = unique(report.uncertainty.filter((item) => item.severity === "blocker").map((item) => item.id));
+  const files: GeneratedFile[] = [
+    {
+      path: "recovered/manifest.json",
+      purpose: "Evidence manifest for reproducible reconstruction.",
+      contents: `${JSON.stringify(report, jsonReplacer, 2)}\n`,
+    },
+    {
+      path: "src/recovered_inventory.c",
+      purpose: "Compilable C source containing only confirmed binary inventory facts.",
+      contents: renderInventoryC(report),
+    },
+    {
+      path: "CMakeLists.txt",
+      purpose: "Portable build harness for the evidence inventory source.",
+      contents: renderCMake(report),
+    },
+    {
+      path: "UNCERTAINTY.md",
+      purpose: "Human-readable uncertainty ledger and blockers.",
+      contents: renderUncertaintyMarkdown(report),
+    },
+    {
+      path: "VERIFY.md",
+      purpose: "Binary equivalence validation commands and prerequisites.",
+      contents: renderVerifyMarkdown(report),
+    },
+  ];
+
+  if (blockedBy.length > 0) {
+    files.push({
+      path: "BLOCKED_REBUILD.md",
+      purpose: "Proof gate explaining why byte-equivalent rebuild output is not emitted.",
+      contents: renderBlockedRebuildMarkdown(report, blockedBy),
+    });
+  }
+
   return {
     root: report.rebuildPlan.projectRoot,
     blockedBy,
-    files: [
-      {
-        path: "recovered/manifest.json",
-        purpose: "Evidence manifest for reproducible reconstruction.",
-        contents: `${JSON.stringify(report, jsonReplacer, 2)}\n`,
-      },
-      {
-        path: "src/recovered_inventory.c",
-        purpose: "Compilable C source containing only confirmed binary inventory facts.",
-        contents: renderInventoryC(report),
-      },
-      {
-        path: "CMakeLists.txt",
-        purpose: "Portable build harness for the evidence inventory source.",
-        contents: renderCMake(report),
-      },
-      {
-        path: "UNCERTAINTY.md",
-        purpose: "Human-readable uncertainty ledger and blockers.",
-        contents: renderUncertaintyMarkdown(report),
-      },
-      {
-        path: "VERIFY.md",
-        purpose: "Binary equivalence validation commands and prerequisites.",
-        contents: renderVerifyMarkdown(report),
-      },
-    ],
+    files,
+  };
+}
+
+export async function writeReconstructionWorkspace(
+  workspace: ReconstructionWorkspace,
+  outputDir: string,
+): Promise<WrittenWorkspace> {
+  const root = resolve(outputDir);
+  const writtenFiles: string[] = [];
+  await mkdir(root, { recursive: true });
+
+  for (const file of workspace.files) {
+    const relativePath = validateWorkspaceRelativePath(file.path);
+    const target = resolve(root, relativePath);
+    if (target !== root && !target.startsWith(`${root}${sep}`)) {
+      throw new Error(`Generated workspace path escapes output root: ${file.path}`);
+    }
+    await mkdir(dirname(target), { recursive: true });
+    await writeFile(target, file.contents, "utf8");
+    writtenFiles.push(relativePath);
+  }
+
+  return {
+    root,
+    writtenFiles,
+    blockedBy: workspace.blockedBy,
   };
 }
 
@@ -325,6 +369,9 @@ function parsePe(bytes: Uint8Array): ParsedBinary {
   const imageBase32 = readU32(bytes, optionalOffset + 28, true);
   const imageBase64 = readU64(bytes, optionalOffset + 24, true);
   const imageBase = isPe32Plus ? imageBase64 : imageBase32 === undefined ? undefined : BigInt(imageBase32);
+  const dataDirectoryOffset = optionalOffset + (isPe32Plus ? 112 : 96);
+  const importTableRva = readU32(bytes, dataDirectoryOffset + 8, true);
+  const importTableSize = readU32(bytes, dataDirectoryOffset + 12, true) ?? 0;
   const sectionOffset = optionalOffset + optionalHeaderSize;
   const sections: BinarySection[] = [];
 
@@ -359,20 +406,25 @@ function parsePe(bytes: Uint8Array): ParsedBinary {
   if (entryPoint !== undefined) details = { ...details, entryPoint };
   if (imageBase !== undefined) details = { ...details, imageBase };
   const fullDetails = timestamp === undefined ? details : { ...details, timestamp };
+  const dependencies = readPeImports(bytes, sections, importTableRva, importTableSize);
+  const uncertainty: Uncertainty[] = [];
+  if ((importTableRva ?? 0) > 0 && importTableSize > 0 && dependencies.length === 0) {
+    uncertainty.push({
+      id: "pe-imports-not-resolved",
+      severity: "warning",
+      area: "dependencies",
+      evidence: `PE import data directory points to RVA ${importTableRva} with size ${importTableSize}, but no import descriptors were resolved.`,
+      impact: "Rebuild plans cannot yet name required import libraries with confirmed confidence.",
+      recommendedAction: "Inspect section RVA mappings, import descriptor bounds, and packed/obfuscated import tables.",
+    });
+  }
 
   return {
     details: fullDetails,
     sections,
-    dependencies: [],
+    dependencies,
     evidence: emptyEvidenceGraph(),
-    uncertainty: [{
-      id: "pe-imports-not-resolved",
-      severity: "warning",
-      area: "dependencies",
-      evidence: "PE data directories are recorded but import descriptor walking is not implemented in this core pass.",
-      impact: "Rebuild plans cannot yet name required import libraries with confirmed confidence.",
-      recommendedAction: "Attach a PE import-table adapter and preserve every descriptor/RVA as evidence.",
-    }],
+    uncertainty,
   };
 }
 
@@ -445,7 +497,7 @@ function parseElf(bytes: Uint8Array): ParsedBinary {
     });
   }
 
-  return { details, sections, dependencies, evidence: { symbols, relocations, typeRelationships }, uncertainty };
+  return { details, sections: publicSections(sections), dependencies, evidence: { symbols, relocations, typeRelationships }, uncertainty };
 }
 
 function parseMachO(bytes: Uint8Array): ParsedBinary {
@@ -929,6 +981,36 @@ function readElfTypeRelationships(sections: readonly ElfSectionRecord[], symbols
   return relationships;
 }
 
+function publicSections(sections: readonly ElfSectionRecord[]): BinarySection[] {
+  return sections.map((section) => compactSection({
+    name: section.name,
+    offset: section.offset,
+    size: section.size,
+    virtualAddress: section.virtualAddress,
+    flags: section.flags,
+    confidence: section.confidence,
+  }));
+}
+
+function compactSection(input: {
+  readonly name: string;
+  readonly offset: number;
+  readonly size: number;
+  readonly virtualAddress: number | undefined;
+  readonly flags: readonly string[];
+  readonly confidence: Confidence;
+}): BinarySection {
+  let section: BinarySection = {
+    name: input.name,
+    offset: input.offset,
+    size: input.size,
+    flags: input.flags,
+    confidence: input.confidence,
+  };
+  if (input.virtualAddress !== undefined) section = { ...section, virtualAddress: input.virtualAddress };
+  return section;
+}
+
 function readElfNeededLibraries(
   bytes: Uint8Array,
   sections: readonly BinarySection[],
@@ -958,6 +1040,55 @@ function readElfNeededLibraries(
     }
   }
   return dependencies;
+}
+
+function readPeImports(
+  bytes: Uint8Array,
+  sections: readonly BinarySection[],
+  importTableRva: number | undefined,
+  importTableSize: number,
+): BinaryDependency[] {
+  if (importTableRva === undefined || importTableRva === 0 || importTableSize === 0) return [];
+  const start = peRvaToFileOffset(sections, importTableRva);
+  if (start === undefined) return [];
+  const end = Math.min(bytes.length, start + importTableSize);
+  const dependencies: BinaryDependency[] = [];
+  const seen = new Set<string>();
+
+  for (let offset = start; offset + 20 <= end; offset += 20) {
+    const originalFirstThunk = readU32(bytes, offset, true) ?? 0;
+    const timestamp = readU32(bytes, offset + 4, true) ?? 0;
+    const forwarderChain = readU32(bytes, offset + 8, true) ?? 0;
+    const nameRva = readU32(bytes, offset + 12, true) ?? 0;
+    const firstThunk = readU32(bytes, offset + 16, true) ?? 0;
+    if (originalFirstThunk === 0 && timestamp === 0 && forwarderChain === 0 && nameRva === 0 && firstThunk === 0) break;
+    const nameOffset = peRvaToFileOffset(sections, nameRva);
+    if (nameOffset === undefined) continue;
+    const name = readCString(bytes, nameOffset);
+    if (name.length === 0 || seen.has(name.toLowerCase())) continue;
+    seen.add(name.toLowerCase());
+    dependencies.push({
+      name,
+      kind: "import-library",
+      confidence: "confirmed",
+      evidence: `IMAGE_IMPORT_DESCRIPTOR at file offset ${offset}`,
+    });
+  }
+
+  return dependencies;
+}
+
+function peRvaToFileOffset(sections: readonly BinarySection[], rva: number): number | undefined {
+  for (const section of sections) {
+    if (section.virtualAddress === undefined) continue;
+    const mappedSize = Math.max(section.size, 1);
+    const start = section.virtualAddress;
+    const end = start + mappedSize;
+    if (rva >= start && rva < end) {
+      return section.offset + (rva - start);
+    }
+  }
+  return undefined;
 }
 
 function blockingIds(uncertainty: readonly Uncertainty[]): string[] {
@@ -1100,12 +1231,42 @@ function renderVerifyMarkdown(report: DecompilationReport): string {
   return `${lines.join("\n")}\n`;
 }
 
+function renderBlockedRebuildMarkdown(report: DecompilationReport, blockedBy: readonly string[]): string {
+  const lines = [
+    "# Rebuild Blocked",
+    "",
+    "The generated workspace is an evidence inventory, not a byte-equivalent source reconstruction.",
+    "",
+    `Input SHA-256: \`${report.identity.sha256}\``,
+    `Format: \`${report.identity.format}\``,
+    "",
+    "Byte-equivalent executable rebuild output is blocked by:",
+    "",
+  ];
+  for (const id of blockedBy) lines.push(`- \`${id}\``);
+  lines.push(
+    "",
+    "Resolve these uncertainties with evidence-backed adapters before emitting executable source or claiming binary equivalence.",
+    "",
+  );
+  return `${lines.join("\n")}\n`;
+}
+
 function jsonReplacer(_key: string, value: unknown): unknown {
   return typeof value === "bigint" ? value.toString() : value;
 }
 
 function cString(value: string): string {
   return value.replaceAll("\\", "\\\\").replaceAll("\"", "\\\"");
+}
+
+function validateWorkspaceRelativePath(path: string): string {
+  if (path.includes("\0")) throw new Error("Generated workspace path contains a null byte.");
+  const normalized = normalize(path.replaceAll("\\", "/"));
+  if (isAbsolute(normalized) || normalized === "." || normalized.startsWith("..") || normalized.split("/").includes("..")) {
+    throw new Error(`Generated workspace path is not safely relative: ${path}`);
+  }
+  return normalized;
 }
 
 function ascii(bytes: Uint8Array): string {

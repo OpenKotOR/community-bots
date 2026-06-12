@@ -188,8 +188,34 @@ export const splitReportIntoPassages = (report: string): EvidencePassage[] => {
   return passages;
 };
 
+const textToEvidenceSentences = (text: string): string => {
+  const cleanedLines: string[] = [];
+  for (const rawLine of text.replace(/\r\n/g, "\n").split("\n")) {
+    let line = rawLine.trim();
+    if (!line) continue;
+    if (/^#{1,6}\s+/u.test(line)) continue;
+    if (/^!\[[^\]]*\]\([^)]*\)$/u.test(line)) continue;
+    if (/^There was an error while loading\b/iu.test(line)) continue;
+    if (/^Loading\s+\[/iu.test(line)) continue;
+
+    line = line
+      .replace(/!\[([^\]]*)\]\([^)]*\)/gu, "$1")
+      .replace(/\[([^\]]+)\]\([^)]*\)/gu, "$1")
+      .replace(/\[\]\([^)]*\)/gu, "")
+      .replace(/^[*+-]\s+/u, "")
+      .replace(/\*+/gu, "")
+      .replace(/`+/gu, "")
+      .trim();
+
+    if (!line) continue;
+    if (/^(For Mod Developers|Quick Info|Featured|Uh oh!)$/iu.test(line)) continue;
+    cleanedLines.push(line);
+  }
+  return cleanedLines.join(" ").replace(/\s+/gu, " ").trim();
+};
+
 const sentenceChunks = (text: string): string[] =>
-  text
+  textToEvidenceSentences(text)
     .split(/(?<=[.!?])\s+/)
     .map((sentence) => sentence.trim())
     .filter((sentence) => sentence.length > 20);

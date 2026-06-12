@@ -2,6 +2,8 @@
 
 The decompilation platform starts from a proof-first contract: every generated artifact must be traceable to binary evidence, recovered metadata, or an explicitly recorded operator input. It must not emit guessed logic, fake compiler flags, or target-specific shortcuts as if they were recovered source.
 
+Operational risks and failure modes are tracked in `docs/knowledgebase/40-operational-risk/decomp-platform-risk-register.md`.
+
 ## Pipeline
 
 1. **Intake** records immutable identity: path, byte length, SHA-256, and detected container format.
@@ -17,14 +19,17 @@ The decompilation platform starts from a proof-first contract: every generated a
 
 - deterministic format detection for PE, ELF, Mach-O, universal Mach-O, static libraries, firmware-like images, and unknown inputs
 - bounded PE/ELF/Mach-O/archive metadata extraction
+- PE import-directory walking for confirmed import-library dependencies
 - an explicit evidence graph for recovered symbols, relocations, and type/calling-convention hints
 - ELF `.symtab` / `.dynsym` symbol extraction, relocation-section extraction, `DT_NEEDED` dependency extraction, and DWARF/unwind presence signals
 - uncertainty ledger entries for missing compiler profiles, import/load-command expansion, semantic lifting, and layout gaps
 - rebuild-plan and equivalence-check generation
 - reconstruction workspace generation with `manifest.json`, `recovered_inventory.c`, `CMakeLists.txt`, `UNCERTAINTY.md`, and `VERIFY.md`
+- proof-gated workspace writing with path traversal protection and `BLOCKED_REBUILD.md` when byte-equivalent rebuild is not yet justified
 - byte-for-byte equivalence reporting
 - CLI entrypoint: `decomp-analyze <binary-path> --pretty`
 - CLI workspace mode: `decomp-analyze <binary-path> --workspace --pretty`
+- CLI write mode: `decomp-analyze <binary-path> --write-workspace <output-dir> --pretty`
 
 ## Non-Negotiables
 
@@ -37,8 +42,8 @@ The decompilation platform starts from a proof-first contract: every generated a
 
 ## Next Architecture Gaps
 
-- PE import/export/resource/relocation and Rich/PDB evidence adapters
+- PE export/resource/relocation and Rich/PDB evidence adapters
 - ELF notes, versioning, `.comment`, GNU property, build-id debug-file discovery, and full relocation-type decoding
 - Mach-O load-command, dyld info, Objective-C, Swift, and chained-fixup adapter
 - architecture-specific lifter interface with proof objects for control flow, data flow, calling convention, and type recovery
-- generated reconstruction workspace writer that refuses to build while blocker uncertainty remains unresolved
+- executable source/lifter integration that only appears after per-function proof objects remove blocker uncertainty
