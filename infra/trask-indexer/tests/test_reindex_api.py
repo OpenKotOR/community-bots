@@ -41,7 +41,7 @@ def test_reindex_accepts_valid_token_and_runs_background(client, monkeypatch):
         calls.append({"limit": limit, "dry_run": dry_run})
         return BatchCrawlResult(attempted=3, indexed=3, failed=0, dry_run=dry_run)
 
-    monkeypatch.setattr(retrieve_api, "run_batch_crawl", fake_crawl)
+    monkeypatch.setattr("trask_indexer.batch_crawl.run_batch_crawl", fake_crawl)
 
     res = client.post(
         "/reindex",
