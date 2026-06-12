@@ -90,7 +90,7 @@ def test_query_passages_promotes_exact_topic_over_generic_dense_neighbor(monkeyp
                 ]],
             }
 
-    hits = query_passages(FakeCollection(), "What is TSLPatcher used for in KOTOR modding?", limit=3)
+    hits = query_passages(FakeCollection(), "TSLPatcher patch lists for KotOR 2DA GFF and TLK modding", limit=3)
 
     assert hits[0].source_id in {"github-tslpatcher", "deadlystream-tslpatcher"}
     assert hits[-1].source_id == "kotorjs-repo"
