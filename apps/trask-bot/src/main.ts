@@ -460,7 +460,7 @@ const proactiveChannelIds =
   config.proactive.channelIds.length > 0 ? config.proactive.channelIds : config.approvedChannelIds;
 
 const proactiveRuntimeReady =
-  config.proactive.enabled && proactiveChannelIds.length > 0 && config.ai.aiProviders.length > 0;
+  config.proactive.enabled && proactiveChannelIds.length > 0;
 const welcomeRuntimeReady = Boolean(config.welcome?.channelId && config.welcome.message);
 
 const client = createBotClient(
@@ -474,7 +474,7 @@ if (config.proactive.enabled && !proactiveRuntimeReady) {
   logger.warn("TRASK_PROACTIVE_ENABLED is set but proactive mode cannot start.", {
     configuredAiProviders: config.ai.aiProviders.map((provider) => provider.id),
     resolvedProactiveChannelCount: proactiveChannelIds.length,
-    hint: "Set TRASK_APPROVED_CHANNEL_IDS or TRASK_PROACTIVE_CHANNEL_IDS and configure HF_TOKEN or Cloudflare AI Gateway credentials.",
+    hint: "Set TRASK_APPROVED_CHANNEL_IDS or TRASK_PROACTIVE_CHANNEL_IDS.",
   });
 }
 

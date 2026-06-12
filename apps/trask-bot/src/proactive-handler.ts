@@ -6,6 +6,7 @@ import type { TraskBotConfig } from "@openkotor/config";
 import type { Logger } from "@openkotor/core";
 import type { JsonTraskQueryRepository } from "@openkotor/persistence";
 import {
+  classifyTraskProactiveMessageHeuristic,
   classifyTraskProactiveMessage,
   createEmbeddingClient,
   createOpenAiClient,
@@ -140,8 +141,7 @@ export const registerTraskProactiveHandlers = (
   const embeddingRuntime = createEmbeddingClient(config.ai);
 
   if (!openAi) {
-    logger.warn("Trask proactive mode needs a configured Hugging Face or Cloudflare AI provider for classification and embeddings.");
-    return;
+    logger.warn("Trask proactive mode has no hosted classifier provider; using conservative local KOTOR question heuristic.");
   }
 
   const channelAllowlist = new Set(resolveProactiveChannelIds(config));
@@ -306,11 +306,13 @@ export const registerTraskProactiveHandlers = (
         return;
       }
 
-      const classification = await classifyTraskProactiveMessage(
-        openAi,
-        config.proactive.classifierModel,
-        pending.content,
-      );
+      const classification = openAi
+        ? await classifyTraskProactiveMessage(
+            openAi,
+            config.proactive.classifierModel,
+            pending.content,
+          )
+        : classifyTraskProactiveMessageHeuristic(pending.content);
 
       if (
         !classification ||

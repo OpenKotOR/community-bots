@@ -209,6 +209,8 @@ const textToEvidenceSentences = (text: string): string => {
 
     if (!line) continue;
     if (/^(For Mod Developers|Quick Info|Featured|Uh oh!)$/iu.test(line)) continue;
+    if (/^Loading\b/iu.test(line)) continue;
+    if (/\b(?:requirements-dev|package-lock|pnpm-lock|node_modules)\b/iu.test(line)) continue;
     cleanedLines.push(line);
   }
   return cleanedLines.join(" ").replace(/\s+/gu, " ").trim();
@@ -218,7 +220,26 @@ const sentenceChunks = (text: string): string[] =>
   textToEvidenceSentences(text)
     .split(/(?<=[.!?])\s+/)
     .map((sentence) => sentence.trim())
-    .filter((sentence) => sentence.length > 20);
+    .filter((sentence) => sentence.length > 20 && /[.!?]$/u.test(sentence));
+
+const restoreQuerySubjectWhenStripped = (
+  query: string | undefined,
+  original: string,
+  cleaned: string,
+): string => {
+  if (!query?.trim()) return cleaned;
+  const cleanedLower = cleaned.toLowerCase();
+  const originalLower = original.toLowerCase();
+  const token = distinctiveAnchorTokens(query)
+    .find((candidate) =>
+      originalLower.includes(candidate.toLowerCase())
+      && !cleanedLower.includes(candidate.toLowerCase()),
+    );
+  if (!token) return cleaned;
+  const match = original.match(new RegExp(`\\b${token.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}\\b`, "iu"));
+  const label = match?.[0] ?? token;
+  return `${label}: ${cleaned}`;
+};
 
 export const extractClaimsHeuristic = (
   query: string,
@@ -752,7 +773,8 @@ export const claimsFromDistinctPassages = (
     const citationUrl = publicCitationUrlForPassage(passage);
     if (!citationUrl.startsWith("http")) continue;
     if (seenUrls.has(citationUrl)) continue;
-    const text = passage.text.replace(/\s+/g, " ").trim();
+    const cleanedText = sentenceChunks(passage.text).join(" ");
+    const text = restoreQuerySubjectWhenStripped(query, passage.text, cleanedText);
     if (text.length < 24) continue;
     const claimText = text.length > 280 ? `${text.slice(0, 277)}…` : text;
     claims.push({

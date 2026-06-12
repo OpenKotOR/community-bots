@@ -16,3 +16,6 @@ new_sqlite_classes = ["TraskAgent"]
 TRASK_WEB_ALLOW_ANONYMOUS = "1"
 TRASK_BUILTIN_API = "0"
 TRASK_BUILTIN_FALLBACK = "0"
+# Set this to the public trask-retrieve Worker in production. Keep retrieval
+# behind that Worker boundary rather than raw Chroma/indexer hosts.
+TRASK_RETRIEVE_BASE_URL = "http://127.0.0.1:8787"

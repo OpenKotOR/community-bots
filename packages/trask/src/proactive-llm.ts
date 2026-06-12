@@ -31,6 +31,29 @@ export interface TraskProactiveClassification {
   readonly confidence: number;
 }
 
+const QUESTION_RE = /\?|^\s*(?:can|could|do|does|how|is|should|what|when|where|which|who|why|would)\b/iu;
+const KOTOR_RELEVANCE_RE = /\b(?:kotor|kotOR|tsl|tslrcm|knights of the old republic|sith lords|tslpatcher|holopatcher|2da|gff|tlk|mdlops|mdx|mdl|pykotor|kotorblender|holocron toolset|deadly stream|widescreen|save files?|snigaroo|cortisol|th3w1zard1)\b/iu;
+const CHATTER_RE = /\b(?:lol|lmao|haha|meme|favorite|vibes|good morning|good night)\b/iu;
+
+export const classifyTraskProactiveMessageHeuristic = (content: string): TraskProactiveClassification => {
+  const trimmed = content.trim().slice(0, 500);
+  const isQuestion = QUESTION_RE.test(trimmed);
+  const kotorRelevant = KOTOR_RELEVANCE_RE.test(trimmed);
+  const chatterPenalty = CHATTER_RE.test(trimmed) && !isQuestion ? 0.25 : 0;
+  const confidence =
+    isQuestion && kotorRelevant
+      ? Math.max(0.58, 0.78 - chatterPenalty)
+      : isQuestion || kotorRelevant
+        ? Math.max(0.2, 0.42 - chatterPenalty)
+        : Math.max(0, 0.08 - chatterPenalty);
+
+  return {
+    isQuestion,
+    kotorRelevant,
+    confidence,
+  };
+};
+
 /** Raw LLM JSON object; fields may arrive as strings or booleans depending on provider. */
 interface ClassificationJson {
   readonly is_question?: string | number | boolean | null;

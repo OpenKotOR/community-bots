@@ -115,6 +115,23 @@ test("extractClaimsHeuristic strips source headings from TSLPatcher brief eviden
   assert.match(body, /mod authors ship list-driven 2DA, GFF, and TLK changes/i);
   assert.match(body, /mod installation tool for Knights of the Old Republic/i);
   assert.equal(collectCitationIndicesFromAnswer(answer).length, 2);
+
+  const fallbackClaims = claimsFromDistinctPassages(passages, 2, "What is TSLPatcher used for in KOTOR modding?", {
+    preserveDistinctPassagePool: true,
+  });
+  const fallbackAnswer = composeGroundedAnswerFromClaims(
+    "What is TSLPatcher used for in KOTOR modding?",
+    fallbackClaims,
+    [
+      { ...sources[0]!, homeUrl: passages[0]!.url },
+      { ...sources[1]!, homeUrl: passages[1]!.url },
+    ],
+    "brief",
+  );
+  const { body: fallbackBody } = splitResearchAnswer(fallbackAnswer);
+  assert.doesNotMatch(fallbackBody, /TSLPatcher on GitHub The TSLPatcher project/);
+  assert.match(fallbackBody, /mod installation tool for Knights of the Old Republic/i);
+  assert.equal(collectCitationIndicesFromAnswer(fallbackAnswer).length, 2);
 });
 
 test("composeGroundedAnswerFromClaims emits Sources for cited indices", () => {

@@ -47,7 +47,7 @@ jobs:
         env:
           TRASK_WEB_ALLOW_ANONYMOUS: "1"
           TRASK_BUILTIN_API: "1"
-        run: pnpm dlx wrangler@4.87.0 deploy --config infra/trask-worker/wrangler.toml --dry-run --var "TRASK_WEB_ALLOW_ANONYMOUS:${TRASK_WEB_ALLOW_ANONYMOUS}" --var "TRASK_BUILTIN_API:${TRASK_BUILTIN_API}"
+        run: pnpm dlx wrangler@4.100.0 deploy --config infra/trask-worker/wrangler.toml --dry-run --var "TRASK_WEB_ALLOW_ANONYMOUS:${TRASK_WEB_ALLOW_ANONYMOUS}" --var "TRASK_BUILTIN_API:${TRASK_BUILTIN_API}"
 
   deploy:
     needs: verify-bundle
@@ -60,6 +60,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           TRASK_RESEARCHWIZARD_BASE_URL: ${{ vars.TRASK_RESEARCHWIZARD_BASE_URL }}
+          TRASK_RETRIEVE_BASE_URL: ${{ vars.TRASK_RETRIEVE_BASE_URL }}
           TRASK_BUILTIN_API: ${{ vars.TRASK_BUILTIN_API != '' && vars.TRASK_BUILTIN_API || '1' }}
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
@@ -84,6 +85,16 @@ jobs:
           if [[ "$TRASK_RESEARCHWIZARD_BASE_URL" == *"example.com"* ]]; then
             echo "configured=false" >> "$GITHUB_OUTPUT"
             echo "::notice::Skipping deploy. Replace placeholder TRASK_RESEARCHWIZARD_BASE_URL or set TRASK_BUILTIN_API=1."
+            exit 0
+          fi
+          if [ -z "$TRASK_RETRIEVE_BASE_URL" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping deploy. Set TRASK_RETRIEVE_BASE_URL so agent evidence commands do not deploy with the local dev default."
+            exit 0
+          fi
+          if [[ "$TRASK_RETRIEVE_BASE_URL" == http://127.0.0.1* ]] || [[ "$TRASK_RETRIEVE_BASE_URL" == http://localhost* ]] || [[ "$TRASK_RETRIEVE_BASE_URL" == *"example.com"* ]]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping deploy. Replace placeholder/local TRASK_RETRIEVE_BASE_URL with the public retrieve Worker origin."
             exit 0
           fi
           echo "configured=true" >> "$GITHUB_OUTPUT"
@@ -126,7 +137,7 @@ jobs:
           TRASK_RESEARCHWIZARD_API_KEY: ${{ secrets.TRASK_RESEARCHWIZARD_API_KEY }}
         run: |
           if [ -n "$TRASK_RESEARCHWIZARD_API_KEY" ]; then
-            echo -n "$TRASK_RESEARCHWIZARD_API_KEY" | pnpm dlx wrangler@4.87.0 secret put TRASK_RESEARCHWIZARD_API_KEY --config infra/trask-worker/wrangler.toml
+            echo -n "$TRASK_RESEARCHWIZARD_API_KEY" | pnpm dlx wrangler@4.100.0 secret put TRASK_RESEARCHWIZARD_API_KEY --config infra/trask-worker/wrangler.toml
           else
             echo "Skipping TRASK_RESEARCHWIZARD_API_KEY sync (secret not set)."
           fi
@@ -140,7 +151,7 @@ jobs:
           TRASK_WEB_API_KEY: ${{ secrets.TRASK_WEB_API_KEY }}
         run: |
           if [ -n "$TRASK_WEB_API_KEY" ]; then
-            echo -n "$TRASK_WEB_API_KEY" | pnpm dlx wrangler@4.87.0 secret put TRASK_WEB_API_KEY --config infra/trask-worker/wrangler.toml
+            echo -n "$TRASK_WEB_API_KEY" | pnpm dlx wrangler@4.100.0 secret put TRASK_WEB_API_KEY --config infra/trask-worker/wrangler.toml
           else
             echo "Skipping TRASK_WEB_API_KEY sync (secret not set)."
           fi
@@ -151,6 +162,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           TRASK_RESEARCHWIZARD_BASE_URL: ${{ vars.TRASK_RESEARCHWIZARD_BASE_URL }}
+          TRASK_RETRIEVE_BASE_URL: ${{ vars.TRASK_RETRIEVE_BASE_URL }}
           TRASK_WEB_ALLOW_ANONYMOUS: ${{ vars.TRASK_WEB_ALLOW_ANONYMOUS != '' && vars.TRASK_WEB_ALLOW_ANONYMOUS || '1' }}
           TRASK_BUILTIN_API: ${{ vars.TRASK_BUILTIN_API != '' && vars.TRASK_BUILTIN_API || '1' }}
           TRASK_BUILTIN_FALLBACK: ${{ vars.TRASK_BUILTIN_FALLBACK != '' && vars.TRASK_BUILTIN_FALLBACK || '1' }}
@@ -165,7 +177,10 @@ jobs:
           if [ "${{ steps.cf_check.outputs.builtin }}" != "true" ] && [ -n "${TRASK_RESEARCHWIZARD_BASE_URL}" ]; then
             deploy_args+=(--var "TRASK_RESEARCHWIZARD_BASE_URL:${TRASK_RESEARCHWIZARD_BASE_URL}")
           fi
-          pnpm dlx wrangler@4.87.0 deploy "${deploy_args[@]}"
+          if [ -n "${TRASK_RETRIEVE_BASE_URL}" ]; then
+            deploy_args+=(--var "TRASK_RETRIEVE_BASE_URL:${TRASK_RETRIEVE_BASE_URL}")
+          fi
+          pnpm dlx wrangler@4.100.0 deploy "${deploy_args[@]}"
 
       - name: Verify deployed worker health
         if: steps.cf_check.outputs.configured == 'true'

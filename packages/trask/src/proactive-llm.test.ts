@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  classifyTraskProactiveMessageHeuristic,
   parseTraskProactiveClassificationJson,
   scoreLexicalResearchAlignment,
 } from "./proactive-llm.js";
@@ -69,4 +70,34 @@ test("scoreLexicalResearchAlignment rejects weak unrelated evidence", () => {
   });
 
   assert.equal(score, 0);
+});
+
+test("classifyTraskProactiveMessageHeuristic accepts KOTOR modding questions", () => {
+  const result = classifyTraskProactiveMessageHeuristic(
+    "Can TSLPatcher safely patch 2DA, GFF, and TLK changes for KotOR mods?",
+  );
+
+  assert.equal(result.isQuestion, true);
+  assert.equal(result.kotorRelevant, true);
+  assert.ok(result.confidence >= 0.55, String(result.confidence));
+});
+
+test("classifyTraskProactiveMessageHeuristic rejects off-topic questions", () => {
+  const result = classifyTraskProactiveMessageHeuristic(
+    "Can anyone recommend a good pizza place downtown?",
+  );
+
+  assert.equal(result.isQuestion, true);
+  assert.equal(result.kotorRelevant, false);
+  assert.ok(result.confidence < 0.55, String(result.confidence));
+});
+
+test("classifyTraskProactiveMessageHeuristic rejects KOTOR chatter without a question", () => {
+  const result = classifyTraskProactiveMessageHeuristic(
+    "KOTOR vibes are immaculate tonight lol",
+  );
+
+  assert.equal(result.isQuestion, false);
+  assert.equal(result.kotorRelevant, true);
+  assert.ok(result.confidence < 0.55, String(result.confidence));
 });

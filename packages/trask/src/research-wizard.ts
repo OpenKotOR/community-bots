@@ -33,6 +33,8 @@ import {
 } from "./web-research.js";
 import {
   BRIEF_DISCORD_MIN_CITATIONS,
+  distinctiveAnchorTokens,
+  haystackIncludesToken,
   passageMatchesQueryAnchor,
 } from "./query-anchor.js";
 import {
@@ -637,6 +639,26 @@ const formatSourcesSection = (sources: readonly SourceDescriptor[]): string => {
     ...sources.map((source, index) => `${index + 1}. ${source.name} - ${source.homeUrl}`),
   ].join("\n");
 };
+
+const answerHasSubstantiveBody = (answer: string): boolean => {
+  const body = _splitAtSourcesHeading(answer)
+    .replace(/\[\d+\]/gu, "")
+    .replace(/\bSources\b/giu, "")
+    .trim();
+  return /[A-Za-z0-9]{3,}/u.test(body);
+};
+
+const sourceMatchesSpecificQueryAnchor = (source: SourceDescriptor, query: string): boolean => {
+  const haystack = `${source.name} ${source.description ?? ""} ${source.homeUrl}`.toLowerCase();
+  return distinctiveAnchorTokens(query)
+    .filter((token) => token.length >= 4)
+    .some((token) => haystackIncludesToken(haystack, token));
+};
+
+const fallbackSourcesAlignedToQuery = (
+  query: string,
+  sources: readonly SourceDescriptor[],
+): SourceDescriptor[] => sources.filter((source) => sourceMatchesSpecificQueryAnchor(source, query));
 
 const countPayloadWebUrls = (payload: ResearchWizardResponsePayload): number => {
   const info = payload.research_information;
@@ -1987,16 +2009,24 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
         : alignCitedSourcesToAnswer(answer, candidatePool);
 
       if (
-        citedSources.length < MIN_HOLOCRON_WEB_CITATIONS
-        && collectCitationIndicesFromAnswer(answer).length < MIN_HOLOCRON_WEB_CITATIONS
-        && !grounded
+        (
+          !answerHasSubstantiveBody(answer)
+          || (
+            citedSources.length < MIN_HOLOCRON_WEB_CITATIONS
+            && collectCitationIndicesFromAnswer(answer).length < MIN_HOLOCRON_WEB_CITATIONS
+          )
+        )
       ) {
-        const fallbackSources = filterPublicWebCitationSources(
-          resolveWebSourcesForFailedSynthesis(query, retrievedSources),
+        const fallbackSources = fallbackSourcesAlignedToQuery(
+          query,
+          filterPublicWebCitationSources(resolveWebSourcesForFailedSynthesis(query, retrievedSources)),
         );
         if (fallbackSources.length > 0) {
           answer = sourceOnlyFallbackAnswer(query, fallbackSources);
           citedSources = alignCitedSourcesToAnswer(answer, fallbackSources);
+        } else if (!answerHasSubstantiveBody(answer)) {
+          answer = degradedAnswerFallback(query, approvedSources);
+          citedSources = [];
         }
       }
 
@@ -2138,8 +2168,9 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
             "brief",
           );
         } else if (retrievedSources.length > 0) {
-          const ranked = filterPublicWebCitationSources(
-            rerankEvidenceSources(query, retrievedSources).slice(0, 5),
+          const ranked = fallbackSourcesAlignedToQuery(
+            query,
+            filterPublicWebCitationSources(rerankEvidenceSources(query, retrievedSources)).slice(0, 5),
           );
           answer =
             ranked.length >= BRIEF_DISCORD_MIN_CITATIONS
@@ -2155,14 +2186,14 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
         try {
           answer = await this.rewriteForDiscordBrief(query, enrichedReport, retrievedSources, budget);
         } catch {
-          const ranked = filterPublicWebCitationSources(retrievedSources);
+          const ranked = fallbackSourcesAlignedToQuery(query, filterPublicWebCitationSources(retrievedSources));
           answer =
             ranked.length >= BRIEF_DISCORD_MIN_CITATIONS
               ? briefDualSourceAnswer(query, ranked)
               : sourceOnlyFallbackAnswer(query, ranked);
         }
       } else if (retrievedSources.length > 0) {
-        const ranked = filterPublicWebCitationSources(retrievedSources);
+        const ranked = fallbackSourcesAlignedToQuery(query, filterPublicWebCitationSources(retrievedSources));
         answer =
           ranked.length >= BRIEF_DISCORD_MIN_CITATIONS
             ? briefDualSourceAnswer(query, ranked)
@@ -2181,9 +2212,30 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
         options,
       );
 
-      const citedSources = grounded
+      let citedSources = grounded
         ? grounded.approvedSources
         : alignCitedSourcesToAnswer(answer, candidatePool);
+
+      if (!answerHasSubstantiveBody(answer) || citedSources.length === 0) {
+        const ranked = filterCitationSourcesForSurface(
+          fallbackSourcesAlignedToQuery(
+            query,
+            filterPublicWebCitationSources(rerankEvidenceSources(query, retrievedSources)).slice(0, 5),
+          ),
+          surfaceProfileId,
+          options,
+        );
+        if (ranked.length >= BRIEF_DISCORD_MIN_CITATIONS) {
+          answer = briefDualSourceAnswer(query, ranked);
+          citedSources = alignCitedSourcesToAnswer(answer, ranked);
+        } else if (ranked.length > 0) {
+          answer = sourceOnlyFallbackAnswer(query, ranked);
+          citedSources = alignCitedSourcesToAnswer(answer, ranked);
+        } else {
+          answer = degradedAnswerFallback(query, approvedSources);
+          citedSources = [];
+        }
+      }
 
       const passagesCount = Number(
         payload.research_information?.passages_count ?? payload.passages?.length ?? 0,

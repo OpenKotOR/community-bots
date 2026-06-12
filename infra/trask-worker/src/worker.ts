@@ -1,5 +1,11 @@
 import { Agent, callable, routeAgentRequest } from "agents";
 
+import {
+  capabilitiesBody,
+  commandToRequest,
+  readJsonObject,
+  stringValue,
+} from "./agent-surface.js";
 import { handleBuiltinRequest } from "./builtin-trask-api.js";
 
 interface Env {
@@ -8,6 +14,8 @@ interface Env {
   TRASK_WEB_ALLOW_ANONYMOUS?: string;
   TRASK_RESEARCHWIZARD_BASE_URL?: string;
   TRASK_RESEARCHWIZARD_API_KEY?: string;
+  TRASK_RETRIEVE_BASE_URL?: string;
+  TRASK_REINDEX_TOKEN?: string;
   TRASK_BUILTIN_API?: string;
   TRASK_BUILTIN_FALLBACK?: string;
 }
@@ -19,60 +27,6 @@ interface TraskAgentState {
   lastStatus?: number;
   lastUpdatedAt?: string;
 }
-
-interface TraskAgentCommand {
-  name: string;
-  description: string;
-  method: "GET" | "POST";
-  path: string;
-  body?: Record<string, string>;
-}
-
-const TRASK_AGENT_COMMANDS: readonly TraskAgentCommand[] = [
-  {
-    name: "ask",
-    description: "Submit a Trask research query through the configured live Trask HTTP upstream.",
-    method: "POST",
-    path: "/api/trask/ask",
-    body: { query: "string", modelId: "optional string", sourcePreference: "optional string" },
-  },
-  {
-    name: "thread",
-    description: "Fetch a persisted Trask query/thread by id after an async ask response.",
-    method: "GET",
-    path: "/api/trask/thread/:id",
-  },
-  {
-    name: "history",
-    description: "List persisted Trask query history for the configured web user.",
-    method: "GET",
-    path: "/api/trask/history",
-  },
-  {
-    name: "sources",
-    description: "List approved Trask source records surfaced by the HTTP runtime.",
-    method: "GET",
-    path: "/api/trask/sources",
-  },
-  {
-    name: "session",
-    description: "Inspect the public Holocron/Trask session capability state.",
-    method: "GET",
-    path: "/api/trask/session",
-  },
-  {
-    name: "health",
-    description: "Probe the Worker and configured Trask HTTP upstream.",
-    method: "GET",
-    path: "/healthz",
-  },
-  {
-    name: "capabilities",
-    description: "Return this agent command registry.",
-    method: "GET",
-    path: "/api/agent/capabilities",
-  },
-];
 
 function corsHeaders(origin: string | null): Headers {
   const headers = new Headers();
@@ -399,83 +353,105 @@ async function serveWorkerRoute(
   return serveUpstreamOrFallback(request, env, origin, url);
 }
 
-function capabilitiesBody() {
-  return {
-    agent: "TraskAgent",
-    agentRoute: "/agents/trask-agent/default",
-    convenienceRoutes: {
-      capabilities: "/api/agent/capabilities",
-      status: "/api/agent/status",
-      state: "/api/agent/state",
-      query: "/api/agent/query",
-      command: "/api/agent/command",
-    },
-    commands: TRASK_AGENT_COMMANDS.map((command) => ({ ...command })),
-    notes: [
-      "Trask research commands proxy to the configured live Trask HTTP upstream.",
-      "State is persisted by the Agents SDK Durable Object instance.",
-      "Use TRASK_WEB_API_KEY to protect public agent routes, or TRASK_WEB_ALLOW_ANONYMOUS=1 for public Holocron.",
-    ],
-  };
+function retrieveBaseUrl(env: Env): string {
+  return normalizeBackendBaseUrl((env.TRASK_RETRIEVE_BASE_URL ?? "").trim());
 }
 
-function readJsonObject(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return {};
-  }
-  return value as Record<string, unknown>;
+function positiveIntegerArg(value: unknown, fallback: number): number {
+  const parsed = Number.parseInt(String(value ?? ""), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function stringValue(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
+function jsonHeaders(extra?: Record<string, string>): Headers {
+  return new Headers({ "Content-Type": "application/json", Accept: "application/json", ...(extra ?? {}) });
 }
 
-function commandToRequest(command: string, args: Record<string, unknown>, baseUrl: string): Request {
-  const url = new URL(baseUrl);
+async function fetchJsonCommand(url: string, init: RequestInit): Promise<Response> {
+  const response = await fetch(url, init);
+  const text = await response.text();
+  const headers = new Headers();
+  headers.set("Content-Type", response.headers.get("Content-Type") ?? "application/json");
+  return new Response(text, { status: response.status, statusText: response.statusText, headers });
+}
+
+async function executeRetrieveCommand(command: string, args: Record<string, unknown>, env: Env): Promise<Response> {
   const normalized = command.trim().toLowerCase();
-
-  if (normalized === "ask" || normalized === "query" || normalized === "research") {
-    url.pathname = "/api/trask/ask";
-    return new Request(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        query: stringValue(args.query || args.question || args.prompt),
-        ...(stringValue(args.modelId) ? { modelId: stringValue(args.modelId) } : {}),
-        ...(stringValue(args.sourcePreference) ? { sourcePreference: stringValue(args.sourcePreference) } : {}),
-      }),
+  const baseUrl = retrieveBaseUrl(env);
+  if (!baseUrl) {
+    return new Response(JSON.stringify({ error: "TRASK_RETRIEVE_BASE_URL is not configured." }), {
+      status: 503,
+      headers: jsonHeaders(),
     });
   }
 
-  if (normalized === "thread") {
-    const id = stringValue(args.id || args.threadId || args.queryId);
-    url.pathname = `/api/trask/thread/${encodeURIComponent(id)}`;
-    return new Request(url, { method: "GET" });
+  if (normalized === "evidence") {
+    const query = stringValue(args.query || args.question || args.prompt);
+    if (!query) {
+      return new Response(JSON.stringify({ error: "Evidence command requires query." }), {
+        status: 422,
+        headers: jsonHeaders(),
+      });
+    }
+    return fetchJsonCommand(`${baseUrl}/retrieve`, {
+      method: "POST",
+      headers: jsonHeaders(),
+      body: JSON.stringify({ query, limit: positiveIntegerArg(args.limit, 8) }),
+    });
   }
 
-  if (normalized === "history") {
-    url.pathname = "/api/trask/history";
-    const limit = stringValue(args.limit);
-    if (limit) url.searchParams.set("limit", limit);
-    return new Request(url, { method: "GET" });
+  if (normalized === "refresh-dry-run") {
+    const token = (env.TRASK_REINDEX_TOKEN ?? "").trim();
+    if (!token) {
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          dryRun: true,
+          skippedReason: "TRASK_REINDEX_TOKEN is not set; dry-run request not sent.",
+          request: { url: `${baseUrl}/reindex`, body: { dryRun: true, limit: positiveIntegerArg(args.limit, 5) } },
+        }),
+        { status: 424, headers: jsonHeaders() },
+      );
+    }
+    return fetchJsonCommand(`${baseUrl}/reindex`, {
+      method: "POST",
+      headers: jsonHeaders({ Authorization: `Bearer ${token}` }),
+      body: JSON.stringify({ dryRun: true, limit: positiveIntegerArg(args.limit, 5) }),
+    });
   }
 
-  if (normalized === "sources") {
-    url.pathname = "/api/trask/sources";
-    return new Request(url, { method: "GET" });
-  }
+  throw Object.assign(new Error(`Unknown retrieve command: ${command}`), { status: 422 });
+}
 
-  if (normalized === "session") {
-    url.pathname = "/api/trask/session";
-    return new Request(url, { method: "GET" });
-  }
+function isRetrieveCommand(command: string): boolean {
+  const normalized = command.trim().toLowerCase();
+  return normalized === "evidence" || normalized === "refresh-dry-run";
+}
 
-  if (normalized === "health") {
-    url.pathname = "/healthz";
-    return new Request(url, { method: "GET" });
+function purgeDiscordDryRunResponse(args: Record<string, unknown>): Response {
+  const channelId = stringValue(args.channelId || args.channel_id);
+  const messageId = stringValue(args.messageId || args.message_id);
+  const guildId = stringValue(args.guildId || args.guild_id);
+  if (!channelId || !messageId) {
+    return new Response(JSON.stringify({ error: "purge-discord-message requires channelId and messageId." }), {
+      status: 422,
+      headers: jsonHeaders(),
+    });
   }
-
-  throw Object.assign(new Error(`Unknown Trask agent command: ${command}`), { status: 422 });
+  return new Response(
+    JSON.stringify({
+      ok: true,
+      dryRun: true,
+      mutates: true,
+      command: "purge-discord-message",
+      note: "Cloudflare Worker prepares purge requests only. Execute repository purge tooling with explicit operator approval.",
+      request: {
+        channelId,
+        messageId,
+        ...(guildId ? { guildId } : {}),
+      },
+    }),
+    { status: 200, headers: jsonHeaders() },
+  );
 }
 
 function withCors(response: Response, origin: string | null): Response {
@@ -514,7 +490,46 @@ export class TraskAgent extends Agent<Env, TraskAgentState> {
 
   @callable()
   async command(command: string, args: Record<string, unknown> = {}) {
-    const request = commandToRequest(command, readJsonObject(args), "https://trask-agent.local/");
+    const commandArgs = readJsonObject(args);
+    if (command.trim().toLowerCase() === "capabilities") {
+      this.setState({
+        ...this.state,
+        totalCommands: this.state.totalCommands + 1,
+        lastCommand: command,
+        lastStatus: 200,
+        lastUpdatedAt: new Date().toISOString(),
+      });
+      return { ok: true, status: 200, body: capabilitiesBody() };
+    }
+    if (isRetrieveCommand(command)) {
+      const response = await executeRetrieveCommand(command, commandArgs, this.env);
+      this.setState({
+        ...this.state,
+        totalCommands: this.state.totalCommands + 1,
+        lastCommand: command,
+        lastQuery: typeof commandArgs.query === "string" ? commandArgs.query : this.state.lastQuery,
+        lastStatus: response.status,
+        lastUpdatedAt: new Date().toISOString(),
+      });
+      const contentType = response.headers.get("content-type") ?? "";
+      if (contentType.includes("application/json")) {
+        return { ok: response.ok, status: response.status, body: await response.json() };
+      }
+      return { ok: response.ok, status: response.status, body: { text: await response.text() } };
+    }
+    if (command.trim().toLowerCase() === "purge-discord-message") {
+      const response = purgeDiscordDryRunResponse(commandArgs);
+      this.setState({
+        ...this.state,
+        totalCommands: this.state.totalCommands + 1,
+        lastCommand: command,
+        lastStatus: response.status,
+        lastUpdatedAt: new Date().toISOString(),
+      });
+      return { ok: response.ok, status: response.status, body: await response.json() };
+    }
+
+    const request = commandToRequest(command, commandArgs, "https://trask-agent.local/");
     const url = new URL(request.url);
     const bodyText = request.method === "GET" || request.method === "HEAD" ? undefined : await request.text();
     const replayed =
@@ -526,7 +541,7 @@ export class TraskAgent extends Agent<Env, TraskAgentState> {
       ...this.state,
       totalCommands: this.state.totalCommands + 1,
       lastCommand: command,
-      lastQuery: typeof args.query === "string" ? args.query : this.state.lastQuery,
+      lastQuery: typeof commandArgs.query === "string" ? commandArgs.query : this.state.lastQuery,
       lastStatus: response.status,
       lastUpdatedAt: new Date().toISOString(),
     });
@@ -635,7 +650,7 @@ export default {
       if (!apiKey && !allowAnon) {
         return jsonResponse(401, { error: "Set TRASK_WEB_API_KEY or TRASK_WEB_ALLOW_ANONYMOUS=1." }, origin);
       }
-      const agentResponse = url.pathname.startsWith("/api/agent/")
+      const agentResponse = url.pathname === "/api/agent" || url.pathname.startsWith("/api/agent/")
         ? await routeConvenienceAgentRequest(request, env)
         : await routeAgentRequest(request, env);
       if (agentResponse) {

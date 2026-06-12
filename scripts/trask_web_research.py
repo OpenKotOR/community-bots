@@ -294,18 +294,25 @@ def _filter_passages_allowlist(
 
 def _retrieve_via_http(query: str, limit: int) -> list[dict[str, Any]]:
     body = json.dumps({"query": query, "limit": limit}).encode("utf-8")
-    req = Request(
-        f"{_indexer_base_url()}/retrieve",
-        data=body,
-        headers={"Content-Type": "application/json", "Accept": "application/json"},
-        method="POST",
-    )
     started = time.monotonic()
-    try:
-        with urlopen(req, timeout=RETRIEVE_TIMEOUT_S) as resp:
-            parsed = json.loads(resp.read().decode("utf-8"))
-    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
-        LOG.warning("retrieve_http failed error=%s", exc)
+    parsed: dict[str, Any] | None = None
+    attempts = max(1, int(os.environ.get("TRASK_RETRIEVE_HTTP_ATTEMPTS", "2")))
+    for attempt in range(1, attempts + 1):
+        req = Request(
+            f"{_indexer_base_url()}/retrieve",
+            data=body,
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            method="POST",
+        )
+        try:
+            with urlopen(req, timeout=RETRIEVE_TIMEOUT_S) as resp:
+                parsed = json.loads(resp.read().decode("utf-8"))
+            break
+        except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
+            LOG.warning("retrieve_http failed attempt=%s/%s error=%s", attempt, attempts, exc)
+            if attempt < attempts:
+                time.sleep(min(0.5 * attempt, 1.5))
+    if parsed is None:
         return []
     elapsed_ms = int((time.monotonic() - started) * 1000)
     passages = parsed.get("passages")

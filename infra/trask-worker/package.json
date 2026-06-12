@@ -4,7 +4,8 @@
   "main": "dist/worker.js",
   "type": "module",
   "scripts": {
-    "build": "esbuild src/worker.ts --bundle --platform=neutral --main-fields=module,main --conditions=workerd,worker,browser --target=es2022 --external:cloudflare:* --external:node:* --external:path --external:os --outfile=dist/worker.js"
+    "build": "esbuild src/worker.ts --bundle --platform=neutral --main-fields=module,main --conditions=workerd,worker,browser --target=es2022 --external:cloudflare:* --external:node:* --external:path --external:os --outfile=dist/worker.js",
+    "test": "pnpm run build && esbuild src/agent-surface.ts --bundle --platform=node --format=esm --target=node24 --outfile=dist/agent-surface.test.js && node --test test/*.test.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.25.0"
