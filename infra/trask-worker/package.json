@@ -8,7 +8,7 @@
     "test": "pnpm run build && esbuild src/agent-surface.ts --bundle --platform=node --format=esm --target=node24 --outfile=dist/agent-surface.test.js && node --test test/*.test.mjs"
   },
   "devDependencies": {
-    "esbuild": "^0.25.0"
+    "esbuild": "^0.28.1"
   },
   "dependencies": {
     "agents": "^0.16.0"

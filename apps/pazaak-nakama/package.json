@@ -18,7 +18,7 @@
     "@openkotor/pazaak-tournament": "workspace:*"
   },
   "devDependencies": {
-    "esbuild": "^0.27.2",
+    "esbuild": "^0.28.1",
     "tsx": "^4.20.6",
     "typescript": "~6.0.2"
   }
