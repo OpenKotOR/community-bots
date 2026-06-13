@@ -34,6 +34,7 @@ lastUpdated: 2026-05-18
 
 # Related
 
+- [discordchat-exporter-trask-bridge-runbook.md](../50-execution/discordchat-exporter-trask-bridge-runbook.md) — DCE recurring scrape fork ↔ Trask Chroma (two-repo, format bridge).
 - [discord-text-ingestion-runbook.md](../50-execution/discord-text-ingestion-runbook.md) — operator export/import.
 - [trask-synthesis-and-chunk-retrieval.md](trask-synthesis-and-chunk-retrieval.md) — chunk search at answer time.
 - [trask-reindex-queue-contract.md](trask-reindex-queue-contract.md) — catalog refresh queue (separate from Discord import).

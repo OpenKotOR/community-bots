@@ -125,8 +125,12 @@ Uses the same lock contract as ingest-worker (`reindex-queue.lock`). Do not run 
 
 ## DiscordChatExporter archives → evidence cache
 
+**Full two-repo bridge (DCE recurring scrape fork + this repo):** [discordchat-exporter-trask-bridge-runbook.md](discordchat-exporter-trask-bridge-runbook.md). [SYNTH] DCE append-only scrape writes flat `*[channel_id].json`; this indexer expects **`manifest.json` + `containers/`** unless targets point at a bot-export tree.
+
 ```bash
 python scripts/trask_discord_sync.py
+# or, after DCE scrape with layout preflight:
+bash scripts/trask_discord_sync_after_scrape.sh
 ```
 
 Default export target config: `data/trask/discord-export-targets.json`. Copy the sample and set each target's `output_dir` to your DiscordChatExporter archive path. Archive sync runs only when that config file exists; otherwise `trask_discord_sync.py` falls back to bot-token export (`TRASK_DISCORD_BOT_TOKEN` required).
