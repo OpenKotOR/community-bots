@@ -59,10 +59,10 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          TRASK_RESEARCHWIZARD_BASE_URL: ${{ vars.TRASK_RESEARCHWIZARD_BASE_URL }}
+          TRASK_RESEARCHWIZARD_BASE_URL: ${{ vars.TRASK_RESEARCHWIZARD_BASE_URL != '' && vars.TRASK_RESEARCHWIZARD_BASE_URL || 'https://openkotor-holocron-trask-http.hf.space' }}
           TRASK_RETRIEVE_BASE_URL: ${{ vars.TRASK_RETRIEVE_BASE_URL != '' && vars.TRASK_RETRIEVE_BASE_URL || 'https://trask-retrieve.bocloud.workers.dev' }}
           TRASK_DISCORD_APP_ID: ${{ vars.TRASK_DISCORD_APP_ID }}
-          TRASK_BUILTIN_API: ${{ vars.TRASK_BUILTIN_API != '' && vars.TRASK_BUILTIN_API || '1' }}
+          TRASK_BUILTIN_API: ${{ vars.TRASK_BUILTIN_API != '' && vars.TRASK_BUILTIN_API || '0' }}
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
             echo "configured=false" >> "$GITHUB_OUTPUT"
@@ -171,13 +171,13 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          TRASK_RESEARCHWIZARD_BASE_URL: ${{ vars.TRASK_RESEARCHWIZARD_BASE_URL }}
+          TRASK_RESEARCHWIZARD_BASE_URL: ${{ vars.TRASK_RESEARCHWIZARD_BASE_URL != '' && vars.TRASK_RESEARCHWIZARD_BASE_URL || 'https://openkotor-holocron-trask-http.hf.space' }}
           TRASK_RETRIEVE_BASE_URL: ${{ vars.TRASK_RETRIEVE_BASE_URL != '' && vars.TRASK_RETRIEVE_BASE_URL || 'https://trask-retrieve.bocloud.workers.dev' }}
           TRASK_DISCORD_APP_ID: ${{ vars.TRASK_DISCORD_APP_ID }}
           TRASK_DISCORD_INVITE_PERMISSIONS: ${{ vars.TRASK_DISCORD_INVITE_PERMISSIONS != '' && vars.TRASK_DISCORD_INVITE_PERMISSIONS || '84992' }}
           TRASK_INVITE_ALLOWED_GUILD_IDS: ${{ vars.TRASK_INVITE_ALLOWED_GUILD_IDS }}
           TRASK_WEB_ALLOW_ANONYMOUS: ${{ vars.TRASK_WEB_ALLOW_ANONYMOUS != '' && vars.TRASK_WEB_ALLOW_ANONYMOUS || '1' }}
-          TRASK_BUILTIN_API: ${{ vars.TRASK_BUILTIN_API != '' && vars.TRASK_BUILTIN_API || '1' }}
+          TRASK_BUILTIN_API: ${{ vars.TRASK_BUILTIN_API != '' && vars.TRASK_BUILTIN_API || '0' }}
           TRASK_BUILTIN_FALLBACK: ${{ vars.TRASK_BUILTIN_FALLBACK != '' && vars.TRASK_BUILTIN_FALLBACK || '1' }}
         run: |
           set -euo pipefail

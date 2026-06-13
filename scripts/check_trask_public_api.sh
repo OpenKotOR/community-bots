@@ -15,7 +15,7 @@ HEALTH_URL="${BASE}/healthz"
 ACTIVE_BASE="$BASE"
 
 echo "Checking ${HEALTH_URL}"
-health_code="$(curl -fsS -o /tmp/trask-health.json -w '%{http_code}' "${HEALTH_URL}" || true)"
+health_code="$(curl -fsS --max-time 15 -o /tmp/trask-health.json -w '%{http_code}' "${HEALTH_URL}" || true)"
 if [ "$health_code" = "200" ]; then
   python3 - <<'PY'
 import json
@@ -53,7 +53,7 @@ ask_code="$(curl -sS -o /tmp/trask-ask.json -w '%{http_code}' \
   -X POST "${ASK_URL}" \
   -H 'Content-Type: application/json' \
   -d "{\"query\":\"What is TSLPatcher used for in KOTOR modding?\",\"threadId\":\"${thread_id}\"}" \
-  --max-time 90)"
+  --max-time 35)"
 
 if [ -z "$ask_code" ] || [ "$ask_code" -ge 500 ] 2>/dev/null || [ "$ask_code" = "000" ]; then
   echo "::error::Trask API ask returned HTTP ${ask_code}"

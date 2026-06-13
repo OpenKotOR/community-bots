@@ -9,6 +9,9 @@ import {
 import { handleBuiltinRequest } from "./builtin-trask-api.js";
 
 const DEFAULT_TRASK_RETRIEVE_BASE_URL = "https://trask-retrieve.bocloud.workers.dev";
+const DEFAULT_TRASK_RESEARCHWIZARD_BASE_URL = "https://openkotor-holocron-trask-http.hf.space";
+const UPSTREAM_FETCH_TIMEOUT_MS = 12_000;
+const UPSTREAM_HEALTH_TIMEOUT_MS = 6_000;
 
 interface Env {
   TraskAgent?: unknown;
@@ -115,7 +118,7 @@ function envFlag(value: string | undefined, defaultWhenUnset: boolean): boolean 
 }
 
 function upstreamBaseUrl(env: Env): string {
-  return (env.TRASK_RESEARCHWIZARD_BASE_URL ?? "").trim();
+  return (env.TRASK_RESEARCHWIZARD_BASE_URL ?? DEFAULT_TRASK_RESEARCHWIZARD_BASE_URL).trim();
 }
 
 function isPlaceholderUpstream(baseUrl: string): boolean {
@@ -178,6 +181,16 @@ function buildUpstreamHeaders(request: Request, upstreamApiKey: string): Headers
   return headers;
 }
 
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort("Trask upstream timeout"), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function proxyToUpstream(
   request: Request,
   targetUrl: string,
@@ -185,12 +198,12 @@ async function proxyToUpstream(
   upstreamApiKey: string,
   bodyText?: string,
 ): Promise<Response> {
-  const upstreamResponse = await fetch(targetUrl, {
+  const upstreamResponse = await fetchWithTimeout(targetUrl, {
     method: request.method,
     headers: buildUpstreamHeaders(request, upstreamApiKey),
     body: request.method === "GET" || request.method === "HEAD" ? undefined : bodyText,
     redirect: "manual",
-  });
+  }, UPSTREAM_FETCH_TIMEOUT_MS);
 
   const headers = corsHeaders(origin);
   for (const [name, value] of upstreamResponse.headers) {
@@ -226,7 +239,7 @@ async function probeUpstreamHealth(baseUrl: string, upstreamApiKey: string): Pro
     if (upstreamApiKey) {
       headers.set("Authorization", `Bearer ${upstreamApiKey}`);
     }
-    const res = await fetch(healthUrl, { method: "GET", headers, redirect: "manual" });
+    const res = await fetchWithTimeout(healthUrl, { method: "GET", headers, redirect: "manual" }, UPSTREAM_HEALTH_TIMEOUT_MS);
     const detail = (await res.text()).slice(0, 300);
     return { reachable: res.ok, status: res.status, detail: detail || undefined };
   } catch (err) {
