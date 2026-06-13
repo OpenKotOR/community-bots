@@ -3,6 +3,8 @@ import { describe, test } from "node:test";
 
 import {
   BRIEF_DISCORD_MIN_CITATIONS,
+  BRIEF_DISCORD_TARGET_CITATIONS,
+  briefDiscordCitationTarget,
   claimMatchesQueryAnchor,
   distinctiveAnchorTokens,
   passageMatchesQueryAnchor,
@@ -11,6 +13,17 @@ import {
 describe("BRIEF_DISCORD_MIN_CITATIONS", () => {
   test("is 2 for brief Discord sufficiency", () => {
     assert.equal(BRIEF_DISCORD_MIN_CITATIONS, 2);
+  });
+
+  test("targets richer answers when enough evidence exists", () => {
+    assert.equal(BRIEF_DISCORD_TARGET_CITATIONS, 3);
+  });
+
+  test("requires the richer target only when enough citations are available", () => {
+    assert.equal(briefDiscordCitationTarget(1), 2);
+    assert.equal(briefDiscordCitationTarget(2), 2);
+    assert.equal(briefDiscordCitationTarget(3), 3);
+    assert.equal(briefDiscordCitationTarget(8), 3);
   });
 });
 

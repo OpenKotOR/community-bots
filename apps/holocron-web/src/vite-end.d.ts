@@ -2,6 +2,8 @@
 
 interface ImportMetaEnv {
   readonly VITE_TRASK_API_BASE?: string
+  readonly VITE_TRASK_API_BASES?: string
+  readonly VITE_TRASK_API_FALLBACK_BASE?: string
   readonly VITE_TRASK_API_KEY?: string
 }
 

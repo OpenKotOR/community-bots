@@ -147,6 +147,7 @@ const proxyPlaceholderApiKey = "sk-local";
 
 type TraskLlmProfile = "free" | "paid";
 const defaultPazaakWorldUrl = "https://openkotor.github.io/community-bots/pazaakworld";
+const defaultTraskWorkerBaseUrl = "https://trask-worker.bocloud.workers.dev";
 
 const integerish = z.coerce.number().int().nonnegative();
 
@@ -181,6 +182,14 @@ const resolveTraskWebAllowAnonymous = (env: NodeJS.ProcessEnv): boolean => {
     return explicit;
   }
   return !Boolean(readOptionalEnv("TRASK_WEB_API_KEY", env)?.trim());
+};
+
+const resolveTraskInstallPolicyUrl = (env: NodeJS.ProcessEnv): string => {
+  const explicit = readOptionalEnv("TRASK_INSTALL_POLICY_URL", env);
+  if (explicit) return explicit;
+  const apiBase = readOptionalEnv("TRASK_API_BASE", env);
+  if (apiBase) return `${stripTrailingSlashes(apiBase)}/api/trask/install-policy`;
+  return `${defaultTraskWorkerBaseUrl}/api/trask/install-policy`;
 };
 
 const readListEnv = (name: string, env: NodeJS.ProcessEnv = process.env): string[] => {
@@ -462,6 +471,10 @@ export interface TraskBotConfig {
   discordSyncIntervalMs: number;
   /** Guild IDs where slash commands are registered (comma list in `TRASK_SLASH_GUILD_IDS`). */
   slashCommandGuildIds: string[];
+  /** Optional Worker install-policy URL for restart-free guild allowlist updates. */
+  installPolicyUrl: string | undefined;
+  installPolicyApiKey: string | undefined;
+  installPolicyRefreshMs: number;
   chunkDir: string;
   /** Directory for `trask-queries.json` (shared with Holocron when using the embedded web UI). */
   queryDataDir: string;
@@ -742,6 +755,9 @@ export const loadTraskBotConfig = (env: NodeJS.ProcessEnv = process.env): TraskB
     discordChannelBlacklist: readListEnv("TRASK_DISCORD_CHANNEL_BLACKLIST", env),
     discordSyncIntervalMs: integerish.parse(readOptionalEnv("TRASK_DISCORD_SYNC_INTERVAL_MS", env) ?? "0"),
     slashCommandGuildIds: readListEnv("TRASK_SLASH_GUILD_IDS", env),
+    installPolicyUrl: resolveTraskInstallPolicyUrl(env),
+    installPolicyApiKey: readOptionalEnv("TRASK_INSTALL_POLICY_API_KEY", env),
+    installPolicyRefreshMs: integerish.parse(readOptionalEnv("TRASK_INSTALL_POLICY_REFRESH_MS", env) ?? "30000"),
     chunkDir: readOptionalEnv("INGEST_STATE_DIR", env) ?? "data/ingest-worker",
     queryDataDir: readOptionalEnv("TRASK_QUERY_DATA_DIR", env) ?? "data/trask-bot",
     webPort: readOptionalEnv("TRASK_WEB_PORT", env)

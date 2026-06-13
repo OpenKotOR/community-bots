@@ -6,63 +6,78 @@
     <title>OpenKotOR — Discord bots</title>
     <link rel="stylesheet" href="/src/style.css" />
   </head>
-  <body>
-    <div class="wrap">
-      <header class="hero">
-        <p class="eyebrow">OpenKotOR · Discord bots</p>
-        <h1>Discord bots</h1>
-        <p class="lede">
+  <body class="modsync-hub">
+    <div class="modsync-hub__wrap">
+      <div class="modsync-hub__toolbar">
+        <p class="modsync-hub__eyebrow" style="margin: 0">OpenKotOR · Discord bots</p>
+        <div style="display: flex; align-items: center; gap: var(--space-6); flex-wrap: wrap">
+          <a class="modsync-showcase__nav-link" href="./design.html" style="color: var(--brand-primary); text-decoration: none; font-weight: var(--weight-semibold); font-size: var(--text-sm)">Design system →</a>
+          <div class="modsync-hub__theme" role="group" aria-label="Theme">
+          <button type="button" class="modsync-hub__theme-seg modsync-hub__theme-seg--active" data-theme="k1" title="KOTOR 1 Theme">K1</button>
+          <button type="button" class="modsync-hub__theme-seg" data-theme="tsl" title="KOTOR 2: TSL Theme">TSL</button>
+          <button type="button" class="modsync-hub__theme-seg" data-theme="light" title="Light Theme">☀</button>
+          </div>
+        </div>
+      </div>
+
+      <header class="modsync-hub__hero">
+        <h1 class="modsync-hub__title">Discord bots</h1>
+        <p class="modsync-hub__lede">
           Invite links, documentation, and quick-start anchors for every Discord bot in this repo. Invites use the same permission integers as
           <code>scripts/discord-install-links.ts</code> (set each bot’s application ID at build time to enable its invite button).
         </p>
       </header>
 
-      <main class="hub-grid">
+      <main class="modsync-hub__grid">
         <!-- Trask -->
-        <section class="bot-panel card" aria-labelledby="trask-title">
-          <div class="bot-panel-head">
+        <section class="modsync-hub__card" aria-labelledby="trask-title">
+          <div>
             <h2 id="trask-title">Trask</h2>
-            <p class="bot-tagline">KOTOR Q&amp;A with citations — use <code>/ask</code> in Discord.</p>
+            <p class="modsync-hub__tagline">KOTOR Q&amp;A with citations — use <code>/ask</code> in Discord.</p>
           </div>
-          <ul class="bot-link-row">
+          <ul class="modsync-hub__actions">
             <li>
-              <a id="trask-invite" class="btn primary hidden" href="#" rel="noopener noreferrer">Invite Trask</a>
+              <a id="trask-invite" class="modsync-hub__btn modsync-hub__btn--primary hidden" href="#" rel="noopener noreferrer">Invite Trask</a>
             </li>
-            <li><a id="trask-docs" class="btn ghost" href="#" rel="noopener noreferrer">Documentation</a></li>
-            <li><a id="trask-quickstart" class="btn ghost" href="#" rel="noopener noreferrer">Quick start</a></li>
+            <li><a id="trask-docs" class="modsync-hub__btn modsync-hub__btn--ghost" href="#" rel="noopener noreferrer">Documentation</a></li>
+            <li><a id="trask-quickstart" class="modsync-hub__btn modsync-hub__btn--ghost" href="#" rel="noopener noreferrer">Quick start</a></li>
+            <li><a id="trask-holocron" class="modsync-hub__btn modsync-hub__btn--ghost" href="#" rel="noopener noreferrer">Holocron Archive</a></li>
           </ul>
-          <p id="trask-invite-missing" class="callout warn hidden">
+          <p id="trask-invite-missing" class="modsync-hub__callout hidden">
             Set <code>VITE_TRASK_DISCORD_APPLICATION_ID</code> at build time (or GitHub Actions variable <code>TRASK_DISCORD_APP_ID</code>) for the invite URL.
           </p>
-          <p class="perm-foot muted">Permissions: <code id="trask-perms"></code></p>
+          <p id="trask-invite-note" class="modsync-hub__note hidden">
+            Trask installs are brokered through the public Worker and require an approved Discord guild id.
+          </p>
+          <p class="modsync-hub__perms">Permissions: <code id="trask-perms"></code></p>
         </section>
 
         <!-- HK -->
-        <section class="bot-panel card" aria-labelledby="hk-title">
-          <div class="bot-panel-head">
+        <section class="modsync-hub__card" aria-labelledby="hk-title">
+          <div>
             <h2 id="hk-title">HK-86</h2>
-            <p class="bot-tagline">Curated self-assignable roles — <code>/designations</code> and optional reaction panels.</p>
+            <p class="modsync-hub__tagline">Curated self-assignable roles — <code>/designations</code> and optional reaction panels.</p>
           </div>
-          <ul class="bot-link-row">
+          <ul class="modsync-hub__actions">
             <li>
-              <a id="hk-invite" class="btn primary hidden" href="#" rel="noopener noreferrer">Invite HK-86</a>
+              <a id="hk-invite" class="modsync-hub__btn modsync-hub__btn--primary hidden" href="#" rel="noopener noreferrer">Invite HK-86</a>
             </li>
-            <li><a id="hk-docs" class="btn ghost" href="#" rel="noopener noreferrer">Documentation</a></li>
-            <li><a id="hk-quickstart" class="btn ghost" href="#" rel="noopener noreferrer">Quick start</a></li>
+            <li><a id="hk-docs" class="modsync-hub__btn modsync-hub__btn--ghost" href="#" rel="noopener noreferrer">Documentation</a></li>
+            <li><a id="hk-quickstart" class="modsync-hub__btn modsync-hub__btn--ghost" href="#" rel="noopener noreferrer">Quick start</a></li>
           </ul>
-          <p class="hk-extra">
-            <a id="hk-panels-json" class="text-link" href="#" rel="noopener noreferrer">Reaction panels example JSON</a>
+          <p class="modsync-hub__extra">
+            <a id="hk-panels-json" class="modsync-hub__text-link" href="#" rel="noopener noreferrer">Reaction panels example JSON</a>
           </p>
-          <p id="hk-invite-missing" class="callout warn hidden">
+          <p id="hk-invite-missing" class="modsync-hub__callout hidden">
             Set <code>VITE_HK_DISCORD_APPLICATION_ID</code> or <code>VITE_DISCORD_APPLICATION_ID</code> (or variable <code>HK86_DISCORD_APP_ID</code>) for the invite URL.
           </p>
-          <p class="perm-foot muted">
+          <p class="modsync-hub__perms">
             Permissions: <code id="hk-perms"></code> — reaction-ready HK invite (Manage Roles, reactions, slash). Matches
             <code>scripts/discord-install-links.ts</code>.
           </p>
-          <details class="hk-details">
+          <details class="modsync-hub__details">
             <summary>Operator checklist (reaction panels)</summary>
-            <ol class="steps">
+            <ol class="modsync-hub__steps">
               <li>
                 Put <code>reaction-role-panels.json</code> under the HK data directory (default <code>data/hk-bot/</code>; override with <code>HK_DATA_DIR</code>). The bot watches the file — edits apply without restart.
               </li>
@@ -73,26 +88,26 @@
         </section>
 
         <!-- Pazaak -->
-        <section class="bot-panel card" aria-labelledby="pazaak-title">
-          <div class="bot-panel-head">
+        <section class="modsync-hub__card" aria-labelledby="pazaak-title">
+          <div>
             <h2 id="pazaak-title">Pazaak Bot</h2>
-            <p class="bot-tagline">Pazaak tables, wallets, and challenges — <code>/pazaak</code> commands.</p>
+            <p class="modsync-hub__tagline">Pazaak tables, wallets, and challenges — <code>/pazaak</code> commands.</p>
           </div>
-          <ul class="bot-link-row">
+          <ul class="modsync-hub__actions">
             <li>
-              <a id="pazaak-invite" class="btn primary hidden" href="#" rel="noopener noreferrer">Invite Pazaak Bot</a>
+              <a id="pazaak-invite" class="modsync-hub__btn modsync-hub__btn--primary hidden" href="#" rel="noopener noreferrer">Invite Pazaak Bot</a>
             </li>
-            <li><a id="pazaak-docs" class="btn ghost" href="#" rel="noopener noreferrer">Documentation</a></li>
-            <li><a id="pazaak-quickstart" class="btn ghost" href="#" rel="noopener noreferrer">Quick start</a></li>
+            <li><a id="pazaak-docs" class="modsync-hub__btn modsync-hub__btn--ghost" href="#" rel="noopener noreferrer">Documentation</a></li>
+            <li><a id="pazaak-quickstart" class="modsync-hub__btn modsync-hub__btn--ghost" href="#" rel="noopener noreferrer">Quick start</a></li>
           </ul>
-          <p id="pazaak-invite-missing" class="callout warn hidden">
+          <p id="pazaak-invite-missing" class="modsync-hub__callout hidden">
             Set <code>VITE_PAZAAK_DISCORD_APPLICATION_ID</code> at build time (or GitHub Actions variable <code>PAZAAK_DISCORD_APP_ID</code>) for the invite URL.
           </p>
-          <p class="perm-foot muted">Permissions: <code id="pazaak-perms"></code></p>
+          <p class="modsync-hub__perms">Permissions: <code id="pazaak-perms"></code></p>
         </section>
       </main>
 
-      <footer class="foot">
+      <footer class="modsync-hub__foot">
         <span>Static hub served from GitHub Pages under <code>/community-bots/hk86/</code>. Ingest worker is not a Discord bot — it has no invite here.</span>
       </footer>
     </div>

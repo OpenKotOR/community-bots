@@ -189,7 +189,7 @@ test("composeGroundedAnswerFromClaims Sources use passage citation URLs not cata
   assert.match(answer, new RegExp(deepB.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 });
 
-test("composeGroundedAnswerFromClaims brief profile emits two citation lines", () => {
+test("composeGroundedAnswerFromClaims brief profile emits explanatory citation lines with source weighting", () => {
   const claims = [
     {
       claim: "TSLPatcher applies 2DA patches.",
@@ -216,9 +216,11 @@ test("composeGroundedAnswerFromClaims brief profile emits two citation lines", (
   );
   const { body } = splitResearchAnswer(answer);
   const lines = body.split(/\r?\n/).filter((line) => line.trim().length > 0);
-  assert.equal(lines.length, 2);
+  assert.equal(lines.length, 3);
   assert.match(answer, /\[1\]/);
   assert.match(answer, /\[2\]/);
+  assert.match(body, /weigh the .* first/i);
+  assert.match(body, /corroboration or user-facing context/i);
 });
 
 test("passagesFromRetrieveRows maps structured retrieve hits", () => {

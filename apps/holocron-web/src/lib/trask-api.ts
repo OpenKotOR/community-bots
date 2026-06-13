@@ -54,12 +54,75 @@ export interface TraskModelOptionDto {
   recommended?: boolean
 }
 
-export function traskApiOrigin(): string {
-  return import.meta.env.VITE_TRASK_API_BASE?.replace(/\/+$/, '') ?? ''
+const DEFAULT_TRASK_PUBLIC_WORKER_BASE = 'https://trask-worker.bocloud.workers.dev'
+const DEFAULT_TRASK_PUBLIC_FALLBACK_BASE = 'https://openkotor-holocron-trask-http.hf.space'
+
+function trimBase(value: string | undefined | null): string {
+  return value?.replace(/\/+$/, '').trim() ?? ''
 }
 
-function apiBase(): string {
-  return traskApiOrigin()
+function parseConfiguredBases(value: string | undefined): string[] {
+  return (value ?? '')
+    .split(',')
+    .map((entry) => trimBase(entry))
+    .filter(Boolean)
+}
+
+function dedupeBases(values: string[]): string[] {
+  const seen = new Set<string>()
+  const ordered: string[] = []
+  for (const base of values) {
+    const key = base.trim()
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    ordered.push(key)
+  }
+  return ordered
+}
+
+function isLocalhostBase(base: string): boolean {
+  try {
+    const url = new URL(base)
+    return url.hostname === 'localhost' || url.hostname === '127.0.0.1'
+  } catch {
+    return false
+  }
+}
+
+function resolveTraskApiBases(): string[] {
+  const explicitBases = parseConfiguredBases(import.meta.env.VITE_TRASK_API_BASES)
+  if (explicitBases.length > 0) {
+    return dedupeBases(explicitBases)
+  }
+
+  const primary = trimBase(import.meta.env.VITE_TRASK_API_BASE)
+  const fallback = trimBase(import.meta.env.VITE_TRASK_API_FALLBACK_BASE) || DEFAULT_TRASK_PUBLIC_FALLBACK_BASE
+  const resolved: string[] = []
+
+  if (primary) {
+    resolved.push(primary)
+  } else if (typeof window !== 'undefined' && isLocalhostBase(window.location.origin)) {
+    if (window.location.port === '4010') {
+      return ['']
+    }
+    resolved.push(`${window.location.protocol}//127.0.0.1:4010`)
+  } else {
+    resolved.push(DEFAULT_TRASK_PUBLIC_WORKER_BASE)
+  }
+
+  if (fallback && !resolved.includes(fallback)) {
+    resolved.push(fallback)
+  }
+
+  if (typeof window !== 'undefined' && isLocalhostBase(window.location.origin) && window.location.port !== '4010') {
+    resolved.push('')
+  }
+
+  return dedupeBases(resolved)
+}
+
+export function traskApiOrigin(): string {
+  return resolveTraskApiBases()[0] ?? ''
 }
 
 export interface TraskHealthDto {
@@ -70,6 +133,9 @@ export interface TraskHealthDto {
   upstreamStatus?: number
   upstreamDetail?: string
   builtinFallback?: boolean
+  resolvedApiBase?: string
+  attemptedApiBases?: string[]
+  fallbackUsed?: boolean
 }
 
 function authHeaders(apiKey?: string): Record<string, string> {
@@ -179,8 +245,7 @@ export function traskErrorMessageFromUnknown(error: unknown): string {
   return 'Holocron request failed.'
 }
 
-function traskRequestInit(apiKey?: string, init?: RequestInit, timeoutMs?: number): RequestInit {
-  const sameOrigin = !apiBase()
+function traskRequestInit(apiKey?: string, init?: RequestInit, timeoutMs?: number, sameOrigin = false): RequestInit {
   const baseHeaders = authHeaders(apiKey)
   const extra =
     init?.headers && typeof init.headers === 'object' && !Array.isArray(init.headers)
@@ -199,21 +264,79 @@ function traskRequestInit(apiKey?: string, init?: RequestInit, timeoutMs?: numbe
 }
 
 export function traskUsesSameOriginApi(): boolean {
-  return !apiBase()
+  return traskApiOrigin() === ''
+}
+
+type TraskFailoverResponse = {
+  response: Response
+  resolvedBase: string
+  attemptedBases: string[]
+  fallbackUsed: boolean
+}
+
+async function fetchTraskWithFailover(path: string, init?: RequestInit, timeoutMs?: number): Promise<TraskFailoverResponse> {
+  const bases = resolveTraskApiBases()
+  const attemptTimeoutMs = Math.min(timeoutMs ?? traskFetchTimeoutMs(), 12_000)
+  let lastResponse: Response | null = null
+  let lastError: Error | null = null
+  const attemptedBases: string[] = []
+
+  for (let i = 0; i < bases.length; i += 1) {
+    const base = bases[i] ?? ''
+    attemptedBases.push(base)
+    const sameOrigin = base === ''
+    const url = base ? `${base}${path.startsWith('/') ? path : `/${path}`}` : path
+    const requestInit = traskRequestInit(undefined, init, attemptTimeoutMs, sameOrigin)
+    try {
+      const response = await fetch(url, requestInit)
+      if (response.status >= 500 && response.status <= 599) {
+        lastResponse = response
+        continue
+      }
+      return { response, resolvedBase: base, attemptedBases, fallbackUsed: i > 0 }
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error))
+    }
+  }
+
+  if (lastResponse) {
+    return {
+      response: lastResponse,
+      resolvedBase: attemptedBases[attemptedBases.length - 1] ?? '',
+      attemptedBases,
+      fallbackUsed: attemptedBases.length > 1,
+    }
+  }
+
+  if (lastError) {
+    throw lastError
+  }
+
+  throw new Error(`Failed to reach API for ${path}`)
 }
 
 export async function traskFetchHealth(): Promise<TraskHealthDto> {
-  const res = await fetch(`${apiBase()}/healthz`, traskRequestInit(undefined, { method: 'GET' }, 12_000))
-  const data = (await res.json().catch(() => ({}))) as TraskHealthDto & { error?: string }
-  if (!res.ok) {
-    throw new Error(data.error ?? (await readTraskErrorBody(res)))
+  const { response, resolvedBase, attemptedBases, fallbackUsed } = await fetchTraskWithFailover(
+    '/healthz',
+    { method: 'GET' },
+    12_000,
+  )
+  const data = (await response.json().catch(() => ({}))) as TraskHealthDto & { error?: string }
+  if (!response.ok) {
+    throw new Error(data.error ?? (await readTraskErrorBody(response)))
   }
-  return data
+  return {
+    ...data,
+    resolvedApiBase: resolvedBase,
+    attemptedApiBases: attemptedBases,
+    fallbackUsed,
+  }
 }
 
 export async function traskFetchSession(): Promise<TraskSessionDto | null> {
   try {
-    const res = await fetch(`${apiBase()}/api/trask/session`, traskRequestInit())
+    const { response } = await fetchTraskWithFailover('/api/trask/session', { method: 'GET' }, traskFetchTimeoutMs())
+    const res = response
     if (!res.ok) {
       return null
     }
@@ -224,7 +347,14 @@ export async function traskFetchSession(): Promise<TraskSessionDto | null> {
 }
 
 export async function traskLogout(): Promise<void> {
-  await fetch(`${apiBase()}/api/trask/auth/logout`, traskRequestInit(undefined, { method: 'POST' }))
+  const { response } = await fetchTraskWithFailover(
+    '/api/trask/auth/logout',
+    { method: 'POST' },
+    traskFetchTimeoutMs(),
+  )
+  if (!response.ok) {
+    throw new Error(await readTraskErrorBody(response))
+  }
 }
 
 /** Tighter per-iteration budget while polling `/thread` so one dead hop cannot waste the full Trask HTTP timeout. */
@@ -243,9 +373,10 @@ export async function traskGetThread(
   const init: RequestInit = outerSignal
     ? { method: 'GET', signal: outerSignal }
     : { method: 'GET' }
-  const res = await fetch(
-    `${apiBase()}/api/trask/thread/${encodeURIComponent(threadId)}`,
-    traskRequestInit(apiKey, init),
+  const { response: res } = await fetchTraskWithFailover(
+    `/api/trask/thread/${encodeURIComponent(threadId)}`,
+    { ...init, headers: authHeaders(apiKey) },
+    traskFetchTimeoutMs(),
   )
   const data = (await res.json()) as { history?: TraskHistoryRecordDto[]; error?: string }
   if (!res.ok) {
@@ -255,7 +386,11 @@ export async function traskGetThread(
 }
 
 export async function traskListSources(apiKey?: string): Promise<TraskSourceDto[]> {
-  const res = await fetch(`${apiBase()}/api/trask/sources`, traskRequestInit(apiKey))
+  const { response: res } = await fetchTraskWithFailover(
+    '/api/trask/sources',
+    { method: 'GET', headers: authHeaders(apiKey) },
+    traskFetchTimeoutMs(),
+  )
   const data = (await res.json()) as { sources?: TraskSourceDto[]; error?: string }
   if (!res.ok) {
     throw new Error(data.error ?? `sources failed: ${res.status}`)
@@ -264,7 +399,11 @@ export async function traskListSources(apiKey?: string): Promise<TraskSourceDto[
 }
 
 export async function traskListModels(apiKey?: string): Promise<TraskModelOptionDto[]> {
-  const res = await fetch(`${apiBase()}/api/trask/models`, traskRequestInit(apiKey))
+  const { response: res } = await fetchTraskWithFailover(
+    '/api/trask/models',
+    { method: 'GET', headers: authHeaders(apiKey) },
+    traskFetchTimeoutMs(),
+  )
   const data = (await res.json()) as { models?: TraskModelOptionDto[]; error?: string }
   if (!res.ok) {
     throw new Error(data.error ?? `models failed: ${res.status}`)
@@ -281,7 +420,11 @@ export async function traskListHistory(
   if (threadId?.trim()) {
     q.set('thread', threadId.trim())
   }
-  const res = await fetch(`${apiBase()}/api/trask/history?${q}`, traskRequestInit(apiKey))
+  const { response: res } = await fetchTraskWithFailover(
+    `/api/trask/history?${q}`,
+    { method: 'GET', headers: authHeaders(apiKey) },
+    traskFetchTimeoutMs(),
+  )
   const data = (await res.json()) as { history?: TraskHistoryRecordDto[]; error?: string }
   if (!res.ok) {
     throw new Error(data.error ?? `history failed: ${res.status}`)
@@ -311,10 +454,15 @@ export async function traskAsk(
   if (sourceWeights?.length) {
     body.sourceWeights = sourceWeights
   }
-  const res = await fetch(`${apiBase()}/api/trask/ask`, traskRequestInit(apiKey, {
-    method: 'POST',
-    body: JSON.stringify(body),
-  }, traskAskTimeoutMs()))
+  const { response: res } = await fetchTraskWithFailover(
+    '/api/trask/ask',
+    {
+      method: 'POST',
+      headers: authHeaders(apiKey),
+      body: JSON.stringify(body),
+    },
+    traskAskTimeoutMs(),
+  )
   const data = (await res.json()) as TraskApiErrorPayload & {
     query?: TraskHistoryRecordDto
   }
@@ -332,9 +480,13 @@ export async function traskAsk(
 }
 
 export async function traskCancelQuery(queryId: string, apiKey?: string): Promise<TraskHistoryRecordDto | null> {
-  const res = await fetch(
-    `${apiBase()}/api/trask/query/${encodeURIComponent(queryId)}/cancel`,
-    traskRequestInit(apiKey, { method: 'POST' }),
+  const { response: res } = await fetchTraskWithFailover(
+    `/api/trask/query/${encodeURIComponent(queryId)}/cancel`,
+    {
+      method: 'POST',
+      headers: authHeaders(apiKey),
+    },
+    traskFetchTimeoutMs(),
   )
   const data = (await res.json()) as { query?: TraskHistoryRecordDto; error?: string }
   if (res.status === 404) return null

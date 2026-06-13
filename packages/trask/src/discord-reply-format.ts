@@ -8,6 +8,7 @@ import {
 } from "./citation-markers.js";
 import {
   BRIEF_DISCORD_MIN_CITATIONS,
+  briefDiscordCitationTarget,
   claimMatchesQueryAnchor,
   distinctiveAnchorTokens,
 } from "./query-anchor.js";
@@ -170,6 +171,9 @@ const scoreAndFilterLines = (pool: readonly string[], query: string): string[] =
     .map((entry) => entry.line);
 };
 
+const lineHasSourceWeightingCue = (line: string): boolean =>
+  /\bweigh\b|\bcorroborat(?:e|ion)\b|\bsupporting context\b|\buser-facing context\b/iu.test(line);
+
 export const citationIndicesInLines = (lines: readonly string[]): Set<number> => {
   const indices = new Set<number>();
   for (const line of lines) {
@@ -287,7 +291,11 @@ export const ensureMinimumDistinctCitedLines = (
 };
 
 /** Keep only lines that match the user question; avoids catalog dumps in Discord embeds. */
-export const filterDiscordLinesForQuery = (lines: readonly string[], query: string): string[] => {
+export const filterDiscordLinesForQuery = (
+  lines: readonly string[],
+  query: string,
+  targetDistinct = BRIEF_DISCORD_MIN_CITATIONS,
+): string[] => {
   if (lines.length <= 1 || !query.trim()) {
     return [...lines];
   }
@@ -295,13 +303,28 @@ export const filterDiscordLinesForQuery = (lines: readonly string[], query: stri
   if (cited.length >= BRIEF_DISCORD_MIN_CITATIONS) {
     const onTopic = scoreAndFilterLines(cited, query);
     if (onTopic.length > 0) {
-      return ensureMinimumDistinctCitedLines(onTopic, cited, query, BRIEF_DISCORD_MIN_CITATIONS);
+      const selected = ensureMinimumDistinctCitedLines(onTopic, cited, query, targetDistinct);
+      const selectedIndices = citationIndicesInLines(selected);
+      for (const line of cited) {
+        if (selected.includes(line) || !lineHasSourceWeightingCue(line)) continue;
+        const lineIndices = citationIndicesInLines([line]);
+        const citesSelectedEvidence =
+          lineIndices.size > 0 && [...lineIndices].every((index) => selectedIndices.has(index));
+        if (!citesSelectedEvidence || selected.length >= DISCORD_ASK_MAX_BODY_LINES) continue;
+        selected.push(line);
+      }
+      return selected;
     }
   }
   return scoreAndFilterLines(lines, query);
 };
 
-export const clampDiscordBodyLines = (body: string, maxLines: number, query?: string): string => {
+export const clampDiscordBodyLines = (
+  body: string,
+  maxLines: number,
+  query?: string,
+  targetDistinct = BRIEF_DISCORD_MIN_CITATIONS,
+): string => {
   const cleaned = unwrapBriefBulletHashLines(body)
     .replace(/^#{1,6}\s+/gm, "")
     .replace(/^Answer for:\s*.+$/im, "")
@@ -317,21 +340,21 @@ export const clampDiscordBodyLines = (body: string, maxLines: number, query?: st
     .filter(Boolean);
 
   if (query?.trim()) {
-    lines = filterDiscordLinesForQuery(lines, query);
+    lines = filterDiscordLinesForQuery(lines, query, targetDistinct);
   }
 
   if (lines.length > maxLines) {
     const cited = lines.filter((line) => lineHasCitationMarker(line));
     const uncited = lines.filter((line) => !lineHasCitationMarker(line));
     if (query?.trim() && cited.length >= BRIEF_DISCORD_MIN_CITATIONS) {
-      lines = ensureMinimumDistinctCitedLines([], cited, query, BRIEF_DISCORD_MIN_CITATIONS);
+      lines = ensureMinimumDistinctCitedLines([], cited, query, targetDistinct);
     } else if (cited.length > 0) {
       lines = [...cited, ...uncited];
     }
     lines = sliceLinesPreservingDistinctCitations(
       lines,
       maxLines,
-      query?.trim() ? BRIEF_DISCORD_MIN_CITATIONS : 1,
+      query?.trim() ? targetDistinct : 1,
     );
   }
 
@@ -388,7 +411,8 @@ export const formatDiscordAskDisplay = (
   const { body, sourceLines } = splitResearchAnswer(alignedAnswer);
   const normalizedBody = normalizeBodyCitationIndices(body);
   const citationUrls = buildCitationUrlMap(sourceLines, approvedSources);
-  const clamped = clampDiscordBodyLines(normalizedBody, maxLines, options?.query);
+  const targetDistinct = briefDiscordCitationTarget(citationUrls.size || approvedSources.length);
+  const clamped = clampDiscordBodyLines(normalizedBody, maxLines, options?.query, targetDistinct);
   return embedInlineCitationLinks(clamped, citationUrls).trim();
 };
 

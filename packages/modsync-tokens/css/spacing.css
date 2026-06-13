@@ -1,0 +1,56 @@
+/* ============================================================
+   ModSync — Spacing, Radius, Borders, Shadows
+   Values lifted from the Avalonia Padding/CornerRadius/BorderThickness
+   conventions across the app's styles.
+   ============================================================ */
+
+:root {
+  /* ---- Spacing scale (px) ---- */
+  --space-0:  0;
+  --space-1:  2px;    /* StackPanel default margin */
+  --space-2:  4px;
+  --space-3:  6px;
+  --space-4:  8px;    /* badge padding, card gaps */
+  --space-5:  10px;   /* button padding (KOTOR), tooltip */
+  --space-6:  12px;   /* download item padding */
+  --space-7:  15px;   /* step / section padding */
+  --space-8:  16px;   /* summary card padding */
+  --space-9:  24px;   /* landing card padding */
+  --space-10: 32px;   /* hero / page gutters */
+  --space-12: 36px;   /* hero padding */
+
+  /* ---- Corner radius ---- */
+  --radius-none: 0;
+  --radius-xs:  2px;    /* light-theme chips */
+  --radius-sm:  4px;    /* badges, tooltips, download items */
+  --radius-md:  6px;    /* summary cards */
+  --radius-lg:  8px;    /* step/progress sections */
+  --radius-xl:  10px;   /* landing action buttons, info panels */
+  --radius-2xl: 12px;   /* landing step cards, overlays */
+  --radius-3xl: 14px;   /* landing cards & sections */
+  --radius-hero:18px;   /* landing hero */
+  --radius-pill: 999px;
+
+  /* ---- Border widths ---- */
+  --border-thin:   1px;   /* light theme, dividers */
+  --border-base:   2px;   /* KOTOR controls, buttons, inputs */
+
+  /* ---- Elevation / shadows ----
+     KOTOR themes are near-flat (borders do the work); the Light
+     installer + landing surfaces use soft ambient shadows. */
+  --shadow-none:  none;
+  --shadow-sm:    0 1px 2px rgba(0, 0, 0, 0.18);
+  --shadow-card:  0 2px 8px rgba(0, 0, 0, 0.28);
+  --shadow-lg:    0 8px 28px rgba(0, 0, 0, 0.40);
+  --shadow-glow:  0 0 0 1px var(--border-default), 0 0 18px rgba(58, 170, 255, 0.18);
+
+  /* ---- Focus ring ---- */
+  --focus-ring: 0 0 0 2px var(--border-hover);
+
+  /* ---- Layout constants (from MainWindow.axaml) ---- */
+  --sidebar-min:    250px;
+  --window-min-w:   600px;
+  --window-control: 40px;   /* min/max/close hit target */
+  --hit-target:     44px;   /* minimum interactive size */
+  --transition:     140ms ease;  /* @kind other */
+}

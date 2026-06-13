@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import {
+  Events,
   PermissionFlagsBits,
   SlashCommandBuilder,
   type ChatInputCommandInteraction,
@@ -84,6 +85,8 @@ const traskHttpRuntime = {
 };
 
 const embeddedWeb = startEmbeddedTraskWebUi({ config, runtime: traskHttpRuntime, logger });
+const remoteAllowedGuildIds = new Set<string>();
+let lastInstallPolicyRefreshMs = 0;
 
 if (embeddedWeb) {
   const shutdownWeb = (): void => {
@@ -506,6 +509,9 @@ client.once("ready", (readyClient) => {
 
 process.on("beforeExit", () => {
   stopDiscordIndexSync?.();
+  if (installPolicyRefreshTimer) {
+    clearInterval(installPolicyRefreshTimer);
+  }
 });
 
 process.on("unhandledRejection", (reason) => {
@@ -521,9 +527,76 @@ process.on("uncaughtException", (error) => {
 });
 
 const isAllowedGuild = (guildId: string | null): boolean => {
-  if (config.allowedGuildIds.length === 0) return true;
-  return guildId !== null && config.allowedGuildIds.includes(guildId);
+  if (config.allowedGuildIds.length === 0 && remoteAllowedGuildIds.size === 0) return true;
+  return guildId !== null && (config.allowedGuildIds.includes(guildId) || remoteAllowedGuildIds.has(guildId));
 };
+
+const refreshInstallPolicy = async (force = false): Promise<void> => {
+  const policyUrl = config.installPolicyUrl?.trim();
+  if (!policyUrl) return;
+  const now = Date.now();
+  if (!force && now - lastInstallPolicyRefreshMs < config.installPolicyRefreshMs) return;
+  lastInstallPolicyRefreshMs = now;
+
+  try {
+    const headers = new Headers({ Accept: "application/json" });
+    if (config.installPolicyApiKey) {
+      headers.set("Authorization", `Bearer ${config.installPolicyApiKey}`);
+    }
+    const response = await fetch(policyUrl, { headers });
+    if (!response.ok) {
+      logger.warn("Trask install-policy refresh returned non-OK status.", {
+        status: response.status,
+        policyUrl,
+      });
+      return;
+    }
+    const payload = await response.json() as { allowedGuildIds?: unknown };
+    const next = Array.isArray(payload.allowedGuildIds)
+      ? payload.allowedGuildIds.map((entry) => String(entry).trim()).filter(Boolean)
+      : [];
+    remoteAllowedGuildIds.clear();
+    for (const guildId of next) {
+      remoteAllowedGuildIds.add(guildId);
+    }
+    logger.info("Trask install-policy refreshed.", {
+      remoteAllowedGuildCount: remoteAllowedGuildIds.size,
+      configuredAllowedGuildCount: config.allowedGuildIds.length,
+    });
+  } catch (error) {
+    logger.warn("Trask install-policy refresh failed.", {
+      error: toErrorMessage(error),
+      policyUrl,
+    });
+  }
+};
+
+void refreshInstallPolicy(true);
+const installPolicyRefreshTimer = config.installPolicyUrl
+  ? setInterval(() => void refreshInstallPolicy(), Math.max(5_000, config.installPolicyRefreshMs))
+  : undefined;
+installPolicyRefreshTimer?.unref?.();
+
+client.on(Events.GuildCreate, async (guild) => {
+  await refreshInstallPolicy(true);
+  if (isAllowedGuild(guild.id)) {
+    logger.info("Trask joined approved guild.", { guildId: guild.id, guildName: guild.name });
+    return;
+  }
+
+  logger.warn("Trask joined unauthorized guild; leaving immediately.", {
+    guildId: guild.id,
+    guildName: guild.name,
+    approvedGuildCount: config.allowedGuildIds.length,
+  });
+
+  await guild.leave().catch((error) => {
+    logger.error("Failed to leave unauthorized guild.", {
+      guildId: guild.id,
+      error: toErrorMessage(error),
+    });
+  });
+});
 
 const isAllowedChannel = (channelId: string): boolean => {
   if (config.approvedChannelIds.length === 0) return true;

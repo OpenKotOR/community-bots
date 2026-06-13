@@ -61,6 +61,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           TRASK_RESEARCHWIZARD_BASE_URL: ${{ vars.TRASK_RESEARCHWIZARD_BASE_URL }}
           TRASK_RETRIEVE_BASE_URL: ${{ vars.TRASK_RETRIEVE_BASE_URL }}
+          TRASK_DISCORD_APP_ID: ${{ vars.TRASK_DISCORD_APP_ID }}
           TRASK_BUILTIN_API: ${{ vars.TRASK_BUILTIN_API != '' && vars.TRASK_BUILTIN_API || '1' }}
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
@@ -156,6 +157,20 @@ jobs:
             echo "Skipping TRASK_WEB_API_KEY sync (secret not set)."
           fi
 
+      - name: Set worker secret TRASK_INVITE_ADMIN_TOKEN (optional)
+        if: steps.cf_check.outputs.configured == 'true'
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          TRASK_INVITE_ADMIN_TOKEN: ${{ secrets.TRASK_INVITE_ADMIN_TOKEN }}
+        run: |
+          if [ -n "$TRASK_INVITE_ADMIN_TOKEN" ]; then
+            echo -n "$TRASK_INVITE_ADMIN_TOKEN" | pnpm dlx wrangler@4.100.0 secret put TRASK_INVITE_ADMIN_TOKEN --config infra/trask-worker/wrangler.toml
+          else
+            echo "Skipping TRASK_INVITE_ADMIN_TOKEN sync (secret not set; TRASK_WEB_API_KEY can still authorize install-policy updates)."
+          fi
+
       - name: Deploy Trask worker to workers.dev (free)
         if: steps.cf_check.outputs.configured == 'true'
         env:
@@ -163,6 +178,9 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           TRASK_RESEARCHWIZARD_BASE_URL: ${{ vars.TRASK_RESEARCHWIZARD_BASE_URL }}
           TRASK_RETRIEVE_BASE_URL: ${{ vars.TRASK_RETRIEVE_BASE_URL }}
+          TRASK_DISCORD_APP_ID: ${{ vars.TRASK_DISCORD_APP_ID }}
+          TRASK_DISCORD_INVITE_PERMISSIONS: ${{ vars.TRASK_DISCORD_INVITE_PERMISSIONS != '' && vars.TRASK_DISCORD_INVITE_PERMISSIONS || '84992' }}
+          TRASK_INVITE_ALLOWED_GUILD_IDS: ${{ vars.TRASK_INVITE_ALLOWED_GUILD_IDS }}
           TRASK_WEB_ALLOW_ANONYMOUS: ${{ vars.TRASK_WEB_ALLOW_ANONYMOUS != '' && vars.TRASK_WEB_ALLOW_ANONYMOUS || '1' }}
           TRASK_BUILTIN_API: ${{ vars.TRASK_BUILTIN_API != '' && vars.TRASK_BUILTIN_API || '1' }}
           TRASK_BUILTIN_FALLBACK: ${{ vars.TRASK_BUILTIN_FALLBACK != '' && vars.TRASK_BUILTIN_FALLBACK || '1' }}
@@ -173,7 +191,14 @@ jobs:
             --var "TRASK_WEB_ALLOW_ANONYMOUS:${TRASK_WEB_ALLOW_ANONYMOUS}"
             --var "TRASK_BUILTIN_API:${TRASK_BUILTIN_API}"
             --var "TRASK_BUILTIN_FALLBACK:${TRASK_BUILTIN_FALLBACK}"
+            --var "TRASK_DISCORD_INVITE_PERMISSIONS:${TRASK_DISCORD_INVITE_PERMISSIONS}"
           )
+          if [ -n "${TRASK_DISCORD_APP_ID}" ]; then
+            deploy_args+=(--var "TRASK_DISCORD_APP_ID:${TRASK_DISCORD_APP_ID}")
+          fi
+          if [ -n "${TRASK_INVITE_ALLOWED_GUILD_IDS}" ]; then
+            deploy_args+=(--var "TRASK_INVITE_ALLOWED_GUILD_IDS:${TRASK_INVITE_ALLOWED_GUILD_IDS}")
+          fi
           if [ "${{ steps.cf_check.outputs.builtin }}" != "true" ] && [ -n "${TRASK_RESEARCHWIZARD_BASE_URL}" ]; then
             deploy_args+=(--var "TRASK_RESEARCHWIZARD_BASE_URL:${TRASK_RESEARCHWIZARD_BASE_URL}")
           fi

@@ -24,7 +24,7 @@ export TRASK_RESEARCH_COMPOSE_MODE="${TRASK_RESEARCH_COMPOSE_MODE:-grounded}"
 export TRASK_LLM_PROFILE="${TRASK_LLM_PROFILE:-free}"
 export TRASK_INDEXER_DENSE_RETRIEVE="${TRASK_INDEXER_DENSE_RETRIEVE:-0}"
 export TRASK_INDEXER_RETRIEVE_TIMEOUT_MS="${TRASK_INDEXER_RETRIEVE_TIMEOUT_MS:-5000}"
-export TRASK_RETRIEVE_UPSTREAM_TIMEOUT_MS="${TRASK_RETRIEVE_UPSTREAM_TIMEOUT_MS:-10000}"
+export TRASK_RETRIEVE_UPSTREAM_TIMEOUT_MS="${TRASK_RETRIEVE_UPSTREAM_TIMEOUT_MS:-5000}"
 # Fast cached-index answers: soft end-to-end budget clamps gather + compose so a
 # query stays under ~30s and honest-degrades instead of stalling on live crawl.
 export TRASK_RESEARCH_BUDGET_MS="${TRASK_RESEARCH_BUDGET_MS:-30000}"
@@ -67,12 +67,18 @@ echo "Starting Chroma indexer on :${INDEXER_PORT}…"
 ) &
 INDEXER_PID=$!
 
+INDEXER_READY=0
 for _ in $(seq 1 60); do
   if curl -sf "http://127.0.0.1:${INDEXER_PORT}/health" >/dev/null; then
+    INDEXER_READY=1
     break
   fi
   sleep 0.5
 done
+if [[ "$INDEXER_READY" != "1" ]]; then
+  echo "Indexer failed to become healthy on :${INDEXER_PORT}" >&2
+  exit 1
+fi
 
 echo "Starting retrieve Worker on :${WORKER_PORT} (proxies indexer)…"
 (
@@ -83,12 +89,18 @@ echo "Starting retrieve Worker on :${WORKER_PORT} (proxies indexer)…"
 ) &
 WORKER_PID=$!
 
+WORKER_READY=0
 for _ in $(seq 1 60); do
   if curl -sf "http://127.0.0.1:${WORKER_PORT}/health" >/dev/null; then
+    WORKER_READY=1
     break
   fi
   sleep 0.5
 done
+if [[ "$WORKER_READY" != "1" ]]; then
+  echo "Retrieve Worker failed to become healthy on :${WORKER_PORT}" >&2
+  exit 1
+fi
 
 node scripts/holocron-e2e-live-build.mjs
 
@@ -99,12 +111,18 @@ TRASK_INDEXER_BASE_URL="http://127.0.0.1:${WORKER_PORT}" \
   bash scripts/holocron-e2e-live-server.sh &
 HTTP_PID=$!
 
+HTTP_READY=0
 for _ in $(seq 1 60); do
   if curl -sf "http://127.0.0.1:${HTTP_PORT}/" >/dev/null; then
+    HTTP_READY=1
     break
   fi
   sleep 0.5
 done
+if [[ "$HTTP_READY" != "1" ]]; then
+  echo "Trask HTTP server failed to become healthy on :${HTTP_PORT}" >&2
+  exit 1
+fi
 
 echo ""
 echo "Trask live stack ready:"

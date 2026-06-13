@@ -16,6 +16,7 @@
     "@heroiclabs/nakama-js": "^2.8.0",
     "@openkotor/blackjack-engine": "workspace:*",
     "@openkotor/pazaak-engine": "workspace:*",
+    "@openkotor/modsync-tokens": "workspace:*",
     "@openkotor/platform": "workspace:*",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"

@@ -75,6 +75,9 @@ jobs:
           VITE_LEGACY_HTTP_ORIGIN: ${{ vars.VITE_LEGACY_HTTP_ORIGIN }}
           VITE_REPO_BASE_URL: https://github.com/${{ github.repository }}
           VITE_WIKI_BASE_URL: ${{ vars.WIKI_BASE_URL }}
+          VITE_TRASK_API_BASE: ${{ vars.TRASK_API_BASE != '' && vars.TRASK_API_BASE || 'https://trask-worker.bocloud.workers.dev' }}
+          VITE_TRASK_API_FALLBACK_BASE: ${{ vars.TRASK_API_FALLBACK_BASE != '' && vars.TRASK_API_FALLBACK_BASE || 'https://openkotor-holocron-trask-http.hf.space' }}
+          VITE_TRASK_INVITE_BASE_URL: ${{ vars.TRASK_INVITE_BASE_URL != '' && vars.TRASK_INVITE_BASE_URL || vars.TRASK_API_BASE != '' && vars.TRASK_API_BASE || 'https://trask-worker.bocloud.workers.dev' }}
           VITE_TRASK_DISCORD_APPLICATION_ID: ${{ vars.TRASK_DISCORD_APP_ID }}
           VITE_HK_DISCORD_APPLICATION_ID: ${{ vars.HK86_DISCORD_APP_ID }}
           VITE_DISCORD_APPLICATION_ID: ${{ vars.HK86_DISCORD_APP_ID }}
@@ -90,25 +93,27 @@ jobs:
       - name: Check Holocron API base
         if: hashFiles('apps/holocron-web/package.json') != ''
         env:
-          TRASK_API_BASE: ${{ vars.TRASK_API_BASE }}
+          TRASK_API_BASE: ${{ vars.TRASK_API_BASE != '' && vars.TRASK_API_BASE || 'https://trask-worker.bocloud.workers.dev' }}
+          TRASK_API_FALLBACK_BASE: ${{ vars.TRASK_API_FALLBACK_BASE != '' && vars.TRASK_API_FALLBACK_BASE || 'https://openkotor-holocron-trask-http.hf.space' }}
         run: |
-          if [ -z "$TRASK_API_BASE" ]; then
-            echo "::error::Set repository variable TRASK_API_BASE to the deployed Trask API origin before publishing Holocron."
-            exit 1
-          fi
+          echo "Holocron Trask API base: ${TRASK_API_BASE}"
 
       - name: Verify Trask public API health (worker + upstream)
         if: hashFiles('apps/holocron-web/package.json') != ''
         env:
-          TRASK_API_BASE: ${{ vars.TRASK_API_BASE }}
-        run: bash scripts/check_trask_public_api.sh
+          TRASK_API_BASE: ${{ vars.TRASK_API_BASE != '' && vars.TRASK_API_BASE || 'https://trask-worker.bocloud.workers.dev' }}
+        run: |
+          if ! bash scripts/check_trask_public_api.sh; then
+            echo "::warning::Trask public API health check failed; continuing Pages deploy because the static client, Worker, and Hugging Face backend deploy independently."
+          fi
 
       - name: Build Holocron web (Trask Q&A SPA)
         if: hashFiles('apps/holocron-web/package.json') != ''
         env:
           BASE: /community-bots/qa-webui/
           ENABLE_SPARK: "0"
-          VITE_TRASK_API_BASE: ${{ vars.TRASK_API_BASE }}
+          VITE_TRASK_API_BASE: ${{ vars.TRASK_API_BASE != '' && vars.TRASK_API_BASE || 'https://trask-worker.bocloud.workers.dev' }}
+          VITE_TRASK_API_FALLBACK_BASE: ${{ vars.TRASK_API_FALLBACK_BASE != '' && vars.TRASK_API_FALLBACK_BASE || 'https://openkotor-holocron-trask-http.hf.space' }}
         run: pnpm --filter @openkotor/holocron-web build
 
       - name: Publish Holocron web under /community-bots/qa-webui/
@@ -122,6 +127,9 @@ jobs:
           BASE: /community-bots/hk86/
           VITE_REPO_BASE_URL: https://github.com/${{ github.repository }}
           VITE_WIKI_BASE_URL: ${{ vars.WIKI_BASE_URL }}
+          VITE_TRASK_API_BASE: ${{ vars.TRASK_API_BASE != '' && vars.TRASK_API_BASE || 'https://trask-worker.bocloud.workers.dev' }}
+          VITE_TRASK_API_FALLBACK_BASE: ${{ vars.TRASK_API_FALLBACK_BASE != '' && vars.TRASK_API_FALLBACK_BASE || 'https://openkotor-holocron-trask-http.hf.space' }}
+          VITE_TRASK_INVITE_BASE_URL: ${{ vars.TRASK_INVITE_BASE_URL != '' && vars.TRASK_INVITE_BASE_URL || vars.TRASK_API_BASE != '' && vars.TRASK_API_BASE || 'https://trask-worker.bocloud.workers.dev' }}
           VITE_TRASK_DISCORD_APPLICATION_ID: ${{ vars.TRASK_DISCORD_APP_ID }}
           VITE_HK_DISCORD_APPLICATION_ID: ${{ vars.HK86_DISCORD_APP_ID }}
           VITE_DISCORD_APPLICATION_ID: ${{ vars.HK86_DISCORD_APP_ID }}

@@ -14,7 +14,7 @@ test.describe("HK-86 bots hub (static)", () => {
       "href",
       /reaction-role-panels\.example\.json/,
     );
-    await hkSection.locator("details.hk-details summary").click();
+    await hkSection.locator("details.modsync-hub__details summary").click();
     await expect(hkSection.getByText(/watches the file/i)).toBeVisible();
   });
 
@@ -32,5 +32,19 @@ test.describe("HK-86 bots hub (static)", () => {
     expect(href).toBeTruthy();
     expect(href).toContain("discord.com");
     expect(href).toContain("permissions=2416266304");
+  });
+});
+
+test.describe("ModSync design showcase", () => {
+  test("design page loads themes, typography, and hub link", async ({ page }) => {
+    await page.goto("/design.html");
+
+    await expect(page.getByRole("heading", { name: "ModSync Design System" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Brand themes" })).toBeVisible();
+    await expect(page.getByText("K1 · Republic")).toBeVisible();
+    await expect(page.getByRole("link", { name: "← Discord bots hub" })).toBeVisible();
+
+    await page.getByRole("button", { name: "TSL", exact: true }).click();
+    await expect(page.locator("html")).toHaveClass(/theme-tsl/);
   });
 });

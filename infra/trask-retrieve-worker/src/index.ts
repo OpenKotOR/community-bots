@@ -92,7 +92,7 @@ export default {
       return json(503, { error: "TRASK_INDEXER_BASE_URL is not configured" });
     }
 
-    const timeoutMs = parsePositiveInteger(env.TRASK_RETRIEVE_UPSTREAM_TIMEOUT_MS, 10_000);
+    const timeoutMs = parsePositiveInteger(env.TRASK_RETRIEVE_UPSTREAM_TIMEOUT_MS, 5_000);
 
     let body: string;
     try {

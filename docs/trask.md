@@ -109,6 +109,9 @@ The following environment variables control Trask's scope:
 | Variable | Purpose |
 |---|---|
 | `TRASK_ALLOWED_GUILD_IDS` | Comma-separated guild IDs where Trask is active |
+| `TRASK_INSTALL_POLICY_URL` / `TRASK_API_BASE` | Optional override for Worker `/api/trask/install-policy`; when unset, Trask uses the public Worker policy endpoint for restart-free persistent guild approvals |
+| `TRASK_INSTALL_POLICY_API_KEY` | Optional bearer/API key for reading the install-policy endpoint |
+| `TRASK_INSTALL_POLICY_REFRESH_MS` | Install-policy poll interval in milliseconds (default `30000`) |
 | `TRASK_APPROVED_CHANNEL_IDS` | Comma-separated channel IDs where `/ask` is allowed |
 | `TRASK_SLASH_GUILD_IDS` | Comma-separated guild IDs where slash commands are **registered** (use when the bot serves multiple servers; overrides single-guild deploy when non-empty) |
 | `TRASK_WEB_RESEARCH_PYTHON` | Python for `scripts/trask_web_research.py` (defaults to `.venv-trask-research` when present) |

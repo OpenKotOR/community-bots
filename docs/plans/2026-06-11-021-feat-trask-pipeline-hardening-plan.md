@@ -125,13 +125,29 @@ Traceability: R-LAT/R-VER/R-LIVE align with origin REQ-C, R13, and R16.
 
 **Verification:** Gate outputs documented in `docs/evidence/` if browser gate scripts run.
 
+### U6. Discord hub ModSync design system (this pass)
+
+**Goal:** Restyle static Discord bots hub surfaces with OpenKotOR ModSync tokens (K1/TSL/Light) and brokered Trask invite links.
+
+**Requirements:** R-LIVE (surface parity)
+
+**Files:** `packages/modsync-tokens/**`, `apps/hk86-web/**`, `apps/pazaak-world/src/components/DiscordBotsHub.tsx`, `apps/cardworld/src/components/DiscordBotsHub.tsx`, `infra/trask-worker/**`
+
+**Verification:** `pnpm --filter hk86-web test:e2e`, agent-browser on dev hub, `pnpm trask:gate:ci`.
+
 ## Scope Boundaries
 
 **In scope:** Budget threading, incremental indexing phase 1, verify auth context, simplification, live gates.
 
 **Deferred for later:** Paginated purge across entire Chroma collection; reranker swap to `bge-reranker-v2-m3`; sync exit code when all export targets skip (P2 polish).
 
-**Out of scope:** Replacing Chroma/Crawl4AI; OpenRouter-as-primary policy.
+**Out of scope:** Replacing Chroma/Crawl4AI; OpenRouter-as-primary policy; full ModSync React component library port.
+
+### Delta Update (2026-06-12)
+
+- **Landed:** `@openkotor/modsync-tokens` package (colors/typography/spacing + hub-shell); hk86-web + pazaak/cardworld DiscordBotsHub restyled with K1/TSL/Light theme switcher; Trask brokered invite via Worker `/api/trask/invite`; trask pipeline hardening diff (budget threading, grounded evidence, worker invite policy); `pnpm trask:gate:ci` composite 215; hk86 Playwright smoke pass; agent-browser hub verification.
+- **Partial:** U2 incremental Discord indexing; U5 full live Holocron e2e + Discord verify (stack not restarted this pass); dependabot PR #101 open.
+- **Next:** Commit + push feature branch → PR; merge dependabot #101 if CI green; run `bash scripts/trask_live_stack.sh` + `pnpm holocron:e2e` + `pnpm verify:trask-discord` before merge claim; deploy trask-worker invite secrets (`TRASK_DISCORD_APP_ID`, `TRASK_INVITE_ALLOWED_GUILD_IDS`).
 
 ## Risks
 

@@ -18,6 +18,10 @@ interface Env {
   TRASK_REINDEX_TOKEN?: string;
   TRASK_BUILTIN_API?: string;
   TRASK_BUILTIN_FALLBACK?: string;
+  TRASK_DISCORD_APP_ID?: string;
+  TRASK_DISCORD_INVITE_PERMISSIONS?: string;
+  TRASK_INVITE_ALLOWED_GUILD_IDS?: string;
+  TRASK_INVITE_ADMIN_TOKEN?: string;
 }
 
 interface TraskAgentState {
@@ -26,6 +30,10 @@ interface TraskAgentState {
   lastQuery?: string;
   lastStatus?: number;
   lastUpdatedAt?: string;
+  inviteAllowedGuildIds?: string[];
+  inviteDiscordAppId?: string;
+  invitePermissions?: string;
+  inviteAdminToken?: string;
 }
 
 function corsHeaders(origin: string | null): Headers {
@@ -47,6 +55,15 @@ function jsonResponse(status: number, body: unknown, origin: string | null): Res
   return new Response(JSON.stringify(body), { status, headers });
 }
 
+function htmlResponse(status: number, title: string, body: string, origin: string | null): Response {
+  const headers = corsHeaders(origin);
+  headers.set("Content-Type", "text/html; charset=utf-8");
+  return new Response(
+    `<!doctype html><meta charset="utf-8"><title>${title}</title><main style="font:16px system-ui,sans-serif;max-width:680px;margin:48px auto;line-height:1.45"><h1>${title}</h1><p>${body}</p></main>`,
+    { status, headers },
+  );
+}
+
 function hasValidClientAuth(request: Request, apiKey: string): boolean {
   const auth = request.headers.get("authorization") ?? request.headers.get("x-trask-api-key");
   if (!auth) {
@@ -59,6 +76,13 @@ function normalizeBackendBaseUrl(rawBaseUrl: string): string {
   let end = rawBaseUrl.length;
   while (end > 0 && rawBaseUrl[end - 1] === "/") end -= 1;
   return rawBaseUrl.slice(0, end);
+}
+
+function readCsv(value: string | undefined): string[] {
+  return (value ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 }
 
 function isTraskApiPath(pathname: string): boolean {
@@ -119,7 +143,7 @@ function useBuiltinApi(env: Env): boolean {
 }
 
 function useBuiltinFallback(env: Env): boolean {
-  return envFlag(env.TRASK_BUILTIN_FALLBACK, false);
+  return envFlag(env.TRASK_BUILTIN_FALLBACK, true);
 }
 
 function shouldFallbackToBuiltin(response: Response): boolean {
@@ -262,6 +286,16 @@ async function serveUpstreamOrFallback(
     }
     return enrichUpstreamFailure(upstreamResponse, baseUrl, origin);
   } catch {
+    if (useBuiltinFallback(env)) {
+      const replayed =
+        bodyText !== undefined
+          ? new Request(request.url, { method: request.method, headers: request.headers, body: bodyText })
+          : request;
+      const builtin = await serveBuiltin(replayed, origin);
+      if (builtin && builtin.status < 500) {
+        return builtin;
+      }
+    }
     return jsonResponse(
       502,
       {
@@ -294,11 +328,13 @@ async function serveWorkerRoute(
       ? await probeUpstreamHealth(baseUrl, upstreamApiKey)
       : { reachable: false as const };
     const upstreamHealthy = hasRealUpstream(env) ? upstreamProbe.reachable : false;
+    const fallbackAvailable = useBuiltinApi(env) || useBuiltinFallback(env);
+    const ok = upstreamHealthy || fallbackAvailable;
     return jsonResponse(
-      upstreamHealthy ? 200 : 503,
+      ok ? 200 : 503,
       {
-        ok: upstreamHealthy,
-        mode: hasRealUpstream(env) ? "proxy" : "builtin-public-api",
+        ok,
+        mode: upstreamHealthy ? "proxy" : fallbackAvailable ? "degraded-builtin" : "unavailable",
         upstream: hasRealUpstream(env) ? normalizeBackendBaseUrl(baseUrl) : undefined,
         upstreamReachable: upstreamProbe.reachable,
         upstreamStatus: upstreamProbe.status,
@@ -454,6 +490,28 @@ function purgeDiscordDryRunResponse(args: Record<string, unknown>): Response {
   );
 }
 
+function discordInvitePermissions(env: Env): string {
+  return (env.TRASK_DISCORD_INVITE_PERMISSIONS ?? "84992").trim() || "84992";
+}
+
+function discordInviteAppId(env: Env): string {
+  return (env.TRASK_DISCORD_APP_ID ?? "").trim();
+}
+
+function buildDiscordInviteUrl(appId: string, guildId: string, permissions: string): string {
+  const url = new URL("https://discord.com/api/oauth2/authorize");
+  url.searchParams.set("client_id", appId);
+  url.searchParams.set("permissions", permissions);
+  url.searchParams.set("scope", "bot applications.commands");
+  url.searchParams.set("guild_id", guildId);
+  url.searchParams.set("disable_guild_select", "true");
+  return url.toString();
+}
+
+function isValidDiscordSnowflake(value: string): boolean {
+  return /^\d{15,25}$/u.test(value);
+}
+
 function withCors(response: Response, origin: string | null): Response {
   const headers = corsHeaders(origin);
   for (const [name, value] of response.headers) {
@@ -486,6 +544,240 @@ export class TraskAgent extends Agent<Env, TraskAgentState> {
   @callable()
   async query(input: { query?: string; question?: string; modelId?: string; sourcePreference?: string }) {
     return this.command("ask", input);
+  }
+
+  @callable()
+  async ask(input: Record<string, unknown> = {}) {
+    return this.command("ask", input);
+  }
+
+  @callable()
+  async research(input: Record<string, unknown> = {}) {
+    return this.command("research", input);
+  }
+
+  @callable()
+  async models() {
+    return this.command("models");
+  }
+
+  @callable()
+  async thread(input: Record<string, unknown> = {}) {
+    return this.command("thread", input);
+  }
+
+  @callable()
+  async cancel(input: Record<string, unknown> = {}) {
+    return this.command("cancel", input);
+  }
+
+  @callable()
+  async history(input: Record<string, unknown> = {}) {
+    return this.command("history", input);
+  }
+
+  @callable()
+  async sources() {
+    return this.command("sources");
+  }
+
+  @callable()
+  async session() {
+    return this.command("session");
+  }
+
+  @callable()
+  async health() {
+    return this.command("health");
+  }
+
+  @callable()
+  async evidence(input: Record<string, unknown> = {}) {
+    return this.command("evidence", input);
+  }
+
+  @callable()
+  async refreshDryRun(input: Record<string, unknown> = {}) {
+    return this.command("refresh-dry-run", input);
+  }
+
+  @callable()
+  async purgeDiscordMessage(input: Record<string, unknown> = {}) {
+    return this.command("purge-discord-message", input);
+  }
+
+  @callable()
+  invitePolicy() {
+    return this.invitePolicyBody();
+  }
+
+  @callable()
+  async allowInviteGuild(input: Record<string, unknown> = {}) {
+    return this.updateInviteGuild(input, true, true);
+  }
+
+  @callable()
+  async revokeInviteGuild(input: Record<string, unknown> = {}) {
+    return this.updateInviteGuild(input, false, true);
+  }
+
+  @callable()
+  async configureInvite(input: Record<string, unknown> = {}) {
+    return this.configureInvitePolicy(input, this.invitePolicyConfigured());
+  }
+
+  private inviteAllowedGuildIds(): string[] {
+    return [
+      ...new Set([
+        ...readCsv(this.env.TRASK_INVITE_ALLOWED_GUILD_IDS),
+        ...(this.state.inviteAllowedGuildIds ?? []),
+      ]),
+    ].filter(isValidDiscordSnowflake);
+  }
+
+  private inviteAppId(): string {
+    return (this.state.inviteDiscordAppId ?? "").trim() || discordInviteAppId(this.env);
+  }
+
+  private invitePermissions(): string {
+    return (this.state.invitePermissions ?? "").trim() || discordInvitePermissions(this.env);
+  }
+
+  private inviteAdminToken(): string {
+    return (this.state.inviteAdminToken ?? "").trim()
+      || (this.env.TRASK_INVITE_ADMIN_TOKEN ?? "").trim()
+      || (this.env.TRASK_WEB_API_KEY ?? "").trim();
+  }
+
+  private inviteAdminAuthorized(request: Request): boolean {
+    const token = this.inviteAdminToken();
+    return Boolean(token) && hasValidClientAuth(request, token);
+  }
+
+  private inviteInputAuthorized(input: Record<string, unknown>): boolean {
+    const token = this.inviteAdminToken();
+    const provided = stringValue(input.adminToken || input.token || input.apiKey);
+    return Boolean(token) && provided === token;
+  }
+
+  private invitePolicyConfigured(): boolean {
+    return Boolean(this.inviteAppId() || this.inviteAllowedGuildIds().length > 0 || this.inviteAdminToken());
+  }
+
+  private invitePolicyBody() {
+    return {
+      ok: true,
+      appConfigured: Boolean(this.inviteAppId()),
+      appIdSource: this.state.inviteDiscordAppId ? "persistent" : discordInviteAppId(this.env) ? "env" : "unset",
+      permissions: this.invitePermissions(),
+      permissionsSource: this.state.invitePermissions ? "persistent" : "env-or-default",
+      adminConfigured: Boolean(this.inviteAdminToken()),
+      adminTokenSource: this.state.inviteAdminToken
+        ? "persistent"
+        : (this.env.TRASK_INVITE_ADMIN_TOKEN ?? this.env.TRASK_WEB_API_KEY) ? "env" : "unset",
+      allowedGuildIds: this.inviteAllowedGuildIds(),
+      envAllowedGuildCount: readCsv(this.env.TRASK_INVITE_ALLOWED_GUILD_IDS).length,
+      persistentAllowedGuildCount: this.state.inviteAllowedGuildIds?.length ?? 0,
+      inviteUrl: "/api/trask/invite?guild_id=<discord-guild-id>",
+      note: "Trask invite links require an allowlisted guild id. App id, permissions, and guild entries can all be updated through this Worker without restarting Trask.",
+    };
+  }
+
+  private async configureInvitePolicy(input: Record<string, unknown>, requireAuth = false) {
+    if (requireAuth && !this.inviteInputAuthorized(input)) {
+      return { ok: false, status: 401, body: { error: "Invite policy configuration requires the persistent admin token." } };
+    }
+    const appId = stringValue(input.appId || input.clientId || input.discordAppId);
+    const permissions = stringValue(input.permissions || input.permissionInteger);
+    const adminToken = stringValue(input.adminToken || input.token || input.apiKey);
+    const patch: Pick<TraskAgentState, "inviteDiscordAppId" | "invitePermissions" | "inviteAdminToken"> = {};
+    if (appId) {
+      if (!isValidDiscordSnowflake(appId)) {
+        return { ok: false, status: 422, body: { error: "appId must be a Discord snowflake." } };
+      }
+      patch.inviteDiscordAppId = appId;
+    }
+    if (permissions) {
+      if (!/^\d+$/u.test(permissions)) {
+        return { ok: false, status: 422, body: { error: "permissions must be a Discord permission integer." } };
+      }
+      patch.invitePermissions = permissions;
+    }
+    if (adminToken) {
+      if (adminToken.length < 12) {
+        return { ok: false, status: 422, body: { error: "adminToken must be at least 12 characters." } };
+      }
+      patch.inviteAdminToken = adminToken;
+    }
+    if (!patch.inviteDiscordAppId && !patch.invitePermissions && !patch.inviteAdminToken) {
+      return { ok: false, status: 422, body: { error: "Provide appId, permissions, and/or adminToken." } };
+    }
+    this.setState({
+      ...this.state,
+      ...patch,
+      totalCommands: this.state.totalCommands + 1,
+      lastCommand: "configure-invite",
+      lastStatus: 200,
+      lastUpdatedAt: new Date().toISOString(),
+    });
+    return { ok: true, status: 200, body: this.invitePolicyBody() };
+  }
+
+  private async updateInviteGuild(input: Record<string, unknown>, allowed: boolean, requireAuth = false) {
+    if (requireAuth && !this.inviteInputAuthorized(input)) {
+      return { ok: false, status: 401, body: { error: "Invite guild updates require the persistent admin token." } };
+    }
+    const guildId = stringValue(input.guildId || input.guild_id || input.id);
+    if (!isValidDiscordSnowflake(guildId)) {
+      return { ok: false, status: 422, body: { error: "A valid Discord guildId is required." } };
+    }
+    const current = new Set(this.state.inviteAllowedGuildIds ?? []);
+    if (allowed) {
+      current.add(guildId);
+    } else {
+      current.delete(guildId);
+    }
+    const inviteAllowedGuildIds = [...current].sort();
+    this.setState({
+      ...this.state,
+      inviteAllowedGuildIds,
+      totalCommands: this.state.totalCommands + 1,
+      lastCommand: allowed ? "allow-invite-guild" : "revoke-invite-guild",
+      lastStatus: 200,
+      lastUpdatedAt: new Date().toISOString(),
+    });
+    return { ok: true, status: 200, body: this.invitePolicyBody() };
+  }
+
+  private async handleInviteRequest(request: Request, origin: string | null): Promise<Response> {
+    const url = new URL(request.url);
+    const guildId = (url.searchParams.get("guild_id") ?? url.searchParams.get("guildId") ?? "").trim();
+    const appId = this.inviteAppId();
+    if (!appId) {
+      return htmlResponse(
+        503,
+        "Trask Invite Not Configured",
+        "The public invite broker is live, but TRASK_DISCORD_APP_ID is not configured on the Worker.",
+        origin,
+      );
+    }
+    if (!isValidDiscordSnowflake(guildId)) {
+      return htmlResponse(
+        400,
+        "Guild Approval Required",
+        "Trask does not publish open-ended Discord install links. Ask an OpenKotOR operator to approve your Discord guild id, then use /api/trask/invite?guild_id=<id>.",
+        origin,
+      );
+    }
+    if (!this.inviteAllowedGuildIds().includes(guildId)) {
+      return htmlResponse(
+        403,
+        "Guild Not Approved",
+        "This Discord guild is not approved for Trask installation. The bot will not be invited until an operator adds the guild to the persistent allowlist.",
+        origin,
+      );
+    }
+    return Response.redirect(buildDiscordInviteUrl(appId, guildId, this.invitePermissions()), 302);
   }
 
   @callable()
@@ -528,6 +820,18 @@ export class TraskAgent extends Agent<Env, TraskAgentState> {
       });
       return { ok: response.ok, status: response.status, body: await response.json() };
     }
+    if (command.trim().toLowerCase() === "invite-policy") {
+      return { ok: true, status: 200, body: this.invitePolicyBody() };
+    }
+    if (command.trim().toLowerCase() === "allow-invite-guild") {
+      return this.updateInviteGuild(commandArgs, true, true);
+    }
+    if (command.trim().toLowerCase() === "revoke-invite-guild") {
+      return this.updateInviteGuild(commandArgs, false, true);
+    }
+    if (command.trim().toLowerCase() === "configure-invite") {
+      return this.configureInvitePolicy(commandArgs, this.invitePolicyConfigured());
+    }
 
     const request = commandToRequest(command, commandArgs, "https://trask-agent.local/");
     const url = new URL(request.url);
@@ -569,6 +873,35 @@ export class TraskAgent extends Agent<Env, TraskAgentState> {
     if (request.method === "GET" && subpath === "/state") {
       return jsonResponse(200, { state: this.state }, origin);
     }
+    if (request.method === "GET" && subpath === "/invite") {
+      return this.handleInviteRequest(request, origin);
+    }
+    if (request.method === "GET" && subpath === "/install-policy") {
+      return jsonResponse(200, this.invitePolicyBody(), origin);
+    }
+    if (
+      request.method === "POST"
+      && (subpath === "/install-policy/allow"
+        || subpath === "/install-policy/revoke"
+        || subpath === "/install-policy/configure")
+    ) {
+      const isBootstrapConfigure = subpath.endsWith("/configure") && !this.invitePolicyConfigured();
+      if (!isBootstrapConfigure && !this.inviteAdminAuthorized(request)) {
+        return jsonResponse(
+          401,
+          {
+            error:
+              "Invite policy update denied. Use the persistent admin token configured on /api/trask/install-policy/configure, or an optional bootstrap env token.",
+          },
+          origin,
+        );
+      }
+      const body = readJsonObject(await request.json().catch(() => ({})));
+      const result = subpath.endsWith("/configure")
+        ? await this.configureInvitePolicy(body)
+        : await this.updateInviteGuild(body, subpath.endsWith("/allow"));
+      return jsonResponse(result.status, result.body, origin);
+    }
     if (request.method === "POST" && subpath === "/query") {
       const body = readJsonObject(await request.json().catch(() => ({})));
       const result = await this.command("ask", body);
@@ -595,6 +928,12 @@ export class TraskAgent extends Agent<Env, TraskAgentState> {
 }
 
 function rewriteToDefaultTraskAgent(request: Request, suffix: string): Request {
+  const url = new URL(request.url);
+  url.pathname = `/agents/trask-agent/default${suffix}`;
+  return new Request(url, request);
+}
+
+function rewriteTraskInstallRouteToAgent(request: Request, suffix: string): Request {
   const url = new URL(request.url);
   url.pathname = `/agents/trask-agent/default${suffix}`;
   return new Request(url, request);
@@ -642,6 +981,22 @@ export default {
 
     const apiKey = (env.TRASK_WEB_API_KEY ?? "").trim();
     const allowAnon = envFlag(env.TRASK_WEB_ALLOW_ANONYMOUS, true);
+
+    if (url.pathname === "/api/trask/invite") {
+      const agentResponse = await routeAgentRequest(rewriteTraskInstallRouteToAgent(request, "/invite"), env);
+      return agentResponse ? withCors(agentResponse, origin) : jsonResponse(404, { error: "Invite route not found." }, origin);
+    }
+
+    if (
+      url.pathname === "/api/trask/install-policy"
+      || url.pathname === "/api/trask/install-policy/allow"
+      || url.pathname === "/api/trask/install-policy/revoke"
+      || url.pathname === "/api/trask/install-policy/configure"
+    ) {
+      const suffix = url.pathname.replace(/^\/api\/trask/u, "");
+      const agentResponse = await routeAgentRequest(rewriteTraskInstallRouteToAgent(request, suffix), env);
+      return agentResponse ? withCors(agentResponse, origin) : jsonResponse(404, { error: "Install policy route not found." }, origin);
+    }
 
     if (isTraskAgentPath(url.pathname)) {
       if (apiKey && !hasValidClientAuth(request, apiKey)) {

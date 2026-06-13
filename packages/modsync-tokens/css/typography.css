@@ -1,0 +1,51 @@
+/* ============================================================
+   ModSync — Typography
+   The app ships no custom webfonts. The KOTOR themes (K1/TSL)
+   render body text in Verdana; the Light installer theme uses
+   Segoe UI; code, regex previews and TOML use Consolas.
+   These stacks reproduce that faithfully with web-safe fonts.
+   ============================================================ */
+
+:root {
+  /* ---- Families ---- */
+  --font-ui:      "Segoe UI", "Verdana", system-ui, -apple-system, sans-serif;
+  --font-body:    "Verdana", "Segoe UI", system-ui, sans-serif;
+  --font-mono:    "Consolas", "Courier New", ui-monospace, monospace;
+
+  /* The KOTOR themes use Verdana as the canonical body face; the
+     Light theme overrides to Segoe UI for an authentic OS look. */
+  --font-default: var(--font-body);
+
+  /* ---- Type scale (px, matching the Avalonia FontSize values) ---- */
+  --text-2xs: 11px;   /* secondary / badges / captions */
+  --text-xs:  12px;   /* tooltips, status, mono previews */
+  --text-sm:  13px;   /* Light-theme body, labels */
+  --text-md:  14px;   /* KOTOR body, default control text */
+  --text-lg:  16px;   /* dialog confirm, option titles */
+  --text-xl:  18px;   /* dialog titles, step titles, home */
+  --text-2xl: 20px;   /* card titles, step numbers */
+  --text-3xl: 22px;   /* section titles */
+  --text-4xl: 24px;   /* app title, window header */
+  --text-5xl: 28px;   /* welcome title */
+  --text-6xl: 32px;   /* landing hero title */
+
+  /* ---- Weights ---- */
+  --weight-normal:   400;
+  --weight-medium:   500;  /* SemiBold-ish */
+  --weight-semibold: 600;
+  --weight-bold:     700;
+
+  /* ---- Line heights ---- */
+  --leading-tight:  1.2;
+  --leading-snug:   1.35;
+  --leading-normal: 1.5;
+
+  /* ---- Letter spacing ---- */
+  --tracking-tight:  -0.01em;
+  --tracking-normal: 0;
+  --tracking-wide:   0.04em;   /* badges / small caps labels */
+}
+
+.theme-light {
+  --font-default: var(--font-ui);
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@openkotor/modsync-tokens",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./css/modsync.css": "./css/modsync.css",
+    "./css/hub-shell.css": "./css/hub-shell.css",
+    "./css/showcase.css": "./css/showcase.css",
+    "./theme": "./src/theme.ts"
+  },
+  "files": [
+    "css",
+    "src"
+  ]
+}

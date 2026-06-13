@@ -6,6 +6,13 @@ import {
 
 /** Minimum distinct inline citations for brief Discord display and compose sufficiency. */
 export const BRIEF_DISCORD_MIN_CITATIONS = 2;
+/** Preferred distinct inline citations for answers with enough evidence. */
+export const BRIEF_DISCORD_TARGET_CITATIONS = 3;
+
+export const briefDiscordCitationTarget = (availableCitationCount: number): number =>
+  availableCitationCount >= BRIEF_DISCORD_TARGET_CITATIONS
+    ? BRIEF_DISCORD_TARGET_CITATIONS
+    : BRIEF_DISCORD_MIN_CITATIONS;
 
 const queryTokens = (query: string): string[] =>
   query

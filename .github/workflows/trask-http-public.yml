@@ -112,11 +112,31 @@ jobs:
         run: |
           python3 - <<'PY'
           import os
+          import urllib.error
+          import urllib.request
           import time
           from huggingface_hub import HfApi
 
+          def print_space_logs(repo_id: str, token: str, log_type: str) -> None:
+              url = f"https://huggingface.co/api/spaces/{repo_id}/logs/{log_type}?tail=160"
+              req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
+              try:
+                  with urllib.request.urlopen(req, timeout=20) as res:
+                      body = res.read().decode("utf-8", errors="replace")
+              except urllib.error.HTTPError as err:
+                  body = err.read().decode("utf-8", errors="replace")
+                  print(f"--- HF {log_type} logs unavailable: HTTP {err.code} ---")
+                  print(body[:4000])
+                  return
+              except Exception as err:
+                  print(f"--- HF {log_type} logs unavailable: {err} ---")
+                  return
+              print(f"--- HF {log_type} logs tail ---")
+              print(body[-12000:])
+
           api = HfApi()
           repo_id = os.environ["HF_SPACE_ID"]
+          token = os.environ.get("HF_TOKEN", "")
           for attempt in range(60):
               info = api.space_info(repo_id, expand=["runtime"])
               stage = getattr(getattr(info, "runtime", None), "stage", None)
@@ -124,8 +144,11 @@ jobs:
               if stage == "RUNNING":
                   print(f"Space running: https://{info.subdomain}.hf.space")
                   break
-              if stage in ("ERROR", "CONFIG_ERROR"):
+              if stage in ("ERROR", "CONFIG_ERROR", "BUILD_ERROR", "RUNTIME_ERROR"):
                   msg = getattr(getattr(info, "runtime", None), "message", None)
+                  if token:
+                      print_space_logs(repo_id, token, "build")
+                      print_space_logs(repo_id, token, "run")
                   raise SystemExit(f"HF Space failed: stage={stage} message={msg}")
               time.sleep(30)
           else:

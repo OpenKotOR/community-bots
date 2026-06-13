@@ -19,6 +19,8 @@ import {
 } from "./discord-citation-url.js";
 import {
   BRIEF_DISCORD_MIN_CITATIONS,
+  BRIEF_DISCORD_TARGET_CITATIONS,
+  briefDiscordCitationTarget,
   claimMatchesQueryAnchor,
   distinctiveAnchorTokens,
   haystackIncludesToken,
@@ -587,8 +589,63 @@ export const composeGroundedAnswerFromClaims = (
   const formatClaimLine = (claim: EvidenceClaim): string =>
     `${stripClaimTitle(claim.claim)} [${claim.sourceIndex}]`;
 
+  const firstAnchorToken = (): string => {
+    const subjectPatterns: Array<[RegExp, string]> = [
+      [/\bTSLPatcher\b/iu, "TSLPatcher"],
+      [/\bMDLOps\b/iu, "MDLOps"],
+      [/\breone\b/iu, "reone"],
+      [/\bwidescreen\b/iu, "widescreen troubleshooting"],
+      [/\bsave\s+(?:games?|files?)\b/iu, "save-file locations"],
+      [/\bOdyssey\b/iu, "Odyssey engine research"],
+      [/\bKOTOR\b|\bKotOR\b/iu, "KOTOR"],
+    ];
+    for (const [pattern, label] of subjectPatterns) {
+      if (pattern.test(query)) return label;
+    }
+    const token = distinctiveAnchorTokens(query)[0] ?? "this question";
+    if (token === "this question") return "this answer";
+    const queryMatch = query.match(new RegExp(`\\b${token.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}\\b`, "iu"));
+    if (queryMatch?.[0]) return queryMatch[0];
+    return token.length > 0 ? `${token[0]!.toUpperCase()}${token.slice(1)}` : "this answer";
+  };
+
+  const roleForClaim = (claim: EvidenceClaim): string => {
+    const citationUrl = publicCitationUrlForClaim(claim).toLowerCase();
+    if (isDiscordJumpUrl(citationUrl) || claim.authority === "discord") return "indexed community discussion";
+    if (citationUrl.includes("github.com")) return "project/source documentation";
+    if (citationUrl.includes("deadlystream.com")) return "community release or troubleshooting reference";
+    if (citationUrl.includes("pcgamingwiki.com")) return "PC configuration reference";
+    if (citationUrl.includes("steamcommunity.com")) return "community guide";
+    return "approved reference";
+  };
+
+  const composeBriefLines = (briefClaims: readonly EvidenceClaim[]): string[] => {
+    if (briefClaims.length < 2) {
+      return briefClaims.map(formatClaimLine);
+    }
+    const [primary, secondary, tertiary] = briefClaims;
+    const subject = firstAnchorToken();
+    const primaryRole = roleForClaim(primary!);
+    const secondaryRole = roleForClaim(secondary!);
+    const weighingLine =
+      primaryRole === secondaryRole
+        ? `For ${subject}, use the first ${primaryRole} as the closest direct match and the second as corroborating context. [${primary!.sourceIndex}] [${secondary!.sourceIndex}]`
+        : `For ${subject}, weigh the ${primaryRole} first and use the ${secondaryRole} as corroboration or user-facing context. [${primary!.sourceIndex}] [${secondary!.sourceIndex}]`;
+    const lines = [
+      formatClaimLine(primary!),
+      formatClaimLine(secondary!),
+      weighingLine,
+    ];
+    if (tertiary) {
+      lines.push(
+        `Use the ${roleForClaim(tertiary)} as supporting context only where it directly matches the setup or symptom being discussed. [${tertiary.sourceIndex}]`,
+      );
+    }
+    return lines;
+  };
+
   const composeClaims = indexed;
-  const claimLines = composeClaims.map(formatClaimLine);
+  const claimLines = profile === "brief" ? composeBriefLines(composeClaims) : composeClaims.map(formatClaimLine);
   const caveat =
     profile === "brief" || conflictHosts.size === 0
       ? ""
@@ -834,12 +891,14 @@ export const countDistinctPublicCitationUrls = (claims: readonly EvidenceClaim[]
       .filter((url) => url.startsWith("http") || isDiscordJumpUrl(url)),
   ).size;
 
-/** Discord brief: ≥2 distinct public citation URLs and at least one query-anchored claim. */
+/** Discord brief: ≥2 distinct public citation URLs, targeting 3 when enough evidence exists, and at least one query-anchored claim. */
 export const hasMinimumDiscordBriefGroundedSupport = (
   claims: readonly EvidenceClaim[],
   query: string,
 ): boolean => {
-  if (countDistinctPublicCitationUrls(claims) < BRIEF_DISCORD_MIN_CITATIONS) return false;
+  const distinctCount = countDistinctPublicCitationUrls(claims);
+  if (distinctCount < BRIEF_DISCORD_MIN_CITATIONS) return false;
+  if (claims.length >= BRIEF_DISCORD_TARGET_CITATIONS && distinctCount < briefDiscordCitationTarget(claims.length)) return false;
   return claims.some((claim) => claimMatchesQueryAnchor(claim, query));
 };
 

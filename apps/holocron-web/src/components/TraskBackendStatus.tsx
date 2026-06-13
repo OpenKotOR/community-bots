@@ -7,6 +7,7 @@ type StatusKind = 'loading' | 'ok' | 'degraded' | 'unreachable'
 function classifyHealth(data: TraskHealthDto | null, fetchError: string | null): StatusKind {
   if (fetchError) return 'unreachable'
   if (!data?.ok) return 'degraded'
+  if (data.fallbackUsed) return 'degraded'
   if (data.upstreamReachable === false) return 'degraded'
   if (data.mode === 'proxy' && !data.upstream) return 'degraded'
   return 'ok'
@@ -52,6 +53,8 @@ export function TraskBackendStatus() {
   const title =
     kind === 'loading'
       ? 'Checking Holocron research API…'
+      : health?.fallbackUsed
+        ? 'Holocron research API is using fallback origin'
       : kind === 'degraded'
         ? 'Holocron research API is misconfigured'
         : 'Holocron research API is unreachable'
@@ -60,6 +63,8 @@ export function TraskBackendStatus() {
     fetchError
     ?? (health?.upstreamDetail
       ? health.upstreamDetail.replace(/\s+/g, ' ').trim().slice(0, 240)
+      : health?.fallbackUsed && health.resolvedApiBase
+        ? `Primary origin was retried and the request completed through ${health.resolvedApiBase}.`
       : health?.upstream
         ? `Proxy mode is active but the upstream Trask HTTP host is not healthy (${health.upstream}).`
         : 'The configured API origin did not return a healthy response.')

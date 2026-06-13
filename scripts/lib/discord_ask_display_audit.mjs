@@ -1,7 +1,7 @@
 /**
  * Shared Discord /ask embed description contract checks (verify script + Playwright harness).
  */
-import { DISCORD_ASK_MAX_BODY_LINES, formatDiscordAskDisplay } from "@openkotor/trask";
+import { DISCORD_ASK_MAX_BODY_LINES, briefDiscordCitationTarget, formatDiscordAskDisplay } from "@openkotor/trask";
 import { degradedAnswerRegexes } from "@openkotor/trask-config";
 
 export const MIN_INLINE_DISCORD_LINKS = 2;
@@ -47,8 +47,9 @@ export function auditDiscordAskDisplay(question, answer, approvedSources) {
     return "raw githubusercontent path in embed description";
   }
   const linked = [...display.matchAll(/\]\(https:\/\/[^)]+\)/g)];
-  if (linked.length < MIN_INLINE_DISCORD_LINKS) {
-    return `only ${linked.length} inline https link(s); need ≥${MIN_INLINE_DISCORD_LINKS}`;
+  const targetLinks = briefDiscordCitationTarget(approvedSources.length);
+  if (linked.length < targetLinks) {
+    return `only ${linked.length} inline https link(s); need ≥${targetLinks}`;
   }
   if (approvedSources.length < MIN_INLINE_DISCORD_LINKS) {
     return `only ${approvedSources.length} approved source(s); need ≥${MIN_INLINE_DISCORD_LINKS}`;

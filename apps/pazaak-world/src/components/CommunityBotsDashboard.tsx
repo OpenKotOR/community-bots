@@ -204,6 +204,11 @@ const OPERATOR_CONSOLE_ROUTE_TRAILING = OPERATOR_CONSOLE_ROUTE.endsWith("/") ? O
 const PAZAAK_WORLD_OAUTH_CALLBACK_BASE = `${PAZAAK_WORLD_PUBLIC_URL}/api/auth/oauth`;
 const TRASK_DISCORD_APP_ID = String(import.meta.env.VITE_TRASK_DISCORD_APP_ID ?? "1305793207036022784").trim();
 const TRASK_INSTALL_PERMISSIONS = "84992";
+const TRASK_INVITE_BASE_URL = String(
+  import.meta.env.VITE_TRASK_INVITE_BASE_URL
+    ?? import.meta.env.VITE_TRASK_API_BASE
+    ?? "https://trask-worker.bocloud.workers.dev",
+).trim().replace(/\/$/, "");
 
 const DEFAULT_DASHBOARD_PREFS: DashboardPrefs = {
   apiBase: "",
@@ -778,6 +783,13 @@ function buildDiscordInstallUrl(appId: string, permissions: string): string {
   return url.toString();
 }
 
+function buildTraskInstallUrl(): string {
+  if (TRASK_INVITE_BASE_URL) {
+    return `${TRASK_INVITE_BASE_URL}/api/trask/invite`;
+  }
+  return buildDiscordInstallUrl(TRASK_DISCORD_APP_ID, TRASK_INSTALL_PERMISSIONS);
+}
+
 function readStoredAppToken(): string {
   try {
     return window.localStorage.getItem(STANDALONE_AUTH_TOKEN_KEY)?.trim() ?? "";
@@ -1234,7 +1246,7 @@ export function CommunityBotsDashboard() {
     || liveData.me?.user.username
     || "Operator";
   const traskInstallUrl = useMemo(
-    () => buildDiscordInstallUrl(TRASK_DISCORD_APP_ID, TRASK_INSTALL_PERMISSIONS),
+    () => buildTraskInstallUrl(),
     [],
   );
   const traskTags = useMemo(

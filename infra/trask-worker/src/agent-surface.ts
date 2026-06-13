@@ -9,6 +9,29 @@ export interface TraskAgentCommand {
   dryRunDefault?: boolean;
 }
 
+export const TRASK_AGENT_CALLABLE_METHODS = [
+  "capabilities",
+  "status",
+  "query",
+  "ask",
+  "research",
+  "models",
+  "thread",
+  "cancel",
+  "history",
+  "sources",
+  "session",
+  "health",
+  "evidence",
+  "refreshDryRun",
+  "purgeDiscordMessage",
+  "invitePolicy",
+  "allowInviteGuild",
+  "revokeInviteGuild",
+  "configureInvite",
+  "command",
+] as const;
+
 export const TRASK_AGENT_COMMANDS: readonly TraskAgentCommand[] = [
   {
     name: "ask",
@@ -94,6 +117,36 @@ export const TRASK_AGENT_COMMANDS: readonly TraskAgentCommand[] = [
     dryRunDefault: true,
   },
   {
+    name: "invite-policy",
+    description: "Read the persistent Trask Discord install allowlist used by the invite broker.",
+    method: "GET",
+    path: "/api/trask/install-policy",
+  },
+  {
+    name: "allow-invite-guild",
+    description: "Persistently allow a Discord guild id to install Trask without restarting the bot or Worker.",
+    method: "POST",
+    path: "/api/trask/install-policy/allow",
+    args: { guildId: "Discord guild id" },
+    mutates: true,
+  },
+  {
+    name: "revoke-invite-guild",
+    description: "Remove a Discord guild id from the persistent Trask install allowlist.",
+    method: "POST",
+    path: "/api/trask/install-policy/revoke",
+    args: { guildId: "Discord guild id" },
+    mutates: true,
+  },
+  {
+    name: "configure-invite",
+    description: "Persistently configure Trask Discord app id and invite permissions without redeploying.",
+    method: "POST",
+    path: "/api/trask/install-policy/configure",
+    args: { appId: "Discord application id", permissions: "optional permission integer" },
+    mutates: true,
+  },
+  {
     name: "capabilities",
     description: "Return this agent command registry.",
     method: "GET",
@@ -113,11 +166,13 @@ export function capabilitiesBody() {
       command: "/api/agent/command",
     },
     commands: TRASK_AGENT_COMMANDS.map((command) => ({ ...command })),
+    callableMethods: [...TRASK_AGENT_CALLABLE_METHODS],
     providerOrder: ["huggingface", "cloudflare", "deterministic-extractive"],
     retrievalBoundary: "$TRASK_RETRIEVE_BASE_URL/retrieve",
     safetyLimits: {
       destructiveActionsDefaultToDryRun: true,
       purgeDiscordMessageIsPlanOnlyInWorker: true,
+      traskInviteRequiresAllowlistedGuild: true,
     },
     notes: [
       "Trask research commands proxy to the configured live Trask HTTP upstream.",
@@ -210,6 +265,34 @@ export function commandToRequest(command: string, args: Record<string, unknown>,
   if (normalized === "health") {
     url.pathname = "/healthz";
     return new Request(url, { method: "GET" });
+  }
+
+  if (normalized === "invite-policy") {
+    url.pathname = "/api/trask/install-policy";
+    return new Request(url, { method: "GET" });
+  }
+
+  if (normalized === "allow-invite-guild" || normalized === "revoke-invite-guild") {
+    url.pathname = normalized === "allow-invite-guild"
+      ? "/api/trask/install-policy/allow"
+      : "/api/trask/install-policy/revoke";
+    return new Request(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ guildId: stringValue(args.guildId || args.guild_id || args.id) }),
+    });
+  }
+
+  if (normalized === "configure-invite") {
+    url.pathname = "/api/trask/install-policy/configure";
+    return new Request(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        appId: stringValue(args.appId || args.clientId || args.discordAppId),
+        permissions: stringValue(args.permissions || args.permissionInteger),
+      }),
+    });
   }
 
   throw Object.assign(new Error(`Unknown Trask agent command: ${command}`), { status: 422 });

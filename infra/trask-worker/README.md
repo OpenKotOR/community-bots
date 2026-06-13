@@ -15,6 +15,20 @@ Routes:
 - `/agents/trask-agent/default/command` — `POST { "command": "ask", "args": { ... } }`
 - `/api/agent/*` — convenience aliases for the same default instance
 
+Callable RPC methods on `TraskAgent`:
+
+- `capabilities()` — command registry, callable methods, provider order, safety limits
+- `status()` — persisted command state plus capabilities
+- `query(input)` / `ask(input)` / `research(input)` — submit a Trask research query
+- `models()` / `sources()` / `session()` / `health()` — read-only Trask capability checks
+- `thread(input)` / `history(input)` — read persisted Trask query/thread state
+- `cancel(input)` — cancel a pending query
+- `evidence(input)` — query the Cloudflare retrieve Worker boundary
+- `refreshDryRun(input)` — token-guarded dry-run reindex request through the retrieve/indexer boundary
+- `purgeDiscordMessage(input)` — safe dry-run purge plan only
+- `invitePolicy()` / `configureInvite(input)` / `allowInviteGuild(input)` / `revokeInviteGuild(input)` — persistent Trask Discord install policy
+- `command(name, args)` — generic registry-backed command entrypoint
+
 Commands exposed by the agent:
 
 - `ask` / `query` / `research` → `POST /api/trask/ask`
@@ -28,7 +42,17 @@ Commands exposed by the agent:
 - `evidence` → `POST $TRASK_RETRIEVE_BASE_URL/retrieve`
 - `refresh-dry-run` → `POST $TRASK_RETRIEVE_BASE_URL/reindex` with `TRASK_REINDEX_TOKEN`
 - `purge-discord-message` → safe dry-run request planning only
+- `invite-policy` → `GET /api/trask/install-policy`
+- `configure-invite` → `POST /api/trask/install-policy/configure`
+- `allow-invite-guild` / `revoke-invite-guild` → persistent install allowlist mutation
 - `capabilities` → command registry
+
+Public Trask install broker:
+
+- `/api/trask/invite?guild_id=<discord-guild-id>` redirects to Discord OAuth only when the guild is allowlisted.
+- `/api/trask/install-policy` exposes the merged env + persistent guild allowlist for bot refresh.
+- `/api/trask/install-policy/configure`, `/allow`, and `/revoke` update persistent state without restarting the Worker or Trask bot. First-time `/configure` can set a persistent `adminToken`; later HTTP mutations require that token in `Authorization: Bearer ...` or an optional bootstrap env token.
+- Env vars are optional bootstrap defaults. Runtime policy lives in the Agent Durable Object state once configured through the API.
 
 Research commands require `TRASK_RESEARCHWIZARD_BASE_URL` to point at a healthy `trask-http-server`. Without it, the agent still deploys and exposes capabilities, but `ask` returns an upstream configuration error.
 Evidence commands require `TRASK_RETRIEVE_BASE_URL` to point at the Cloudflare retrieve Worker (local default `http://127.0.0.1:8787`), preserving the production retrieve boundary instead of pointing agents at raw Chroma/indexer hosts.
@@ -39,7 +63,7 @@ The GitHub deploy workflow intentionally skips proxy-mode deploys when this valu
 - **Proxy mode** (`TRASK_BUILTIN_API=0`, required for research): forwards `/api/trask/*` to `TRASK_RESEARCHWIZARD_BASE_URL` (for example Hugging Face Space `OpenKotOR/holocron-trask-http`).
 - **Builtin stub** (`TRASK_BUILTIN_API=1`): health checks only; `/api/trask/*` returns **503** (bundled reference Q&A was removed).
 
-When `TRASK_BUILTIN_FALLBACK=1`, upstream **5xx** responses fall back to the builtin stub (still **503** for research — bundled Q&A was removed). `/healthz` probes upstream and returns **503** with `ok: false` when the Trask HTTP host is down (for example HF Space `OpenKotOR/holocron-trask-http` in **ERROR**).
+Upstream **5xx**, timeout, and rate-limit responses fall back to the builtin stub by default (still **503** for research — bundled Q&A was removed). `/healthz` reports `mode: "degraded-builtin"` with `ok: true` when the live Trask HTTP host is down but the Worker can still answer health and install-policy traffic. Set `TRASK_BUILTIN_FALLBACK=0` only when you want upstream failures to fail the Worker health check.
 
 ## Layout
 
@@ -77,8 +101,12 @@ curl -sS -X POST http://127.0.0.1:8787/api/agent/command \
 | `TRASK_RESEARCHWIZARD_BASE_URL` | Full `trask-http-server` origin when `TRASK_BUILTIN_API=0` |
 | `TRASK_RETRIEVE_BASE_URL` | Cloudflare retrieve Worker origin for `evidence` and dry-run reindex commands |
 | `TRASK_REINDEX_TOKEN` | Optional token for `refresh-dry-run`; without it the command reports the planned request and does not call upstream |
-| `TRASK_BUILTIN_FALLBACK` | `0` — do not serve offline reference answers on upstream errors |
+| `TRASK_BUILTIN_FALLBACK` | Optional; defaults to `1` so upstream failures degrade fast instead of hanging Worker health |
 | `TRASK_WEB_API_KEY` | Optional API key for locked-down deployments |
+| `TRASK_DISCORD_APP_ID` | Optional bootstrap Discord application id for brokered Trask installs; API-configured state wins |
+| `TRASK_DISCORD_INVITE_PERMISSIONS` | Optional bootstrap Trask OAuth permission integer (default `84992`); API-configured state wins |
+| `TRASK_INVITE_ALLOWED_GUILD_IDS` | Optional comma-separated bootstrap install allowlist; API-configured state is merged |
+| `TRASK_INVITE_ADMIN_TOKEN` | Optional bootstrap secret for live install-policy updates; persistent `/configure` token is preferred |
 
 Public Holocron: point `TRASK_API_BASE` at this worker with `TRASK_BUILTIN_API=0` and a working Trask HTTP upstream.
 
@@ -91,7 +119,7 @@ pnpm --dir infra/trask-worker run build
 pnpm dlx wrangler@4.100.0 deploy --config infra/trask-worker/wrangler.toml \
   --var "TRASK_WEB_ALLOW_ANONYMOUS:1" \
   --var "TRASK_BUILTIN_API:0" \
-  --var "TRASK_BUILTIN_FALLBACK:0" \
+  --var "TRASK_BUILTIN_FALLBACK:1" \
   --var "TRASK_RETRIEVE_BASE_URL:https://trask-retrieve.example.workers.dev" \
   --var "TRASK_RESEARCHWIZARD_BASE_URL:https://your-trask-http-origin.example"
 ```
@@ -99,15 +127,18 @@ pnpm dlx wrangler@4.100.0 deploy --config infra/trask-worker/wrangler.toml \
 For GitHub Actions deploys, configure repository variables:
 
 - `TRASK_BUILTIN_API=0`
-- `TRASK_BUILTIN_FALLBACK=0`
+- `TRASK_BUILTIN_FALLBACK=1` is the default; set `0` only for strict upstream-required health
 - `TRASK_WEB_ALLOW_ANONYMOUS=1` unless the public Worker is API-key protected
 - `TRASK_RESEARCHWIZARD_BASE_URL=https://<live-trask-http-origin>`
 - `TRASK_RETRIEVE_BASE_URL=https://<public-trask-retrieve-worker-origin>`
+- `TRASK_DISCORD_APP_ID=<Trask Discord application id>`
+- `TRASK_INVITE_ALLOWED_GUILD_IDS=<optional bootstrap guild ids>`
 
 Optional repository secrets:
 
 - `TRASK_RESEARCHWIZARD_API_KEY`
 - `TRASK_WEB_API_KEY`
+- `TRASK_INVITE_ADMIN_TOKEN` (bootstrap only; not required when configured through the API)
 
 Verification:
 

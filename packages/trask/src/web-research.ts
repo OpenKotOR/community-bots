@@ -20,6 +20,7 @@ import {
   searchHitsToCommunitySources,
 } from "./community-knowledge.js";
 import { isRewriteComposeEnabled } from "./research-compose.js";
+import { BRIEF_DISCORD_TARGET_CITATIONS } from "./query-anchor.js";
 
 import {
   listHeadlessWebResearchModels,
@@ -1023,7 +1024,8 @@ const sourceMatchesQuery = (source: SourceDescriptor, query: string): boolean =>
 
 const sourceRelevanceScore = (source: SourceDescriptor, query: string): number => {
   const tokens = tokenizeQuery(query);
-  if (tokens.length === 0) return 1;
+  const authorityBonus = (source.authorityWeight ?? 0) * 1.5;
+  if (tokens.length === 0) return 1 + authorityBonus;
   const haystack = [
     source.name,
     source.description,
@@ -1036,7 +1038,20 @@ const sourceRelevanceScore = (source: SourceDescriptor, query: string): number =
   }
   const titleBonus = tokens.some((token) => source.name.toLowerCase().includes(token)) ? 2 : 0;
   const urlBonus = tokens.some((token) => source.homeUrl.toLowerCase().includes(token)) ? 1 : 0;
-  return hits * 2 + titleBonus + urlBonus;
+  const primarySourceBonus =
+    source.kind === "github" && /github|repo|readme|source|tool|project|code/iu.test(query)
+      ? 5
+      : 0;
+  const communitySourceBonus =
+    source.kind === "discord" && /snigaroo|cortisol|th3w1zard1|community|discord|thread|discussion/iu.test(query)
+      ? 6
+      : 0;
+  const troubleshootingBonus =
+    source.tags?.some((tag) => /troubleshoot|widescreen|install|modding|tool/i.test(tag))
+    && /troubleshoot|fix|issue|problem|error|install|patch|2da|gff|tlk|mdlops|widescreen/i.test(query)
+      ? 4
+      : 0;
+  return hits * 2 + titleBonus + urlBonus + authorityBonus + primarySourceBonus + communitySourceBonus + troubleshootingBonus;
 };
 
 const rerankEvidenceSources = (query: string, sources: readonly SourceDescriptor[]): readonly SourceDescriptor[] => {
@@ -1049,10 +1064,13 @@ const rerankEvidenceSources = (query: string, sources: readonly SourceDescriptor
     }))
     .sort((left, right) => right.score - left.score || left.index - right.index);
   if (tokens.length === 0) {
-    return ranked.map((entry) => entry.source).slice(0, 4);
+    return ranked.map((entry) => entry.source).slice(0, 5);
   }
   const strong = ranked.filter((entry) => entry.score >= 2).map((entry) => entry.source);
-  return strong.slice(0, 8);
+  if (strong.length > 0) {
+    return strong.slice(0, 8);
+  }
+  return ranked.map((entry) => entry.source).slice(0, Math.max(6, BRIEF_DISCORD_TARGET_CITATIONS));
 };
 
 const resolveWebSourcesForFailedSynthesis = (
@@ -1061,7 +1079,7 @@ const resolveWebSourcesForFailedSynthesis = (
 ): readonly SourceDescriptor[] => {
   const candidates = filterPublicWebCitationSources(retrievedSources);
   const matched = candidates.filter((source) => sourceMatchesQuery(source, query));
-  return (matched.length > 0 ? matched : candidates).slice(0, 5);
+  return rerankEvidenceSources(query, matched.length > 0 ? matched : candidates).slice(0, 6);
 };
 
 const researchDomainsForSources = (sources: readonly SourceDescriptor[]): string[] => {

@@ -33,6 +33,8 @@ import {
 } from "./web-research.js";
 import {
   BRIEF_DISCORD_MIN_CITATIONS,
+  BRIEF_DISCORD_TARGET_CITATIONS,
+  briefDiscordCitationTarget,
   distinctiveAnchorTokens,
   haystackIncludesToken,
   passageMatchesQueryAnchor,
@@ -1196,7 +1198,8 @@ const queryPhraseTokens = (query: string): string[] => {
 const sourceRelevanceScore = (source: SourceDescriptor, query: string): number => {
   const tokens = tokenizeQuery(query);
   const intent = classifyQueryIntent(query);
-  if (tokens.length === 0) return 1 + intentTagScoreDelta(intent, source.tags ?? []);
+  const authorityBonus = (source.authorityWeight ?? 0) * 1.5;
+  if (tokens.length === 0) return 1 + authorityBonus + intentTagScoreDelta(intent, source.tags ?? []);
   const haystack = [
     source.name,
     source.description,
@@ -1214,6 +1217,19 @@ const sourceRelevanceScore = (source: SourceDescriptor, query: string): number =
     if (source.homeUrl.toLowerCase().includes(phrase)) phraseBonus += 10;
     else if (haystack.includes(phrase)) phraseBonus += 5;
   }
+  const primarySourceBonus =
+    source.kind === "github" && /github|repo|readme|source|tool|project|code/iu.test(query)
+      ? 5
+      : 0;
+  const communitySourceBonus =
+    source.kind === "discord" && /snigaroo|cortisol|th3w1zard1|community|discord|thread|discussion/iu.test(query)
+      ? 6
+      : 0;
+  const troubleshootingBonus =
+    source.tags?.some((tag) => /troubleshoot|widescreen|install|modding|tool/i.test(tag))
+    && /troubleshoot|fix|issue|problem|error|install|patch|2da|gff|tlk|mdlops|widescreen/i.test(query)
+      ? 4
+      : 0;
   let shallowPenalty = 0;
   try {
     const parsed = new URL(source.homeUrl);
@@ -1223,7 +1239,18 @@ const sourceRelevanceScore = (source: SourceDescriptor, query: string): number =
   } catch {
     shallowPenalty = 0;
   }
-  return hits * 2 + titleBonus + urlBonus + phraseBonus + intentTagScoreDelta(intent, source.tags ?? []) + shallowPenalty;
+  return (
+    hits * 2
+    + titleBonus
+    + urlBonus
+    + phraseBonus
+    + authorityBonus
+    + primarySourceBonus
+    + communitySourceBonus
+    + troubleshootingBonus
+    + intentTagScoreDelta(intent, source.tags ?? [])
+    + shallowPenalty
+  );
 };
 
 const rerankEvidenceSources = (query: string, sources: readonly SourceDescriptor[]): readonly SourceDescriptor[] => {
@@ -1236,13 +1263,13 @@ const rerankEvidenceSources = (query: string, sources: readonly SourceDescriptor
     }))
     .sort((left, right) => right.score - left.score || left.index - right.index);
   if (tokens.length === 0) {
-    return ranked.map((entry) => entry.source).slice(0, 4);
+    return ranked.map((entry) => entry.source).slice(0, 5);
   }
   const strong = ranked.filter((entry) => entry.score >= 2).map((entry) => entry.source);
   if (strong.length > 0) {
-    return strong.slice(0, 6);
+    return strong.slice(0, 8);
   }
-  return ranked.map((entry) => entry.source).slice(0, 5);
+  return ranked.map((entry) => entry.source).slice(0, Math.max(6, BRIEF_DISCORD_TARGET_CITATIONS));
 };
 
 const resolveWebSourcesForFailedSynthesis = (
@@ -1251,7 +1278,7 @@ const resolveWebSourcesForFailedSynthesis = (
 ): readonly SourceDescriptor[] => {
   const candidates = filterPublicWebCitationSources(retrievedSources);
   const matched = candidates.filter((source) => sourceMatchesQuery(source, query));
-  return (matched.length > 0 ? matched : candidates).slice(0, 5);
+  return rerankEvidenceSources(query, matched.length > 0 ? matched : candidates).slice(0, 6);
 };
 
 const researchDomainsForSources = (sources: readonly SourceDescriptor[]): string[] => {
@@ -1605,7 +1632,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
     );
     let answer = templateAnswer;
     const minCitationsForProfile =
-      composeProfile === "brief" ? BRIEF_DISCORD_MIN_CITATIONS : MIN_HOLOCRON_WEB_CITATIONS;
+      composeProfile === "brief" ? briefDiscordCitationTarget(webSources.length) : MIN_HOLOCRON_WEB_CITATIONS;
     const templateCitationCount = collectCitationIndicesFromAnswer(templateAnswer).length;
     const templateAligned = alignCitedSourcesToAnswer(templateAnswer, webSources);
     const templateMeetsCitationBar =
@@ -1723,7 +1750,10 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
       if (approvedSources.length === 0) {
         return null;
       }
-      const minCitations = minWebCitationsForProfile(surfaceProfileId);
+      const minCitations = Math.max(
+        minWebCitationsForProfile(surfaceProfileId),
+        briefDiscordCitationTarget(webSources.length),
+      );
       const citationIndexCountBrief = collectCitationIndicesFromAnswer(answer).length;
       if (approvedSources.length < minCitations || citationIndexCountBrief < minCitations) {
         const templateAligned = alignCitedSourcesToAnswer(templateAnswer, webSources);

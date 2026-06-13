@@ -73,6 +73,9 @@ lastUpdated: 2026-06-11
 | `TRASK_DISCORD_CLIENT_SECRET` | [REPO] Optional (OAuth flows). |
 | `TRASK_DISCORD_GUILD_ID` / `DISCORD_TARGET_GUILD_ID` | [REPO] Guild id fallback. |
 | `TRASK_ALLOWED_GUILD_IDS` | [REPO] Allow-list; all listed guilds are exported when running `scripts/trask_discord_sync.py`. |
+| `TRASK_INSTALL_POLICY_URL` / `TRASK_API_BASE` | [REPO] Optional overrides for Worker `/api/trask/install-policy`; when unset, the bot uses the public Worker policy endpoint and merges its `allowedGuildIds` for restart-free guild authorization. |
+| `TRASK_INSTALL_POLICY_API_KEY` | [REPO] Optional bearer/API key for reading the install policy URL. |
+| `TRASK_INSTALL_POLICY_REFRESH_MS` | [REPO] Poll interval for live install-policy refresh (default `30000`). |
 | `TRASK_DISCORD_CHANNEL_BLACKLIST` | [REPO] Channel IDs excluded from Discord export/indexing (comma-separated). |
 | `TRASK_DISCORD_SYNC_INTERVAL_MS` | [REPO] When &gt; 0, Trask bot runs `scripts/trask_discord_sync.py` on an interval (Chroma path). |
 | `TRASK_SLASH_GUILD_IDS` | [REPO] Guilds for slash registration. |

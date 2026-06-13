@@ -8,19 +8,16 @@ if [ -z "$BASE" ]; then
   exit 1
 fi
 
+FALLBACK_BASE="${TRASK_API_FALLBACK_BASE:-https://openkotor-holocron-trask-http.hf.space}"
+
 BASE="${BASE%/}"
 HEALTH_URL="${BASE}/healthz"
-ASK_URL="${BASE}/api/trask/ask"
+ACTIVE_BASE="$BASE"
 
 echo "Checking ${HEALTH_URL}"
 health_code="$(curl -fsS -o /tmp/trask-health.json -w '%{http_code}' "${HEALTH_URL}" || true)"
-if [ "$health_code" != "200" ]; then
-  echo "::error::Trask API health returned HTTP ${health_code}"
-  cat /tmp/trask-health.json 2>/dev/null || true
-  exit 1
-fi
-
-python3 - <<'PY'
+if [ "$health_code" = "200" ]; then
+  python3 - <<'PY'
 import json
 import sys
 
@@ -29,13 +26,21 @@ with open("/tmp/trask-health.json", encoding="utf-8") as f:
 if not data.get("ok"):
     print("::error::Trask API health reports ok=false", file=sys.stderr)
     sys.exit(1)
-if data.get("upstreamReachable") is False:
-    print("::error::Trask API upstream is unreachable", file=sys.stderr)
+fallback_active = data.get("fallbackUsed") or data.get("builtinFallback") or data.get("mode") == "degraded-builtin"
+if data.get("upstreamReachable") is False and not fallback_active:
+    print("::error::Trask API upstream is unreachable and no fallback is active", file=sys.stderr)
     sys.exit(1)
 PY
 
-echo "Health OK:"
-cat /tmp/trask-health.json
+  echo "Health OK:"
+  cat /tmp/trask-health.json
+else
+  echo "::warning::Primary Trask API health returned HTTP ${health_code}; checking fallback origin ${FALLBACK_BASE}."
+  ACTIVE_BASE="${FALLBACK_BASE%/}"
+  echo "::warning::Using fallback Trask API origin ${ACTIVE_BASE}; will validate it with the ask smoke below."
+fi
+
+ASK_URL="${ACTIVE_BASE}/api/trask/ask"
 
 thread_id="$(python3 - <<'PY'
 import uuid

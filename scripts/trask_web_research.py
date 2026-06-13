@@ -102,8 +102,16 @@ def _timeout_seconds(env_name: str, default_ms: int) -> int:
     return max(1, timeout_ms // 1000)
 
 
+def _default_int(env_name: str, key: str, fallback: int) -> int:
+    try:
+        return int(os.environ.get(env_name, _RETRIEVAL_DEFAULTS.get(key, fallback)))
+    except (TypeError, ValueError):
+        return fallback
+
+
 FETCH_TIMEOUT_S = _timeout_seconds("TRASK_FETCH_TIMEOUT_MS", _default_ms("fetchTimeoutMs", 20_000))
 RETRIEVE_TIMEOUT_S = _timeout_seconds("TRASK_RETRIEVE_TIMEOUT_MS", _default_ms("retrieveTimeoutMs", 10_000))
+RETRIEVE_HTTP_ATTEMPTS = max(1, _default_int("TRASK_RETRIEVE_HTTP_ATTEMPTS", "retrieveHttpAttempts", 1))
 URL_VERIFY_TIMEOUT_S = _timeout_seconds(
     "TRASK_URL_VERIFY_TIMEOUT_MS",
     _default_ms("urlVerifyTimeoutMs", _default_ms("fetchTimeoutMs", 8_000)),
@@ -296,7 +304,7 @@ def _retrieve_via_http(query: str, limit: int) -> list[dict[str, Any]]:
     body = json.dumps({"query": query, "limit": limit}).encode("utf-8")
     started = time.monotonic()
     parsed: dict[str, Any] | None = None
-    attempts = max(1, int(os.environ.get("TRASK_RETRIEVE_HTTP_ATTEMPTS", "2")))
+    attempts = RETRIEVE_HTTP_ATTEMPTS
     for attempt in range(1, attempts + 1):
         req = Request(
             f"{_indexer_base_url()}/retrieve",

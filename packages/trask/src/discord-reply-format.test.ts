@@ -51,6 +51,44 @@ test("formatDiscordAskDisplay keeps two https links for expert TSLPatcher query"
   assert.doesNotMatch(display, /\nSources\s*\n/i);
 });
 
+test("formatDiscordAskDisplay preserves three inline links when aligned evidence supports it", () => {
+  const raw = `TSLPatcher applies 2DA list patches for KotOR mod installs. [1]
+The TSLPatcher GitHub repository documents GFF and TLK list-driven changes. [2]
+Deadly Stream describes TSLPatcher as the player-facing installer for these patch lists. [3]
+
+Sources
+1. Deadly Stream - https://deadlystream.com/files/file/1982-tslpatcher
+2. github.com - https://github.com/th3w1zard1/TSLPatcher
+3. Deadly Stream topic - https://deadlystream.com/topic/123-tslpatcher-notes`;
+  const display = formatDiscordAskDisplay(
+    raw,
+    [
+      ...approvedSources,
+      { name: "Deadly Stream topic", homeUrl: "https://deadlystream.com/topic/123-tslpatcher-notes" },
+    ],
+    { query: expertQuery },
+  );
+  const links = [...display.matchAll(/\]\((https:\/\/[^)]+)\)/g)];
+  assert.equal(links.length, 3, display);
+});
+
+test("formatDiscordAskDisplay preserves source-weighting context lines", () => {
+  const raw = `The TSLPatcher project documents list-driven 2DA, GFF, and TLK changes for KotOR installs. [1]
+TSLPatcher is a mod installation tool for Knights of the Old Republic and The Sith Lords. [2]
+For TSLPatcher, weigh the project/source documentation first and use the community release as user-facing context. [1] [2]
+
+Sources
+1. github.com - https://github.com/th3w1zard1/TSLPatcher
+2. Deadly Stream - https://deadlystream.com/files/file/1982-tslpatcher`;
+
+  const display = formatDiscordAskDisplay(raw, approvedSources, { query: expertQuery });
+  const lines = display.split(/\r?\n/).filter(Boolean);
+  assert.equal(lines.length, 3, display);
+  assert.match(display, /weigh the project\/source documentation first/i);
+  assert.match(display, /user-facing context/i);
+  assert.equal([...display.matchAll(/\]\((https:\/\/[^)]+)\)/g)].length, 4, display);
+});
+
 test("formatDiscordAskDisplay strips Sources block from display", () => {
   const display = formatDiscordAskDisplay(expertTslpatcherRaw, approvedSources, { query: expertQuery });
   assert.doesNotMatch(display, /^\s*Sources\b/im);

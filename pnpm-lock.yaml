@@ -44,6 +44,9 @@ importers:
       '@openkotor/blackjack-engine':
         specifier: workspace:*
         version: link:../../packages/blackjack-engine
+      '@openkotor/modsync-tokens':
+        specifier: workspace:*
+        version: link:../../packages/modsync-tokens
       '@openkotor/pazaak-engine':
         specifier: workspace:*
         version: link:../../packages/pazaak-engine
@@ -145,6 +148,9 @@ importers:
 
   apps/hk86-web:
     devDependencies:
+      '@openkotor/modsync-tokens':
+        specifier: workspace:*
+        version: link:../../packages/modsync-tokens
       '@playwright/test':
         specifier: ^1.58.0
         version: 1.60.0
@@ -502,6 +508,9 @@ importers:
       '@openkotor/blackjack-engine':
         specifier: workspace:*
         version: link:../../packages/blackjack-engine
+      '@openkotor/modsync-tokens':
+        specifier: workspace:*
+        version: link:../../packages/modsync-tokens
       '@openkotor/pazaak-engine':
         specifier: workspace:*
         version: link:../../packages/pazaak-engine
@@ -749,6 +758,8 @@ importers:
       discord.js:
         specifier: ^14.26.2
         version: 14.26.4
+
+  packages/modsync-tokens: {}
 
   packages/pazaak-engine: {}
 

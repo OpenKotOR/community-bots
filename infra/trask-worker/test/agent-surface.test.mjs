@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { TRASK_AGENT_COMMANDS, capabilitiesBody, commandToRequest } from "../dist/agent-surface.test.js";
+import {
+  TRASK_AGENT_CALLABLE_METHODS,
+  TRASK_AGENT_COMMANDS,
+  capabilitiesBody,
+  commandToRequest,
+} from "../dist/agent-surface.test.js";
 
 const readJson = async (request) => JSON.parse(await request.text());
 
@@ -21,6 +26,10 @@ test("capabilities expose Trask HTTP and safe ops commands", () => {
     "evidence",
     "refresh-dry-run",
     "purge-discord-message",
+    "invite-policy",
+    "allow-invite-guild",
+    "revoke-invite-guild",
+    "configure-invite",
     "capabilities",
   ]) {
     assert.equal(commands.has(command), true, `${command} should be registered`);
@@ -28,6 +37,28 @@ test("capabilities expose Trask HTTP and safe ops commands", () => {
 
   assert.equal(capabilities.agent, "TraskAgent");
   assert.equal(capabilities.agentRoute, "/agents/trask-agent/default");
+  assert.deepEqual(capabilities.callableMethods, [...TRASK_AGENT_CALLABLE_METHODS]);
+  for (const method of [
+    "ask",
+    "research",
+    "models",
+    "thread",
+    "cancel",
+    "history",
+    "sources",
+    "session",
+    "health",
+    "evidence",
+    "refreshDryRun",
+    "purgeDiscordMessage",
+    "invitePolicy",
+    "allowInviteGuild",
+    "revokeInviteGuild",
+    "configureInvite",
+    "command",
+  ]) {
+    assert.equal(capabilities.callableMethods.includes(method), true, `${method} should be callable`);
+  }
   assert.deepEqual(capabilities.providerOrder, ["huggingface", "cloudflare", "deterministic-extractive"]);
   assert.equal(capabilities.safetyLimits.destructiveActionsDefaultToDryRun, true);
 });
@@ -70,4 +101,30 @@ test("read commands map to Trask HTTP routes", () => {
     new URL(commandToRequest("cancel", { queryId: "q-1" }, "https://trask-agent.local/").url).pathname,
     "/api/trask/query/q-1/cancel",
   );
+  assert.equal(new URL(commandToRequest("health", {}, "https://trask-agent.local/").url).pathname, "/healthz");
+  assert.equal(
+    new URL(commandToRequest("invite-policy", {}, "https://trask-agent.local/").url).pathname,
+    "/api/trask/install-policy",
+  );
+});
+
+test("invite allowlist commands map to install policy routes", async () => {
+  const allow = commandToRequest("allow-invite-guild", { guildId: "123456789012345678" }, "https://trask-agent.local/");
+  assert.equal(allow.method, "POST");
+  assert.equal(new URL(allow.url).pathname, "/api/trask/install-policy/allow");
+  assert.deepEqual(await readJson(allow), { guildId: "123456789012345678" });
+
+  const revoke = commandToRequest("revoke-invite-guild", { id: "123456789012345678" }, "https://trask-agent.local/");
+  assert.equal(revoke.method, "POST");
+  assert.equal(new URL(revoke.url).pathname, "/api/trask/install-policy/revoke");
+  assert.deepEqual(await readJson(revoke), { guildId: "123456789012345678" });
+
+  const configure = commandToRequest(
+    "configure-invite",
+    { appId: "1305793207036022784", permissions: "84992" },
+    "https://trask-agent.local/",
+  );
+  assert.equal(configure.method, "POST");
+  assert.equal(new URL(configure.url).pathname, "/api/trask/install-policy/configure");
+  assert.deepEqual(await readJson(configure), { appId: "1305793207036022784", permissions: "84992" });
 });
