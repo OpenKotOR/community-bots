@@ -61,4 +61,16 @@ for (const rel of required) {
   }
 }
 
+const forbidden = [
+  "apps/trask-http-server/data/trask-http-server/trask-queries.json",
+];
+
+for (const rel of forbidden) {
+  const path = join(packDir, rel);
+  if (existsSync(path)) {
+    console.error(`verify_trask_http_hf_pack: packed tree must not include runtime cache ${rel}`);
+    process.exit(1);
+  }
+}
+
 console.log(`OK: HF pack valid at ${packDir} (sdk=docker app_port=7860)`);

@@ -24,16 +24,17 @@ RUN pnpm --filter @openkotor/retrieval build
 RUN pnpm --filter @openkotor/trask build
 RUN pnpm --filter @openkotor/trask-http-server build
 RUN pnpm --filter @openkotor/holocron-web build
-RUN bash scripts/bootstrap_trask_research.sh
-RUN bash scripts/bootstrap_trask_indexer.sh
-RUN node scripts/export_trask_allowlist_catalog.mjs
-RUN TRASK_INDEX_SEED_REQUIRE_INDEXER=0 bash scripts/trask_index_seed_for_qa.sh
-# Drop pytest baselines and caches from Python venvs — shrinks export layer on CI runners.
-RUN find /workspace/.venv-trask-research /workspace/.venv-trask-indexer \
-    -type d \( -name tests -o -name __pycache__ \) -prune -exec rm -rf {} + 2>/dev/null || true \
-  && find /workspace/.venv-trask-research /workspace/.venv-trask-indexer -type f -name '*.pyc' -delete 2>/dev/null || true
+RUN bash scripts/bootstrap_trask_research.sh \
+  && bash scripts/bootstrap_trask_indexer.sh \
+  && node scripts/export_trask_allowlist_catalog.mjs \
+  && TRASK_INDEX_SEED_REQUIRE_INDEXER=0 bash scripts/trask_index_seed_for_qa.sh \
+  && find /workspace/.venv-trask-research /workspace/.venv-trask-indexer \
+    -type d \( -name tests -o -name __pycache__ -o -path '*/litellm/proxy/_experimental/out/assets/logos' \) \
+    -prune -exec rm -rf {} + 2>/dev/null || true \
+  && find /workspace/.venv-trask-research /workspace/.venv-trask-indexer -type f -name '*.pyc' -delete 2>/dev/null || true \
+  && rm -rf /root/.cache/pip /tmp/*
 
-FROM base AS runtime
+FROM deps AS runtime
 WORKDIR /workspace
 ARG PORT=7860
 ENV PORT=${PORT}
@@ -47,7 +48,6 @@ ENV TRASK_RESEARCH_TIMEOUT_MS=900000
 ENV TRASK_RESEARCHWIZARD_TIMEOUT_MS=900000
 ENV INGEST_STATE_DIR=/workspace/data/ingest-worker
 ENV TRASK_HTTP_DATA_DIR=/workspace/data/trask-http-server
-COPY --from=deps /workspace /workspace
 COPY infra/trask-http-public/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 EXPOSE 7860

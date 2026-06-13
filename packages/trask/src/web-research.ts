@@ -112,12 +112,11 @@ const buildCustomPrompt = (): string => {
     "Requirements:",
     "- Lead with the answer, not an introduction.",
     "- Sound direct, practical, and helpful.",
-    "- Keep the answer concise: at most 3 short paragraphs or 5 compact bullets total before sources.",
+    "- Keep the answer concise: at most 3 short paragraphs or 5 compact bullets total.",
     "- Do not describe your research process, retrieval steps, indexing, backend systems, or source policy unless the user explicitly asks.",
     "- Include inline numeric citations like [1] tied to concrete claims.",
-    ' - End with the exact heading "Sources" on its own line.',
-    "- Under Sources, list only the sources you cited, each on its own numbered line in the format: 1. Source Name - URL",
-    "- Do not add markdown headings other than the final Sources heading.",
+    "- Do not add a trailing Sources heading, bibliography, or raw URL dump.",
+    "- The application renders the structured source list separately.",
   ].join("\n");
 };
 
@@ -129,8 +128,8 @@ const buildCustomPromptBrief = (): string => {
     "- Do not narrate tooling, retrieval steps, or how you searched.",
     "- Prefer actionable answers over background essays.",
     "- Include inline numeric citations like [1] tied to concrete claims.",
-    ' - End with the exact heading "Sources" on its own line.',
-    "- Under Sources, list only cited sources as numbered lines: 1. Source Name - URL",
+    "- Do not add a trailing Sources heading, bibliography, or raw URL dump.",
+    "- The application renders the structured source list separately.",
   ].join("\n");
 };
 
@@ -613,12 +612,8 @@ const isSynthesisFailureReport = (report: string, payload: WebResearchResponsePa
 const sourceOnlyFallbackAnswer = (query: string, sources: readonly SourceDescriptor[]): string => {
   if (sources.length === 0) return "I could not complete live archive synthesis for this question right now.";
   const topic = stripTrailingQuestionMarks(query) || "this question";
-  return [
-    `I found candidate sources for ${topic}, but I could not support a grounded answer from the retrieved evidence.`,
-    "Review the sources below or try a narrower wording.",
-    "",
-    formatSourcesSection(sources),
-  ].join("\n");
+  const cited = sources.slice(0, 3).map((_source, index) => `[${index + 1}]`).join(", ");
+  return `I found candidate sources for ${topic}, but I could not support a grounded answer from the retrieved evidence. Review ${cited} or try a narrower wording.`;
 };
 
 const DEFAULT_REWRITE_TIMEOUT_MS = 15_000;
@@ -704,7 +699,7 @@ const fallbackDiscordRewrite = (
     summary = `${summary} [1]`.trim();
   }
 
-  return sources.length > 0 ? `${summary}\n\n${formatSourcesSection(sources)}` : summary;
+  return summary;
 };
 
 const fallbackDiscordBrief = (query: string, report: string, sources: readonly SourceDescriptor[]): string => {
@@ -743,7 +738,7 @@ const fallbackDiscordBrief = (query: string, report: string, sources: readonly S
     summary = `${summary} [1]`.trim();
   }
 
-  return sources.length > 0 ? `${summary}\n\n${formatSourcesSection(sources)}` : summary;
+  return summary;
 };
 
 const degradedAnswerFallback = (_query: string, _approvedSources: readonly SourceDescriptor[]): string => {
@@ -1199,7 +1194,8 @@ export class WebResearchClient implements WebResearchQueryHandler {
                   "Rewrite research reports into concise Discord answers.",
                   "Do not mention research steps, indexing, tooling, or backend behavior.",
                   "Use only the numbered sources provided by the user.",
-                  "Return plain Markdown with no headings except the final Sources heading.",
+                  "Return plain Markdown with inline numeric citations only.",
+                  "Do not add a trailing Sources heading, bibliography, or raw URL dump.",
                 ].join(" "),
               },
               {
@@ -1209,10 +1205,10 @@ export class WebResearchClient implements WebResearchQueryHandler {
                   "Write a concise answer for Discord.",
                   "Requirements:",
                   "- Lead with the answer.",
-                  "- Use at most 3 short paragraphs or 5 compact bullets before sources.",
+                  "- Use at most 3 short paragraphs or 5 compact bullets.",
                   "- Use inline numeric citations like [1], [2].",
-                  ' - End with the exact heading "Sources" on its own line.',
-                  "- Under Sources, include only the cited sources using the exact numbered lines provided below.",
+                  "- Put citations in the sentence or bullet they support.",
+                  "- Do not include a final Sources section; the app renders sources separately.",
                   "Allowed Sources:",
                   allowedSources,
                   ...(communityDigest ? ["Community context (lower authority than web archives):", communityDigest] : []),
@@ -1227,8 +1223,8 @@ export class WebResearchClient implements WebResearchQueryHandler {
 
         const rewritten = completion.choices[0]?.message?.content?.trim();
 
-        if (rewritten && /\nSources\s*\n/i.test(rewritten)) {
-          return rewritten;
+        if (rewritten && /\[\d+\]/.test(rewritten)) {
+          return splitAtSourcesHeading(rewritten);
         }
       } catch {
         continue;
@@ -1294,8 +1290,9 @@ export class WebResearchClient implements WebResearchQueryHandler {
                   "Rewrite research into a very short Discord chat reply (like a quick DM).",
                   "No preamble, no essay tone, no meta commentary about research.",
                   "Use only the numbered sources provided.",
-                  "Plain sentences; at most 2 short sentences OR up to 3 compact bullets before Sources.",
-                  'End with the exact heading "Sources" on its own line, then cited sources only.',
+                  "Plain sentences; at most 2 short sentences OR up to 3 compact bullets.",
+                  "Use inline numeric citations like [1], [2].",
+                  "Do not include a final Sources section; the app renders sources separately.",
                 ].join(" "),
               },
               {
@@ -1316,8 +1313,8 @@ export class WebResearchClient implements WebResearchQueryHandler {
 
         const rewritten = completion.choices[0]?.message?.content?.trim();
 
-        if (rewritten && /\nSources\s*\n/i.test(rewritten)) {
-          return rewritten;
+        if (rewritten && /\[\d+\]/.test(rewritten)) {
+          return splitAtSourcesHeading(rewritten);
         }
       } catch {
         continue;

@@ -113,10 +113,10 @@ jobs:
         run: |
           python3 - <<'PY'
           import os
+          import json
           import urllib.error
           import urllib.request
           import time
-          from huggingface_hub import HfApi
 
           def print_space_logs(repo_id: str, token: str, log_type: str) -> None:
               url = f"https://huggingface.co/api/spaces/{repo_id}/logs/{log_type}?tail=160"
@@ -135,18 +135,26 @@ jobs:
               print(f"--- HF {log_type} logs tail ---")
               print(body[-12000:])
 
-          api = HfApi()
+          def read_space_runtime(repo_id: str, token: str) -> tuple[str | None, str | None, str | None]:
+              url = f"https://huggingface.co/api/spaces/{repo_id}?expand=runtime"
+              req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
+              with urllib.request.urlopen(req, timeout=20) as res:
+                  data = json.loads(res.read().decode("utf-8", errors="replace"))
+              runtime = data.get("runtime") or {}
+              return runtime.get("stage"), runtime.get("message"), data.get("subdomain")
+
           repo_id = os.environ["HF_SPACE_ID"]
           token = os.environ.get("HF_TOKEN", "")
           for attempt in range(60):
-              info = api.space_info(repo_id, expand=["runtime"])
-              stage = getattr(getattr(info, "runtime", None), "stage", None)
+              stage, msg, subdomain = read_space_runtime(repo_id, token)
               print(f"attempt {attempt}: stage={stage}")
               if stage == "RUNNING":
-                  print(f"Space running: https://{info.subdomain}.hf.space")
+                  if subdomain:
+                      print(f"Space running: https://{subdomain}.hf.space")
+                  else:
+                      print(f"Space running: https://{repo_id.split('/')[-1]}.hf.space")
                   break
               if stage in ("ERROR", "CONFIG_ERROR", "BUILD_ERROR", "RUNTIME_ERROR"):
-                  msg = getattr(getattr(info, "runtime", None), "message", None)
                   if token:
                       print_space_logs(repo_id, token, "build")
                       print_space_logs(repo_id, token, "run")

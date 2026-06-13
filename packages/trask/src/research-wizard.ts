@@ -734,7 +734,7 @@ const briefDualSourceAnswer = (query: string, sources: readonly SourceDescriptor
       `See ${source.homeUrl}`;
     return `${summary} [${index + 1}]`;
   });
-  return [...lines, "", formatSourcesSection(cited)].join("\n");
+  return lines.join("\n");
 };
 
 const sourceOnlyFallbackAnswer = (query: string, sources: readonly SourceDescriptor[]): string => {
@@ -754,8 +754,6 @@ const sourceOnlyFallbackAnswer = (query: string, sources: readonly SourceDescrip
     `I found candidate sources for ${topic}, but I could not support a grounded answer from the retrieved evidence.`,
     ...lines,
     "Review the linked sources or try a narrower wording.",
-    "",
-    formatSourcesSection(cited),
   ].join("\n");
 };
 
@@ -845,7 +843,7 @@ const fallbackDiscordRewrite = (
     .slice(0, 5);
   summary = lines.join("\n");
 
-  return sources.length > 0 ? `${summary}\n\n${formatSourcesSection(sources)}` : summary;
+  return summary;
 };
 
 const fallbackDiscordBrief = (query: string, report: string, sources: readonly SourceDescriptor[]): string => {
@@ -880,7 +878,7 @@ const fallbackDiscordBrief = (query: string, report: string, sources: readonly S
     summary = bodyOnly.slice(0, 420).trim();
   }
 
-  return sources.length > 0 ? `${summary}\n\n${formatSourcesSection(sources)}` : summary;
+  return summary;
 };
 
 const degradedAnswerFallback = (_query: string, _approvedSources: readonly SourceDescriptor[]): string => {
@@ -1404,7 +1402,8 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
                   "Rewrite research reports into concise Discord answers.",
                   "Do not mention research steps, indexing, tooling, or backend behavior.",
                   "Use only the numbered sources provided by the user.",
-                  "Return plain Markdown with no headings except the final Sources heading.",
+                  "Return plain Markdown with inline numeric citations only.",
+                  "Do not add a trailing Sources heading, bibliography, or raw URL dump.",
                 ].join(" "),
               },
               {
@@ -1414,10 +1413,10 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
                   "Write a concise answer for Discord.",
                   "Requirements:",
                   "- Lead with the answer.",
-                  "- Use at most 5 short lines before sources (one fact per line; no intro paragraph).",
+                  "- Use at most 5 short lines (one fact per line; no intro paragraph).",
                   "- Use inline numeric citations like [1], [2].",
-                  ' - End with the exact heading "Sources" on its own line.',
-                  "- Under Sources, include only the cited sources using the exact numbered lines provided below.",
+                  "- Put citations in the sentence or bullet they support.",
+                  "- Do not include a final Sources section; the app renders sources separately.",
                   "Allowed Sources:",
                   allowedSources,
                   "Research Report:",
@@ -1431,8 +1430,8 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
 
         const rewritten = completion.choices[0]?.message?.content?.trim();
 
-        if (rewritten && hasSourcesSection(rewritten)) {
-          return rewritten;
+        if (rewritten && /\[\d+\]/.test(rewritten)) {
+          return _splitAtSourcesHeading(rewritten);
         }
       } catch {
         continue;
@@ -1488,8 +1487,9 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
                   "Rewrite research into a very short Discord chat reply (like a quick DM).",
                   "No preamble, no essay tone, no meta commentary about research.",
                   "Use only the numbered sources provided.",
-                  "Plain sentences; at most 2 short sentences OR up to 3 compact bullets before Sources.",
-                  'End with the exact heading "Sources" on its own line, then cited sources only.',
+                  "Plain sentences; at most 2 short sentences OR up to 3 compact bullets.",
+                  "Use inline numeric citations like [1], [2].",
+                  "Do not include a final Sources section; the app renders sources separately.",
                 ].join(" "),
               },
               {
@@ -1510,8 +1510,8 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
 
         const rewritten = completion.choices[0]?.message?.content?.trim();
 
-        if (rewritten && hasSourcesSection(rewritten)) {
-          return rewritten;
+        if (rewritten && /\[\d+\]/.test(rewritten)) {
+          return _splitAtSourcesHeading(rewritten);
         }
       } catch {
         continue;

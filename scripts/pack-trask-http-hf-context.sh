@@ -14,7 +14,8 @@ cp "$ROOT/infra/trask-http-public/docker-entrypoint.sh" "$OUT/infra/trask-http-p
 cp "$ROOT/package.json" "$ROOT/pnpm-lock.yaml" "$ROOT/pnpm-workspace.yaml" "$ROOT/tsconfig.base.json" "$ROOT/tsconfig.workspace.json" "$OUT/"
 
 rsync -a --exclude node_modules --exclude dist "$ROOT/packages/" "$OUT/packages/"
-rsync -a --exclude node_modules --exclude dist "$ROOT/apps/trask-http-server/" "$OUT/apps/trask-http-server/"
+rsync -a --exclude node_modules --exclude dist --exclude data/trask-http-server \
+  "$ROOT/apps/trask-http-server/" "$OUT/apps/trask-http-server/"
 rsync -a --exclude node_modules --exclude dist "$ROOT/apps/holocron-web/" "$OUT/apps/holocron-web/"
 rsync -a --exclude node_modules --exclude dist --exclude .venv --exclude data/trask-indexer/chroma \
   "$ROOT/infra/trask-indexer/" "$OUT/infra/trask-indexer/"
