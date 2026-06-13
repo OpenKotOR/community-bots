@@ -289,6 +289,9 @@ async function serveUpstreamOrFallback(
     if (upstreamResponse.ok) {
       return upstreamResponse;
     }
+    if (upstreamResponse.status < 500) {
+      return upstreamResponse;
+    }
     if (useBuiltinFallback(env) && shouldFallbackToBuiltin(upstreamResponse)) {
       const replayed =
         bodyText !== undefined

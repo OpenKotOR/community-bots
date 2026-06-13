@@ -196,7 +196,7 @@ app.use(
   }),
 );
 
-app.get("/health", (_req, res) => {
+app.get(["/health", "/healthz"], (_req, res) => {
   res.status(200).json({ ok: true, service: "trask-http-server" });
 });
 
