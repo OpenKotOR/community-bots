@@ -1,6 +1,6 @@
 # Trask retrieve Worker (Wrangler)
 
-Edge `POST /retrieve` for Trask RAG. **Phase 1** proxies to the existing Chroma indexer (`trask-indexer serve` on port 8790). Chroma does not run inside Workers; use a persistent indexer host or migrate to **Vectorize + D1** later.
+Edge `POST /retrieve` for Trask RAG. **Phase 1** proxies to the existing Chroma indexer (`trask-indexer serve` on port 8790). Chroma does not run inside Workers; public deploys default to the Hugging Face Trask HTTP Space, which exposes `POST /retrieve` and proxies to its in-container indexer. Use a persistent indexer host or migrate to **Vectorize + D1** later when needed.
 
 ## Local dev
 

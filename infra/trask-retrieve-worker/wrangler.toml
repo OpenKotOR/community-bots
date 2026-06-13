@@ -6,7 +6,7 @@ workers_dev = true
 # Edge retrieve API for Trask RAG. Chroma stays on a persistent host (or future Vectorize index);
 # this Worker forwards POST /retrieve to that backend until Vectorize migration lands.
 [vars]
-TRASK_INDEXER_BASE_URL = "http://127.0.0.1:8790"
+TRASK_INDEXER_BASE_URL = "https://openkotor-holocron-trask-http.hf.space"
 TRASK_RETRIEVE_UPSTREAM_TIMEOUT_MS = "5000"
 
 # Production: set the public indexer origin (or replace handler with Vectorize bindings).

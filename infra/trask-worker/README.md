@@ -54,9 +54,9 @@ Public Trask install broker:
 - `/api/trask/install-policy/configure`, `/allow`, and `/revoke` update persistent state without restarting the Worker or Trask bot. First-time `/configure` can set a persistent `adminToken`; later HTTP mutations require that token in `Authorization: Bearer ...` or an optional bootstrap env token.
 - Env vars are optional bootstrap defaults. Runtime policy lives in the Agent Durable Object state once configured through the API.
 
-Research commands require `TRASK_RESEARCHWIZARD_BASE_URL` to point at a healthy `trask-http-server`. Without it, the agent still deploys and exposes capabilities, but `ask` returns an upstream configuration error.
-Evidence commands require `TRASK_RETRIEVE_BASE_URL` to point at the Cloudflare retrieve Worker (local default `http://127.0.0.1:8787`), preserving the production retrieve boundary instead of pointing agents at raw Chroma/indexer hosts.
-The GitHub deploy workflow intentionally skips proxy-mode deploys when this value is unset, local, or a placeholder, so agent `evidence` and `refresh-dry-run` commands cannot accidentally ship against `127.0.0.1`.
+Research commands default to the Hugging Face Trask HTTP Space and can be overridden with `TRASK_RESEARCHWIZARD_BASE_URL`.
+Evidence commands default to the public Cloudflare retrieve Worker (`https://trask-retrieve.bocloud.workers.dev`), preserving the production retrieve boundary instead of pointing agents at raw Chroma/indexer hosts.
+The GitHub deploy workflow only skips proxy-mode deploys when an explicit retrieve URL is local or a placeholder, so env vars remain overrides rather than required setup.
 
 ## Modes
 
@@ -99,7 +99,7 @@ curl -sS -X POST http://127.0.0.1:8787/api/agent/command \
 | `TRASK_WEB_ALLOW_ANONYMOUS` | `1` for public Holocron without API key |
 | `TRASK_BUILTIN_API` | `0` (required) to proxy live Trask HTTP |
 | `TRASK_RESEARCHWIZARD_BASE_URL` | Full `trask-http-server` origin when `TRASK_BUILTIN_API=0` |
-| `TRASK_RETRIEVE_BASE_URL` | Cloudflare retrieve Worker origin for `evidence` and dry-run reindex commands |
+| `TRASK_RETRIEVE_BASE_URL` | Optional Cloudflare retrieve Worker origin for `evidence` and dry-run reindex commands; defaults to `https://trask-retrieve.bocloud.workers.dev` |
 | `TRASK_REINDEX_TOKEN` | Optional token for `refresh-dry-run`; without it the command reports the planned request and does not call upstream |
 | `TRASK_BUILTIN_FALLBACK` | Optional; defaults to `1` so upstream failures degrade fast instead of hanging Worker health |
 | `TRASK_WEB_API_KEY` | Optional API key for locked-down deployments |

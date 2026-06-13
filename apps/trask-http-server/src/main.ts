@@ -163,6 +163,31 @@ app.use((req, res, next) => {
   next();
 });
 
+app.post("/retrieve", async (req, res) => {
+  const base = (config.researchWizard.indexerBaseUrl || "http://127.0.0.1:8790").replace(/\/+$/u, "");
+  try {
+    const upstream = await fetch(`${base}/retrieve`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(req.body ?? {}),
+    });
+    const text = await upstream.text();
+    res.status(upstream.status);
+    res.type(upstream.headers.get("content-type") ?? "application/json");
+    res.send(text);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(503).json({
+      error: "retrieve_upstream_unavailable",
+      upstream: base,
+      detail: message,
+    });
+  }
+});
+
 app.use(
   "/api/trask",
   createTraskHttpRouter({

@@ -10,7 +10,7 @@ startup_duration_timeout: 1h
 
 # Holocron Trask HTTP (Hugging Face Space)
 
-Public `trask-http-server` with **in-container Crawl4AI indexer** (`trask-indexer serve` on :8790), local ingest chunks, and `/api/trask/*` for Holocron.
+Public `trask-http-server` with **in-container Crawl4AI indexer** (`trask-indexer serve` on :8790), local ingest chunks, `/api/trask/*` for Holocron, and `POST /retrieve` for the public retrieve Worker.
 
 The Docker image runs a **supervisor entrypoint** that starts the indexer, waits for `/health`, then starts `trask-http-server`. Build time seeds Chroma with golden QA fixtures (`trask_index_seed_for_qa.sh`).
 

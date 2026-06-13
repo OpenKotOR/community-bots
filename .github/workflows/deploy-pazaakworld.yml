@@ -63,6 +63,7 @@ jobs:
       - name: Build workspace libraries (dist for workspace:* deps)
         run: |
           pnpm --filter @openkotor/platform build
+          pnpm --filter @openkotor/trask build
           pnpm --filter @openkotor/blackjack-engine build
           pnpm --filter @openkotor/pazaak-engine build
 

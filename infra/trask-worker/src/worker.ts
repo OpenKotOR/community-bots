@@ -8,6 +8,8 @@ import {
 } from "./agent-surface.js";
 import { handleBuiltinRequest } from "./builtin-trask-api.js";
 
+const DEFAULT_TRASK_RETRIEVE_BASE_URL = "https://trask-retrieve.bocloud.workers.dev";
+
 interface Env {
   TraskAgent?: unknown;
   TRASK_WEB_API_KEY?: string;
@@ -390,7 +392,7 @@ async function serveWorkerRoute(
 }
 
 function retrieveBaseUrl(env: Env): string {
-  return normalizeBackendBaseUrl((env.TRASK_RETRIEVE_BASE_URL ?? "").trim());
+  return normalizeBackendBaseUrl((env.TRASK_RETRIEVE_BASE_URL ?? DEFAULT_TRASK_RETRIEVE_BASE_URL).trim());
 }
 
 function positiveIntegerArg(value: unknown, fallback: number): number {

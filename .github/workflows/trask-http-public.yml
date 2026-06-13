@@ -102,6 +102,7 @@ jobs:
           chmod +x scripts/pack-trask-http-hf-context.sh
           PACK_DIR="$(scripts/pack-trask-http-hf-context.sh)"
           hf upload "${HF_SPACE_ID}" "$PACK_DIR/" --repo-type space \
+            --delete "*" \
             --commit-message "Deploy trask-http from community-bots@${{ github.sha }}"
 
       - name: Wait for Space build
