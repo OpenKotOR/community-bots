@@ -54,7 +54,7 @@ def test_index_discord_export_targets_reports_disabled_and_missing_archives(tmp_
 
     assert results[0].target == "openkotor"
     assert results[0].enabled is True
-    assert "no DiscordChatExporter archive found" in results[0].skipped_reason
+    assert "no Discord export archive found" in results[0].skipped_reason
     assert results[1].target == "private_staff"
     assert results[1].enabled is False
     assert results[1].skipped_reason == "staff channels are not indexed by default"
@@ -211,3 +211,97 @@ def test_index_discord_export_reindexes_when_window_hash_changes(tmp_path: Path,
 
     assert count > 0
     assert upsert_invocations == [1]
+
+
+def _write_dce_flat_export(
+    export_dir: Path,
+    *,
+    channel_id: str = "456",
+    guild_id: str = "123",
+    message_id: str = "1",
+    content: str = "allowed message",
+    channel_name: str = "yes_general",
+) -> None:
+    export_dir.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "guild": {"id": guild_id, "name": "KOTOR"},
+        "channel": {"id": channel_id, "name": channel_name, "type_name": "GuildText"},
+        "messages": [{"id": message_id, "content": content, "timestamp": "2026-01-01T00:00:00+00:00", "author": {"username": "tester"}}],
+    }
+    filename = f"KOTOR - Yes General - yes_general [{channel_id}].json"
+    (export_dir / filename).write_text(json.dumps(payload), encoding="utf-8")
+    (export_dir / ".dce-meta").mkdir(exist_ok=True)
+    (export_dir / ".dce-temp").mkdir(exist_ok=True)
+
+
+def test_index_discord_export_targets_indexes_dce_flat_layout(tmp_path: Path, monkeypatch):
+    config_path = tmp_path / "scrape-targets.json"
+    export_dir = tmp_path / "kotor"
+    _write_dce_flat_export(export_dir)
+    config_path.write_text(
+        json.dumps(
+            {
+                "targets": [
+                    {
+                        "name": "KotOR_discord_msgs",
+                        "output_dir": str(export_dir),
+                        "channel_ids": ["456"],
+                    },
+                ],
+            },
+        ),
+        encoding="utf-8",
+    )
+
+    indexed_channels: list[str] = []
+
+    def fake_upsert_discord_windows(collection, windows):
+        del collection
+        for window in windows:
+            meta = window.get("extra_metadata") or {}
+            if meta.get("channel_id"):
+                indexed_channels.append(str(meta["channel_id"]))
+        return sum(len(window["chunks"]) for window in windows)
+
+    monkeypatch.setattr(
+        "trask_indexer.discord_index.upsert_discord_windows",
+        fake_upsert_discord_windows,
+    )
+    monkeypatch.setattr("trask_indexer.discord_index._existing_window_hashes", lambda *_args, **_kwargs: {})
+
+    results = index_discord_export_targets(object(), config_path=config_path, indexed_at="2026-06-13T00:00:00+00:00")
+
+    assert results[0].target == "KotOR_discord_msgs"
+    assert results[0].skipped_reason == ""
+    assert results[0].chunks_indexed > 0
+    assert results[0].channels_indexed == 1
+    assert results[0].degraded_reason == ""
+    assert indexed_channels == ["456"]
+
+
+def test_index_discord_export_targets_marks_zero_chunk_enabled_target_degraded(tmp_path: Path, monkeypatch):
+    config_path = tmp_path / "scrape-targets.json"
+    export_dir = tmp_path / "kotor"
+    _write_dce_flat_export(export_dir, channel_id="999")
+    config_path.write_text(
+        json.dumps(
+            {
+                "targets": [
+                    {
+                        "name": "KotOR_discord_msgs",
+                        "output_dir": str(export_dir),
+                        "channel_ids": ["456"],
+                    },
+                ],
+            },
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("trask_indexer.discord_index.upsert_discord_windows", lambda *_a, **_k: 0)
+    monkeypatch.setattr("trask_indexer.discord_index._existing_window_hashes", lambda *_args, **_kwargs: {})
+
+    results = index_discord_export_targets(object(), config_path=config_path, indexed_at="2026-06-13T00:00:00+00:00")
+
+    assert results[0].chunks_indexed == 0
+    assert results[0].channels_indexed == 0
+    assert "indexed 0 chunks" in results[0].degraded_reason

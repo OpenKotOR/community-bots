@@ -18,6 +18,9 @@ from trask_indexer.chunk import chunk_markdown
 
 logger = logging.getLogger(__name__)
 
+_DCE_FLAT_CHANNEL_ID_RE = re.compile(r"\[\s*(\d+)\s*\]\.json$", re.I)
+_DCE_FLAT_SKIP_PREFIXES = (".dce-",)
+
 
 DISCORD_SOURCE_ID = "approved-discord-knowledge"
 WINDOW_MESSAGES = 25
@@ -45,6 +48,8 @@ class DiscordTargetIndexResult:
     enabled: bool
     skipped_reason: str = ""
     chunks_indexed: int = 0
+    channels_indexed: int = 0
+    degraded_reason: str = ""
     export_dir: str = ""
 
 
@@ -138,6 +143,44 @@ def load_discord_export_targets(
     return parsed
 
 
+def _channel_id_from_dce_filename(path: Path) -> str:
+    match = _DCE_FLAT_CHANNEL_ID_RE.search(path.name)
+    return match.group(1) if match else ""
+
+
+def _is_dce_flat_json_file(path: Path) -> bool:
+    if not path.is_file() or path.suffix.lower() != ".json":
+        return False
+    if ".bak." in path.name or path.name.endswith(".json.bak"):
+        return False
+    if path.name.startswith(_DCE_FLAT_SKIP_PREFIXES):
+        return False
+    return bool(_channel_id_from_dce_filename(path))
+
+
+def _has_dce_flat_layout(output_dir: Path) -> bool:
+    if not output_dir.is_dir():
+        return False
+    return any(_is_dce_flat_json_file(child) for child in output_dir.iterdir())
+
+
+def _dce_flat_container_paths(
+    output_dir: Path,
+    *,
+    include_channel_ids: set[str] | None = None,
+) -> list[Path]:
+    include = _id_set(include_channel_ids)
+    paths: list[Path] = []
+    for child in sorted(output_dir.iterdir()):
+        if not _is_dce_flat_json_file(child):
+            continue
+        channel_id = _channel_id_from_dce_filename(child)
+        if include and channel_id not in include:
+            continue
+        paths.append(child)
+    return paths
+
+
 def _resolve_export_dirs(target: DiscordExportTarget) -> list[Path]:
     if (target.output_dir / "manifest.json").is_file() and (
         target.output_dir / "containers"
@@ -155,7 +198,20 @@ def _resolve_export_dirs(target: DiscordExportTarget) -> list[Path]:
     if target.guild_ids:
         allowed = set(target.guild_ids)
         export_dirs = [path for path in export_dirs if path.name in allowed]
-    return export_dirs
+    if export_dirs:
+        return export_dirs
+    if _has_dce_flat_layout(target.output_dir):
+        return [target.output_dir]
+    return []
+
+
+def _guild_id_from_payload(payload: dict[str, Any], fallback: str = "") -> str:
+    guild_payload = payload.get("guild")
+    if isinstance(guild_payload, dict):
+        return str(guild_payload.get("id") or "").strip()
+    if isinstance(guild_payload, str):
+        return guild_payload.strip()
+    return fallback
 
 
 def _delete_target_rows(collection: Collection, target_name: str) -> int:
@@ -243,26 +299,35 @@ def index_discord_export(
     indexed_at: str | None = None,
     source_target: str = "",
     reconcile: bool = False,
+    indexed_channels: set[str] | None = None,
 ) -> int:
-    """Upsert all container JSON files under `export_dir/containers` into Chroma."""
+    """Upsert Discord export JSON into Chroma (manifest/containers or DCE flat layout)."""
     exclude = _id_set(exclude_channel_ids)
     include = _id_set(include_channel_ids)
-    guild_id = export_dir.name.strip()
-    if not guild_id.isdigit():
-        guild_id = ""
+    default_guild_id = export_dir.name.strip()
+    if not default_guild_id.isdigit():
+        default_guild_id = ""
     target_name = source_target.strip()
     if reconcile and target_name:
         _delete_target_rows(collection, target_name)
     extra_metadata = {"indexed_at": indexed_at} if indexed_at else None
     manifest = export_dir / "manifest.json"
     containers_dir = export_dir / "containers"
-    if not manifest.is_file() or not containers_dir.is_dir():
+    if manifest.is_file() and containers_dir.is_dir():
+        container_paths = sorted(containers_dir.glob("*.json"))
+    elif _has_dce_flat_layout(export_dir):
+        container_paths = _dce_flat_container_paths(
+            export_dir,
+            include_channel_ids=include,
+        )
+    else:
         raise FileNotFoundError(
-            f"Expected Discord export at {export_dir} (manifest.json + containers/)"
+            f"Expected Discord export at {export_dir} "
+            "(manifest.json + containers/ or DCE flat *[channel_id].json files)"
         )
 
     total = 0
-    for path in sorted(containers_dir.glob("*.json")):
+    for path in container_paths:
         try:
             payload: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
@@ -279,10 +344,13 @@ def index_discord_export(
             payload.get("channel") if isinstance(payload.get("channel"), dict) else {}
         )
         channel_id = str(channel.get("id") or "").strip()
+        if not channel_id:
+            channel_id = _channel_id_from_dce_filename(path)
         if not channel_id or channel_id in exclude:
             continue
         if include and channel_id not in include:
             continue
+        guild_id = _guild_id_from_payload(payload, default_guild_id)
         messages = payload.get("messages")
         if not isinstance(messages, list) or not messages:
             continue
@@ -374,6 +442,8 @@ def index_discord_export(
         flush()
         if pending_windows:
             total += upsert_discord_windows(collection, pending_windows)
+            if indexed_channels is not None:
+                indexed_channels.add(channel_id)
 
     return total
 
@@ -405,7 +475,10 @@ def index_discord_export_targets(
                 DiscordTargetIndexResult(
                     target=target.name,
                     enabled=True,
-                    skipped_reason=f"no DiscordChatExporter archive found at {target.output_dir}",
+                    skipped_reason=(
+                        f"no Discord export archive found at {target.output_dir} "
+                        "(expected manifest.json + containers/ or DCE flat *[channel_id].json)"
+                    ),
                     export_dir=str(target.output_dir),
                 ),
             )
@@ -413,6 +486,7 @@ def index_discord_export_targets(
         if reconcile:
             _delete_target_rows(collection, target.name)
         chunks = 0
+        channels_indexed: set[str] = set()
         include_channels = set(target.channel_ids) if target.channel_ids else None
         for export_dir in export_dirs:
             chunks += index_discord_export(
@@ -423,12 +497,26 @@ def index_discord_export_targets(
                 indexed_at=indexed_at,
                 source_target=target.name,
                 reconcile=False,
+                indexed_channels=channels_indexed,
             )
+        degraded_reason = ""
+        if chunks == 0:
+            if target.channel_ids:
+                degraded_reason = (
+                    "enabled target indexed 0 chunks for allowlisted channel_ids "
+                    f"{list(target.channel_ids)} — check export path and layout"
+                )
+            else:
+                degraded_reason = (
+                    "enabled target indexed 0 chunks — export tree may be empty or unreadable"
+                )
         results.append(
             DiscordTargetIndexResult(
                 target=target.name,
                 enabled=True,
                 chunks_indexed=chunks,
+                channels_indexed=len(channels_indexed),
+                degraded_reason=degraded_reason,
                 export_dir=str(target.output_dir),
             ),
         )

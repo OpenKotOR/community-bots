@@ -1,6 +1,6 @@
 ---
 name: Holocron & Trask
-last_updated: 2026-06-11
+last_updated: 2026-06-13
 ---
 
 # Holocron & Trask Strategy
@@ -35,6 +35,8 @@ The durable contract is source-first: every factual answer must be backed by exa
 ### Citation-First Evidence Cache
 
 Scheduled web and Discord ingestion normalize approved material into citation-ready evidence records. The crawler/parser and backing store may be Crawl4AI/Chroma, Trafilatura/Docling plus Qdrant/LanceDB/sqlite-vec, or Cloudflare-native storage if they meet the replacement gates.
+
+**Two-repo Discord pipeline (2026-06):** append-only archives are scraped in the DiscordChatExporter fork (`feat/recurring-cli-scrape`); Trask indexes from `community-bots` via `data/trask/discord-export-targets.json` and `scripts/trask_discord_sync.py`. Indexer accepts bot-export `manifest.json` + `containers/` **or** DCE flat `* [channel_id].json`. KotOR `yes_general` (`221726893064454144`) is the pilot allowlist target — enable only after post-scrape sync proves `channels_indexed ≥ 1`. Runbook: `docs/knowledgebase/50-execution/discordchat-exporter-trask-bridge-runbook.md`.
 
 _Why it serves the approach:_ Users trust Trask when every answer can be traced to exact, authorized sources.
 

@@ -2,7 +2,7 @@
 title: DiscordChatExporter recurring scrape → Trask index bridge
 owner: trask-bot
 status: active
-lastUpdated: 2026-06-04
+lastUpdated: 2026-06-13
 ---
 
 # DiscordChatExporter scrape ↔ Trask evidence cache
@@ -32,28 +32,52 @@ lastUpdated: 2026-06-04
 
 Periodic sync alternative: set `TRASK_DISCORD_SYNC_INTERVAL_MS` on trask-bot (`infra/trask-bot-stack/.env.production.example`, default 30 min).
 
-## Format bridge (read before enabling targets)
+## Format bridge
 
-[REPO] **Trask indexer** (`infra/trask-indexer/trask_indexer/discord_index.py`) indexes directories with:
+[REPO] **Trask indexer** (`infra/trask-indexer/trask_indexer/discord_index.py`) indexes either:
 
-- `manifest.json` + `containers/*.json` (layout produced by `scripts/export_discord_server.py`)
+| Layout | Producer | Detection |
+|--------|----------|-----------|
+| `manifest.json` + `containers/*.json` | `scripts/export_discord_server.py` | `manifest.json` + `containers/` at `output_dir` |
+| **DCE flat** `* [channel_id].json` | DCE `run-discord-scrape.sh` merge | Flat JSON at `output_dir` (skips `.dce-meta/`, `.dce-temp/`, `*.bak.*`) |
 
-[REPO] **DCE recurring scrape** writes **flat** per-channel JSON under each target `output_dir`, e.g.:
+[REPO] **DCE recurring scrape** writes flat per-channel JSON under each target `output_dir`, e.g.:
 
-- `KOTOR - Original Games - yes_general [221726893064454144].json`
+- `KOTOR - Yes General Chats - yes_general [221726893064454144].json`
 - `.dce-meta/`, `.dce-temp/` alongside archives
 
-[SYNTH] These layouts are **not interchangeable today**. Pointing `discord-export-targets.json` at a DCE-only folder without `manifest.json` yields `no DiscordChatExporter archive found` and **zero chunks indexed**.
+[SYNTH] **Precedence:** manifest layout wins when both exist at the same path. Mixed trees are unusual — prefer one layout per `output_dir`.
+
+### Post-scrape operator tree (KotOR yes_general pilot)
+
+```text
+DCE fork                          community-bots
+────────────────────────────────  ────────────────────────────────────
+run-kotor-preflight-ladder.sh     (after flat JSON updated on disk)
+run-kotor-yes-general-catchup.sh
+print-scrape-summary.sh           bash scripts/trask_discord_sync_after_scrape.sh
+                                  → expect chunks_indexed > 0, channels_indexed ≥ 1
+                                  bash scripts/trask_indexed_stack_health.sh --strict-stale
+                                  pnpm verify:trask-discord (when stack + token up)
+```
+
+[SYNTH] Sync reports **DEGRADED** when an enabled target indexes **0 chunks** (allowlist mismatch, empty export, or unreadable files). Do not treat sync exit 0 alone as success — read per-target `chunks_indexed` / `channels_indexed`.
+
+### Enablement checklist (flip `KotOR_discord_msgs` to `enabled: true`)
+
+1. DCE catch-up succeeded; flat file exists: `*[221726893064454144].json` under `output_dir`.
+2. `channel_ids` includes `221726893064454144` in `data/trask/discord-export-targets.json`.
+3. `bash scripts/trask_discord_sync_after_scrape.sh` preflight prints **OK → DCE flat JSON layout**.
+4. Pilot sync indexes **≥1 channel** and **>0 chunks**; `discord_sync_status.json` reflects target row.
+5. `GET /health` on indexer **8790** shows fresh `last_discord_sync`; run `pnpm trask:gate` after indexer code changes.
 
 ### Operator paths (pick one per guild corpus)
 
 | Goal | Path |
 |------|------|
-| **Personal append-only archive (all channels, cron)** | DCE fork only — not auto-indexed by Trask until an adapter lands |
-| **Trask RAG over Discord text** | Run `scripts/export_discord_server.py` into a directory with `manifest.json` + `containers/`, then set that path as `output_dir` in `data/trask/discord-export-targets.json` |
-| **Both** | Keep DCE `output_dir` for archives; maintain a **separate** bot-export tree under `data/trask-discord-export/<target>/` for Trask sync |
-
-[OPEN] Future: extend `discord_index.py` to ingest DCE flat `*[channel_id].json` files (same message schema as DCE merge output). Until then, do not assume scrape → sync works without format alignment.
+| **Personal append-only archive (all channels, cron)** | DCE fork — index via flat adapter after sync |
+| **Trask RAG over Discord text (bot export layout)** | `scripts/export_discord_server.py` → `manifest.json` + `containers/` |
+| **Both** | Same `output_dir` works when DCE flat files are present; manifest takes precedence if both exist |
 
 ## Config mapping
 
@@ -64,13 +88,13 @@ Link targets by **shared logical name** and **filesystem path intent** — two J
 | `name`, `output_dir`, `enabled`, `channel_ids` | `name`, `output_dir`, `enabled`, `channel_ids` (allowlist when non-empty) |
 | `container_memory`, scrape locks, salvage | N/A (indexer only reads JSON) |
 
-Example KotOR mapping (Trask side — enable only when `output_dir` has `manifest.json` + `containers/`):
+Example KotOR mapping (Trask side — enable after enablement checklist passes):
 
 ```json
 {
   "name": "KotOR_discord_msgs",
   "enabled": false,
-  "disabled_reason": "Enable after export_discord_server.py manifest layout exists at output_dir",
+  "disabled_reason": "Pilot: enable after DCE yes_general flat JSON exists and pilot sync indexes ≥1 channel — see bridge runbook enablement checklist",
   "output_dir": "/home/brunner56/Documents/KotOR_discord_msgs",
   "guild_ids": [],
   "channel_ids": ["221726893064454144"]
@@ -95,7 +119,7 @@ Channel **221726893064454144** (`yes_general`). Run from DCE repo root:
 
 Validate DCE automation: `DCE_MIN_FREE_MB=0 ./scripts/run-all-smokes.sh` (**28/28** offline gate).
 
-After a successful catch-up, run Trask sync **only if** the Trask target path uses the manifest layout (see Format bridge).
+After a successful catch-up, run Trask sync from community-bots (`bash scripts/trask_discord_sync_after_scrape.sh`). Flat DCE JSON at the mapped `output_dir` is indexed when the target is enabled.
 
 ## Trask sync commands (this repo)
 
@@ -120,7 +144,7 @@ Fallback when targets config missing: `trask_discord_sync.py` uses bot-token liv
 When asked to refresh Discord evidence for Trask:
 
 1. Confirm which repo the task touches (scrape vs index).
-2. Read Format bridge — do not enable Trask targets pointing at DCE-only flat JSON without an adapter.
+2. Read Format bridge — enabled targets at DCE flat paths require `*[channel_id].json` files; sync DEGRADED when 0 chunks indexed.
 3. After index sync, verify `GET /health` on indexer **8790** and run `pnpm trask:gate` / `pnpm verify:trask-discord` when changing ingestion code.
 4. Cite [trask-indexed-stack-runbook.md](trask-indexed-stack-runbook.md) for stack restart rules after indexer changes.
 

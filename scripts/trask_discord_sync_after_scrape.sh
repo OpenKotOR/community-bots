@@ -19,6 +19,19 @@ has_trask_export_layout() {
   [[ -f "$dir/manifest.json" && -d "$dir/containers" ]]
 }
 
+has_dce_flat_layout() {
+  local dir=$1
+  [[ -d "$dir" ]] || return 1
+  local f
+  for f in "$dir"/*.json; do
+    [[ -e "$f" ]] || continue
+    [[ "$f" == *".bak."* ]] && continue
+    [[ "$(basename "$f")" == .* ]] && continue
+    [[ "$f" =~ \[[0-9]+\]\.json$ ]] && return 0
+  done
+  return 1
+}
+
 preflight_targets() {
   command -v jq >/dev/null 2>&1 || {
     printf 'WARN: jq not found; skipping export layout preflight\n' >&2
@@ -36,8 +49,10 @@ preflight_targets() {
     [[ -n "$output_dir" && "$output_dir" != "null" ]] || continue
     if has_trask_export_layout "$output_dir"; then
       printf 'OK: %s → manifest layout at %s\n' "$name" "$output_dir"
+    elif has_dce_flat_layout "$output_dir"; then
+      printf 'OK: %s → DCE flat JSON layout at %s\n' "$name" "$output_dir"
     else
-      printf 'WARN: %s enabled but %s lacks manifest.json + containers/ (DCE flat JSON is not indexed yet)\n' \
+      printf 'WARN: %s enabled but %s lacks manifest.json + containers/ and no DCE flat *[channel_id].json files\n' \
         "$name" "$output_dir" >&2
       warnings=$((warnings + 1))
     fi

@@ -6,7 +6,7 @@
     {
       "name": "KotOR_discord_msgs",
       "enabled": false,
-      "disabled_reason": "Trask indexer requires manifest.json + containers/ at output_dir. DCE recurring scrape uses flat *[channel_id].json — run export_discord_server.py into this tree or a separate data/trask-discord-export/ path before enabling. See docs/knowledgebase/50-execution/discordchat-exporter-trask-bridge-runbook.md",
+      "disabled_reason": "Pilot: enable after DCE yes_general flat JSON exists and pilot sync indexes ≥1 channel — see docs/knowledgebase/50-execution/discordchat-exporter-trask-bridge-runbook.md enablement checklist",
       "output_dir": "/home/brunner56/Documents/KotOR_discord_msgs",
       "guild_ids": [],
       "channel_ids": ["221726893064454144"]
@@ -14,7 +14,7 @@
     {
       "name": "openkotor_discord_msgs",
       "enabled": false,
-      "disabled_reason": "Enable after manifest.json + containers/ exist at output_dir (see discordchat-exporter-trask-bridge-runbook.md)",
+      "disabled_reason": "Enable after export layout exists at output_dir (manifest+containers or DCE flat *[channel_id].json — see discordchat-exporter-trask-bridge-runbook.md)",
       "output_dir": "/home/brunner56/Documents/openkotor_discord_msgs",
       "guild_ids": [],
       "channel_ids": []
@@ -22,7 +22,7 @@
     {
       "name": "holocron_toolset_discord",
       "enabled": false,
-      "disabled_reason": "Enable after manifest.json + containers/ exist at output_dir (see discordchat-exporter-trask-bridge-runbook.md)",
+      "disabled_reason": "Enable after export layout exists at output_dir (manifest+containers or DCE flat *[channel_id].json — see discordchat-exporter-trask-bridge-runbook.md)",
       "output_dir": "/home/brunner56/Documents/holocron_toolset_discord",
       "guild_ids": [],
       "channel_ids": []
@@ -30,7 +30,7 @@
     {
       "name": "expanded_kotor_discord",
       "enabled": false,
-      "disabled_reason": "Enable after manifest.json + containers/ exist at output_dir (see discordchat-exporter-trask-bridge-runbook.md)",
+      "disabled_reason": "Enable after export layout exists at output_dir (manifest+containers or DCE flat *[channel_id].json — see discordchat-exporter-trask-bridge-runbook.md)",
       "output_dir": "/home/brunner56/Documents/expanded_kotor_discord",
       "guild_ids": [],
       "channel_ids": []
@@ -38,7 +38,7 @@
     {
       "name": "eod_discord",
       "enabled": false,
-      "disabled_reason": "Enable after manifest.json + containers/ exist at output_dir (see discordchat-exporter-trask-bridge-runbook.md)",
+      "disabled_reason": "Enable after export layout exists at output_dir (manifest+containers or DCE flat *[channel_id].json — see discordchat-exporter-trask-bridge-runbook.md)",
       "output_dir": "/home/brunner56/Documents/eod_discord",
       "guild_ids": [],
       "channel_ids": []
@@ -46,7 +46,7 @@
     {
       "name": "KotOR_Speedrun_Discord",
       "enabled": false,
-      "disabled_reason": "Enable after manifest.json + containers/ exist at output_dir (see discordchat-exporter-trask-bridge-runbook.md)",
+      "disabled_reason": "Enable after export layout exists at output_dir (manifest+containers or DCE flat *[channel_id].json — see discordchat-exporter-trask-bridge-runbook.md)",
       "output_dir": "/home/brunner56/Documents/KotOR_Speedrun_Discord",
       "guild_ids": [],
       "channel_ids": []
@@ -54,7 +54,7 @@
     {
       "name": "DS_Discord_msgs",
       "enabled": false,
-      "disabled_reason": "Enable after manifest.json + containers/ exist at output_dir (see discordchat-exporter-trask-bridge-runbook.md)",
+      "disabled_reason": "Enable after export layout exists at output_dir (manifest+containers or DCE flat *[channel_id].json — see discordchat-exporter-trask-bridge-runbook.md)",
       "output_dir": "/home/brunner56/Documents/DS_Discord_msgs",
       "guild_ids": [],
       "channel_ids": []
@@ -62,7 +62,7 @@
     {
       "name": "ror_orig_discord",
       "enabled": false,
-      "disabled_reason": "Enable after manifest.json + containers/ exist at output_dir (see discordchat-exporter-trask-bridge-runbook.md)",
+      "disabled_reason": "Enable after export layout exists at output_dir (manifest+containers or DCE flat *[channel_id].json — see discordchat-exporter-trask-bridge-runbook.md)",
       "output_dir": "/home/brunner56/Documents/ror_orig_discord",
       "guild_ids": [],
       "channel_ids": []
@@ -70,7 +70,7 @@
     {
       "name": "ror_new_discord",
       "enabled": false,
-      "disabled_reason": "Enable after manifest.json + containers/ exist at output_dir (see discordchat-exporter-trask-bridge-runbook.md)",
+      "disabled_reason": "Enable after export layout exists at output_dir (manifest+containers or DCE flat *[channel_id].json — see discordchat-exporter-trask-bridge-runbook.md)",
       "output_dir": "/home/brunner56/Documents/ror_new_discord",
       "guild_ids": [],
       "channel_ids": []

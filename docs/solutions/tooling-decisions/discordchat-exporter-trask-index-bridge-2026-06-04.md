@@ -28,7 +28,7 @@ A second issue: **on-disk JSON layouts differ**. DCE recurring scrape writes fla
 | Artifact | Purpose |
 |----------|---------|
 | `docs/knowledgebase/50-execution/discordchat-exporter-trask-bridge-runbook.md` | Operator + agent runbook (workflow, format bridge, config mapping, KotOR ladder) |
-| `data/trask/discord-export-targets.json` | Trask index targets aligned by name/`output_dir` with DCE scrape config (disabled until manifest layout) |
+| `data/trask/discord-export-targets.json` | Trask index targets aligned by name/`output_dir` with DCE scrape config (disabled until pilot enablement checklist) |
 | `scripts/trask_discord_sync_after_scrape.sh` | Post-scrape sync entry with layout preflight |
 | `AGENTS.md` Learned Workspace Facts | One-line pointer so every agent session sees the bridge |
 
@@ -41,17 +41,16 @@ A second issue: **on-disk JSON layouts differ**. DCE recurring scrape writes fla
 
 Shared paths typically under `~/Documents/<target>/` per maintainer config.
 
-## Format bridge (current)
+## Format bridge (2026-06-13)
 
 | Layout | Producer | Trask indexer |
 |--------|----------|---------------|
-| `manifest.json` + `containers/*.json` | `scripts/export_discord_server.py` | Supported |
-| Flat `Guild - … [channel_id].json` | DCE `run-discord-scrape.sh` merge | **Not supported yet** |
+| `manifest.json` + `containers/*.json` | `scripts/export_discord_server.py` | Supported (preferred when both exist) |
+| Flat `Guild - … [channel_id].json` | DCE `run-discord-scrape.sh` merge | **Supported** (`discord_index.py` flat adapter) |
 
-Until flat-json ingestion exists, operators either:
+Indexer skips `.dce-meta/`, `.dce-temp/`, and `*.bak.*` siblings. Enabled targets that index **0 chunks** surface `degraded_reason` in sync output — do not treat sync exit 0 as success without reading per-target counts.
 
-1. Run bot export into a Trask-dedicated tree, or
-2. Use DCE archives for backup only and accept Trask uses live/bot export path
+**KotOR pilot:** `KotOR_discord_msgs` + channel `221726893064454144` — enable only after enablement checklist in bridge runbook; pilot sync not yet validated on maintainer disk in this pass.
 
 ## Verification
 
@@ -60,15 +59,16 @@ Until flat-json ingestion exists, operators either:
 DCE_MIN_FREE_MB=0 ./scripts/run-all-smokes.sh
 
 # community-bots
-python scripts/trask_discord_sync.py
+pytest infra/trask-indexer/tests/test_discord_index_targets.py
+bash scripts/trask_discord_sync_after_scrape.sh
 bash scripts/trask_indexed_stack_health.sh --strict-stale
 pnpm trask:gate
 ```
 
 ## Deferred
 
-- `discord_index.py` adapter for DCE flat channel JSON
 - Auto-sync hook from DCE cron into `trask_discord_sync.py`
+- `--strict` exit code when all enabled targets are degraded/skipped
 - Upstream Tyrrrz PR (private fork; local smokes are gate)
 
 ## References

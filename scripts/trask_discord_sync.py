@@ -110,13 +110,25 @@ def main() -> int:
                     "enabled": result.enabled,
                     "skipped_reason": result.skipped_reason,
                     "chunks_indexed": result.chunks_indexed,
+                    "channels_indexed": result.channels_indexed,
+                    "degraded_reason": result.degraded_reason,
                     "export_dir": result.export_dir,
                 }
             )
             if result.skipped_reason:
                 print(f"Target {result.target}: skipped ({result.skipped_reason})", flush=True)
+            elif result.degraded_reason:
+                print(
+                    f"Target {result.target}: indexed {result.chunks_indexed} chunks "
+                    f"({result.channels_indexed} channels) — DEGRADED: {result.degraded_reason}",
+                    flush=True,
+                )
             else:
-                print(f"Target {result.target}: indexed {result.chunks_indexed} chunks", flush=True)
+                print(
+                    f"Target {result.target}: indexed {result.chunks_indexed} chunks "
+                    f"({result.channels_indexed} channels)",
+                    flush=True,
+                )
             total_chunks += result.chunks_indexed
 
         print(

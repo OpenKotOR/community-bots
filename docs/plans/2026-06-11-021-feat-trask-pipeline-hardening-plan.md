@@ -143,6 +143,12 @@ Traceability: R-LAT/R-VER/R-LIVE align with origin REQ-C, R13, and R16.
 
 **Out of scope:** Replacing Chroma/Crawl4AI; OpenRouter-as-primary policy; full ModSync React component library port.
 
+### Delta Update (2026-06-13, DCE flat adapter)
+
+- **Landed:** `discord_index.py` ingests DCE flat `* [channel_id].json` (manifest layout still preferred when both exist); per-target `channels_indexed` + `degraded_reason` when enabled target indexes 0 chunks; sync/preflight scripts recognize flat layout; bridge runbook post-scrape tree + KotOR enablement checklist; `AGENTS.md` + `STRATEGY.md` two-repo track; pytest coverage for flat layout and degraded targets.
+- **Partial:** KotOR_discord_msgs target still `enabled: false` (pilot sync against live `~/Documents/KotOR_discord_msgs` not run this pass); U5 live Holocron e2e + Discord verify; sync exit code on all-degraded targets still deferred (P2).
+- **Next:** Enable KotOR pilot target after manual sync proves chunks > 0; run `bash scripts/trask_live_stack.sh` + `pnpm verify:trask-discord`; optional `--strict` on `trask_discord_sync_after_scrape.sh` to fail on degraded targets.
+
 ### Delta Update (2026-06-13)
 
 - **Landed:** ModSync design showcase page at `apps/hk86-web/design.html` (themes triptych, typography, semantic swatches, hub components, spacing scale); hub ↔ design cross-links; `@openkotor/modsync-tokens/css/showcase.css`; hk86 Playwright covers design page + TSL theme toggle; prior U6 hub restyle + trask pipeline hardening diff retained on branch.
