@@ -73,7 +73,7 @@ function dedupeBases(values: string[]): string[] {
   const ordered: string[] = []
   for (const base of values) {
     const key = base.trim()
-    if (!key || seen.has(key)) continue
+    if (seen.has(key)) continue
     seen.add(key)
     ordered.push(key)
   }
@@ -111,11 +111,10 @@ function resolveTraskApiBases(): string[] {
   }
 
   if (fallback && !resolved.includes(fallback)) {
+    if (typeof window !== 'undefined' && isLocalhostBase(window.location.origin) && window.location.port !== '4010') {
+      resolved.push('')
+    }
     resolved.push(fallback)
-  }
-
-  if (typeof window !== 'undefined' && isLocalhostBase(window.location.origin) && window.location.port !== '4010') {
-    resolved.push('')
   }
 
   return dedupeBases(resolved)

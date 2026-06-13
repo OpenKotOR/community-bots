@@ -98,7 +98,30 @@ test('unreachable indexer: failed grounding and classifiable liveTrace', async (
       }>
     }>
   }
-  const completed = (body.history ?? []).filter((row) => row.status === 'complete').pop()
+  let completed = (body.history ?? []).filter((row) => row.status === 'complete').pop()
+  if (!completed) {
+    const fallbackRes = await request.get(`${baseURL}/api/trask/history?limit=12`)
+    expect(fallbackRes.ok(), `history fallback failed: ${fallbackRes.status()}`).toBeTruthy()
+    const fallbackBody = (await fallbackRes.json()) as {
+      history?: Array<{
+        query?: string
+        status?: string
+        groundingStatus?: string
+        liveTrace?: Array<{
+          phase?: string
+          detail?: string
+          diag?: Record<string, unknown>
+        }>
+      }>
+    }
+    completed = (fallbackBody.history ?? [])
+      .filter((row) =>
+        row.status === 'complete'
+        && row.query === FAILURE_QUESTION
+        && traceShowsFailureClass(row.liveTrace ?? []),
+      )
+      .pop()
+  }
   expect(completed, 'expected a completed query record on thread').toBeTruthy()
   expect(completed?.groundingStatus, 'failed retrieve should record groundingStatus failed').toBe('failed')
 

@@ -1972,11 +1972,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
           urls: grounded.approvedSources.map((s) => s.homeUrl).filter((u) => u.startsWith("https://")),
         });
       } else if (isIndexMissPayload(payload)) {
-        const webSources = filterPublicWebCitationSources(retrievedSources);
-        answer =
-          webSources.length > 0
-            ? sourceOnlyFallbackAnswer(query, webSources)
-            : degradedAnswerFallback(query, approvedSources);
+        answer = degradedAnswerFallback(query, approvedSources);
       } else if (retrievedSources.length === 0) {
         answer = degradedAnswerFallback(query, approvedSources);
       } else if (isSynthesisFailureReport(enrichedReport, payload)) {
@@ -2039,7 +2035,8 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
         : alignCitedSourcesToAnswer(answer, candidatePool);
 
       if (
-        (
+        !isIndexMissPayload(payload)
+        && (
           !answerHasSubstantiveBody(answer)
           || (
             citedSources.length < MIN_HOLOCRON_WEB_CITATIONS
@@ -2153,11 +2150,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
       if (grounded) {
         answer = grounded.answer;
       } else if (isIndexMissPayload(payload)) {
-        const webSources = filterPublicWebCitationSources(retrievedSources);
-        answer =
-          webSources.length > 0
-            ? sourceOnlyFallbackAnswer(query, webSources)
-            : degradedAnswerFallback(query, approvedSources);
+        answer = degradedAnswerFallback(query, approvedSources);
       } else if ((payload.passages?.length ?? 0) > 0) {
         const passages = await filterReachableByUrl(
           rankPassagesForQuery(
@@ -2246,7 +2239,7 @@ export class ResearchWizardClient implements ResearchWizardQueryHandler {
         ? grounded.approvedSources
         : alignCitedSourcesToAnswer(answer, candidatePool);
 
-      if (!answerHasSubstantiveBody(answer) || citedSources.length === 0) {
+      if (!isIndexMissPayload(payload) && (!answerHasSubstantiveBody(answer) || citedSources.length === 0)) {
         const ranked = filterCitationSourcesForSurface(
           fallbackSourcesAlignedToQuery(
             query,
