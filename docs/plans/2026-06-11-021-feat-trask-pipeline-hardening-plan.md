@@ -143,6 +143,12 @@ Traceability: R-LAT/R-VER/R-LIVE align with origin REQ-C, R13, and R16.
 
 **Out of scope:** Replacing Chroma/Crawl4AI; OpenRouter-as-primary policy; full ModSync React component library port.
 
+### Delta Update (2026-06-13)
+
+- **Landed:** ModSync design showcase page at `apps/hk86-web/design.html` (themes triptych, typography, semantic swatches, hub components, spacing scale); hub ↔ design cross-links; `@openkotor/modsync-tokens/css/showcase.css`; hk86 Playwright covers design page + TSL theme toggle; prior U6 hub restyle + trask pipeline hardening diff retained on branch.
+- **Partial:** U2 incremental Discord indexing; U5 full live Holocron e2e + Discord verify (stack restart deferred to post-merge CI/local); dependabot PR #101 open.
+- **Next:** Commit + push → open PR `feat/discord-hub-modsync-design-trask-invite`; CI watch; merge dependabot #101 if green; post-merge run `bash scripts/trask_live_stack.sh` + `pnpm holocron:e2e`; configure Worker invite secrets (`TRASK_DISCORD_APP_ID`, `TRASK_INVITE_ALLOWED_GUILD_IDS`).
+
 ### Delta Update (2026-06-12)
 
 - **Landed:** `@openkotor/modsync-tokens` package (colors/typography/spacing + hub-shell); hk86-web + pazaak/cardworld DiscordBotsHub restyled with K1/TSL/Light theme switcher; Trask brokered invite via Worker `/api/trask/invite`; trask pipeline hardening diff (budget threading, grounded evidence, worker invite policy); `pnpm trask:gate:ci` composite 215; hk86 Playwright smoke pass; agent-browser hub verification.
