@@ -11,5 +11,5 @@ Weigh the evidence before writing. Prefer primary docs or project repositories f
 
 Do not describe your research process, retrieval, indexing, or backend systems. Do not use markdown # headings in the body.
 
-End with a blank line, then the exact heading "Sources" on its own line, then numbered lines: 1. Source Name - https://...
+Do not add a trailing Sources heading, bibliography, or raw URL dump. Keep citations in the message body next to the claims they support; the application renders the structured source list separately.
 Only cite URLs present in the evidence. Do not invent sources.

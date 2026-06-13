@@ -29,7 +29,6 @@ import {
 import { splitResearchAnswer, syncSourcesSectionToApproved } from "./research-answer-split.js";
 import {
   enhanceWebCitationUrl,
-  webCitationDisplayLabel,
 } from "./github-citation-url.js";
 
 const MIN_WEB_CITATIONS = loadTraskPolicy().minWebCitations;
@@ -551,12 +550,6 @@ export const composeGroundedAnswerFromClaims = (
     return out.trim();
   };
 
-  const stripTrailingSlashes = (url: string): string => {
-    let end = url.length;
-    while (end > 0 && url[end - 1] === "/") end -= 1;
-    return url.slice(0, end);
-  };
-
   const stripMarkdownArtifacts = (value: string): string => {
     const capped = value.length > 8000 ? value.slice(0, 8000) : value;
     return capped
@@ -656,33 +649,7 @@ export const composeGroundedAnswerFromClaims = (
       ? [...claimLines, caveat].filter(Boolean).join("\n").trim()
       : [...claimLines, caveat].filter(Boolean).join("\n\n").trim();
 
-  const normalize = (url: string): string => stripTrailingSlashes(url.trim());
-  const sourceLabelForClaim = (claim: EvidenceClaim): string => {
-    const citationUrl = publicCitationUrlForClaim(claim);
-    const match = sources.find(
-      (source) =>
-        normalize(source.homeUrl) === normalize(citationUrl)
-        || normalize(source.homeUrl) === normalize(claim.url),
-    );
-    const catalogName = match?.name?.trim();
-    if (catalogName && !/^github\.com$/iu.test(catalogName) && catalogName !== hostFromUrl(citationUrl)) {
-      return webCitationDisplayLabel(citationUrl, catalogName);
-    }
-    return webCitationDisplayLabel(citationUrl, catalogName || hostFromUrl(citationUrl));
-  };
-
-  const seenSourceIndices = new Set<number>();
-  const sourceLines: string[] = [];
-  for (const claim of composeClaims) {
-    if (seenSourceIndices.has(claim.sourceIndex)) continue;
-    seenSourceIndices.add(claim.sourceIndex);
-    const citationUrl = publicCitationUrlForClaim(claim);
-    sourceLines.push(`${claim.sourceIndex}. ${sourceLabelForClaim(claim)} - ${citationUrl}`);
-  }
-
-  const sourcesSection = ["Sources", ...sourceLines].join("\n");
-
-  return `${body}\n\n${sourcesSection}`;
+  return body;
 };
 
 export const composeGroundedAnswerWithLlm = async (
@@ -755,8 +722,9 @@ export const composeGroundedAnswerWithLlm = async (
   );
 
   const bibliography = citedSources.length > 0 ? citedSources : sources.slice(0, Math.min(sources.length, indexed.length));
+  const synced = syncSourcesSectionToApproved(text, bibliography);
 
-  return syncSourcesSectionToApproved(text, bibliography);
+  return splitResearchAnswer(synced).body.trim();
 };
 
 export const rankPassagesForQuery = (

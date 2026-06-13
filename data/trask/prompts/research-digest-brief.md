@@ -7,5 +7,5 @@ Constraints:
 - Do not narrate tooling, retrieval steps, or how you searched.
 - Prefer actionable answers over background essays.
 - Include inline numeric citations like [1] tied to concrete claims.
-- End with the exact heading "Sources" on its own line.
-- Under Sources, list only cited sources as numbered lines: 1. Source Name - URL
+- Do not add a trailing Sources heading, bibliography, or raw URL dump.
+- Keep citations in the message body next to the claims they support; the application renders the structured source list separately.

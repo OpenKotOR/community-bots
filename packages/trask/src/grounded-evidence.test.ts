@@ -134,7 +134,7 @@ test("extractClaimsHeuristic strips source headings from TSLPatcher brief eviden
   assert.equal(collectCitationIndicesFromAnswer(fallbackAnswer).length, 2);
 });
 
-test("composeGroundedAnswerFromClaims emits Sources for cited indices", () => {
+test("composeGroundedAnswerFromClaims emits inline citations without a Sources footer", () => {
   const claims = [
     {
       claim: "TSLPatcher edits 2DA files",
@@ -156,10 +156,10 @@ test("composeGroundedAnswerFromClaims emits Sources for cited indices", () => {
   const answer = composeGroundedAnswerFromClaims("What is TSLPatcher?", claims, sources);
   assert.match(answer, /\[1\]/);
   assert.match(answer, /\[2\]/);
-  assert.match(answer, /\nSources\n/);
+  assert.doesNotMatch(answer, /^\s*Sources\b/im);
 });
 
-test("composeGroundedAnswerFromClaims Sources use passage citation URLs not catalog roots", () => {
+test("composeGroundedAnswerFromClaims inline citations align to passage citation URLs", () => {
   const deepA = "https://deadlystream.com/files/file/1982-tslpatcher/";
   const deepB = "https://github.com/th3w1zard1/TSLPatcher";
   const catalog = [
@@ -185,8 +185,12 @@ test("composeGroundedAnswerFromClaims Sources use passage citation URLs not cata
     },
   ];
   const answer = composeGroundedAnswerFromClaims("What is TSLPatcher?", claims, catalog);
-  assert.match(answer, new RegExp(deepA.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  assert.match(answer, new RegExp(deepB.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  const aligned = collectCitedSourcesFromAnswer(answer, [
+    { ...sources[0]!, homeUrl: deepA },
+    { ...sources[1]!, homeUrl: deepB },
+  ], _collectCitedSourcesFromText);
+  assert.deepEqual(aligned.map((source) => source.homeUrl), [deepA, deepB]);
+  assert.doesNotMatch(answer, /^\s*Sources\b/im);
 });
 
 test("composeGroundedAnswerFromClaims brief profile emits explanatory citation lines with source weighting", () => {
